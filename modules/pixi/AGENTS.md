@@ -88,8 +88,19 @@ rules that come out of it:
   Code that looks a feature up right after data arrives should wait for `gfx.pending` to be
   `false`, or handle it not being there.
 - **Go easy on the OSM API when measuring.** `bun run measure --fresh` and every reload of the
-  debug Chrome ask it for 20 to 36 map tiles. After about forty in a day it answers 429, and the
-  map stays empty. To make features again without the network, use `layer.reset()`.
+  debug Chrome ask it for 20 to 36 map tiles. After enough of them it answers 429 (five loads of
+  Užice in an hour and a half did it), and the map stays empty until the time it gives is up. To
+  make features again without the network, use `layer.reset()`. To load a place again and again,
+  record it once: `--tape places.tape.json` on `bun run measure` and `bun run compare`
+  (`scripts/tape.ts`).
+- **A redraw request without a layer is a pass in every layer.** In a dense place that's 200 ms
+  of the OSM layer walking everything it has, to find the little that changed. Don't make one
+  for each item of something that arrives in hundreds (each icon, each tile of another layer):
+  name the layer, or go on with waiting work (below).
+- **When a texture arrives, call `scene.texturesLoaded()`, not `deferredRedraw()`.** A feature
+  drawn without its icon stays dirty (`PixiFeaturePoint.updateStyle`), and a layer that draws
+  with `updateFeature()` remembers it. `texturesLoaded()` has those drawn again over the next
+  frames, and asks for a frame (`gfx.resumeWaiting()`), not for a pass.
 - **A layer's `render()` can run 60 times a second.** While the view moves, a frame is drawn on
   every tick. Whatever a layer does before `keepFeatures()`, and everything in a layer that doesn't
   call it, is paid on each one. The same goes for listeners to `gfx`'s `draw` event: throttle them

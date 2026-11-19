@@ -617,8 +617,11 @@ what the developer is seeing when they report a problem.
    `design/graphics-system.md`). It moves the developer's map.
 5. To compare with another build, an older Rapid or iD, `bun run compare <label> <url> <place>` pans
    and zooms any of them with real input events, in a new tab, and reports how the page kept up.
-   Both scripts load places from the OSM API, which answers 429 after too many: name the places
-   you need, and don't run them in a loop.
+   Both scripts load places from the OSM API, which answers 429 after too many (for everyone at
+   your address, for a while): name the places you need, and don't run them in a loop.
+   **Use a tape for anything you'll measure more than once:** `--tape places.tape.json` on either
+   script keeps the API's answers in that file the first time, and answers from it after that
+   (`scripts/tape.ts`). `*.tape.json` is gitignored: tapes are large and hold OSM data.
 
 Tips:
 - **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`

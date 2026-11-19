@@ -57,7 +57,7 @@ Still to do, in about this order:
   features are drawn again over several frames when one frame has no time for them
   (`updateFeature()`, `continueWaiting()`); labels wait for them. A zoom's frame went from 147 +
   30 ms to 17 + 10 in Seattle, and from 334 + 47 to 64 + 18 at Staten Island.
-  **Baselines** (Nov 19; not committed yet): `bun run compare` measures any editor from outside,
+  **Baselines** (Nov 19): `bun run compare` measures any editor from outside,
   and `graphics-system.md` section 11 has this branch against `main`, Rapid 2.5.7 and iD 2.42 at
   Seattle, Staten Island and Užice. A pinch at Staten Island: 50 frames a second on the branch,
   18 on `main`, 8 in iD. Nine of the twelve places aren't measured (the OSM API's rate limit).
@@ -68,14 +68,22 @@ Still to do, in about this order:
   **Making features waits too** (Nov 19): `PixiLayerOsm._waitToMake()`, and
   the budget is bigger (24 ms) when the view is still and the scheduler idle. The longest frame of
   a load at Staten Island went from 753 ms to about 145.
-  **To pick up:** Užice's restyle takes 64 frames and 2.1 s since features' DRAW cost counts
-  against the budget (it was 12 frames and 1.0 s), and the rule meant to let the budget grow there
-  isn't doing it. Not looked into: the OSM API was answering 429 after about forty reloads of
-  dense places in a day. **Go easy on `--fresh` and reloads**, and don't measure Užice more than
-  once or twice in a session.
+  **Užice's budget** (Nov 19; not committed yet, section 10 "What a frame costs when little is
+  done in it"): everything is drawn 15 s after the page opens there, where it was 24 (`main`:
+  10). The extra time was 27 passes that made nothing (each icon's texture asked for a redraw of
+  everything; now `scene.texturesLoaded()`), a budget that never grew (it waited for an idle
+  scheduler, whose queues the frames' own `draw` listeners kept full; now it goes by the view,
+  and `SchedulerSystem` gives normal tasks 4 ms of every tick), and bookkeeping that grew with
+  the waiting work. Moving the view measures the same as before. What's left is in `backlog.md`:
+  first the points and lines render groups, which cost 38 to 85 ms of DRAW on every frame that
+  touches them in Užice.
+  **Measure dense places from a tape** (`--tape file.tape.json` on `bun run measure` and
+  `bun run compare`, `scripts/tape.ts`): the OSM API answered 429 again after five loads of Užice
+  in an hour and a half. A tape of Užice (119 MB, not in the repo) has to be recorded once on each
+  machine.
   **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
-  Next (section 10, "What it doesn't do yet"): a frame between passes during a zoom, the pass's
-  own cost at dense places, and the other layers.
+  Next (section 10, "What it doesn't do yet"): smaller render groups for points and lines, a
+  frame between passes during a zoom, the pass's own cost at dense places, and the other layers.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

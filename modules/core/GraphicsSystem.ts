@@ -38,9 +38,12 @@ const APP_BUDGET_MS = 6;
 const MAX_APP_BUDGET_MS = 50;
 
 /**
- * The budget when nothing else wants the time: the view has been still for `STILL_AFTER_MS`, and
- * the scheduler has no tasks waiting. Then catching up sooner matters more than 60 frames a
- * second, and the frames come at about 30 until it's done.
+ * The budget when the view has been still for `STILL_AFTER_MS`. Then catching up sooner matters
+ * more than 60 frames a second, and the frames come at about 30 until it's done.
+ * (It used to need an idle scheduler too. But the UI's listeners to `draw` queue tasks on every
+ * frame, and where frames are long those never ran, so the scheduler was never idle while the
+ * map caught up: in Užice the budget stayed at 6 to 13 ms. The scheduler now gives normal
+ * tasks a share of every tick, so the frame doesn't have to make room for them.)
  */
 const STILL_BUDGET_MS = 24;
 const STILL_AFTER_MS = 150;
@@ -678,6 +681,17 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
+   * Asks for a frame in which the layers go on with work they put off, without saying that
+   * anything changed. No layer has to do its pass for it, and it doesn't wait for a turn.
+   * For when something that the waiting work needed has arrived (see `PixiScene.texturesLoaded`).
+   */
+  public resumeWaiting(): void {
+    this._unfinished = true;
+    this._appPending = true;
+  }
+
+
+  /**
    * Remembers what a redraw was requested for, for the next frame.
    * @param layerID - The one layer whose content changed, or nothing for the whole scene
    */
@@ -884,7 +898,6 @@ export class GraphicsSystem extends AbstractSystem {
     if (!this._started || this._paused) return;
 
     const context = this.context;
-    const scheduler = context.systems.scheduler!;
 
     // If the user is currently resizing, skip rendering until the size has settled
     if (context.container().classed('resizing')) return;
@@ -922,12 +935,14 @@ export class GraphicsSystem extends AbstractSystem {
     frame.viewBox = mapViewport.visibleWorldExtent();
 
     // How long may this frame spend on work that can wait?
-    // Little while the view is moving or background work is waiting, more when nothing else wants the time.
+    // Little while the view is moving, more once it's still.
+    // (Not by what the scheduler has waiting: the frames' own `draw` listeners keep its queues
+    // full, and it gives its tasks a share of every tick itself.)
     const tDrawn = this._prevTransform;
     if (tDrawn.x !== mapTransform.x || tDrawn.y !== mapTransform.y || tDrawn.z !== mapTransform.z || tDrawn.r !== mapTransform.r) {
       this._viewMovedTime = frame.time;
     }
-    const isStill = (frame.time - this._viewMovedTime > STILL_AFTER_MS) && !scheduler.numPending;
+    const isStill = (frame.time - this._viewMovedTime > STILL_AFTER_MS);
     // ..and at least half of what a frame costs here anyway. (The cheaper of the last two frames:
     // one slow frame on its own, like a pass or the first DRAW of a session, doesn't count.)
     const recentMs = Math.min(this._renderFrames.at(-1)?.cpuMs ?? 0, this._renderFrames.at(-2)?.cpuMs ?? 0);

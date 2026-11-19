@@ -21,6 +21,12 @@ const KEEP_UNSEEN_PASSES = 20;
 const MIN_WAITING_PER_FRAME = 32;
 
 /**
+ * While the view moves, the work waiting outside it is looked at this often (ms), for what has
+ * come into view (see `_sortWaiting`). Not on every frame: it's a walk over everything waiting.
+ */
+const SORT_WAITING_MS = 100;
+
+/**
  * What drawing a feature costs later, in the frame's DRAW pass, in milliseconds. Pixi builds a
  * shape's geometry when it first renders it, so a feature that's new or has changed costs more
  * there than one drawn again after a zoom. Measured Nov 2026 on an M4 at Staten Island: a
@@ -88,6 +94,14 @@ export class AbstractPixiLayer {
   protected _waitingInView: Set<AbstractPixiFeature>;
   /** Dirty features outside the view (in the cull box's padding), drawn again when a frame has time to spare */
   protected _waitingOutside: Set<AbstractPixiFeature>;
+  /** Features that were drawn and are still dirty: a texture of theirs hasn't loaded (see `texturesLoaded`) */
+  protected _waitingForTexture: Set<AbstractPixiFeature>;
+  /** The view (`frame.viewBox`) that the waiting work was last sorted by, into in view and outside */
+  protected _sortedBox: Extent | null;
+  /** When the waiting work was last sorted again (`frame.time`, see `_sortWaiting`) */
+  protected _sortedTime: number;
+  /** How many of the layer's features are visible (kept by `AbstractPixiFeature`, see `numVisible`) */
+  protected _numVisible: number;
   /**
    * Whether the layer is making features after its pass has ended (in a later frame, or after
    * `cull()`), for data that the pass put off. `retainFeature()` then counts them as seen by that pass.
@@ -128,6 +142,10 @@ export class AbstractPixiLayer {
     this._keptFrame = -1;
     this._waitingInView = new Set<AbstractPixiFeature>();
     this._waitingOutside = new Set<AbstractPixiFeature>();
+    this._waitingForTexture = new Set<AbstractPixiFeature>();
+    this._sortedBox = null;
+    this._sortedTime = -Infinity;
+    this._numVisible = 0;
     this._catchingUp = false;
 
     // Feature <-> Data
@@ -227,6 +245,9 @@ export class AbstractPixiLayer {
     this.retained.clear();
     this._waitingInView.clear();
     this._waitingOutside.clear();
+    this._waitingForTexture.clear();
+    this._sortedBox = null;
+    this._numVisible = 0;
     this._currentBox = null;
 
     for (const spatialID of this._spatialIDs) {
@@ -298,6 +319,7 @@ export class AbstractPixiLayer {
     }
     this._currentBox = frame.cullBox;
     this._passFrame = frame.id;
+    this._sortedBox = frame.viewBox;   // a pass sorts whatever it puts off by this frame's view
     return false;
   }
 
@@ -383,6 +405,9 @@ export class AbstractPixiLayer {
   public addFeature(feature: AbstractPixiFeature): void {
     this.features.set(feature.id, feature);
     this.work.created++;
+    if (feature.visible) {
+      this._numVisible++;
+    }
   }
 
 
@@ -393,10 +418,38 @@ export class AbstractPixiLayer {
   public removeFeature(feature: AbstractPixiFeature): void {
     this.unbindData(feature.id);
     this.retained.delete(feature.id);
-    this.features.delete(feature.id);
+    if (this.features.delete(feature.id) && feature.visible) {
+      this._numVisible--;
+    }
     this._waitingInView.delete(feature);
     this._waitingOutside.delete(feature);
+    this._waitingForTexture.delete(feature);
     this.work.destroyed++;
+  }
+
+
+  /**
+   * Counts a feature of this layer being shown or hidden. `AbstractPixiFeature` calls this when
+   * its `visible` changes, so the layer knows how many are visible without walking them all.
+   * @param visible - Whether the feature is visible now
+   */
+  public visibilityChanged(visible: boolean): void {
+    if (visible) {
+      this._numVisible++;
+      this.work.shown++;
+    } else {
+      this._numVisible--;
+      this.work.hidden++;
+    }
+  }
+
+
+  /**
+   * How many of the layer's features are visible (not culled).
+   * @return The number of visible features
+   */
+  public get numVisible(): number {
+    return this._numVisible;
   }
 
 
@@ -449,18 +502,11 @@ export class AbstractPixiLayer {
    * @param outside - Whether to go on to the features outside the view, once the ones in view are done
    */
   public continueWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean = false): void {
+    this._sortWaiting(frame);
+
     const inView = this._waitingInView;
     const notInView = this._waitingOutside;
     if (!inView.size && !notInView.size) return;
-
-    // The view may have moved since they were put off: what's in view now comes first.
-    for (const feature of notInView) {
-      const extent = feature.geometry?.world?.extent;
-      if (!extent || extent.intersects(frame.viewBox)) {
-        notInView.delete(feature);
-        inView.add(feature);
-      }
-    }
 
     const lastPass = this._pass - 1;
     let count = 0;
@@ -481,6 +527,34 @@ export class AbstractPixiLayer {
 
 
   /**
+   * Sorts the waiting work again if the view has moved since it was sorted: what waited outside
+   * the view and is in view now comes first. It's a walk over everything that waits outside, so
+   * it happens only when the view is somewhere else, and then only now and then (`SORT_WAITING_MS`).
+   * A layer with waiting work of its own overrides this, and sorts that too when this says so.
+   * @param frame - The frame being rendered
+   * @return `true` if the work was sorted again
+   */
+  protected _sortWaiting(frame: RenderFrame): boolean {
+    if (this._sortedBox?.equals(frame.viewBox)) return false;              // the view hasn't moved
+    if (frame.time - this._sortedTime < SORT_WAITING_MS) return false;    // it has, but we just looked
+
+    this._sortedBox = frame.viewBox;
+    this._sortedTime = frame.time;
+
+    const inView = this._waitingInView;
+    const notInView = this._waitingOutside;
+    for (const feature of notInView) {
+      const extent = feature.geometry?.world?.extent;
+      if (!extent || extent.intersects(frame.viewBox)) {
+        notInView.delete(feature);   // (deleting from a Set while iterating over it is safe)
+        inView.add(feature);
+      }
+    }
+    return true;
+  }
+
+
+  /**
    * Draws a dirty feature, and counts what that will cost in the frame's DRAW pass against the
    * frame's time (see `RenderFrame.drawDebt`).
    * @param feature - The feature to draw
@@ -491,6 +565,30 @@ export class AbstractPixiLayer {
     const drawMs = feature.onlyTransformDirty ? DRAW_MS_PER_REDRAW : DRAW_MS_PER_NEW;
     feature.update(viewport);
     frame.drawDebt += drawMs;
+
+    // Still dirty? Then it's drawn without a texture that hasn't loaded yet (an icon, see
+    // `PixiFeaturePoint.updateStyle`). `texturesLoaded()` draws it again when one arrives.
+    if (feature.dirty) {
+      this._waitingForTexture.add(feature);
+    } else {
+      this._waitingForTexture.delete(feature);
+    }
+  }
+
+
+  /**
+   * A texture has loaded (see `PixiScene.texturesLoaded`). The features that were drawn without
+   * one go back to waiting, and `continueWaiting()` draws them again over the next frames.
+   * (Whichever texture it was: a feature still without its own waits for the next one.)
+   */
+  public texturesLoaded(): void {
+    const viewBox = this._sortedBox;
+    for (const feature of this._waitingForTexture) {
+      const extent = feature.geometry?.world?.extent;
+      const inView = !extent || !viewBox || extent.intersects(viewBox);
+      (inView ? this._waitingInView : this._waitingOutside).add(feature);
+    }
+    this._waitingForTexture.clear();
   }
 
 

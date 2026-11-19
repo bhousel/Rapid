@@ -279,6 +279,52 @@ describe('PixiLayerOsm', () => {
         assert.strictEqual(calls, 4);
       });
 
+      it('takes them in the order they waited, and leaves the rest where it is', () => {
+        addWaiting(200);
+        const waiting = layer._unmadeInView;
+        layer.continueWaiting(makeFrame(false), {});
+        assert.deepEqual(made.slice(0, 3), ['w0', 'w1', 'w2']);
+        assert.strictEqual(layer._unmadeInView, waiting);            // not a copy of what's left
+        assert.strictEqual([...waiting.lines][0], 'w64');
+      });
+
+      it('puts an entity that still can\'t be made back with the ones waiting, after the others', () => {
+        addWaiting(200);
+        const renderLines = layer.renderLines;
+        layer.renderLines = (frame, viewport, data) => {
+          layer._madeCount = 64;          // as when the features made before it used up the batch
+          renderLines(frame, viewport, data);
+        };
+        layer.continueWaiting(makeFrame(false), {});
+        assert.strictEqual(made.length, 0);
+        assert.strictEqual(layer.numWaitingInView, 200);
+        assert.strictEqual([...layer._unmadeInView.lines][0], 'w64');   // the first batch went to the back
+        assert.strictEqual([...layer._unmadeInView.lines].at(-1), 'w63');
+      });
+
+      it('does not look at the ones outside the view again while the view stays where it is', () => {
+        addWaiting(10, 30);
+        const graph = layer.context.systems.editor.staging.graph;
+        const geometry = graph.geometry;
+        let lookups = 0;
+        graph.geometry = entity => {
+          lookups++;
+          return geometry(entity);
+        };
+
+        layer.continueWaiting(makeFrame(false, { time: 1000 }), {});   // the first look sorts them
+        assert.strictEqual(lookups, 30);
+        layer.continueWaiting(makeFrame(false, { time: 2000 }), {});
+        layer.continueWaiting(makeFrame(false, { time: 3000 }), {});
+        assert.strictEqual(lookups, 30);
+        assert.strictEqual(layer.numWaitingInView, 0);
+
+        const moved = makeFrame(false, { time: 4000, viewBox: new Rapid.sdk.Extent([60, 0], [100, 50]) });
+        layer.continueWaiting(moved, {});
+        assert.strictEqual(lookups, 60);
+        assert.isAbove(made.filter(id => id.startsWith('far')).length, 0);
+      });
+
       it('leaves the ones outside the view until it is asked to go on to them', () => {
         addWaiting(10, 30);
         layer.continueWaiting(makeFrame(true), {});          // the layer's own call

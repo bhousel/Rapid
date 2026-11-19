@@ -128,7 +128,7 @@ scheduler.schedule(workID, fn, { priority: 'idle' });
 | Priority | Meaning | When it runs |
 |----------|---------|-------------|
 | `'urgent'` | Must run this frame if possible | Before idle work, within remaining budget |
-| `'normal'` | Run when convenient | During idle phase, respects budget |
+| `'normal'` | Run when convenient | During idle phase, respects budget, but gets at least 4 ms of every tick (decision 6) |
 | `'idle'` | Run whenever there's spare time | Only when frames are consistently under budget |
 
 This covers the `requestIdleCallback` use case (`'idle'` priority) and could eventually cover `requestAnimationFrame`-like scheduling (`'urgent'` priority) for work that needs to happen every frame but isn't part of the core render.
@@ -456,6 +456,10 @@ Resolved design questions (kept for context):
 4. **SchedulerSystem owns the game loop and the target frame rate.** It replaces `PIXI.Ticker` entirely (Option A — roll our own `requestAnimationFrame` loop). The Pixi Ticker was used for very little (`deltaMS`, start/stop, one listener), and owning the loop gives the scheduler full control over frame timing, budget, and backpressure. See "Ownership of the Game Loop" section above.
 
 5. **"Game loop"** is the term of art for the `requestAnimationFrame` loop throughout code and docs.
+
+6. **Normal tasks get a share of every tick** (Nov 2026, `MIN_NORMAL_MS` = 4 ms). They used to run only in what the frame callbacks left of the 16.7 ms tick. In a dense place the map's frames take longer than a tick for seconds at a time (while it makes features after a load, or draws them again after a zoom), and then nothing was left: measured in Užice over a 10 s catch-up, no normal task ran on 214 of the 258 ticks that had one waiting, and tasks waited up to 2.4 s. Those tasks are the UI's own updates (the scale bar, the url, the undo button) and the results of tile requests. With the share, none of the ticks went without, and the longest wait was 141 ms. A tick that's already late gets up to 4 ms later; a single task still runs whole, however long it takes.
+   - Idle tasks have no share. Under pressure they wait, as before (decision 3).
+   - `GraphicsSystem` used to give its frames a smaller budget while this scheduler had tasks waiting, to leave them time. That never helped (a small budget didn't make the frame fit in a tick), and it kept the budget small for as long as the map's own `draw` listeners kept queueing tasks, which was always. It goes by the view alone now (`design/graphics-system.md` section 10).
 
 ## Open Questions
 

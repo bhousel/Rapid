@@ -30,6 +30,9 @@ Thumbs.db
 # Debugging browser profile (`bun run start:chrome`)
 .chrome-debug/
 
+# The OSM API's answers, recorded for measuring (`--tape`, see `scripts/tape.ts`)
+*.tape.json
+
 # Playwright output (`bun run test:e2e`)
 test/e2e/results/
 test/e2e/report/

@@ -239,6 +239,7 @@ describe('PixiScene', () => {
         id: id,
         enabled: enabled,
         features: new Map(visibility.map((visible, i) => [`${id}-${i}`, { visible: visible }])),
+        numVisible: visibility.filter(Boolean).length,
         render: (frame, viewport) => calls.push(`render ${id} ${frame.id} ${viewport}`),
         cull: frame => calls.push(`cull ${id} ${frame.id}`),
         keptFeatures: () => kept,
@@ -314,6 +315,26 @@ describe('PixiScene', () => {
       PixiScene.prototype.render.call(scene, next, 'viewport');
       assert.isFalse(next.unfinished);
       assert.strictEqual(next.layers.get('osm').waiting, 0);
+    });
+  });
+
+
+  describe('texturesLoaded', () => {
+    it('tells every layer, and asks for a frame that goes on with waiting work, not for a redraw', () => {
+      const calls = [];
+      const scene = {
+        layers: new Map([
+          ['osm', { texturesLoaded: () => calls.push('osm') }],
+          ['rapid', { texturesLoaded: () => calls.push('rapid') }]
+        ]),
+        gfx: {
+          resumeWaiting: () => calls.push('resumeWaiting'),
+          deferredRedraw: () => calls.push('deferredRedraw'),
+          immediateRedraw: () => calls.push('immediateRedraw')
+        }
+      };
+      PixiScene.prototype.texturesLoaded.call(scene);
+      assert.deepEqual(calls, ['osm', 'rapid', 'resumeWaiting']);
     });
   });
 

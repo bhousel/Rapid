@@ -1080,6 +1080,51 @@ describe('SchedulerSystem', () => {
           });
         });
 
+        describe('a tick that the frame callbacks used up', () => {
+          // The deadline has passed before any task runs, as after a long frame.
+          const past = () => performance.now() - 100;
+
+          it('still runs normal tasks, for a minimum share of the tick', () => {
+            const ran = [];
+            for (let i = 0; i < 5; i++) {
+              _scheduler.schedule(() => ran.push(i)).catch(() => {});
+            }
+            _scheduler._drainQueues(past());
+            assert.deepEqual(ran, [0, 1, 2, 3, 4]);
+          });
+
+          it('stops when that share is used, and goes on in the next tick', () => {
+            const ran = [];
+            const busy = (i) => () => {
+              const until = performance.now() + 3;
+              while (performance.now() < until) { /* a task that takes 3 ms */ }
+              ran.push(i);
+            };
+            for (let i = 0; i < 6; i++) {
+              _scheduler.schedule(busy(i)).catch(() => {});
+            }
+            _scheduler._drainQueues(past());
+            assert.isAtLeast(ran.length, 1);
+            assert.isBelow(ran.length, 6);
+
+            let ticks = 1;
+            while (ran.length < 6 && ticks < 10) {
+              _scheduler._drainQueues(past());
+              ticks++;
+            }
+            assert.deepEqual(ran, [0, 1, 2, 3, 4, 5]);
+          });
+
+          it('does not run idle tasks', async () => {
+            let executed = false;
+            _scheduler.scheduleIdleTask(() => { executed = true; }).catch(() => {});
+            _scheduler._drainQueues(past());
+            assert.isFalse(executed);
+
+            await _scheduler.resetAsync();
+          });
+        });
+
         describe('resetAsync resets metrics', () => {
           it('resets all metrics and pressure to initial state', async () => {
             const budget = _scheduler.targetFrameTime;

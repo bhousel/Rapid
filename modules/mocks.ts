@@ -210,6 +210,8 @@ export class MockGfxSystem extends MockSystem {
   public deferredRedraw() {}
   /** Forces an immediate redraw (no-op stub) */
   public immediateRedraw() {}
+  /** Asks for a frame that goes on with waiting work (no-op stub) */
+  public resumeWaiting() {}
   /**
    * Sets the viewport transform and resolves immediately (no animation in tests).
    * @param t - The transform props to apply

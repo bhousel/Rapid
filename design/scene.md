@@ -215,6 +215,21 @@ that: with the bigger ones the fullest tile there still held 3,232 polygons, wit
 - **Lines and points are still one group each** (per level, for lines): 1,445 lines in level 0 at
   Staten Island, where a hover costs 4 to 6 ms. By tile, lines of different road classes that cross
   near a tile edge would be drawn in the wrong order, and so would overlapping pins. Not decided.
+  **Measured in Užice (Nov 19):** its points group holds 49,259 features and level 0 of its lines
+  18,882. A frame that makes one point there costs 38 ms of DRAW, and one that makes or redraws a
+  line 44 ms, whatever else it does (`graphics-system.md` section 10, "What a frame costs when
+  little is done in it"). It's the biggest cost left in making Užice's features, and the same is
+  paid for a hover or a drag. **A split that keeps the draw order** (an idea, not tried):
+  - Points are ordered by latitude (`zIndex` is the latitude, negated). Split by rows of map
+    tiles, each row's group ordered by its `y`, they'd be drawn exactly as now. Points with
+    viewfields (`zIndex` + 1000) need a group of their own on top.
+  - Lines are ordered by level, then by `zIndex`, which is the road class (0 for anything that
+    isn't a highway). Lines of the same level and `zIndex` are in no particular order today, so
+    those could be split by tile freely: a group per level, `zIndex` and tile.
+  - It only helps if a frame's work lands in few groups. The waiting work is in the order the
+    pass found it, which is roughly by place. To check.
+  - More groups means more draw calls. Polygons went from 526 to 560 at Staten Island with no
+    change in GPU time, but this would be hundreds more in a dense place.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
   touches a big group.
 

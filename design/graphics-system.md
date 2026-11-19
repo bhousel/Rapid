@@ -871,10 +871,11 @@ check `dirty`, which works as before.
 
 `GraphicsSystem` gives each frame a deadline, and layers ask `frame.hasTime()`. The budget:
 
-- **6 ms** (`APP_BUDGET_MS`) while the view is moving, or while the scheduler has tasks waiting.
-- **24 ms** (`STILL_BUDGET_MS`) when nothing else wants the time: the view has been still for
-  150 ms and the scheduler's queues are empty. The frames then come at about 30 a second until
-  the work is done.
+- **6 ms** (`APP_BUDGET_MS`) while the view is moving.
+- **24 ms** (`STILL_BUDGET_MS`) once the view has been still for 150 ms. The frames then come at
+  about 30 a second until the work is done. (At first this also needed the scheduler's queues to
+  be empty. They never were while the map caught up: see "What a frame costs when little is done
+  in it" below.)
 - **At least half of what recent frames cost anyway,** up to 50 ms. Where a frame is expensive
   whatever changed in it, small steps cost more than they save.
 
@@ -913,6 +914,9 @@ or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 n
   that exist are still drawn. In a frame the user asked for, they're placed at once.
 - **Another frame.** If any layer has work waiting after a frame (`frame.unfinished`), the next
   tick makes another, pass or no pass. These frames aren't paced: they're cheap by construction.
+  (Except where DRAW has a big fixed cost, as in Užice: see "What a frame costs when little is
+  done in it".) `gfx.resumeWaiting()` asks for such a frame from outside, when something the
+  waiting work needed has arrived (a texture).
   `gfx.pending` is `true` until nothing is left, and scripts and tests wait for that.
 
 ### What it does
@@ -955,8 +959,130 @@ the settled picture is the same, pixel for pixel, as after every style is matche
 the features are the same and a label can be in another place: labels placed as features arrive
 don't always end up where labels placed all at once do. That was already so after a pan.
 
+### What a frame costs when little is done in it (Užice)
+
+Section 11 found one number where this branch was clearly behind `main`: in Užice (106,762
+features at z16) everything was drawn 24 s after the page opened, against 10. Looked into on Nov
+19, with every frame of a load logged. The tiles had all arrived 3.9 s into the log; making the
+features took another 17.1 s. Where those went:
+
+| | Frames | APP | DRAW | Features made |
+|---|---|---|---|---|
+| Passes | 27 | 5.6 s | 0.3 s | 1,744 |
+| Frames that catch up (kept and held) | 260 | 5.1 s | 3.3 s | 103,635 |
+
+Making a feature costs about 35 µs, so 3.7 s of this was the work itself. The rest was paid per
+frame, whatever the frame did, and the frames did little: 273 features each. Five things, none
+of which shows at Seattle or Staten Island:
+
+1. **A pass every half second that made nothing.** Each icon is turned into a texture the first
+   time a feature asks for it, and when it arrived `PixiTextures` asked for a redraw of
+   everything: 267 times during that load. A pass in Užice walks 100,000 entities (190 ms) and,
+   in the middle of a load, makes its one batch of 64. Now a texture's arrival asks for a frame,
+   not a pass: a feature drawn without its icon stays dirty, the layer remembers it, and
+   `scene.texturesLoaded()` has those drawn again (`gfx.resumeWaiting()`).
+2. **The budget was 6 to 13 ms, never 24.** The bigger budget needed an idle scheduler. But the
+   UI's listeners to `draw` queue a task each on every frame, and the scheduler ran normal tasks
+   only in what was left of a 16.7 ms tick, which was nothing: no normal task ran on 214 of the
+   258 ticks that had one waiting, and the scale bar's update waited up to 2.4 s. So the queues
+   were never empty, because of the frames themselves. Now the budget goes by the view alone,
+   and the scheduler gives normal tasks 4 ms of every tick (`design/scheduler-system.md`): their
+   longest wait in the same test is 141 ms.
+3. **Bookkeeping that grew with what was waiting.** `_makeWaiting()` took the whole set of
+   waiting entities and put back what it had no time for: a copy of up to 100,000 IDs, twice a
+   frame (1.2 s of the 5.5 s that making took under the profiler). It looked through everything
+   outside the view again every 100 ms, though the view hadn't moved, and the scene counted the
+   visible features of every layer on every frame (1.1 ms). Now the waiting sets are consumed in
+   place, they're sorted again only when the view has moved (`_sortWaiting()`), and a layer keeps
+   count of its visible features as they change (`numVisible`).
+4. **DRAW has a fixed cost per render group that changed,** and two groups are huge here: all
+   49,259 points, and the 18,882 lines of level 0. One frame's DRAW, by what changed in it:
+
+   | Changed in the frame | DRAW |
+   |---|---|
+   | Nothing | 5 to 7 ms |
+   | 100 points drawn again | 5 ms |
+   | 100 points made | 38 ms |
+   | 100 lines drawn again, or made | 44 ms |
+   | 100 polygons made, in tiles all over the view | 17 to 23 ms |
+   | 100 features of every kind made | 85 ms |
+   | 10,000 made | 135 ms |
+
+   Pixi collects a whole group again when anything in it is added, removed, or has new geometry
+   (86% of such a DRAW is `_buildInstructions`). After the fixed cost, a feature costs what the
+   budget assumes: 4 to 5 µs. So a frame that makes 64 lines and one that makes 5,000 pay the
+   same 44 ms first. **Not fixed:** see below.
+5. **The first frame after a zoom** (not part of a load) takes 365 to 400 ms here, and sometimes
+   twice that after a pause (section 9). With the profiler on it's 480: the pass's usual 190,
+   about 130 more in its loops because every feature is dirty, and 160 in the labels layer,
+   which resets every label at once. **Not fixed.**
+
+With 1 to 3 fixed (dev build, the same window, one load each):
+
+| Užice | Before | After |
+|---|---|---|
+| Load: from the last tile until every feature is made | 17.1 s | 7.4 s |
+| Load: passes meanwhile | 27 | 0 |
+| Load: features made per frame (median) | 273 | 624 |
+| Load: a frame's cost, median / 90th percentile / longest | 25 / 167 / 496 ms | 35 / 60 / 200 ms |
+| Load: frames over 100 ms | 33 | 5 |
+| Every feature made again (`layer.reset()`) | 11.1 s in 215 frames | 8.6 s in 149 |
+| Every feature drawn again (restyle) | 3.4 s in 97 frames | 1.8 to 2.4 s in 29 |
+
+At Staten Island a load's features are all made 2.0 s after the last tile, in 48 frames of 27 ms
+(median), with the first pass the longest frame (117 ms).
+
+What's left of Užice's 7.4 s is the work (3.5 s of APP) and item 4 (3.0 s of DRAW, 19 ms a
+frame).
+
+**From outside, on a tape.** `bun run compare` on the production bundle, the commit before
+these fixes and then with them, two runs each. All four were answered from one recording of the
+API's map tiles, each tile after the time it really took (`--tape`, see section 11), so they
+loaded the same data at the same pace:
+
+| Užice, `bun run compare` | Before | After |
+|---|---|---|
+| Drawn after | 24.1, 23.8 s | 14.8, 14.7 s |
+| First pan: frames a second | 19.7, 18.6 | 18.0, 18.4 |
+| First pan: longest gap | 345, 751 ms | 506, 520 ms |
+| First pan: time its events took | 7.2, 7.2 s | 7.3, 7.4 s |
+| Pan back: frames a second | 46.9, 47.0 | 43.1, 42.4 |
+| Pinch in: frames a second, longest gap | 29.5 / 327, 29.8 / 302 ms | 28.5 / 319, 29.7 / 339 ms |
+| Zoom key in: longest gap | 182, 202 ms | 182, 170 ms |
+
+Everything is drawn 9 s sooner, and moving the view is about what it was. The pan back over
+loaded data lost 4 frames a second of 47 in both runs; not looked into. Without the tape, two runs of the new build
+against the live API had a slower first pan (14 and 16 frames a second, 931 and 656 ms) than
+the one run of the old build earlier in the day (19, 377 ms). On the same data that difference
+isn't there, so it was the network that day or the luck of one run. It's the reason the tape
+exists.
+
+**The first pan itself** (600 px into data that isn't loaded, 8.5 s, dev build on the tape) is
+where items 4 and the pass show most. Of 8.6 s of ticks, 8.1 s were frames:
+
+| | Frames | APP | DRAW | Features made |
+|---|---|---|---|---|
+| Passes (a tile arrived, or the view left the cull box) | 11 | 2.3 s (212 ms each) | 0.7 s | 710 |
+| Frames that catch up, kept and held | 55 | 1.2 s | 3.4 s (80 to 95 ms each, when anything was made) | 19,673 |
+| Frames that only moved the view | 21 | 0.1 s | 0.1 s | 0 |
+
+Every frame that made a feature paid the 80 to 95 ms of DRAW for the points and lines groups,
+and the budget sat at its 50 ms ceiling because of it. One DRAW took 533 ms (1,331 features made
+in that frame; not explained, and the longest gap of each `compare` run is probably the same
+thing). The scheduler's tasks took 143 ms in all, of which `UiContributors-render` 128 ms in 10
+calls.
+
 ### What it doesn't do yet
 
+- **Big render groups make every changed frame expensive** (item 4 above): in Užice 38 to 85 ms
+  of DRAW for a frame that makes or redraws anything among the points or the lines. That's also
+  what a hover, a selection or a drag costs there. Smaller groups would fix it, and they can keep
+  the draw order: points by rows of tiles (they're sorted by latitude), lines by level and
+  `zIndex`, then by tile. See "What's left" in `design/scene.md`.
+- **Labels do their part of a zoom in one frame** (160 ms in Užice, item 5), and place
+  everything at once when the last feature is made (128 ms in one frame of a load there).
+- **Matching a style copies it twice** (`utilDeepMerge`, in `styleMatch()` and the `style`
+  setter): 14% of the APP time of making Užice's features.
 - **The pass itself can't wait:** gathering, filtering and sorting the data, and the loop over
   every entity. That's the 50 to 65 ms a frame at a new zoom still takes at Staten Island, and 270
   in Užice. It's also why a pass for a new cull box costs what it did (42 to 59 ms APP and 9 to
@@ -965,11 +1091,6 @@ don't always end up where labels placed all at once do. That was already so afte
 - **The first pass after a load pays two things once:** `FilterSystem` matching every entity for
   the first time (87 of that pass's 141 ms at Staten Island), and the first DRAW pass that has
   anything in it (76 to 128 ms, whatever it draws).
-- **Užice's restyle takes longer in all than it did before features' DRAW cost was counted:** 64
-  frames and 2.1 s, where it was 12 frames and 1.0 s (and one block of 1.8 s before any of this).
-  The frames are short now and there are many of them. The rule that should let the budget grow
-  there (half of what recent frames cost) isn't doing it, and I couldn't look into why: the OSM
-  API was answering 429 by then (below).
 - **No frame between passes during a zoom.** The CSS transform still carries a zoom between pass
   frames. Now that a feature can be shown at a zoom it wasn't drawn for, a held frame could be
   drawn at a new zoom too, sharp and with the right imagery.
@@ -1011,6 +1132,14 @@ areas. So more is drawn here than in the other sections' measurements, which hid
 
 Each number is from one run. They vary: the same pan in Seattle on this branch had a longest frame
 of 39, 79 and 115 ms in three runs.
+
+**Record a place once.** With `--tape file.tape.json` (`scripts/tape.ts`, also on `bun run
+measure`), the API's answers to map requests are kept in that file the first time, and later
+runs are answered from it, each tile after the time it really took. A run from a tape costs the
+API nothing, and two builds see the same data arrive at the same pace, which two live runs
+don't: in Užice the first pan measured 14 to 19 frames a second live and 18 to 20 from the tape,
+for the same builds. A tape of Užice is 119 MB (57 tiles); `*.tape.json` is gitignored. The
+tables below were measured live, before the tape existed.
 
 ### Results
 
@@ -1078,8 +1207,13 @@ map" column aren't comparable between iD and Rapid either: an SVG element isn't 
 - **This branch takes longer until everything is drawn:** 7.9 s against 6.4 at Staten Island, and
   24 s against 10 in Užice. That's the features being made over many frames (section 10): the map
   is usable meanwhile, and it's the trade Bryan chose (what the user sees happening matters more
-  than the clock). In Užice it's too long all the same, and it's the budget rule that section 10
-  says isn't growing there.
+  than the clock). In Užice it was too long all the same. **Looked into since, and now 15 s**
+  (section 10, "What a frame costs when little is done in it"): most of the extra time was
+  passes that made nothing and bookkeeping, not the features. The table above still has the
+  24 s it was measured with.
+- **Užice's first pan (19 frames a second to Rapid 2.5's 25) is render groups and passes.** Every
+  frame that makes a feature there pays 80 to 95 ms of DRAW for the two biggest groups, and
+  each tile that arrives brings a pass of 210 ms (same section). Not fixed.
 
 ### Not measured
 

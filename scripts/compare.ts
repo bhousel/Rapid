@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { MAP_REQUEST, useTape } from './tape.ts';
 import { PLACES } from './places.ts';
 import { writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
@@ -20,6 +21,11 @@ import { parseArgs, styleText } from 'node:util';
 // Give the places by name (`bun run measure --list`). There is no "all": each place asks the OSM
 // API for 6 to 36 map tiles for each build, and after enough of them the API answers 429 for a while.
 //
+// To download a place only once, give a tape (see `scripts/tape.ts`): the first run records the
+// API's answers in the file, and later runs are answered from it, each after the time it really took.
+//
+//   bun run compare branch http://127.0.0.1:8080/dist/index.html uzice --tape ../uzice.tape.json
+//
 // For each gesture it reports:
 // - fps:      animation frames a second while the gesture's events were being sent
 // - longest:  the longest gap between two animation frames, in ms, until 2.5 s after the gesture
@@ -38,7 +44,8 @@ const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
-    out: { type: 'string' }
+    out: { type: 'string' },
+    tape: { type: 'string' }
   }
 });
 
@@ -49,12 +56,11 @@ if (!label || !baseURL || !places.length || unknown.length) {
   if (unknown.length) {
     console.error(styleText('redBright', `Unknown place: ${unknown.join(', ')}. See \`bun run measure --list\`.`));
   }
-  console.error('Usage: bun run compare <label> <url> <place> [place…] [--out results.json]');
+  console.error('Usage: bun run compare <label> <url> <place> [place…] [--out results.json] [--tape file.json]');
   process.exit(1);
 }
 
 const HIDDEN_FEATURES = 'boundaries';
-const MAP_REQUEST = /openstreetmap\.org\/api\/0\.6\/map/;
 const GESTURES = ['panOut', 'panBack', 'pinchIn', 'pinchOut', 'zoomIn', 'zoomOut'];
 const SETTLE_MS = 2500;         // how long after a gesture the page is watched
 const GESTURE_LIMIT_MS = 45000; // give up on a gesture after this long: a page that far behind is unusable
@@ -151,6 +157,7 @@ function readRecording(args: { start: number, inputMs: number }) {
 const results = [];
 for (const place of places) {
   const page = await context.newPage();
+  const tape = values.tape ? await useTape(page, values.tape) : null;
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
   const taskSeconds = async () => {
@@ -297,6 +304,10 @@ for (const place of places) {
     result.error = (err as Error).message.split('\n')[0];
   }
 
+  if (tape) {
+    result.tape = { replayed: tape.replayed, recorded: tape.recorded };
+    tape.save();
+  }
   results.push(result);
   await page.close();
 
@@ -307,6 +318,9 @@ for (const place of places) {
     `: ${result.tiles} tiles (${JSON.stringify(result.statuses)}) in ${seconds(result.dataMs)}, drawn after ${seconds(result.drawnMs)}, ${drawn}`);
   if (result.error) {
     console.log(styleText('redBright', `  failed: ${result.error}`));
+  }
+  if (result.tape) {
+    console.log(`  tape: ${result.tape.replayed} requests answered from ${values.tape}, ${result.tape.recorded} added to it`);
   }
   for (const name of GESTURES) {
     const r = result[name];

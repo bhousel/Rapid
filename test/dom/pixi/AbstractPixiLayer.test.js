@@ -322,6 +322,73 @@ describe('AbstractPixiLayer', () => {
         assert.include(drawn, 'far');
       });
 
+      it('looks again at what waited outside the view only once the view has moved, and then only now and then', () => {
+        const far = addDirtyFeature('far', 80);
+        const left = addDirtyFeature('left', 10);
+        runPass(makeTimedFrame(true, { contentChanged: true }), [far]);   // the view is the left half
+        assert.strictEqual(layer.numWaitingInView, 0);
+
+        // Walking everything that waits costs something on every frame, so: not while the view is still
+        const walked = [];
+        const geometry = far.geometry;
+        Object.defineProperty(far, 'geometry', {
+          get: () => {
+            walked.push('far');
+            return geometry;
+          }
+        });
+        assert.isFalse(layer._sortWaiting(makeTimedFrame(false, { time: 1000 })));
+        assert.deepEqual(walked, []);
+
+        const right = new Rapid.sdk.Extent([60, 0], [100, 50]);
+        const movedFrame = (props) => Object.assign(makeTimedFrame(false, props), { viewBox: right });
+        assert.isTrue(layer._sortWaiting(movedFrame({ time: 1000 })));
+        assert.deepEqual(walked, ['far']);
+        assert.strictEqual(layer.numWaitingInView, 1);
+
+        // A pass with the view on the right puts `left` off, as outside it. Then the view moves back.
+        runPass(movedFrame({ contentChanged: true, time: 1010 }), [far, left]);
+        assert.strictEqual(layer.numWaitingInView, 1);
+        assert.isFalse(layer._sortWaiting(makeTimedFrame(false, { time: 1050 })));   // moved, but it just looked
+        assert.strictEqual(layer.numWaitingInView, 1);
+        assert.isTrue(layer._sortWaiting(makeTimedFrame(false, { time: 1150 })));
+        assert.strictEqual(layer.numWaitingInView, 2);
+      });
+
+      it('remembers a feature that is still dirty after it was drawn, and draws it again when a texture has loaded', () => {
+        let loaded = false;
+        const pin = addDirtyFeature('pin', 10);
+        pin.update = () => {
+          pin.dirty = !loaded;   // (as `PixiFeaturePoint` does while its icon is missing)
+          drawn.push('pin');
+        };
+        const clean = addDirtyFeature('clean', 20);
+        runPass(makeTimedFrame(true, { contentChanged: true }), [pin, clean]);
+        assert.deepEqual(drawn, ['pin', 'clean']);
+        assert.strictEqual(layer.numWaiting, 0);   // nothing to go on with until the texture is there
+
+        layer.continueWaiting(makeTimedFrame(true), viewport, true);
+        assert.deepEqual(drawn, ['pin', 'clean']);
+
+        loaded = true;
+        layer.texturesLoaded();
+        assert.strictEqual(layer.numWaitingInView, 1);
+        layer.continueWaiting(makeTimedFrame(true), viewport);
+        assert.deepEqual(drawn, ['pin', 'clean', 'pin']);
+        assert.strictEqual(layer.numWaiting, 0);
+
+        layer.texturesLoaded();   // nothing is waiting for one now
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
+      it('forgets a feature that waited for a texture when it is destroyed', () => {
+        const pin = addDirtyFeature('pin', 10, { update: () => {} });   // stays dirty
+        runPass(makeTimedFrame(true, { contentChanged: true }), [pin]);
+        pin.destroy();
+        layer.texturesLoaded();
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
       it('counts what each feature it draws will cost in the DRAW pass against the frame\'s time', () => {
         const changed = addDirtyFeature('changed', 10);
         const zoomed = addDirtyFeature('zoomed', 20, { onlyTransformDirty: true });
@@ -377,6 +444,23 @@ describe('AbstractPixiLayer', () => {
         assert.strictEqual(layer.numWaiting, 0);
         assert.isTrue(b.dirty);   // if it comes back, it's drawn then
       });
+    });
+
+    it('counts its visible features as they are made, hidden, shown and removed', () => {
+      const a = addFeature('a');
+      const b = addFeature('b');
+      assert.strictEqual(layer.numVisible, 2);
+
+      b.visible = false;
+      layer.visibilityChanged(false);   // (a real feature's `visible` setter calls this)
+      assert.strictEqual(layer.numVisible, 1);
+      b.destroy();                      // it wasn't visible: no change
+      assert.strictEqual(layer.numVisible, 1);
+      a.destroy();
+      assert.strictEqual(layer.numVisible, 0);
+
+      const work = layer.takeWork();
+      assert.include(work, { shown: 0, hidden: 1 });
     });
 
     it('counts the features made and destroyed, and hands the counts over once', () => {

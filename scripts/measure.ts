@@ -1,5 +1,6 @@
 import { chromium } from '@playwright/test';
 import { PLACES } from './places.ts';
+import { useTape } from './tape.ts';
 import { writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
 
@@ -13,11 +14,14 @@ import { parseArgs, styleText } from 'node:util';
 //   bun run measure --runs 15               Frames per mode (default 9; the median is reported)
 //   bun run measure --out stats.json        Also save every number as JSON
 //   bun run measure --fresh                 Reload the tab before each place (slower, but comparable)
+//   bun run measure --tape ../osm.tape.json Keep the OSM API's answers in a file, and answer from it
 //   bun run measure --list                  List the places
 //
 // Without `--fresh`, everything loaded at earlier places stays in memory and in the scene, so the
 // numbers depend on the order. Use `--fresh` to compare one build with another, but not in a loop:
 // it downloads every place again from the OSM API. A place that shows 0 visible features didn't load.
+// With `--tape`, a place is downloaded the first time only (see `scripts/tape.ts`): then `--fresh`
+// costs the API nothing, and every run sees the same data.
 //
 // At each place it waits for the data to load, then measures three kinds of frame:
 // - redraw:  nothing changed, the scene is drawn again
@@ -44,6 +48,7 @@ const { values, positionals } = parseArgs({
     runs:  { type: 'string', default: '9' },
     out:   { type: 'string' },
     fresh: { type: 'boolean', default: false },
+    tape:  { type: 'string' },
     list:  { type: 'boolean', default: false }
   }
 });
@@ -76,6 +81,7 @@ if (!page) {
   console.error(styleText('redBright', 'No open tab found.'));
   process.exit(1);
 }
+const tape = values.tape ? await useTape(page, values.tape) : null;
 await page.waitForFunction(() => (globalThis as any).rapidContext?.systems?.editor?.started, null, { timeout: 120000 });
 
 
@@ -352,6 +358,11 @@ console.log('a zoom: the first frame, then how many frames and how many ms until
 if (values.out) {
   writeFileSync(values.out, JSON.stringify({ date: new Date().toISOString(), runs, env, places: results }, null, 2));
   console.log(`Saved ${values.out}`);
+}
+
+if (tape) {
+  tape.save();
+  console.log(`Tape ${values.tape}: ${tape.replayed} map requests answered from it, ${tape.recorded} added to it.`);
 }
 
 // Disconnect, without closing the developer's browser.

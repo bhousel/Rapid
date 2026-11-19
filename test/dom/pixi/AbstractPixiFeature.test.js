@@ -79,6 +79,25 @@ describe('AbstractPixiFeature', () => {
   });
 
 
+  it('tells its layer when it is hidden, shown or destroyed, so the layer knows how many are visible', () => {
+    const a = makeFeature('a');
+    const b = makeFeature('b');
+    assert.strictEqual(layer.numVisible, 2);
+
+    a.visible = false;
+    a.visible = false;   // no change
+    assert.strictEqual(layer.numVisible, 1);
+    a.visible = true;
+    assert.strictEqual(layer.numVisible, 2);
+
+    b.visible = false;
+    b.destroy();
+    assert.strictEqual(layer.numVisible, 1);
+    a.destroy();
+    assert.strictEqual(layer.numVisible, 0);
+  });
+
+
   // A feature that's dirty only because the view's zoom or rotation changed can be drawn as it
   // was for a few frames. One that changed itself can't, in a frame the user asked for.
   describe('onlyTransformDirty', () => {

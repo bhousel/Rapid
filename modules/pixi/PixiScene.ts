@@ -508,17 +508,13 @@ export class PixiScene extends EventEmitter {
         frame.unfinished = true;   // another frame should follow
       }
 
-      let visible = 0;
-      for (const feature of layer.features.values()) {
-        if (feature.visible) visible++;
-      }
       frame.layers.set(layer.id, {
         enabled: layer.enabled,
         kept: layer.keptFeatures(frame),
         renderMs: time.renderMs,
         cullMs: time.cullMs,
         features: layer.features.size,
-        visible: visible,
+        visible: layer.numVisible,
         waiting: waiting,
         ...layer.takeWork()
       });
@@ -730,6 +726,20 @@ export class PixiScene extends EventEmitter {
     for (const layer of this.layers.values()) {
       layer.dirtyTransform();
     }
+  }
+
+
+  /**
+   * A texture has loaded that some features were drawn without (an icon, see `PixiTextures`).
+   * Those features are still dirty, and they're drawn again over the next frames. Nothing about
+   * the data changed, so this asks for a frame and not for a redraw: a layer that keeps its
+   * features doesn't do its pass again for every icon.
+   */
+  public texturesLoaded(): void {
+    for (const layer of this.layers.values()) {
+      layer.texturesLoaded();
+    }
+    this.gfx.resumeWaiting();
   }
 
 

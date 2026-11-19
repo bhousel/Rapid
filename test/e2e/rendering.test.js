@@ -299,6 +299,69 @@ test('makes features over several frames when there are many to make, and ends u
 });
 
 
+// An icon's texture is made the first time a feature asks for it, and arrives a little later.
+// The features drawn without it are drawn again then, and no layer does its pass for that.
+test('draws a point again when its icon arrives, without another pass', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const settle = async () => {
+      await nextFrame();
+      while (gfx.pending) {
+        await nextFrame();
+      }
+    };
+    const layer = gfx.scene.layers.get('osm');
+    const textures = gfx.textureManager;
+    const EMPTY = PIXI.Texture.EMPTY;
+
+    const withIcon = [...layer.features.values()].filter(feature => feature.visible && feature.icon?.visible);
+    const feature = withIcon[0];
+    const image = feature.style.icon.image;
+    const startup = { withIcons: withIcon.length, missing: withIcon.filter(f => f.icon.texture === EMPTY || f.dirty).length };
+
+    // Pretend the icon hasn't loaded, and draw the feature again: it's drawn without, and stays dirty.
+    const getTexture = textures.getTexture;
+    textures.getTexture = (atlasID, textureID) => (textureID === image) ? EMPTY : getTexture.call(textures, atlasID, textureID);
+    feature.dirty = true;
+    gfx.immediateRedraw();
+    await settle();
+    const without = { missing: feature.icon.texture === EMPTY, dirty: feature.dirty, pending: gfx.pending };
+
+    // The icon arrives.
+    const startID = gfx.lastRenderFrame.id;
+    delete textures.getTexture;
+    gfx.scene.texturesLoaded();
+    await settle();
+    const frames = gfx.renderFrames.filter(frame => frame.id > startID);
+    return {
+      startup: startup,
+      without: without,
+      after: { missing: feature.icon.texture === EMPTY, dirty: feature.dirty },
+      frames: frames.length,
+      passes: frames.filter(frame => !frame.layers.get('osm').kept).length
+    };
+  });
+
+  // Everything that has an icon got it while the page loaded
+  expect(result.startup.withIcons).toBeGreaterThan(0);
+  expect(result.startup.missing).toBe(0);
+  // A feature without its icon waits for it, and asks for no more frames meanwhile
+  expect(result.without).toEqual({ missing: true, dirty: true, pending: false });
+  // ..and is drawn with it once it's there, in a frame where the layer kept its features
+  expect(result.after).toEqual({ missing: false, dirty: false });
+  expect(result.frames).toBeGreaterThan(0);
+  expect(result.passes).toBe(0);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
 test('counts WebGL calls while detailed stats are on', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);

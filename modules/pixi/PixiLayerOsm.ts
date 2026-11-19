@@ -79,9 +79,6 @@ const KIND_GEOMETRY: Record<OsmDataKind, GeometryType> = {
  */
 const MAKE_BATCH = 64;
 
-/** While the view moves, entities waiting outside it are checked this often (ms) for having come into view */
-const RECHECK_OUTSIDE_MS = 100;
-
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
   type: 'midpoint';
@@ -148,8 +145,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _madeCount: number;
   /** Whether features outside the view may be made now (in the scene's call to `continueWaiting()`, when there's time) */
   protected _makingOutside: boolean;
-  /** When the entities waiting outside the view were last checked for having come into view */
-  protected _recheckedOutside: number;
 
 
   /**
@@ -170,7 +165,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._lastRelated = { descendantIDs: new Set<EntityID>(), siblingIDs: new Set<EntityID>() };
     this._madeCount = 0;
     this._makingOutside = false;
-    this._recheckedOutside = 0;
   }
 
 
@@ -420,14 +414,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   public override continueWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean = false): void {
     super.continueWaiting(frame, viewport, outside);
 
-    const numOutside = this._countUnmade(this._unmadeOutside);
-    if (!numOutside && !this._countUnmade(this._unmadeInView)) return;
-
-    // The view may have moved over entities that waited outside it. Look now and then.
-    if (numOutside && frame.time - this._recheckedOutside > RECHECK_OUTSIDE_MS) {
-      this._recheckedOutside = frame.time;
-      this._recheckOutside(frame);
-    }
+    if (!this._countUnmade(this._unmadeOutside) && !this._countUnmade(this._unmadeInView)) return;
 
     this._catchingUp = true;
     this._madeCount = 0;
@@ -455,14 +442,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
 
-    // Take them all, and put back the ones there's no time for.
     const waiting = outside ? this._unmadeOutside : this._unmadeInView;
-    const putBack = this._newUnmade();
-    if (outside) {
-      this._unmadeOutside = putBack;
-    } else {
-      this._unmadeInView = putBack;
-    }
 
     const newBatch = (): OsmData => ({
       polygons: new Map<EntityID, OsmWay | OsmRelation>(),
@@ -485,12 +465,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       stopped = !frame.hasTime();
     };
 
+    // Take them in the order they waited, and leave the rest where it is when the time is up.
+    // (Not a copy of what's left: tens of thousands can be waiting, on every frame.)
+    // An entity that still can't be made goes back to waiting: `_waitToMake()` adds it again,
+    // after the others. That only happens once the frame is out of time, so the loop ends there.
     for (const kind of Object.keys(waiting) as OsmDataKind[]) {
-      for (const entityID of waiting[kind]) {
-        if (stopped) {
-          putBack[kind].add(entityID);
-          continue;
-        }
+      const entityIDs = waiting[kind];
+      for (const entityID of entityIDs) {
+        entityIDs.delete(entityID);   // (deleting from a Set while iterating over it is safe)
 
         // Is it still there, and still the same kind of thing? If not, the next pass sorts it out.
         const entity = graph.hasEntity(entityID);
@@ -499,6 +481,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         (batch[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
         if (++batchSize >= MAKE_BATCH) {
           makeBatch();
+          if (stopped) return;
         }
       }
     }
@@ -510,10 +493,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Moves the entities that waited outside the view, and are in view now, to the ones in view.
+   * Sorts the waiting work again if the view has moved (see `AbstractPixiLayer._sortWaiting`):
+   * the entities that waited outside the view, and are in view now, go with the ones in view.
    * @param frame - The frame being rendered
+   * @return `true` if the work was sorted again
    */
-  protected _recheckOutside(frame: RenderFrame): void {
+  protected override _sortWaiting(frame: RenderFrame): boolean {
+    if (!super._sortWaiting(frame)) return false;
+
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
 
@@ -528,6 +515,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         }
       }
     }
+    return true;
   }
 
 
