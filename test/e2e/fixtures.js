@@ -88,10 +88,12 @@ export async function startRapid(page, hash = '') {
   await page.waitForFunction(() => globalThis.rapidContext?.systems?.editor?.started, null, { timeout: 60_000 });
 
   // A new browser profile gets the welcome screen, which covers the map.
+  // It fades out over animation frames, and while Rapid is still starting up there are few of those:
+  // with software rendering and several pages at once, closing it takes 3 seconds or more.
   const splash = page.locator('.modal-splash');
   if (await splash.isVisible()) {
     await page.keyboard.press('Escape');
-    await expect(splash).toBeHidden();
+    await expect(splash).toBeHidden({ timeout: 30_000 });
   }
 }
 

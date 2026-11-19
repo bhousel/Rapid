@@ -940,6 +940,9 @@
       },
       "rendering": {
         "title": "Rendering",
+        "frames": "Frames",
+        "frames_drawn": "{frames} in the last second",
+        "frames_held": "{frames} in the last second, {held} with a pass held back",
         "app": "App",
         "draw": "Draw",
         "gpu": "GPU",

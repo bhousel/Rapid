@@ -120,6 +120,12 @@ export class RenderFrame {
    * can tell that it already has what this frame needs (see `PixiScene.updateCullBox`).
    */
   public cullBox: Extent;
+  /**
+   * Whether a pass was wanted (a redraw was requested, or the view left the cull box) and was held
+   * back until the gap after the last pass is over. A held frame only moves the view: layers are
+   * told nothing changed and get the cull box they had (see `FramePacer`).
+   */
+  public held: boolean;
   /** Milliseconds spent in the APP pass */
   public appMs: number;
   /** What each layer cost during the APP pass */
@@ -140,6 +146,7 @@ export class RenderFrame {
     this.contentChanged = true;
     this.changedLayerIDs = new Set<LayerID>();
     this.cullBox = new Extent();
+    this.held = false;
     this.appMs = 0;
     this.layers = new Map<LayerID, LayerFrameStats>();
     this.draw = null;
@@ -159,7 +166,7 @@ export class RenderFrame {
 
   /**
    * Milliseconds the frame spent on the CPU: its APP pass plus its DRAW pass.
-   * (The two passes run in different animation frames.)
+   * (The two passes run in the same animation frame when the APP pass was quick, or else in two.)
    * @return Total CPU milliseconds
    */
   public get cpuMs(): number {
@@ -179,6 +186,7 @@ export class RenderFrame {
       contentChanged: this.contentChanged,
       changedLayerIDs: [...this.changedLayerIDs],
       cullBox: this.cullBox.rectangle(),
+      held: this.held,
       appMs: this.appMs,
       layers: Object.fromEntries(this.layers),
       draw: this.draw

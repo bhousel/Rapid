@@ -248,7 +248,8 @@ export class AbstractPixiLayer {
    * Whether the layer can leave its features exactly as the last frame had them. That's so when
    * nothing that concerns this layer asked for the frame, only a move of the view
    * (`frame.changedFor()`), and the layer already made everything in the frame's cull box
-   * (`frame.cullBox`) in an earlier pass.
+   * (`frame.cullBox`) in an earlier pass. It's also so in a held frame (`frame.held`), where the pass
+   * is put off: the layer keeps what it has until a frame that may do the pass.
    *
    * A layer that gathers its data by `frame.cullBox` calls this from `render()`, once it knows it has
    * something to draw and before it gathers anything, and returns if the answer is `true`. `cull()`
@@ -258,7 +259,8 @@ export class AbstractPixiLayer {
    * @return `true` to skip the pass, `false` to do it
    */
   public keepFeatures(frame: RenderFrame): boolean {
-    if (!frame.changedFor(this.id) && this._currentBox === frame.cullBox) {
+    // (A held frame keeps features even if they were marked dirty since: their pass is still to come.)
+    if (!frame.changedFor(this.id) && (frame.held || this._currentBox === frame.cullBox)) {
       this._keptFrame = frame.id;
       return true;
     }

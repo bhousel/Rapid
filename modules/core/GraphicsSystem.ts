@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { findChangedRenderGroups, GLCallCounter, GLTimer, readInstructionStats } from '../pixi/lib/RenderStats.ts';
+import { FramePacer } from '../pixi/lib/FramePacer.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
 import { PixiTextures } from '../pixi/PixiTextures.ts';
@@ -15,8 +16,11 @@ import type { D3Selection } from 'd3-selection';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
-/** Throttled rendering milliseconds (for now) */
-const THROTTLE = 250;
+/**
+ * The DRAW pass runs in the same tick as the APP pass when the tick has used less than this many
+ * milliseconds (about half of a frame at 60 per second). Otherwise it waits for the next tick.
+ */
+const DRAW_SAME_TICK_MS = 8;
 
 /** How many recent frames to keep stats for (see `renderFrames`) */
 const RENDER_FRAME_HISTORY = 120;
@@ -95,17 +99,21 @@ export class GraphicsSystem extends AbstractSystem {
   // Private properties
   /** A copy of the context viewport as seen by Pixi, used to detect transform changes */
   protected _pixiViewport: Viewport | null;
-  /** The map transform at the time of the last full redraw (used to compute CSS pan offsets) */
+  /** The map transform that the last frame was drawn at (used to compute CSS pan offsets) */
   protected _prevTransform: TransformProps;
+  /** The map transform that the APP pass ran at, for the frame whose DRAW pass is pending */
+  protected _appTransform: TransformProps | null;
   /** Whether a temporary CSS transform is currently applied to `supersurface` */
   protected _isTempTransformed: boolean;
   /** Active animated transform transition, or null if none is in progress */
   protected _transformEase: TransformEase | null;
   /** Monotonically incrementing frame counter */
   protected _frame: number;
-  /** Milliseconds until the next deferred redraw is due */
-  protected _timeToNextRender: number;
-  /** Whether a Pixi app-level render has been requested but not yet executed */
+  /** Decides when a frame may do a pass (see "Frame pacing" in `design/graphics-system.md`) */
+  protected _pacer: FramePacer;
+  /** Whether the frame whose DRAW pass is pending did a pass (it wasn't only a move of the view) */
+  protected _appWasPass: boolean;
+  /** Whether a frame is wanted: the view moved, or a redraw was requested and hasn't been drawn */
   protected _appPending: boolean;
   /** Whether a full scene-graph redraw has been requested but not yet executed */
   protected _drawPending: boolean;
@@ -117,6 +125,8 @@ export class GraphicsSystem extends AbstractSystem {
   protected _redrawRequested: boolean;
   /** The layers that `deferredRedraw()` or `immediateRedraw()` was called for since the last APP pass */
   protected _redrawLayerIDs: Set<LayerID>;
+  /** The layers among `_redrawLayerIDs` that `immediateRedraw()` was called for: they don't wait for a pass */
+  protected _urgentLayerIDs: Set<LayerID>;
   /** Whether the WebGL context is currently lost */
   protected _isContextLost: boolean;
   /** Callback that resumes the GraphicsSystem after a WebGL context restore */
@@ -165,15 +175,18 @@ export class GraphicsSystem extends AbstractSystem {
     this._pixiViewport = null;
 //    this._prevTransform = { x: 0, y: 0, k: 256 / Math.PI, r: 0 };    // transform at time of last draw
     this._prevTransform = { x: 0, y: 0, z: 1, r: 0 };    // transform at time of last draw
+    this._appTransform = null;
     this._isTempTransformed = false;     // is the supersurface transformed?
     this._transformEase = null;
 
     this._frame = 0;              // counter that increments
-    this._timeToNextRender = 0;   // milliseconds of time to defer rendering
+    this._pacer = new FramePacer();
+    this._appWasPass = false;
     this._appPending = false;
     this._drawPending = false;
     this._redrawRequested = true;   // the first frame has everything to do
     this._redrawLayerIDs = new Set<LayerID>();
+    this._urgentLayerIDs = new Set<LayerID>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -441,59 +454,84 @@ export class GraphicsSystem extends AbstractSystem {
       }
     }
 
-    // For now, we will perform either APP (Rapid prepares scene graph) or DRAW (Pixi render) during a tick.
+    // A tick performs APP (Rapid prepares scene graph), or DRAW (Pixi render), or both when APP was
+    // quick, as it is for a frame that only moves the view.
     // GPU work will happen in its own thread, and we don't have direct insight into its timing.
     // For reference:
     //   16.7ms = 60fps
     //   33.3ms = 30fps
+    const tickStart = window.performance.now();
 
     // Process a pending DRAW before a pending APP.
     // This is so pending APP does not sneak in front of DRAW causing a race condition.
     if (this._drawPending) {
-      const frame = this._frame;
-      const drawStart = `draw-${frame}-start`;
-      const drawEnd = `draw-${frame}-end`;
-      window.performance.mark(drawStart);
-
       this._draw();  // note that DRAW increments the frame counter
-
-      window.performance.mark(drawEnd);
-      window.performance.measure(`draw-${frame}`, drawStart, drawEnd);
-      // const measureDraw = window.performance.getEntriesByName(`draw-${frame}`, 'measure')[0];
-      // const durationDraw = measureDraw.duration.toFixed(1);
-      // console.log(`draw-${frame} : ${durationDraw} ms`);
+      this._measure(`draw-${this._frame - 1}`, tickStart);
       return;
     }
 
-    // Perform any updates to the scene's transform..
-    this._tform();
+    // Perform any updates to the map's transform..
+    const follow = this._updateTransform();
 
 // shader experiment - always render
 // this._appPending = true;
 
-    // Do APP to prepare the next frame..
+    // Do APP to prepare the next frame, if one is wanted.
+    // A frame that needs a pass waits for its turn (see `FramePacer`).
+    // Until then a frame can still move the view, and doesn't wait.
     if (this._appPending) {
-      this._timeToNextRender -= deltaMS;
+      this._app(this._passAllowed(tickStart));
 
-      if (this._timeToNextRender >= 0) {   // render later
-        return;
+      if (this._drawPending) {   // APP made a frame
+        const appEnd = window.performance.now();
+        this._measure(`app-${this._frame}`, tickStart);
 
-      } else {  // render now
-        const frame = this._frame;
-        const appStart = `app-${frame}-start`;
-        const appEnd = `app-${frame}-end`;
-        window.performance.mark(appStart);
-
-        this._app();
-
-        window.performance.mark(appEnd);
-        window.performance.measure(`app-${frame}`, appStart, appEnd);
-        // const measureApp = window.performance.getEntriesByName(`app-${frame}`, 'measure')[0];
-        // const durationApp = measureApp.duration.toFixed(1);
-        // console.log(`app-${frame} : ${durationApp} ms`);
-        return;
+        // ..and DRAW it now, if this tick has the time.
+        if (appEnd - tickStart < DRAW_SAME_TICK_MS) {
+          this._draw();
+          this._measure(`draw-${this._frame - 1}`, appEnd);
+          return;
+        }
       }
     }
+
+    // Until a frame is drawn at the map's transform, a CSS transform follows it.
+    if (follow) {
+      this._followTransform();
+    }
+  }
+
+
+  /**
+   * Leaves a measure for a DevTools performance recording (`app-N`, `draw-N`).
+   * It's removed from the page's own performance timeline, which would otherwise grow with every frame.
+   * @param name - The measure's name
+   * @param start - When the measured work started (`performance.now()`)
+   */
+  protected _measure(name: string, start: number): void {
+    const performance = window.performance;
+    performance.measure(name, { start: start, end: performance.now() });
+    performance.clearMeasures(name);
+  }
+
+
+  /**
+   * Whether the frame about to be made may do a pass: consume the redraw requests, and get a new
+   * cull box if the view needs one. A frame that wants no pass is always allowed. One that wants a
+   * pass waits for the gap after the last pass (see `FramePacer`).
+   * @param now - The current time (`performance.now()`)
+   * @return `true` if the frame may do a pass
+   */
+  protected _passAllowed(now: number): boolean {
+    const mapViewport = this.context.viewport;
+    const pixiViewport = this._pixiViewport;
+    const scene = this.scene;
+    if (!pixiViewport || !scene) return true;
+
+    // Does the view show something no layer has features for, or show it turned around?
+    const forView = !scene.cullBoxCovers(mapViewport) || pixiViewport.transform.r !== mapViewport.transform.r;
+    const wanted = forView || this._redrawRequested || this._redrawLayerIDs.size > 0;
+    return !wanted || this._pacer.wait(now, forView) === 0;
   }
 
 
@@ -514,6 +552,16 @@ export class GraphicsSystem extends AbstractSystem {
    */
   public get lastRenderFrame(): RenderFrame | undefined {
     return this._renderFrames.at(-1);
+  }
+
+
+  /**
+   * What decides when a frame may do a pass: after each pass, the next one waits for a gap that
+   * grows with what the pass cost. See "Frame pacing" in `design/graphics-system.md`.
+   * @return The frame pacer
+   */
+  public get pacer(): FramePacer {
+    return this._pacer;
   }
 
 
@@ -554,7 +602,7 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Schedules an APP pass but does not reset the timer.
+   * Asks for a redraw, when its turn comes (see `FramePacer`).
    * This is intended for most situations where new data is streaming in, but we can
    * allow the changes to batch up over several animation frames before rendering.
    *
@@ -570,15 +618,20 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Schedules an APP pass on the next available tick.
-   * If there was a DRAW pending, cancel it.
+   * Asks for a redraw on the next available tick, without waiting for a turn.
    * This is intended for interactive situations where the user did a thing and we want
    * the map to update on the next available animation frame to show their change.
    * @param layerID - The one layer whose content changed, if the caller knows nothing else did
-   *   (see `deferredRedraw`)
+   *   (see `deferredRedraw`). Then only that layer is drawn at once: whatever else is waiting for
+   *   its turn keeps waiting.
    */
   public immediateRedraw(layerID?: LayerID): void {
-    this._timeToNextRender = 0;    // asap
+    // asap: for one layer, only that layer's change. Whatever else waits for a pass keeps waiting.
+    if (layerID) {
+      this._urgentLayerIDs.add(layerID);
+    } else {
+      this._pacer.hurry();
+    }
     this._appPending = true;
     this._requestRedraw(layerID);
   }
@@ -641,18 +694,18 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * On each tick, manage the scene's transform
+   * On each tick, manage the map's transform
    * The few things we do here involve:
    *  - if there is a transform ease in progress, compute the eased transform
    *  - if the dimensions have changed, update the supersurface and overlay.
-   *  - if the transform has changed from the last drawn transform,
-   *    apply the difference to the supersurface and overlay
+   * @return `false` if the dimensions just changed, and the CSS transform should be left as it is
+   *   until the next frame is drawn (see `_followTransform`)
    */
-  protected _tform(): void {
+  protected _updateTransform(): boolean {
     // Between APP and DRAW we dont want to change the transform at all.
     // This shouldn't happen, but we check for it just in case.
-    if (this._drawPending) return;
-    if (!this._pixiViewport) return;  // not initialized yet
+    if (this._drawPending) return false;
+    if (!this._pixiViewport) return false;  // not initialized yet
 
     const context = this.context;
     const mapViewport = context.viewport;
@@ -719,14 +772,28 @@ export class GraphicsSystem extends AbstractSystem {
         }
 
         this._appPending = true;
-        this._timeToNextRender = 0;    // asap
+        this._pacer.hurry();    // asap
 
         // Return here and don't touch the temp transform anymore.
         // We are about to do APP then DRAW and will throw it out.
         // (If we modify it now, will cause the map to jump until DRAW happens)
-        return;
+        return false;
       }
     }
+
+    return true;
+  }
+
+
+  /**
+   * Follows the map's transform with a CSS transform, on ticks where no frame is drawn at it.
+   * If the transform has changed from the last drawn transform, apply the difference to the
+   * supersurface and overlay.
+   */
+  protected _followTransform(): void {
+    if (!this._pixiViewport) return;  // not initialized yet
+
+    const mapViewport = this.context.viewport;
 
     // Here we calculate a temporary CSS transform that includes
     // whatever map movements have occurred between full redraws.
@@ -764,8 +831,14 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * The "Rapid" part of the drawing.
    * Where we set up the scene graph and tell Pixi what needs to be drawn.
+   *
+   * A frame that may do a pass consumes the redraw requests, and gets a new cull box if the view
+   * needs one. A frame that may not is held: it moves the view and tells the layers that nothing
+   * changed, so the requests and the cull box wait for a later frame. If moving the view isn't
+   * enough to draw it (the zoom or rotation changed, or the view didn't move), no frame is made.
+   * @param mayPass - Whether this frame may do a pass (see `_passAllowed`)
    */
-  protected _app(): void {
+  protected _app(mayPass: boolean): void {
     // Wait for textures to be loaded before attempting rendering.
     if (!this.textureManager?.loaded) return;
     if (!this._started || this._paused) return;
@@ -777,10 +850,10 @@ export class GraphicsSystem extends AbstractSystem {
 
     const mapViewport = context.viewport;
     const pixiViewport = this._pixiViewport!;
-    const frame = new RenderFrame(this._frame, mapViewport.transform.zoom);
+    const scene = this.scene!;
 
     // At this point, the map transform is settled
-    // (`_tform` is called immediately before `_app`)
+    // (`_updateTransform` is called immediately before `_app`)
     const mapTransform = mapViewport.transform;
     const pixiTransform = pixiViewport.transform;
 
@@ -792,12 +865,25 @@ export class GraphicsSystem extends AbstractSystem {
     const dist = vecLength(pixiXY, mapXY);
     let offset;
 
+    // A held frame needs a reason (the view moved, or a layer asked to be drawn now) and features
+    // that can stay as they are: the same zoom and rotation, in the cull box they were made for.
+    // Otherwise wait for the pass. (Meanwhile the CSS transform follows the view.)
+    if (!mayPass) {
+      const tPrev = this._prevTransform;
+      const moved = tPrev.x !== mapTransform.x || tPrev.y !== mapTransform.y;
+      const urgent = this._urgentLayerIDs.size > 0;
+      const sameShape = pixiTransform.z === mapTransform.z && pixiTransform.r === mapTransform.r && dist <= 100000;
+      if (!(moved || urgent) || !sameShape || !scene.cullBox) return;
+    }
+
+    const frame = new RenderFrame(this._frame, mapTransform.zoom);
+
 // worldcoordinates
 //    if (pixiTransform.k !== mapTransform.k || dist > 100000) {
     if (pixiTransform.z !== mapTransform.z || dist > 100000) {
       offset = [0,0];
       pixiViewport.transform = mapTransform;   // reset (sync pixi = map)
-      this.scene!.dirtyScene();                // all geometry must be reprojected
+      scene.dirtyScene();                      // all geometry must be reprojected
       frame.dirtyScene = true;
     } else {
       offset = vecSubtract(pixiXY, mapXY);
@@ -805,7 +891,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     if (pixiTransform.r !== mapTransform.r) {
       pixiTransform.rotation = mapTransform.r;
-      this.scene!.dirtyScene();               // only really needs restyle
+      scene.dirtyScene();                     // only really needs restyle
       frame.dirtyScene = true;
     }
 
@@ -833,28 +919,50 @@ export class GraphicsSystem extends AbstractSystem {
     // Keep the scene's anchor near the view: within 100,000 pixels its render groups stay exact
     // to a hundredth of a pixel (see `PixiScene.worldContainer`).
     const centerWorld = mapViewport.screenToWorld(mapViewport.center());
-    if (frame.dirtyScene || vecLength(centerWorld, this.scene!.anchor) * worldScale > 100000) {
-      this.scene!.setAnchor(centerWorld);
+    if (frame.dirtyScene || vecLength(centerWorld, scene.anchor) * worldScale > 100000) {
+      scene.setAnchor(centerWorld);
     }
 
-    // Tell the layers whether something changed, or only the view moved.
-    // (Cleared before they render, so a request made while rendering counts for the next frame.)
-    frame.contentChanged = this._redrawRequested || frame.dirtyScene;
-    frame.changedLayerIDs = this._redrawLayerIDs;
-    this._redrawRequested = false;
-    this._redrawLayerIDs = new Set<LayerID>();
+    if (mayPass) {
+      // Tell the layers whether something changed, or only the view moved.
+      // (Cleared before they render, so a request made while rendering counts for the next frame.)
+      frame.contentChanged = this._redrawRequested || frame.dirtyScene;
+      frame.changedLayerIDs = this._redrawLayerIDs;
+      this._redrawRequested = false;
+      this._redrawLayerIDs = new Set<LayerID>();
+      this._urgentLayerIDs = new Set<LayerID>();
 
-    // ..and which part of the world to have features ready for: the view and some padding. It stays
-    // the same while the view moves around inside it (see "A CULL pass" in `design/graphics-system.md`).
-    frame.cullBox = this.scene!.updateCullBox(mapViewport);
+      // ..and which part of the world to have features ready for: the view and some padding. It stays
+      // the same while the view moves around inside it (see "A CULL pass" in `design/graphics-system.md`).
+      const prevCullBox = scene.cullBox;
+      frame.cullBox = scene.updateCullBox(mapViewport);
+
+      // Was there anything for a layer to do, or did only the view move?
+      this._appWasPass = frame.contentChanged || frame.changedLayerIDs.size > 0 || frame.cullBox !== prevCullBox;
+      this._pacer.begin();
+
+    } else {
+      // No pass: the redraw requests and the view's new cull box wait for a frame that may do one.
+      // Only the layers that asked to be drawn now are told that something changed.
+      frame.contentChanged = false;
+      frame.changedLayerIDs = this._urgentLayerIDs;
+      for (const layerID of this._urgentLayerIDs) {
+        this._redrawLayerIDs.delete(layerID);
+      }
+      this._urgentLayerIDs = new Set<LayerID>();
+      frame.cullBox = scene.cullBox!;
+      frame.held = this._redrawRequested || this._redrawLayerIDs.size > 0 || !scene.cullBoxCovers(mapViewport);
+      this._appWasPass = false;
+    }
 
     // Let's go!
-    this.scene!.render(frame, pixiViewport);
+    scene.render(frame, pixiViewport);
     // this._renderDebug();
 
     frame.appMs = performance.now() - frame.time;
     this._appFrame = frame;
-    this._appPending = false;
+    this._appTransform = mapTransform.props;
+    this._appPending = frame.held;   // a held frame still has its pass to come
     this._drawPending = true;
   }
 
@@ -917,15 +1025,32 @@ export class GraphicsSystem extends AbstractSystem {
 //    });
 
     // Remove any temporary parent transform..
-    if (this._isTempTransformed) {
+    const wasTempTransformed = this._isTempTransformed;
+    if (wasTempTransformed) {
       utilSetTransform(this.supersurface, 0, 0, 1, 0);
       utilSetTransform(this.overlay, 0, 0, 1, 0);
       this._isTempTransformed = false;
+    }
+
+    // The frame was drawn at the transform its APP pass saw. If the map has moved since
+    // (APP and DRAW in different ticks), the CSS transform takes up the difference.
+    const tPrev = this._prevTransform;
+    const tDrawn = this._appTransform ?? this.context.viewport.transform.props;
+    const moved = tPrev.x !== tDrawn.x || tPrev.y !== tDrawn.y || tPrev.z !== tDrawn.z || tPrev.r !== tDrawn.r;
+    this._prevTransform = tDrawn;
+    this._appTransform = null;
+
+    // The map is somewhere else on screen than before this frame: the CSS transform went away,
+    // or the frame was drawn at a new transform without one (as on every tick of a pan).
+    if (wasTempTransformed || moved) {
       this.emit('move');
     }
 
-    this._prevTransform = this.context.viewport.transform.props;
-    this._timeToNextRender = THROTTLE;
+    // After a pass, the next one waits its turn.
+    if (this._appWasPass) {
+      this._pacer.passed(window.performance.now(), (frame?.appMs ?? 0) + drawMs);
+      this._appWasPass = false;
+    }
 
     this._drawPending = false;
     this.emit('draw');

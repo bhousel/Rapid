@@ -383,6 +383,29 @@ export class PixiScene extends EventEmitter {
 
 
   /**
+   * The cull box that the last frame's layers worked from, or `null` before the first.
+   * @return The current cull box
+   */
+  public get cullBox(): Extent | null {
+    return this._cullBox;
+  }
+
+
+  /**
+   * Whether the current cull box still has what the given view needs: the view is inside it, at the
+   * zoom it was made for. If not, the next `updateCullBox()` makes a new one, and layers that
+   * gather by it do a pass.
+   * @param viewport - The map's viewport
+   * @return `true` if the view is covered
+   */
+  public cullBoxCovers(viewport: Viewport): boolean {
+    const current = this._cullBox;
+    if (!current || viewport.transform.zoom !== this._cullZoom) return false;
+    return current.contains(viewport.visibleWorldExtent());
+  }
+
+
+  /**
    * Returns the cull box for the given view: the part of the world, in world coordinates, that layers
    * should have features ready for. It is the view with `CULL_PADDING` pixels around it, and it's
    * kept (the same object) for as long as the view stays inside it at the same zoom. So while the
@@ -393,12 +416,11 @@ export class PixiScene extends EventEmitter {
    * @return The cull box
    */
   public updateCullBox(viewport: Viewport): Extent {
+    const current = this._cullBox;
+    if (current && this.cullBoxCovers(viewport)) return current;
+
     const zoom = viewport.transform.zoom;
     const view = viewport.visibleWorldExtent();
-
-    const current = this._cullBox;
-    if (current && zoom === this._cullZoom && current.contains(view)) return current;
-
     const pad = CULL_PADDING * (2 ** (WORLD_ZOOM - zoom));   // in world coordinates
     const box = new Extent(
       [view.min[0] - pad, view.min[1] - pad],

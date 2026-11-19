@@ -6,8 +6,8 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 
 > **Status:** In progress (Nov 2026). Steps 1 to 5 of the plan are done (frame stats, a script that
 > measures a set of difficult places, where the GPU time goes, a rendering info card, and the
-> `RenderFrame` passed to the layers), and so is the CULL pass for the OSM layer (section 8);
-> sections 4 and 5 aren't built. The first
+> `RenderFrame` passed to the layers), and so are the CULL pass for the OSM layer (section 8) and
+> frame pacing (section 9); sections 4 and 5 aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
 > reproduce them. The plan is in section 7.
 
@@ -27,6 +27,12 @@ Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the poi
 - **Cull box:** the part of the world a frame wants features ready for: the view, and padding around it.
 - **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view had
   moved, inside the cull box it already had everything for (section 8).
+- **Pass frame:** a frame in which layers had a pass to do: a redraw was requested, or the view needed
+  a new cull box. A frame that only moves the view isn't one.
+- **Gap:** how long a pass frame waits after the one before it. It grows with what that one cost
+  (section 9).
+- **Held frame:** a frame drawn while a pass frame waits for its gap. It moves the view, and every
+  layer that can keeps its features.
 - **DRAW pass:** Pixi's half. `pixi.render()` walks the display tree, builds its instruction list, and
   issues the GPU calls (`GraphicsSystem._draw()`).
 - **Instruction:** one entry in a Pixi render group's instruction list. Each names the pipe that runs it:
@@ -41,21 +47,36 @@ Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the poi
 ## 1. How a frame is made today
 
 `SchedulerSystem` owns the `requestAnimationFrame` loop and calls `GraphicsSystem._tick(deltaMS)` once
-per frame. A tick does at most one of the two passes, so a redraw takes two frames:
+per animation frame. A tick does this:
 
-1. Between redraws, `_tform()` follows the map's transform with a CSS transform on the `supersurface`,
-   so panning and zooming look smooth without redrawing.
-2. **APP**, when a redraw is pending and its delay has run out (`THROTTLE`, 250 ms after the last draw,
-   unless `immediateRedraw()` asked for one now). If the zoom changed, or the map moved more than
-   100,000 px, every feature is marked dirty (`scene.dirtyScene()`) and its geometry is rebuilt;
-   otherwise only the `origin` container moves. The frame is told why it's being drawn (a redraw
-   request, or only a move of the view) and gets its cull box (section 8). Then
-   `scene.render(frame, viewport)`.
-3. **DRAW**, on the next tick: resize the renderer if needed, `pixi.render()`, drop the CSS transform,
-   emit `draw`, and count the frame.
+1. **DRAW**, if an APP pass from the tick before is waiting for it, and nothing else.
+2. Otherwise `_updateTransform()` moves an eased transform along and takes up a change of the map's
+   size.
+3. **APP**, if a frame is wanted: the view moved, or a redraw was requested. `_passAllowed()` asks the
+   `FramePacer` whether this frame may do a pass (section 9).
+   - If it may: when the zoom changed, or the map moved more than 100,000 px, every feature is
+     marked dirty (`scene.dirtyScene()`) and its geometry is rebuilt; otherwise only the `origin`
+     container moves. The frame takes the redraw requests made since the last one, and its cull box
+     (section 8).
+   - If it may not, the frame is **held**: it only moves the view. The redraw requests stay where
+     they are and the cull box stays the same. If moving the view isn't enough (the zoom or the
+     rotation changed, or the view didn't move), no frame is made on this tick.
 
-Both passes already leave performance marks (`app-N`, `draw-N`). The minimap renders the same stage a
-second time into its own canvas (`UiMinimap`), which is why the renderer has `multiView` on.
+   Then `scene.render(frame, viewport)`.
+4. **DRAW in the same tick**, if the tick has used less than 8 ms so far (`DRAW_SAME_TICK_MS`), as
+   it has after a frame that only moved the view. Otherwise DRAW waits for the next tick. DRAW
+   resizes the renderer if needed, calls `pixi.render()`, drops the CSS transform, emits `move` if
+   the map is somewhere new on screen (the edit menu follows it) and `draw`, and counts the frame.
+5. On a tick that drew nothing, `_followTransform()` follows the map's transform with a CSS
+   transform on the `supersurface`, so a zoom still looks smooth while its pass waits.
+
+Both passes leave performance measures (`app-N`, `draw-N`) in a DevTools recording. The minimap renders
+the same stage a second time into its own canvas (`UiMinimap`), which is why the renderer has
+`multiView` on.
+
+Until Nov 19 a tick did one pass or the other, and an APP pass waited 250 ms after the last DRAW
+(`THROTTLE`) unless `immediateRedraw()` asked for one now, with the CSS transform carrying the view in
+between. The measurements in sections 2 to 8 were taken that way, except where they say otherwise.
 
 **What makes Rapid unlike a game:** we don't know what we're drawing until the APP pass has run. The
 user can put the map anywhere in the world, at any zoom, with any layers on. A street grid in Seattle,
@@ -584,11 +605,12 @@ limit now, before it measures.)
   it's 17 ms against 327. About 3 render groups are rebuilt in such a frame (the imagery and the
   labels), against 26 to 80 in a frame that does the pass.
 - **The cull frames can't be compared with the old pan frames like for like.** The old ones were
-  measured back to back; these come 250 ms apart, as in a real drag (no redraw is requested for a
-  pan, so each waits for the throttle). A pass that follows a 250 ms pause takes about twice as
-  long as the same pass straight after another: 21.6 ms against 11 in Seattle with nothing moving
-  at all (`gather` 1.9 against 0.6, `filter` 12 against 5.9). So real pans cost about twice what
-  section 2's table says, before and after, and the throttle is part of the reason.
+  measured back to back; these came 250 ms apart (no redraw is requested for a pan, so each waited
+  for the throttle). A pass that follows a 250 ms pause takes about twice as long as the same pass
+  straight after another: 21.6 ms against 11 in Seattle with nothing moving at all (`gather` 1.9
+  against 0.6, `filter` 12 against 5.9). That's the processor slowing down while the page is idle
+  (section 9). It makes the script's numbers too high, not a real drag's: the pointer events of a
+  drag keep the page busy.
 
 Checked by screenshot at Seattle, Staten Island and Bochum: after each of 17 pans (some inside the
 box, some out of it), the picture is the same, pixel for pixel, as after a full pass at the same
@@ -662,27 +684,13 @@ Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull fra
 
 ### What's left
 
-- **Frame pacing in place of the 250 ms throttle** (`THROTTLE`). The number is a rough guess
-  carried over from iD. It does two jobs: it keeps an expensive pass from running too often, and it
-  leaves time for input and for background work (tiles, validation; `SchedulerSystem` owns that).
-  Bryan's direction (Nov 19): let the frame rate float with what's going on, so that 60, 30 or 20
-  frames a second are reached when the work allows. Rapid isn't a game and needn't hold 60; at 10
-  it's usable and visibly laggy. Proposed, not built:
-  - A frame that only moves the view (every layer kept its features) runs on every tick, APP and
-    DRAW together. Today they take a tick each, so 30 a second is the most a pan could reach. At 3
-    to 7 ms such a frame leaves about 10 ms of a 60 fps frame to the scheduler's queues.
-  - A frame that does a pass waits its turn: the gap after a pass grows with what the pass cost, so
-    passes take a set share of the time. `immediateRedraw()` (hover, select, drag) still skips the
-    wait. The scheduler's pressure level can stretch the gap.
-  - Užice's 150 to 220 ms pass is 4 to 7 a second with nothing else running. Pacing can't fix
-    that; a cheaper pass or a pass spread over frames can.
-  - To measure first: why a pass after a pause costs twice as much (above), and how long the
-    background work takes to finish under each policy (`bun run measure` doesn't record it yet).
-- **A deadline on the frame, and work that can wait.** With the frame carrying a deadline, a layer
-  whose work can come a frame late keeps what it has and asks for another frame. Labels are the
-  first case: about 1 ms on a pan (5 in Užice), but 355 of the 386 ms a zoom change costs at Smith
-  Point, and 83 ms in Užice. The same deadline would restyle the view first after a zoom change, and the padding
-  afterwards.
+- **Frame pacing in place of the 250 ms throttle:** done, section 9.
+- **A deadline on the frame, and work that can wait.** A pass frame is still one block of work
+  (section 9, "What it doesn't fix"). With the frame carrying a deadline, a layer whose work can
+  come a frame late keeps what it has and asks for another frame. Labels are the first case: about
+  1 ms on a pan (5 in Užice), but 355 of the 386 ms a zoom change costs at Smith Point, and 83 ms
+  in Užice. The same deadline would restyle the view first after a zoom change, and the padding
+  afterwards, and spread the first pass after a load over several frames.
 - **All layers alike.** Only the OSM layer keeps its features today. The others do their pass on
   every frame, which is cheap at the places measured (the Rapid layer 0.1 to 0.6 ms) but is
   different code for the same job, and the deadline above needs every layer to say whether it has
@@ -690,3 +698,132 @@ Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull fra
 - **Make the pass cheaper.** The filter's quick fixes are done (above). Next, the vertices: don't
   gather, filter, sort and test each one when few are drawn (`design/filter-system.md` section 4).
 - **More requests could name their layer:** the photo and QA services, `VectorTileService`.
+
+## 9. Frame pacing
+
+Built Nov 19. Until then an APP pass waited 250 ms after the last DRAW, whatever it was for. The
+number was a rough guess carried over from iD, and it did two jobs: it kept an expensive pass from
+running too often, and it left time for input and for background work (tiles, validation). Since
+the CULL pass, most frames of a pan are cheap, and the two jobs can be told apart.
+
+Bryan's direction: let the frame rate float with what's going on, so that 60, 30 or 20 frames a
+second are reached when the work allows. Rapid isn't a game and needn't hold 60. At 10 it's usable
+and visibly laggy. Keep leaving time for the background work.
+
+### The rule
+
+A frame that has no pass to do is drawn on the next tick, APP and DRAW together. A pass frame waits
+its turn, and how long depends on why it's wanted:
+
+| Why the pass is wanted | It waits |
+|---|---|
+| `immediateRedraw()`: the user did something | Not at all |
+| `immediateRedraw(layerID)`: one layer has something to show now (a label texture) | That layer is drawn on the next tick. Anything else that's waiting keeps waiting. |
+| The view needs it: it left the cull box, or the zoom or rotation changed | The gap: twice what the last pass frame cost (APP and DRAW together), at most 250 ms |
+| `deferredRedraw()`: data arrived | The gap, and at least 250 ms after the last pass frame, so that arrivals batch up |
+
+So passes take at most a third of the time, nothing waits longer than it did before, and data
+arriving is drawn as often as before.
+
+**While a pass frame waits**, the view doesn't have to: a held frame is drawn on every tick that the
+view moved. It tells the layers that nothing changed and gives them the cull box they had, so the
+OSM layer keeps its features (`keepFeatures()` says yes in a held frame even for features marked
+dirty since). The view shows what the last pass made, in the right place, with the 256 px of
+padding to move into. A held frame can't follow a change of zoom or rotation, because features are
+styled for their zoom. Then no frame is made, and the CSS transform carries the view as it always
+did.
+
+`FramePacer` (`modules/pixi/lib/`) holds the rule. It has no clock of its own: `GraphicsSystem`
+tells it when a pass begins and what it cost, and asks how long the next must wait
+(`gfx.pacer`). A frame records whether it was held (`RenderFrame.held`), and the rendering card
+shows how many frames were drawn in the last second.
+
+### A pass after a pause costs twice as much, because the processor slowed down
+
+The same pass (Staten Island, nothing changing, APP ms), run after a gap of the given length. In
+one case the page did nothing during the gap, in the other it kept the main thread busy:
+
+| Gap before the pass | 0 | 17 ms | 50 ms | 100 ms | 250 ms | 1 s |
+|---|---|---|---|---|---|---|
+| Page idle | 29 | 27 | 35 | 40 | 54 | 57 |
+| Main thread busy | | 27 | 27 | 26 | 27 | 27 |
+
+It isn't the JIT, the caches or garbage collection: a busy thread stays fast for a full second.
+The processor (an M4) slows an idle thread down within 50 ms, and the spatial query suffers most
+(`gather` 2.5 → 10 ms). What follows:
+
+- **Frames on every tick keep it fast.** A pass in the middle of a pan drawn at 60 frames a second
+  runs at the fast cost.
+- **A drag was never slow this way.** Its pointer events keep the page busy. It was the measuring
+  script's pans, with nothing happening between them, that paid double.
+- **One action after a pause still pays it** (a hover, a click). Nothing to do about that.
+- `bun run measure`'s redraw frames run back to back, so they show the fast cost.
+
+### What it does
+
+Staten Island (z16.5, 18,500 features shown), old build then new in one session (Nov 19).
+
+**A drag with real pointer events**, 600 px out and back, about 30 events a second from the script:
+
+| | Before | After |
+|---|---|---|
+| Frames drawn | 17 in 4.3 s (4 a second) | 134 in 4.6 s (29 a second, one per pointer event) |
+| Between frames (median) | 296 ms | 33 ms |
+| View-only frames, APP + DRAW | 1.5 + 1.5 ms | 1.1 + 1.1 ms |
+| Pass frames when the view left the cull box | 3 at 42 + 8 ms | 4 at 38 + 8 ms |
+| Main thread time in ticks | 0.42 s (10%) | 0.79 s (17%) |
+| Animation frames longer than 25 ms / 50 ms | 4 / 3 | 6 / 1 |
+
+**A pan on every animation frame** (from a script, 5 px a frame): 237 frames in 4.1 s, 57 a
+second, with 29% of the main thread's time in ticks. At 15 px a frame (900 px a second, into
+unloaded territory): 46 a second, with a pass frame every 280 ms or so at 45 + 14 ms, and 20 of 240
+animation frames longer than 25 ms.
+
+**Loading isn't held up.** Time until Staten Island had loaded and the scheduler was idle, one run
+each:
+
+| | Before | After |
+|---|---|---|
+| Map still | 31.9 s (7 frames) | 31.9 s (5 frames) |
+| Panning on every animation frame meanwhile | 37.9 s (133 frames, 8.8 s of main thread) | 37.4 s (2,163 frames, 13.2 s of main thread) |
+
+Loading waits on the network: of the 32 s, the main thread works for about 6 (5 on the scheduler's
+queues, 1 drawing). Sixteen times the frames made no difference to it, which is why the gap doesn't
+look at the scheduler's pressure level. That can be added if a case turns up.
+
+**`bun run measure` (pan frames, ms), now that they come a tick apart:** Seattle's view-only frames
+1.2 APP + 1.3 DRAW and its pass frames 18 + 12; Staten Island 1.4 + 1.3 and 40 + 9; Užice 5.0 +
+4.6 and 182 + 54. The script also has a `glide` measurement now: the view moves on every animation
+frame along the pan path, and it reports the frames drawn a second, the animation frames longer
+than 25 ms, and what a pass frame cost in the middle of it. Seattle: 58 a second, 2 long of 240,
+31 ms. Staten Island: 57, 4 and 67 ms.
+
+**Start-up in the e2e tests** (software rendering, five pages at once; medians of 40 runs): OSM
+data is on screen 8.2 s after the page opens where it was 8.7, and a Rapid dataset shows 0.2 s
+after it's turned on where it took 1.0. The first frame's DRAW pass used to block for 3.3 s there
+and now takes 3 ms; the cost shows up later, in the first frame with features (1.4 s where it was
+0.7). Why the first one blocked isn't traced. One side effect: the page answers the tests sooner,
+while it's still busy starting, so the welcome screen (which fades out over animation frames) took
+longer to close after its Escape, and the tests' start-up helper waits longer for it now.
+
+**Checked by screenshot** at Staten Island: after 6 pans, and after an eased zoom in, pan, rotation
+and rotation back, the settled picture is the same, pixel for pixel, as after a full pass at the
+same view. A held frame after a pan out of the cull box is the same as the full pass over the part
+the old box covers.
+
+### What it doesn't fix
+
+- **A pass frame is one block of work.** When the view leaves the cull box at Staten Island, that's
+  45 to 80 ms in two ticks, three to five animation frames missed. The first pass after a load is
+  790 ms. Pacing decides how often that happens, not how long it takes: a cheaper pass, or a pass
+  spread over frames (section 8, "What's left"), does.
+- **Užice's pass frame is 240 ms.** With the longest gap after it, that's about two a second, as
+  before.
+- **Zooming is as it was:** a restyle of everything, at most every 250 ms in dense places, with the
+  CSS transform in between.
+- **Layers without `keepFeatures()` do their pass in a held frame too.** Cheap so far (section 8).
+- **`draw` is emitted for every frame, up to 60 times a second** where it was 4. It has about 20
+  listeners, and most throttle themselves. Together they took 0.3 ms a frame at Staten Island (cards
+  closed), 0.6 with the minimap shown. A new listener should throttle itself.
+- **The OSM layer asks for the view's tiles on every frame** (`context.loadTiles()`), which is part
+  of the 1 to 2 ms a view-only frame's APP pass takes.

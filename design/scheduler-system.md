@@ -43,7 +43,7 @@ This replaces `PIXI.Ticker` entirely. The features we used from it (`deltaMS`, s
 scheduler._onFrame(timestamp)          ← owns the rAF
   ├─ compute deltaMS, record frame start
   ├─ gfx._tick(frameBudgetMs)          ← scheduler calls graphics
-  │   ├─ _tform()                      — transform easing, viewport sync
+  │   ├─ _updateTransform()            — transform easing, viewport sync
   │   ├─ _app()                        — scene graph updates
   │   └─ _draw()                       — pixi.render()
   ├─ mature expired timers into idle queue
@@ -56,7 +56,7 @@ scheduler._onFrame(timestamp)          ← owns the rAF
 
 **Boundary**: The scheduler owns *when* work happens. GraphicsSystem owns *what* rendering work to do. The scheduler doesn't import Pixi or know about the scene graph. GraphicsSystem doesn't call `requestAnimationFrame` or track frame timing.
 
-**Frame rate target**: The scheduler owns the target frame rate and computes the per-frame budget. It can dynamically adjust (e.g., drop from 60fps to 30fps under heavy pressure). GraphicsSystem's existing `THROTTLE = 250ms` logic (skip rendering for 250ms after each draw) stays in GraphicsSystem — that's a rendering concern about how often to re-prepare the scene graph, not a frame-timing concern.
+**Frame rate target**: The scheduler owns the target frame rate and computes the per-frame budget. It can dynamically adjust (e.g., drop from 60fps to 30fps under heavy pressure). How often GraphicsSystem re-prepares the scene graph stays in GraphicsSystem — that's a rendering concern, not a frame-timing concern. (Until Nov 2026 that was a fixed `THROTTLE = 250ms` after each draw. Now a `FramePacer` spaces the expensive frames by what they cost, and cheap ones are drawn on every tick: see "Frame pacing" in [`graphics-system.md`](graphics-system.md).)
 
 **Context loss**: When WebGL context is lost, GraphicsSystem calls `scheduler.pause()` (which it already supports via the reference-counted pause/resume mechanism). On context restore, it releases the pause. The scheduler stops the rAF loop while paused and resumes it on unpause.
 
@@ -461,7 +461,7 @@ Resolved design questions (kept for context):
 
 1. **Frame callback registration API** — Should GraphicsSystem call `scheduler.addFrameCallback(fn)` to register, or should the scheduler call `gfx._tick()` directly? The callback approach is more decoupled (any system could register frame work), but direct calling is simpler and GraphicsSystem is the only consumer for now. Leaning toward callback registration for extensibility.
 
-2. **Render throttle interaction** — GraphicsSystem currently throttles rendering to every 250ms via `_timeToNextRender`. With the scheduler owning frame timing, should this logic move to the scheduler (as a render-specific policy), or stay in GraphicsSystem (since it's a rendering concern)? Leaning toward keeping it in GraphicsSystem — the scheduler provides the budget, GraphicsSystem decides whether it's time to actually re-render.
+2. **Render throttle interaction** — GraphicsSystem currently throttles rendering to every 250ms via `_timeToNextRender`. With the scheduler owning frame timing, should this logic move to the scheduler (as a render-specific policy), or stay in GraphicsSystem (since it's a rendering concern)? Leaning toward keeping it in GraphicsSystem — the scheduler provides the budget, GraphicsSystem decides whether it's time to actually re-render. **Answered (Nov 2026):** it stayed in GraphicsSystem, as a `FramePacer` (see "Frame pacing" in [`graphics-system.md`](graphics-system.md)). It doesn't read the scheduler's pressure level: loading a dense place took the same time with 16 times the frames drawn, because loading waits on the network.
 
 3. **`performance.now()` vs `timestamp` from rAF** — `requestAnimationFrame` provides a `DOMHighResTimeStamp`. Should we use that as the frame's reference time, or call `performance.now()` ourselves? The rAF timestamp is more accurate (it's the time the frame started, not when our callback runs). Leaning toward using the rAF timestamp.
 

@@ -44,12 +44,17 @@ Still to do, in about this order:
   section 3), and the OSM layer has a CULL pass (Nov 19, `graphics-system.md` section 8):
   it has features ready for the view plus 256 px, and skips its work on frames
   where only the view moved inside that. A pan frame at Staten Island went from about 50 ms to 3.
-  `FilterSystem` got quick fixes and a design doc (Nov 19, [`design/filter-system.md`](../design/filter-system.md);
-  not committed yet): its step of the OSM pass is a third of what it was (Staten Island's pass 55
-  → 32 ms). Its rethink (level of detail) is for after this branch.
+  `FilterSystem` got quick fixes and a design doc (Nov 19, [`design/filter-system.md`](../design/filter-system.md)):
+  its step of the OSM pass is a third of what it was (Staten Island's pass 55 → 32 ms). Its rethink
+  (level of detail) is for after this branch.
+  **Frame pacing replaced the 250 ms throttle** (Nov 19, `graphics-system.md` section 9; not
+  committed yet): a frame that only moves the view is drawn on the next tick, and a frame with a
+  pass to do waits twice what the last one cost (at most 250 ms), with held frames moving the view
+  meanwhile. A drag at Staten Island draws 29 frames a second (one per pointer event) where it
+  drew 4, and loading takes the same time.
   **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
-  Next in section 8, "What's left": frame pacing in place of the 250 ms throttle, a deadline on the
-  frame so work like labels can wait, all layers keeping their features the same way.
+  Next in section 8, "What's left": a deadline on the frame so work like labels can wait and a
+  pass can be spread over frames, all layers keeping their features the same way.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

@@ -245,6 +245,14 @@ export class UiRenderingCard extends AbstractUiCard {
 
     const rows: Row[] = [];
 
+    // How many frames were drawn in the last second, and in how many of them a pass was held back
+    const held = recent.filter(frame => frame.held).length;
+    rows.push({
+      id: 'frames',
+      label: l10n.t('info_panels.rendering.frames'),
+      value: l10n.t(`info_panels.rendering.${held ? 'frames_held' : 'frames_drawn'}`, { frames: count(recent.length), held: count(held) })
+    });
+
     // Times. The bars use the chart's scale: two frame budgets wide.
     const times: [string, number | undefined][] = [
       ['app', average(sample.map(frame => frame.appMs))],

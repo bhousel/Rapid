@@ -279,7 +279,7 @@ describe('PixiScene', () => {
     }
 
     beforeEach(() => {
-      scene = { _cullBox: null, _cullZoom: 0 };
+      scene = { _cullBox: null, _cullZoom: 0, cullBoxCovers: PixiScene.prototype.cullBoxCovers };
     });
 
     it('pads the view by 256 pixels on each side', () => {
@@ -321,6 +321,16 @@ describe('PixiScene', () => {
       const box = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10000, 20000]));
       const zoomed = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16.5, [10100, 20100]));
       assert.notStrictEqual(zoomed, box);
+    });
+
+    it('says whether the current box covers a view, without changing it', () => {
+      assert.isFalse(scene.cullBoxCovers(viewportAt(16, [10000, 20000])));   // no box yet
+
+      const box = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10000, 20000]));
+      assert.isTrue(scene.cullBoxCovers(viewportAt(16, [10200, 19800])));     // inside the padding
+      assert.isFalse(scene.cullBoxCovers(viewportAt(16, [10300, 20000])));    // past it
+      assert.isFalse(scene.cullBoxCovers(viewportAt(16.5, [10100, 20100])));  // another zoom
+      assert.strictEqual(scene._cullBox, box);
     });
   });
 });

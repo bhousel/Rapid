@@ -67,7 +67,7 @@ describe('UiRenderingCard', () => {
   it('shows the times of the APP and DRAW passes, the features and Pixi\'s instructions', () => {
     makeCard(makeContext([makeFrame(1, 9.7, 0.8)]));
 
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'features', 'layers', 'instructions', 'groups']);
+    assert.deepEqual(rowIDs(), ['frames', 'app', 'draw','features', 'layers', 'instructions', 'groups']);
     assert.include(valueOf('groups'), '3.0 98');      // rebuilt per frame, then all
     assert.include(valueOf('app'), '9.7');
     assert.include(valueOf('draw'), '0.8');
@@ -79,7 +79,7 @@ describe('UiRenderingCard', () => {
   it('shows GPU time and WebGL calls only for frames that have them', () => {
     makeCard(makeContext([makeFrame(1, 9.7, 0.8, 6.1)]));
 
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'gpu', 'features', 'layers', 'instructions', 'groups', 'webgl']);
+    assert.deepEqual(rowIDs(), ['frames', 'app', 'draw','gpu', 'features', 'layers', 'instructions', 'groups', 'webgl']);
     assert.include(valueOf('gpu'), '6.1');
     assert.include(valueOf('webgl'), 'draws 50');
   });
@@ -88,9 +88,26 @@ describe('UiRenderingCard', () => {
     const frames = [makeFrame(1, 9.7, 0.8), makeFrame(2, 2, 2, undefined, true), makeFrame(3, 2, 2, undefined, true)];
     makeCard(makeContext(frames));
 
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'features', 'layers', 'kept', 'instructions', 'groups']);
+    assert.deepEqual(rowIDs(), ['frames', 'app', 'draw','features', 'layers', 'kept', 'instructions', 'groups']);
     assert.strictEqual(valueOf('kept'), 'osm 2/3');
     assert.include(valueOf('groups'), '1.0 98');   // 3, 0 and 0 rebuilt
+  });
+
+  it('counts the frames drawn in the last second, and the ones that held a pass back', () => {
+    const frames = [makeFrame(1, 9.7, 0.8), makeFrame(2, 2, 2, undefined, true), makeFrame(3, 2, 2, undefined, true)];
+    const context = makeContext(frames);
+    const card = makeCard(context);
+    assert.strictEqual(valueOf('frames'), 'info_panels.rendering.frames_drawn 3 0');
+
+    frames[1].held = true;
+    card.render();
+    assert.strictEqual(valueOf('frames'), 'info_panels.rendering.frames_held 3 1');
+
+    for (const frame of frames) {
+      frame.time -= 5000;   // drawn a while ago
+    }
+    card.render();
+    assert.strictEqual(valueOf('frames'), 'info_panels.rendering.frames_drawn 0 0');
   });
 
   it('averages the times of the frames drawn in the last second', () => {
@@ -118,7 +135,7 @@ describe('UiRenderingCard', () => {
 
     assert.strictEqual($container.select('.rendering-row-app').node(), appRow);
     assert.include(valueOf('app'), '12.5');
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'gpu', 'features', 'layers', 'instructions', 'groups', 'webgl']);
+    assert.deepEqual(rowIDs(), ['frames', 'app', 'draw','gpu', 'features', 'layers', 'instructions', 'groups', 'webgl']);
   });
 
   it('shows no rows before the first frame is drawn', () => {

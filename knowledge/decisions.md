@@ -174,6 +174,23 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 - **DashLine halos: `scale` only, no per-caller workaround** — DashLine's `scale` option multiplies `width` and each `dash[i]` to convert drawing-coord units to screen pixels. Line/Polygon halo containers have `scale=1` (drawing in world units), so they pass `scale: 2^(WORLD_ZOOM - zoom)` (a.k.a. `localScale`) to keep dashes at fixed screen-pixel sizes. Point halo containers have a counter-scale (`1/worldScale`) that puts halo-local units in CSS pixels, so `scale=1` (default) is correct. DashLine itself uses `textureSpace: 'global'` (normalizes UV by texture pixel dimensions, no per-segment stretch), keeps pow2 padding for WebGL1 REPEAT-wrap, and compensates in the per-segment matrix using `texW`/`texH` instance fields so one full cycle covers exactly `dashSize * userScale` local units. Matrix composed scale-then-rotate for non-uniform scale correctness.
 - **`viewZoom` vs `styleZoom` naming convention** — Throughout the Pixi layer and feature files: `viewZoom = viewport.transform.zoom` is used for scale chain math (world↔screen scale factors, `worldScale = 2^(viewZoom - WORLD_ZOOM)`). `styleZoom = map?.effectiveZoom() ?? viewZoom` is the latitude-adjusted zoom used only for LOD thresholds (`< 16`, `< 17`) and styling decisions. The two are explicitly named at the top of each method that needs both. `PixiFeaturePolygon` has no LOD thresholds so it only has `viewZoom` — intentional.
 
+## Frame pacing (Nov 2026)
+
+- **Frames that only move the view aren't paced; frames with a pass to do are, by their cost.**
+  After a pass frame the next waits twice what it cost, at most 250 ms (`FramePacer`,
+  `design/graphics-system.md` section 9). A deferred redraw request alone waits at least 250 ms, as
+  it did under the fixed throttle, so data that streams in still batches up.
+- **Why twice the cost:** passes then take at most a third of the time, and with the 250 ms cap
+  nothing waits longer than it did. Not tuned further; change it with measurements.
+- **Rejected: tying the gap to the scheduler's pressure level.** Loading Staten Island took the
+  same time (37 s while panning) with 2,163 frames drawn as with 133: loading waits on the network.
+  Add it if a case shows background work being held up.
+- **Rejected: a held frame during a zoom.** Features are styled for their zoom (stroke widths in
+  world units, screen-sized markers), so the old ones can't be drawn at a new zoom. The CSS
+  transform still covers that.
+- **`immediateRedraw(layerID)` hurries only that layer.** Label textures ask for it several times
+  a second during a pan; if that hurried everything, no pass would ever wait its turn.
+
 ## World coordinates and their numerics
 
 - **SDK-native z16 world coordinates are the one world space** (`@rapid-sdk/math`, `WORLD_ZOOM = 16`,

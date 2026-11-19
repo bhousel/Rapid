@@ -161,6 +161,30 @@ describe('AbstractPixiLayer', () => {
       assert.isTrue(a.visible);
     });
 
+    it('keeps its features in a held frame, even dirty ones or with another cull box, and does the pass after', () => {
+      const a = addFeature('a');
+      const b = addFeature('b');
+      runFrame(makeFrame(), [a, b]);
+
+      layer.dirtyFeatures('a');
+      const otherBox = new Rapid.sdk.Extent([50, 50], [150, 150]);
+      assert.isTrue(runFrame(makeFrame({ held: true }), [a]));                       // marked dirty
+      assert.isTrue(runFrame(makeFrame({ held: true, cullBox: otherBox }), [a]));    // (GraphicsSystem keeps the box, but still)
+      assert.isTrue(b.visible);   // nothing was culled
+
+      assert.isFalse(runFrame(makeFrame(), [a]));   // the pass it still owed
+      assert.isFalse(b.visible);
+    });
+
+    it('does a pass in a held frame when the layer itself asked to be drawn now', () => {
+      const a = addFeature('a');
+      runFrame(makeFrame(), [a]);
+
+      const changedLayerIDs = new Set(['osm']);
+      assert.isFalse(runFrame(makeFrame({ held: true, changedLayerIDs: changedLayerIDs }), [a]));
+      assert.isTrue(runFrame(makeFrame({ held: true, changedLayerIDs: new Set(['labels']) }), [a]));
+    });
+
     it('destroys a feature that 20 passes haven\'t seen, not counting the frames it kept its features', () => {
       const a = addFeature('a');
       const b = addFeature('b');

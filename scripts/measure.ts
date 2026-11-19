@@ -23,8 +23,11 @@ import { parseArgs, styleText } from 'node:util';
 // - pan:     the view moved 100 px since the last frame, over an area it has shown before
 //            (so it measures moving the view, not making new features or loading data).
 //            Most pan frames only move the view; about one in three leaves the cull box, and the
-//            OSM layer does its whole pass ("cull" in the table). No redraw is requested for these,
-//            so each waits for the 250 ms throttle, as a real drag does.
+//            OSM layer does its whole pass ("cull" in the table). No redraw is requested for these:
+//            a frame that only moves the view is drawn on the next tick, and a pass waits for the
+//            gap after the last one (`FramePacer`), with held frames in between, as in a real drag.
+// - glide:   the view moves a little on every animation frame, along the same path. It reports how
+//            many frames a second were drawn and how many animation frames ran long.
 // - restyle: every feature is restyled (what a zoom change costs)
 //
 // OSM changes, so a place can stop being difficult. Add new ones here, and to the table in the design doc.
@@ -155,13 +158,15 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
   // Draws one frame after `change()`, and waits until it's done.
   // (A frame that began before the change doesn't count: both of its passes must come after.)
   // A redraw request says that something changed, so every layer does its work. A pan doesn't make
-  // one: moving the view is enough to get a frame (up to 250 ms later, as when a user drags the map),
-  // and layers that already have what the view needs can keep their features as they are.
+  // one: moving the view is enough to get a frame, and layers that already have what the view needs
+  // can keep their features as they are. If the view needs a pass that has to wait its turn, the
+  // frames until then are held (they only move the view); this waits for the one after them.
   const drawFrame = async (change?: () => void, request = true) => {
     const since = performance.now();
     change?.();
     if (request) gfx.immediateRedraw();
-    while (!(gfx.lastRenderFrame?.time >= since)) await nextFrame();
+    const isDone = () => { const last = gfx.lastRenderFrame; return last?.time >= since && !last.held; };
+    while (!isDone()) await nextFrame();
   };
 
   // Panning: the view moves by this much between frames, a few steps one way, then back, and so on.
@@ -241,15 +246,46 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
     };
   };
 
+  // Glide: the view moves a little on every animation frame, along the pan path and back, twice, as
+  // a smooth drag does. How many frames a second get drawn, and how many animation frames ran long
+  // (stutter the user would see)? It keeps the page busy, so its pass frames show what a pass costs
+  // in the middle of a drag (see "Frame pacing" in the design doc).
+  const measureGlide = async () => {
+    const GLIDE_TICKS = 240;
+    const LEG = GLIDE_TICKS / 4;
+    const step = [PAN_STEP[0] * PAN_LEG / LEG, PAN_STEP[1] * PAN_LEG / LEG];   // pixels per animation frame
+    const startID = gfx.lastRenderFrame?.id ?? -1;
+    const stamps: number[] = [];
+    const start = performance.now();
+    for (let i = 0; i < GLIDE_TICKS; i++) {
+      const sign = (Math.floor(i / LEG) % 2 === 0) ? 1 : -1;
+      map.pan([step[0] * sign, step[1] * sign]);
+      stamps.push(await nextFrame() as number);
+    }
+    const ms = performance.now() - start;
+    const drawn = gfx.renderFrames.filter((f: any) => f.id > startID);   // the most recent of them
+    const passes = drawn.filter((f: any) => !f.layers.get('osm')?.kept);
+    const frames = (gfx.lastRenderFrame?.id ?? -1) - startID;
+    return {
+      ticks: GLIDE_TICKS,
+      ms: Math.round(ms),
+      frames: frames,
+      fps: +(frames / (ms / 1000)).toFixed(1),
+      longFrames: stamps.filter((stamp, i) => i > 0 && stamp - stamps[i - 1] > 25).length,
+      passMs: median(passes.map((f: any) => f.appMs + f.draw.ms))
+    };
+  };
+
   gfx.enableDetailedStats(true);
   const redraw = await measure('redraw');
   const restyle = await measure('restyle');
   const pan = await measure('pan');   // last: it brings more features into the scene
   gfx.enableDetailedStats(false);
+  const glide = await measureGlide();
 
   await map.setMapParamsAsync(args.loc, args.zoom, 0, 0);   // back to where the place is
 
-  return { loadMs, loaded, zoom: gfx.lastRenderFrame?.zoom, redraw, pan, restyle };
+  return { loadMs, loaded, zoom: gfx.lastRenderFrame?.zoom, redraw, pan, glide, restyle };
 }
 
 
@@ -259,6 +295,7 @@ const cols = [
   ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6],
   ['| pan APP', 10], ['DRAW', 6], ['GPU', 6],
   ['| cull APP', 11], ['DRAW', 6], ['of', 5],
+  ['| glide fps', 11], ['long', 5], ['pass', 6],
   ['| restyle APP', 14], ['DRAW', 6], ['GPU', 6]
 ] as const;
 const row = (vals: (string | number | null | undefined)[]) =>
@@ -294,6 +331,7 @@ for (const place of places) {
       r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched,
       r.pan.kept.appMs, r.pan.kept.drawMs, r.pan.kept.gpuMs,
       r.pan.pass.appMs, r.pan.pass.drawMs, `${r.pan.pass.frames}/${r.pan.frames}`,
+      r.glide.fps, r.glide.longFrames, r.glide.passMs,
       r.restyle.appMs, r.restyle.drawMs, r.restyle.gpuMs
     ]));
     results.push({ ...place, ...r });
@@ -306,8 +344,11 @@ for (const place of places) {
 console.log('\nTimes in ms. The first group is a frame where nothing changed. load ends with ! if the data was');
 console.log('still loading after a minute. visible = features shown, also those in the padding around the view.');
 console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch.');
-console.log('pan = pan frames where the OSM layer kept its features as they were. cull = pan frames where it');
-console.log('did its whole pass, because the view left the cull box (or something else changed); of = how many.');
+console.log('pan = pan frames where the OSM layer kept its features as they were (also while a pass was held');
+console.log('back). cull = pan frames where it did its whole pass, because the view left the cull box (or');
+console.log('something else changed); of = how many. glide = the view moving on every animation frame for');
+console.log('240 of them: frames drawn a second, animation frames longer than 25 ms, and what a frame with');
+console.log('a pass cost (APP + DRAW) in the middle of that.');
 
 if (values.out) {
   writeFileSync(values.out, JSON.stringify({ date: new Date().toISOString(), runs, env, places: results }, null, 2));

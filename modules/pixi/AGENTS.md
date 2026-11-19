@@ -42,8 +42,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 
 ## Frames, passes and redraw requests
 
-How a frame is made, and the CULL pass, are in [`design/graphics-system.md`](../../design/graphics-system.md)
-(sections 1, 3 and 8). The rules that come out of it:
+How a frame is made, the CULL pass and frame pacing are in [`design/graphics-system.md`](../../design/graphics-system.md)
+(sections 1, 3, 8 and 9). The rules that come out of it:
 
 - **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
   on to the layer's own `render…()` helpers.
@@ -63,6 +63,17 @@ How a frame is made, and the CULL pass, are in [`design/graphics-system.md`](../
   view itself (the labels, the imagery tiles).
 - **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
   it, and a layer that kept its features did no pass.
+- **A layer's `render()` can run 60 times a second.** While the view moves, a frame is drawn on
+  every tick. Whatever a layer does before `keepFeatures()`, and everything in a layer that doesn't
+  call it, is paid on each one. The same goes for listeners to `gfx`'s `draw` event: throttle them
+  (`scheduler.throttle()`).
+- **`immediateRedraw()` is for something the user did.** It skips the wait that spaces out
+  expensive frames. With a layer's ID, only that layer is drawn at once (in a held frame, if a pass
+  is waiting). For data that arrived, use `deferredRedraw()`.
+- **Don't change the frame loop's timing without measuring it.** `bun run measure` reports frames
+  a second and long animation frames while the view moves on every animation frame (`glide`), and
+  section 9 has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
+  tests; `test/e2e/rendering.test.js` checks it in a browser.
 
 ## Working with Services
 
