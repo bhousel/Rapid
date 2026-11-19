@@ -15,7 +15,8 @@ import { parseArgs, styleText } from 'node:util';
 //   bun run measure --list                  List the places
 //
 // Without `--fresh`, everything loaded at earlier places stays in memory and in the scene, so the
-// numbers depend on the order. Use `--fresh` to compare one build with another.
+// numbers depend on the order. Use `--fresh` to compare one build with another, but not in a loop:
+// it downloads every place again from the OSM API. A place that shows 0 visible features didn't load.
 //
 // At each place it waits for the data to load, then measures two kinds of frame:
 // - redraw:  nothing changed, the scene is drawn again (what panning costs)
@@ -213,8 +214,15 @@ for (const place of places) {
         location.hash = params.toString().replaceAll('%2F', '/');
       }, place.map);
       await page.reload();
-      await page.waitForFunction(() => (globalThis as any).rapidContext?.systems?.editor?.started, null, { timeout: 120000 });
-      await page.keyboard.press('Escape');   // close the welcome screen
+      await page.waitForFunction(() => (globalThis as any).rapidContext?.systems?.ui?.started, null, { timeout: 120000 });
+      // Close whatever the UI opened at startup. Nothing loads while the restore prompt is open, and
+      // Escape doesn't close it. "Skip for now" keeps the saved sessions.
+      const skipRestore = page.locator('.restore-skip');
+      if (await skipRestore.count()) {
+        await skipRestore.click();
+      } else {
+        await page.keyboard.press('Escape');   // the welcome screen
+      }
     }
     const r = await page.evaluate(measurePlace, { loc, zoom, runs });
     const visible = Object.values(r.redraw.layers).reduce((sum: number, l: any) => sum + l.visible, 0);

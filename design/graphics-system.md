@@ -4,8 +4,8 @@ How `GraphicsSystem` turns the map into a frame, what we know about what a frame
 explorations planned to make frames cheaper. Rendering performance is where Rapid has the most room to
 improve, and until now we've had no way to see it except spot checks in Spector.
 
-> **Status:** In progress (Nov 2026). Steps 1 and 2 of the plan (frame stats, and a script that
-> measures a set of difficult places) are built; the rest of sections 4–6 isn't. The first
+> **Status:** In progress (Nov 2026). Steps 1 to 3 of the plan are done (frame stats, a script that
+> measures a set of difficult places, and where the GPU time goes); sections 4 and 5 aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
 > reproduce them. The plan is in section 7.
 
@@ -144,11 +144,16 @@ What that says:
   (292 of 319). In Užice they're 168 of 2,061, and the 1,213 unbatched `Graphics` (ways over 200
   vertices) dominate. Steps 6 and 7 are both needed.
 - **About 5 ms of GPU time is fixed.** Heybridge draws 25 calls and still takes 4.7 ms; only Užice goes
-  far beyond 7 ms. So the GPU question (section 6) is mostly about a fixed cost per frame, not about
-  what we draw.
+  far beyond 7 ms. So the GPU question is mostly about a fixed cost per frame, not about what we draw.
+  Section 6 takes it apart.
 - **Užice's background work runs for minutes.** Its data loaded within the minute, but the
-  scheduler's idle queue still had work after 90 seconds and took several minutes to drain. Not
-  looked at yet.
+  scheduler's idle queue still had work after 90 seconds and took several minutes to drain. Probably
+  the validator working through everything that loaded (Bryan's guess); not confirmed yet.
+- **A reload right after Užice sometimes showed no OSM data at all** (three times), with nothing in
+  flight and no rate limit showing a minute later. Not explained. One thing that makes it stick:
+  `OsmService.loadTiles()` returns early while the view is unchanged, so tiles that failed aren't
+  asked for again until the map moves. `--fresh` downloads every place again from the OSM API (Užice
+  is 36 tiles), so don't run it in a loop.
 - Without `--fresh`, the scene keeps every feature from the places before (84,000 in the OSM layer at
   Bochum, 2,400 of them visible; culling them took 4.6 ms) and `FilterSystem` kept 434,000 cache
   entries. Rapid never drops data the user has scrolled away from; that's for
@@ -301,17 +306,60 @@ Then the per-dash mode can go.
 
 ## 6. GPU time
 
-About 9 ms a frame on an M4 in Seattle, whatever the draw calls, and about 5 ms even where almost
-nothing is drawn (section 2, the difficult places). Candidates to rule in or out, one toggle at a time:
+6 to 9 ms a frame on an M4 in Seattle, whatever the draw calls, and about 5 ms even where almost
+nothing is drawn (section 2, the difficult places). Step 3 of the plan took it apart (Nov 18).
 
-- Pixels: the canvas at device pixel ratio 2, times MSAA (`antialias: highQuality`). Compare with
-  `highQuality` off.
-- Stencil work for the masks (part of the 1 ms difference in the table).
-- `preserveDrawingBuffer: true`, which can stop the browser from discarding the buffer after compositing.
-- `multiView`: Pixi renders into a hidden WebGL canvas and then copies it onto the visible canvas with
-  a 2D `drawImage()` every frame (`GlRenderTargetAdaptor.postrender`). The timer query doesn't see that
-  copy, so its cost has to be measured another way (DevTools' GPU track, or Chrome's tracing).
-- Overdraw: full-screen imagery under translucent fills, casings and strokes.
+**Most of it is three fixed costs, and what Rapid draws is the small part.** In Seattle, of 6.1 ms:
+
+| Part | GPU ms | What it is |
+|---|---|---|
+| An empty frame | 2.9 | Clearing and resolving a 2556×2334 canvas with 4× MSAA, and `multiView`'s copy (about 1.5 of it) |
+| The imagery filter | 2.1 | The `AdjustmentFilter` on the base imagery, at its default values |
+| The imagery itself | 0.1 | |
+| All OSM features | 1.0 | 769 of the 771 draw calls. The partial-fill masks are about 0.6 of it |
+
+How it was measured: each row below is a fresh load with one renderer option changed, or one part of
+the scene hidden just before rendering. The number is the GPU time of one more render when the GPU is
+busy (a burst of 32 renders against a burst of 8, ended by a `readPixels()`), from the timer query.
+Wall-clock time for the same bursts agrees within about 1 ms, so the timer query can be trusted. A
+single render on an idle GPU (what frame stats show) varies more, and reads up to 3 ms higher where
+there's a lot to draw; the GPU probably runs at a lower clock when it has little to do.
+
+| | Heybridge | Seattle | Staten Island | Bochum | Užice |
+|---|---|---|---|---|---|
+| As drawn today | 5.1 | 6.1 | 6.0 | 5.8 | 12.1 |
+| Nothing drawn | 2.9 | 2.9 | 2.8 | 2.8 | 2.8 |
+| Imagery only | 5.1 | 5.0 | 5.1 | 5.1 | 4.9 |
+| Imagery only, without its filter | 3.1 | 3.0 | 3.0 | | |
+| Everything, without the imagery filter | 3.1 | 3.8 | 3.7 | 3.8 | 10.1 |
+| Masks removed (fills drawn in full) | 5.2 | 5.5 | 5.5 | 5.4 | 10.8 |
+| No MSAA (`antialias: false`) | 1.4 | 2.1 | 1.9 | 2.0 | 4.2 |
+| Ratio 1 (`resolution: 1`), with MSAA | 1.4 | 2.1 | 2.0 | | |
+| Ratio 1, no MSAA (what `highQuality` off gives) | 0.5 | 0.8 | 0.8 | | |
+
+What that says:
+
+- **The imagery filter costs 2 ms and does nothing.** `PixiLayerBackgroundTiles.applyFilters()` puts an
+  `AdjustmentFilter` on the base imagery whenever it renders, also when brightness, contrast and
+  saturation are all 1. A filter makes Pixi draw the imagery into a full-size texture and then draw
+  that texture through the filter's shader (0.6 ms without MSAA). It also makes a new filter object on
+  every frame. Skipping the filter at the default values takes a third off the GPU time in most places.
+- **MSAA at ratio 2 triples everything.** Turning either one off brings Seattle from 6.1 to 2.1 ms, and
+  both off to 0.8. At ratio 2 a pixel is small enough that 4× MSAA may not be worth it; that's a
+  decision to make by looking at screenshots, not from these numbers.
+- **`multiView` costs about 1.5 to 2 ms a frame.** Pixi renders into a hidden WebGL canvas, and copies
+  it onto the visible canvas with a 2D `drawImage()` after every render
+  (`GlRenderTargetAdaptor.postrender`); the copy has to resolve the MSAA buffer first. With
+  `multiView: false` an empty frame went from 3.2 to 1.6 ms, and Seattle from 7.6 to about 6 (single
+  renders; bursts don't work without it). We use it only so the minimap can share the renderer. The
+  map could render straight to its own WebGL canvas, with the minimap (small, and seldom redrawn)
+  paying for a copy instead.
+- **The masks cost 0.4 to 1.3 ms**, more where there are more of them. Removing them is worth more for
+  the draw calls and the batching than for the GPU.
+- **What we draw matters in Užice only:** 7 ms for 61,000 features in 2,056 draw calls.
+- `preserveDrawingBuffer: false` made no difference, and `useBackBuffer: true` made it worse (both
+  tried at Heybridge only).
+- `gl.finish()` returns at once in Chrome and can't be used to wait for the GPU; `readPixels()` can.
 
 ## 7. Plan
 
@@ -350,7 +398,11 @@ Each step is measured with frame stats on the same set of places.
    | Golmud Solar Park, Qinghai | `16.00/36.0677/100.2792` | solar panels, each one an area |
    | Factories, Jiangsu, China | `15/34.54897/119.58936` | building detail |
    | Heybridge, England | `18.00/51.72229/0.67766` | fences |
-3. **GPU time.** Run the toggles in section 6 on those places.
+3. **GPU time. Done (Nov 18).** The toggles are in section 6: most of the GPU time is fixed (MSAA at
+   ratio 2, the imagery filter, `multiView`'s copy), and the features are about 1 ms of it. Three
+   changes come out of it, none made yet: skip the imagery filter at its default values (2 ms, small),
+   render the map without `multiView` (1.5 to 2 ms, larger), and decide whether ratio 2 needs MSAA.
+   The experiments needed a temporary hook to override Pixi's options at startup; it isn't in the code.
 4. **A rendering info card** next to the measurement and history cards, showing the frame stats live
    while panning (the "Performer-inspired statistics display" in `backlog.md`).
 5. **Pass a `RenderFrame` through `render()` and `cull()`**, so layers can report their own counts.
