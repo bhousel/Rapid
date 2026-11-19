@@ -444,6 +444,29 @@ export class AbstractPixiLayer {
 
 
   /**
+   * The mode changed (`Context.enter`). The frame that follows isn't a redraw of everything
+   * (`gfx.requestFrame()`), so a layer that keeps its features, and draws something that depends
+   * on the mode, overrides this to draw that again.
+   */
+  public modeChanged(): void {
+    // nothing to do here
+  }
+
+
+  /**
+   * Some of the layer's data changed (an edit), and nothing else did. The caller names everything
+   * the change affects: what changed, was added or was removed, and whatever is drawn differently
+   * because of it.
+   * Here that marks the data's features dirty, which makes the layer do its next pass
+   * (`dirtyData`). A layer that keeps its features overrides this to draw just that data again.
+   * @param dataIDs - The data the change affects
+   */
+  public dataChanged(dataIDs: OneOrMore<DataID>): void {
+    this.dirtyData(dataIDs);
+  }
+
+
+  /**
    * Counts a feature of this layer being shown or hidden. `AbstractPixiFeature` calls this when
    * its `visible` changes, so the layer knows how many are visible without walking them all.
    * @param visible - Whether the feature is visible now

@@ -205,6 +205,7 @@ export class MockGfxSystem extends MockSystem {
     this.scene = new MockSystem(context);
     (this.scene as any).layers = new Map();
     (this.scene as any).dirtyData = () => {};
+    (this.scene as any).dataChanged = () => {};
   }
   /** Schedules a redraw at the next animation frame (no-op stub) */
   public deferredRedraw() {}

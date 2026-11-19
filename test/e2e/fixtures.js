@@ -138,3 +138,34 @@ export async function waitForIdle(page) {
     return !network.numInflight && !network.numQueued && !scheduler.numPending && !gfx.pending;
   }, null, { timeout: 30_000 });
 }
+
+
+/**
+ * Describes what the OSM layer shows: for each visible feature, the container it's in, its
+ * classes, whether it's been drawn (not dirty), whether it's bound to the entity as it is now,
+ * and where it is. Two of these are equal if a mapper would see the same features the same way.
+ *
+ * Use it to check work the layer does without its whole pass (a hover, an edit, a change of
+ * mode): take one, ask for a full pass (`gfx.immediateRedraw()`), wait, and take another. They
+ * should be equal. (See "The pass, and what asks for it" in `design/graphics-system.md`.)
+ * @param page - The Playwright page
+ * @return One string per visible feature, sorted
+ */
+export async function osmSceneState(page) {
+  return page.evaluate(() => {
+    const { gfx, editor } = rapidContext.systems;
+    const graph = editor.staging.graph;
+    const results = [];
+    for (const feature of gfx.scene.layers.get('osm').features.values()) {
+      if (!feature.visible) continue;
+      const entity = feature.data?.id && graph.hasEntity(feature.data.id);
+      const bound = entity ? (feature.data === entity) : 'not an entity';
+      const position = feature.container.position;
+      results.push([
+        feature.id, feature.container.parent?.label, [...feature.classes].sort().join(','),
+        feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`
+      ].join(' | '));
+    }
+    return results.sort();
+  });
+}

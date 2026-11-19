@@ -6,6 +6,7 @@ import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
+import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
@@ -91,6 +92,13 @@ const KIND_GEOMETRY: Record<OsmDataKind, GeometryType> = {
  * at a time, and checks the frame's time between them. At least one batch is made on every call.
  */
 const MAKE_BATCH = 64;
+
+/**
+ * How many changed entities the layer draws again one by one (see `_renderChanged`). Beyond this
+ * it does its pass, which costs the same whatever changed: about 0.7 µs for each entity in the
+ * cull box (207 ms for 296,000 in Užice), where an entity drawn again costs 10 to 40 µs.
+ */
+const MAX_CHANGED = 5000;
 
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
@@ -190,6 +198,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _changedIDs: Set<DataID>;
   /** The features retained while `_renderChanged()` runs, `null` the rest of the time */
   protected _seenFeatureIDs: Set<FeatureID> | null;
+  /** Whether the mode changed since the midpoints were last drawn (they're shown in select mode only) */
+  protected _modeDirty: boolean;
 
 
   /**
@@ -213,6 +223,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._makingOutside = false;
     this._changedIDs = new Set<DataID>();
     this._seenFeatureIDs = null;
+    this._modeDirty = false;
   }
 
 
@@ -354,6 +365,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const related = this._gatherRelated(viewZoom);
     this._lastRelated = related;
     this._changedIDs.clear();   // the pass has seen every feature, whatever changed
+    this._modeDirty = false;
     t = this._endStep('related', t);
 
     this.renderVertices(frame, viewport, data, related);
@@ -424,8 +436,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param outside - Whether to go on to what's outside the view, once what's in view is done
    */
   public override continueWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean = false): void {
-    // First what the user is looking at: the data whose classes changed (a hover, a selection)
-    if (this._changedIDs.size) {
+    // First what the user is looking at: the data that changed (an edit), or whose classes did
+    // (a hover, a selection). Unless a pass is due anyway: it sees everything.
+    if ((this._changedIDs.size || this._modeDirty) && this._currentBox) {
       this._renderChanged(frame, viewport);
     }
 
@@ -454,6 +467,39 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   public override classChanged(dataID: DataID): void {
     this._changedIDs.add(dataID);
+  }
+
+
+  /**
+   * Notes that the mode changed, to draw the midpoints again (or take them away) on the next
+   * frame: they're shown in select mode only.
+   */
+  public override modeChanged(): void {
+    this._modeDirty = true;
+  }
+
+
+  /**
+   * Remembers the entities that an edit affects, to draw them again on the next frame without
+   * a pass (see `_renderChanged`). Their features are marked dirty, so they get their styles
+   * worked out again: what changed may be only how they connect (a vertex that's shared now).
+   * When there are too many (a big undo, a paste), a pass is the cheaper way, and this asks
+   * for one.
+   * @param dataIDs - The entities the edit affects (`Difference.complete()`)
+   */
+  public override dataChanged(dataIDs: OneOrMore<DataID>): void {
+    for (const dataID of utilIterable(dataIDs)) {
+      this._changedIDs.add(dataID);
+      for (const featureID of (this._dataHasFeature.get(dataID) ?? [])) {
+        const feature = this.features.get(featureID);
+        if (feature) {
+          feature.dirty = true;
+        }
+      }
+    }
+    if (this._changedIDs.size > MAX_CHANGED) {
+      this._currentBox = null;   // do the pass (see `keepFeatures`)
+    }
   }
 
 
@@ -551,45 +597,40 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
 
-    const before = this._lastRelated;
-    const related = this._gatherRelated(viewport.transform.zoom);
-    this._lastRelated = related;
-
-    const dataIDs = new Set<DataID>(this._changedIDs);
+    const changedIDs = new Set<DataID>(this._changedIDs);
     this._changedIDs.clear();
-    for (const ids of [before.descendantIDs, before.siblingIDs, related.descendantIDs, related.siblingIDs]) {
-      for (const dataID of ids) {
-        dataIDs.add(dataID);
-      }
-    }
+    this._modeDirty = false;
 
-    // Sort them as a pass does. (Some aren't entities: midpoints, and other layers' data.)
-    const data: OsmData = {
-      polygons: new Map<EntityID, OsmWay | OsmRelation>(),
-      lines: new Map<EntityID, OsmWay>(),
-      points: new Map<EntityID, OsmNode>(),
-      vertices: new Map<EntityID, OsmNode>()
+    // Sorts data as a pass does, leaving out what a pass wouldn't have gathered: what's outside
+    // the cull box, or hidden. (Some of it isn't entities: midpoints, and other layers' data.)
+    const sort = (dataIDs: Iterable<DataID>): OsmData => {
+      const sorted: OsmData = {
+        polygons: new Map<EntityID, OsmWay | OsmRelation>(),
+        lines: new Map<EntityID, OsmWay>(),
+        points: new Map<EntityID, OsmNode>(),
+        vertices: new Map<EntityID, OsmNode>()
+      };
+      for (const dataID of dataIDs) {
+        const entity = graph.hasEntity(dataID);
+        if (!entity) continue;
+
+        const extent = graph.geometry(entity).world?.extent;
+        if (!extent?.intersects(frame.cullBox)) continue;
+        const geom = entity.geometry(graph) as GeometryType;
+        if (filters.isHidden(entity, graph, geom)) continue;
+
+        if (geom === 'point') {
+          sorted.points.set(entity.id, entity as OsmNode);
+        } else if (geom === 'vertex') {
+          sorted.vertices.set(entity.id, entity as OsmNode);
+        } else if (geom === 'line') {
+          sorted.lines.set(entity.id, entity as OsmWay);
+        } else if (geom === 'area') {
+          sorted.polygons.set(entity.id, entity as OsmWay | OsmRelation);
+        }
+      }
+      return sorted;
     };
-    for (const dataID of dataIDs) {
-      const entity = graph.hasEntity(dataID);
-      if (!entity) continue;
-
-      // Only what a pass would have gathered: in the cull box, and not hidden
-      const extent = graph.geometry(entity).world?.extent;
-      if (!extent?.intersects(frame.cullBox)) continue;
-      const geom = entity.geometry(graph) as GeometryType;
-      if (filters.isHidden(entity, graph, geom)) continue;
-
-      if (geom === 'point') {
-        data.points.set(entity.id, entity as OsmNode);
-      } else if (geom === 'vertex') {
-        data.vertices.set(entity.id, entity as OsmNode);
-      } else if (geom === 'line') {
-        data.lines.set(entity.id, entity as OsmWay);
-      } else if (geom === 'area') {
-        data.polygons.set(entity.id, entity as OsmWay | OsmRelation);
-      }
-    }
 
     // What was a midpoint before may not be one after
     const midpointsBefore = [...this._midpoints.keys()];
@@ -600,9 +641,38 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._madeCount = 0;
     this._seenFeatureIDs = new Set<FeatureID>();
 
+    // First the shapes of what changed, as in a pass. They link each way to its nodes, and what's
+    // related to the selection is worked out from those links: a way that just gained a node
+    // has to be drawn before its vertices are.
+    const data = sort(changedIDs);
     if (data.polygons.size)  this.renderPolygons(frame, viewport, data);
     if (data.lines.size)     this.renderLines(frame, viewport, data);
     if (data.points.size)    this.renderPoints(frame, viewport, data);
+
+    const before = this._lastRelated;
+    const related = this._gatherRelated(viewport.transform.zoom);
+    this._lastRelated = related;
+
+    // ..then whatever was or is now related to what's selected or hovered, and wasn't drawn above
+    const relatedIDs = new Set<DataID>();
+    for (const ids of [before.descendantIDs, before.siblingIDs, related.descendantIDs, related.siblingIDs]) {
+      for (const dataID of ids) {
+        if (!changedIDs.has(dataID)) {
+          relatedIDs.add(dataID);
+        }
+      }
+    }
+    const more = sort(relatedIDs);
+    if (more.polygons.size)  this.renderPolygons(frame, viewport, more);
+    if (more.lines.size)     this.renderLines(frame, viewport, more);
+    if (more.points.size)    this.renderPoints(frame, viewport, more);
+
+    // ..then the vertices and midpoints of all of it
+    for (const kind of Object.keys(more) as OsmDataKind[]) {
+      for (const [entityID, entity] of more[kind]) {
+        (data[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
+      }
+    }
     if (data.vertices.size)  this.renderVertices(frame, viewport, data, related);
 
     if (context.mode?.id === 'select') {
@@ -610,6 +680,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     } else {
       this._midpoints.clear();
     }
+
+    const dataIDs = new Set<DataID>([...changedIDs, ...relatedIDs]);
 
     const seen = this._seenFeatureIDs;
     this._seenFeatureIDs = null;

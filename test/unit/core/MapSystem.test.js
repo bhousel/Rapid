@@ -283,13 +283,16 @@ describe('MapSystem', () => {
 
 
   describe('stagingchange', () => {
-    it('clears the filter cache entries of the changed entities, and marks them dirty without changing them', async () => {
+    it('clears the filter cache entries of the changed entities, and tells the scene which they are without changing them', async () => {
       const ctx = new Rapid.MockContext();
       const editor = new Rapid.MockSystem(ctx);
       const filters = new Rapid.FilterSystem(ctx);
       const gfx = new Rapid.MockGfxSystem(ctx);
-      const dirtied = [];
-      gfx.scene.dirtyData = (layerID, dataIDs) => dirtied.push(layerID, ...dataIDs);
+      const changed = [];
+      const asked = [];
+      gfx.scene.dataChanged = (layerID, dataIDs) => changed.push(layerID, ...dataIDs);
+      gfx.requestFrame = () => asked.push('frame');
+      gfx.immediateRedraw = () => asked.push('redraw');
       ctx.systems = {
         editor:  editor,
         filters: filters,
@@ -312,7 +315,8 @@ describe('MapSystem', () => {
 
       assert.strictEqual(n1.key, oldKey);   // other graphs share the object, so it isn't touched
       assert.isFalse(filters._cache.has(n1));
-      assert.deepEqual(dirtied, ['osm', 'n1']);
+      assert.deepEqual(changed, ['osm', 'n1']);
+      assert.deepEqual(asked, ['frame']);   // not a redraw of everything: a drag is an edit on every pointer move
     });
   });
 

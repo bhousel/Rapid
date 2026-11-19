@@ -161,8 +161,10 @@ export class MapSystem extends AbstractSystem {
                 filters?.clearEntity(entity);  // clear feature filter cache
               }
             }
-            scene.dirtyData('osm', [...complete.keys()]);
-            gfx.immediateRedraw();
+            // (A frame, not a redraw of everything: the OSM layer draws what the edit affects, and
+            // a drag makes an edit on every pointer move. See `PixiLayerOsm._renderChanged`.)
+            scene.dataChanged('osm', [...complete.keys()]);
+            gfx.requestFrame();
           })
           .on('historyjump', (prevIndex: number, currIndex: number) => {
             this._historyJumped(prevIndex, currIndex);

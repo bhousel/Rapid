@@ -88,17 +88,22 @@ Still to do, in about this order:
   in an hour and a half. A tape of Užice (119 MB, not in the repo) has to be recorded once on each
   machine.
   **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
-  **A hover without a pass** (Nov 19; not committed yet, `graphics-system.md` section 12): every
+  **A hover without a pass** (Nov 19, `graphics-system.md` section 12): every
   hover asked for a redraw of everything, and a pass in Užice takes 207 ms. Now
   `scene.setClass()` tells the layers which data changed class, the OSM layer draws that data
   again on a frame where it keeps the rest (`_renderChanged()`), and the caller asks for a frame
   (`gfx.requestFrame()`). Also found: Pixi's `globalMove` and `wheel` events were never off (the
   option was passed as `events`, Pixi reads `eventFeatures`), so every pointer move walked the
   scene (50 ms in Užice). Moving the pointer across Užice for 4 seconds took 37 s, and takes 5.
-  Next (section 12, "What still asks for a pass"): each edit (a drag is a pass per frame), each
-  tile that arrives, leaving the cull box, a click. Each can go the way the hover went. Then
-  the pass itself: half of it is vertices. Also a frame between passes during a zoom, and the
-  other layers.
+  **An edit and a change of mode without a pass** (Nov 19; not committed yet, same section):
+  `MapSystem` passes what an edit affects to `scene.dataChanged('osm', …)`, `Context.enter()`
+  asks for a frame, and `FilterSystem.forceVisible()` and `PhotoSystem` tell the scene what
+  they change. Dragging a vertex in Užice for one second took 14 s (61 passes) and takes 1.5.
+  Checked against a full pass after 110 edits, 64 changes of mode and 74 hovers: nothing shown
+  differs.
+  Next (section 12, "What still asks for a pass"): each tile that arrives, and leaving the
+  cull box. Then the pass itself: half of it is vertices. Also a frame between passes during a
+  zoom, and the other layers.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

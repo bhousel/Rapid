@@ -162,6 +162,7 @@ describe('PhotoSystem', () => {
       ctx.systems = {
         gfx: {
           immediateRedraw: () => {},
+          requestFrame: () => {},
           scene: {
             layers: new Map([['mapillary-signs', signsLayer]]),
             clearClass: () => {},

@@ -456,6 +456,11 @@ export class PixiScene extends EventEmitter {
         container.eventMode = eventMode;
       }
     }
+
+    // A layer that keeps its features may draw something for the mode (the OSM layer's midpoints)
+    for (const layer of this.layers.values()) {
+      layer.modeChanged();
+    }
   }
 
 
@@ -797,6 +802,19 @@ export class PixiScene extends EventEmitter {
    */
   public dirtyData(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
     this.layers.get(layerID)?.dirtyData(dataIDs);
+  }
+
+
+  /**
+   * Says that some of a layer's data changed (an edit), and nothing else in it did. The layer
+   * draws that data again on the next frame, without doing its whole pass if it can
+   * (see `AbstractPixiLayer.dataChanged`). Follow it with `gfx.requestFrame()`.
+   * @param layerID - layerID that is rendering the data
+   * @param dataIDs - Everything the change affects: what changed, was added or was removed, and
+   *   whatever is drawn differently because of it (for an OSM edit, `Difference.complete()`)
+   */
+  public dataChanged(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
+    this.layers.get(layerID)?.dataChanged(dataIDs);
   }
 
 

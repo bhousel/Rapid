@@ -254,7 +254,7 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * Called whenever the photo changes.
-   * This will update the urlhash (the current photo and detection), trigger a redraw, and emit a 'photochange' event.
+   * This will update the urlhash (the current photo and detection), ask for a frame, and emit a 'photochange' event.
    */
   protected _photoChanged(): void {
     const context = this.context;
@@ -277,7 +277,10 @@ export class PhotoSystem extends AbstractSystem {
       urlhash.setParam('detection', detectionString);
     }
 
-    gfx?.immediateRedraw();
+    // A frame, not a redraw of everything: what changed on the map is the classes of a photo or a
+    // detection, and the scene has told the layers (`scene.setClass`). Select mode calls this on
+    // every exit, with or without a photo, and a redraw makes the OSM layer do its whole pass.
+    gfx?.requestFrame();
     this.emit('photochange');
   }
 

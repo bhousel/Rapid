@@ -548,6 +548,7 @@ describe('PixiLayerOsm', () => {
 
       frame = new RenderFrame(1, 17);
       frame.cullBox = BOX;
+      layer._currentBox = BOX;   // as after a pass for this box
 
       // Two ways and their nodes. `w1` was hovered at the last pass, so its vertices are on top.
       // (The ways are big enough on screen for their vertices to be shown.)
@@ -622,6 +623,64 @@ describe('PixiLayerOsm', () => {
       layer.continueWaiting(frame, viewport);
       assert.deepEqual(calls, []);
       assert.isTrue(layer.features.has('osm-n1'));
+    });
+
+    it('draws again the entities that an edit affects, with their styles worked out again', () => {
+      const line1 = addFeature('w1');
+      const junction = addFeature('n2');
+      interesting.add('n2');
+      addEntity('n9', 'point');   // the edit added it: no feature yet
+
+      layer.dataChanged(['w1', 'n2', 'n9', 'n404']);
+      assert.isTrue(line1.dirty);
+      assert.isTrue(junction.dirty);
+      assert.strictEqual(layer._currentBox, BOX);   // no pass asked for
+
+      layer.continueWaiting(frame, viewport);
+      assert.includeMembers(calls, ['lines w1', 'vertices n2', 'points n9']);
+      assert.notInclude(calls.join(), 'n404');
+      assert.strictEqual(layer._changedIDs.size, 0);
+    });
+
+    it('hides the features of an entity that an edit deleted', () => {
+      const line2 = addFeature('w2');
+      const vertex = addFeature('n3');
+      entities.delete('w2');
+      entities.delete('n3');
+
+      layer.dataChanged(['w2', 'n3']);
+      layer.continueWaiting(frame, viewport);
+      assert.isFalse(line2.visible);
+      assert.isFalse(vertex.visible);
+    });
+
+    it('does its pass instead when an edit affects thousands of entities', () => {
+      const ids = [];
+      for (let i = 0; i < 6000; i++) {
+        ids.push(`n${1000 + i}`);
+      }
+      layer.dataChanged(ids);
+      assert.isNull(layer._currentBox);   // so `keepFeatures()` says no
+
+      layer.continueWaiting(frame, viewport);   // (a held frame, while that pass waits its turn)
+      assert.deepEqual(calls, []);
+      assert.strictEqual(layer._changedIDs.size, 6000);   // the pass clears them
+    });
+
+    it('draws the midpoints again after a change of mode, with nothing else changed', () => {
+      let midpoints = 0;
+      layer.renderMidpoints = () => midpoints++;
+
+      layer.continueWaiting(frame, viewport);
+      assert.strictEqual(midpoints, 0);
+
+      layer.context.mode = { id: 'select' };
+      layer.modeChanged();
+      layer.continueWaiting(frame, viewport);
+      assert.strictEqual(midpoints, 1);
+
+      layer.continueWaiting(frame, viewport);   // once
+      assert.strictEqual(midpoints, 1);
     });
   });
 

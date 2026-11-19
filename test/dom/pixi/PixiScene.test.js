@@ -79,7 +79,8 @@ describe('PixiScene', () => {
         _spatialContainers: new Map(),
         _interactiveSpatialIDs: null,
         _anchor: [0, 0],
-        _worldContainers: new Set()
+        _worldContainers: new Set(),
+        layers: new Map()
       };
       const names = [
         'getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged',
@@ -142,7 +143,11 @@ describe('PixiScene', () => {
       assert.strictEqual(basemapRapid.eventMode, 'passive');
       assert.strictEqual(pointsNotes.eventMode, 'passive');
 
+      // ..and the layers hear of each change of mode
+      let told = 0;
+      scene.layers.set('osm', { modeChanged: () => told++ });
       scene._modeChanged(null);   // no mode at all
+      assert.strictEqual(told, 1);
       assert.strictEqual(pointsNotes.eventMode, 'passive');
     });
 
@@ -370,6 +375,22 @@ describe('PixiScene', () => {
       scene.clearClass('hover');
       assert.sameMembers(told, ['osm w1', 'rapid w1', 'osm n1', 'rapid n1']);
       assert.deepEqual([...scene.getDataWithClass('select')], ['w2']);
+    });
+  });
+
+
+  describe('dataChanged', () => {
+    it('tells the one layer which data changed', () => {
+      const told = [];
+      const scene = {
+        layers: new Map([
+          ['osm', { dataChanged: dataIDs => told.push(['osm', ...dataIDs]) }],
+          ['rapid', { dataChanged: dataIDs => told.push(['rapid', ...dataIDs]) }]
+        ])
+      };
+      PixiScene.prototype.dataChanged.call(scene, 'osm', ['w1', 'n1']);
+      PixiScene.prototype.dataChanged.call(scene, 'no-such-layer', ['w1']);
+      assert.deepEqual(told, [['osm', 'w1', 'n1']]);
     });
   });
 

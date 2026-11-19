@@ -638,9 +638,13 @@ export class FilterSystem extends AbstractSystem {
    * @param entityIDs - Array of Entity ids
    */
   public forceVisible(entityIDs: EntityID[]): void {
+    const context = this.context;
+    const editor = context.systems.editor;
+    const gfx = context.systems.gfx;     // optional
+
+    const before = this._forceVisible;
     this._forceVisible = new Set<EntityID>();
 
-    const editor = this.context.systems.editor;
     if (!editor) return;
     const graph = editor.staging.graph!;
 
@@ -653,6 +657,29 @@ export class FilterSystem extends AbstractSystem {
           this._forceVisible.add(member.id);
         }
       }
+    }
+
+    // Tell the map which entities this shows, or lets be hidden again, and their nodes with them.
+    // (Only if a filter hides anything: otherwise this changes nothing on the map.)
+    const scene = gfx?.scene;
+    if (!scene || !this._hidden.size) return;
+
+    const changedIDs = new Set<EntityID>();
+    for (const [ids, others] of [[before, this._forceVisible], [this._forceVisible, before]]) {
+      for (const entityID of ids) {
+        if (others.has(entityID)) continue;
+        changedIDs.add(entityID);
+        const entity = graph.hasEntity(entityID);
+        if (entity?.type === 'way') {
+          for (const nodeID of (entity as OsmWay).nodes) {
+            changedIDs.add(nodeID);
+          }
+        }
+      }
+    }
+    if (changedIDs.size) {
+      scene.dataChanged('osm', [...changedIDs]);
+      gfx.requestFrame();
     }
   }
 

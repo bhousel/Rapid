@@ -41,8 +41,17 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
   for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
   that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in
-  Užice costs 3 ms of APP that way, and 175 with `immediateRedraw()`. Use a redraw request when
-  something else changed too (the mode, the data).
+  Užice costs 3 ms of APP that way, and 175 with `immediateRedraw()`.
+- **For an edit, `scene.dataChanged('osm', ids)` and `gfx.requestFrame()`,** with everything the
+  edit affects (`Difference.complete()`). `MapSystem` does this for `stagingchange`. The layer
+  draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
+- **A change of mode asks for a frame, not a redraw** (`Context.enter()`). If a mode changes
+  what the map shows, it has to reach the layers: through a class, an edit, a redraw request of
+  its own, or (for something a layer draws in one mode only, like the OSM layer's midpoints)
+  `AbstractPixiLayer.modeChanged()`.
+- **Check work done without a pass against a pass.** After it, `gfx.immediateRedraw()` should
+  change nothing that's shown: `osmSceneState()` in `test/e2e/fixtures.js` describes what's
+  shown, for comparing before and after.
 - **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
 - **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
   minimap, `autoStart: false`, the renderer choice from the url).

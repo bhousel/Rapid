@@ -1279,7 +1279,8 @@ does a view that leaves the cull box. Three kinds of request turned out to be mo
   time the pointer crossed onto another feature. Moving the pointer across the map in Užice for
   what should take 4 seconds (240 pointer events, 60 a second) took 36.9 s: 116 frames, each one a
   pass of 175 ms or more.
-- **Each tile that arrives, each edit, each click.** Still so, see below.
+- **Each edit, each click, each tile that arrives.** Edits and clicks are fixed below; tiles
+  aren't.
 
 ### A hover without a pass
 
@@ -1321,21 +1322,62 @@ Its `wheel` events were on too: a hit test for each wheel event of a pan, for an
 a second with a longest gap of 374 and 322 ms (it was 310 to 935 in the four runs before), and
 "drawn after" 14.9 and 13.7 s.
 
+### An edit and a change of mode without a pass
+
+Measured next (Nov 19), with the real mouse in Užice: dragging a vertex for 60 pointer moves,
+one second's worth, took 14.1 s. Each move is an edit, each edit asked for a redraw of
+everything, and so did entering and leaving the drag mode: 61 passes of about 200 ms.
+
+- **An edit.** `MapSystem` hears `stagingchange` with everything the edit affects
+  (`Difference.complete()`: what changed, the nodes of changed ways, the members of changed
+  relations, and all their parents). It passes that to `scene.dataChanged('osm', …)` and asks for
+  a frame. The OSM layer marks those entities' features dirty and runs them through
+  `_renderChanged()`, which already leaves out what's hidden or outside the cull box, makes what's
+  new, and hides the features of what's gone. Beyond 5,000 entities (a big undo, a paste) it does
+  its pass: that's cheaper.
+- **A change of mode.** `Context.enter()` asks for a frame too. What a mode changes on the map
+  reaches the layers some other way: classes (`setClass`), edits, and the entities that select
+  mode keeps visible though a filter hides them (`FilterSystem.forceVisible()` now tells the scene
+  which). The scene tells the layers that the mode changed, and the OSM layer draws its midpoints
+  again, or takes them away: they're shown in select mode only.
+- **`PhotoSystem`** asked for a redraw of everything each time select mode was left, photo or no
+  photo. What it changes is classes, so it asks for a frame.
+- **The order inside `_renderChanged()` matters.** It draws the shapes of what changed first,
+  then works out what's related to the selection, then draws the vertices. The links between a
+  way and its nodes are made when the way is drawn, and "related" goes by them. (Found by the
+  e2e test that draws a line: the newest node of a selected line was drawn among the points and
+  not above everything, until its way had been drawn again.)
+
+| Užice: dragging a vertex, 60 pointer moves | Before | After |
+|---|---|---|
+| Time they took (1 s if the page keeps up) | 14.1 s | 1.5 s |
+| Passes | 61 | 0 |
+| A frame of the drag, APP + DRAW | 198 + 7 ms | 2.5 + 7 ms |
+| Between animation frames, 90th percentile / longest | 214 / 679 ms | 26 / 57 ms |
+
+Selecting and deselecting (64 changes of mode, features of every kind) takes 2.7 ms of APP at
+the median, where each was a pass.
+
+**Checked against a full pass**, in Užice: after each of 110 edits (moving a vertex of a line, of
+an area, a point; retagging so that the road class changes, or so that a filter hides the
+feature; deleting a vertex, a way, a point; with and without a selection; and reverting each),
+64 changes of mode and 74 hovers, a full pass changed nothing that was shown: no feature's
+visibility, container, order, classes, position or the entity it's bound to. After a drag of a
+junction of five ways, the screenshot is the same as after a full pass, pixel for pixel.
+`test/e2e/` has `osmSceneState()` for the same check, used after a hover, a drag, and each click
+of drawing a line.
+
+**What this doesn't update:** the count of hidden features in the footer comes from the pass
+(`FilterSystem.filterScene()`), so after an edit it's the last pass's count until the next one.
+
 ### What still asks for a pass
 
-Each of these can go the way the hover went: the layer is told which data changed, and draws
-that. `_renderChanged()` and the features that wait (`_makeWaiting()`) already run a set of
-entities through the `render…()` functions.
-
-- **Each edit.** `MapSystem` answers `stagingchange` with `dirtyData()` for the changed entities
-  and `immediateRedraw()`. Dragging a node is an edit on every pointer move, so in Užice each
-  frame of a drag is a pass. (From the code. Not measured: the debug Chrome isn't for editing.)
-- **Each tile that arrives** (`merge`): 8 to 11 passes during the first pan there, 2.3 of its
+- **Each tile that arrives** (`merge`): 8 to 11 passes during the first pan in Užice, 2.3 of its
   4.2 s of frames. The merged IDs are known. Entities they change without being among them need
   care: a point becomes a vertex when its way arrives.
 - **Leaving the cull box.** What enters and leaves is the difference between two answers of the
   spatial index.
-- **A click** (select mode shows midpoints, so the mode matters too).
+- **Anything that marks the whole layer dirty:** a filter, the styles, the language, a zoom.
 
 And the pass itself, for when it's needed (the filters, the styles, a zoom):
 

@@ -974,6 +974,53 @@ describe('FilterSystem', () => {
         _filters.forceVisible(['a']);
         assert.isNull(_filters.isHidden(a, graph, ageo));
       });
+
+      it('tells the map which entities forceVisible shows, or lets be hidden again', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', version: 1 });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', version: 1 });
+        const w1 = new Rapid.OsmWay(context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } });
+        const p1 = new Rapid.OsmNode(context, { id: 'p1', version: 1 });
+        const graph = new Rapid.Graph(context, [n1, n2, w1, p1]);
+        const told = [];
+        const systems = context.systems;
+        context.systems = Object.assign({}, systems, {
+          editor: { staging: { graph: graph } },
+          gfx: {
+            scene: { dataChanged: (layerID, dataIDs) => told.push([layerID, ...dataIDs].join(' ')) },
+            requestFrame: () => told.push('frame'),
+            immediateRedraw: () => told.push('redraw')
+          }
+        });
+
+        try {
+          _filters.disable('points');
+          _filters.forceVisible([]);                // (start from nothing)
+          told.length = 0;
+
+          _filters.forceVisible(['w1']);            // a way brings its nodes
+          assert.deepEqual(told, ['osm w1 n1 n2', 'frame']);
+
+          told.length = 0;
+          _filters.forceVisible(['w1']);            // the same again: nothing changed
+          assert.deepEqual(told, []);
+
+          _filters.forceVisible(['p1']);            // `w1` may be hidden again, `p1` is shown
+          assert.deepEqual(told, ['osm w1 n1 n2 p1', 'frame']);
+
+          told.length = 0;
+          _filters.forceVisible([]);
+          assert.deepEqual(told, ['osm p1', 'frame']);
+
+          // With no filter hiding anything, it changes nothing on the map
+          _filters.enableAll();
+          told.length = 0;
+          _filters.forceVisible(['w1']);
+          _filters.forceVisible([]);
+          assert.deepEqual(told.filter(what => what !== 'redraw'), []);
+        } finally {
+          context.systems = systems;
+        }
+      });
     });
 
 
