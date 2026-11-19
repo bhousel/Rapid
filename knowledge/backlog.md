@@ -241,8 +241,8 @@ the order people are likely to ask:
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
 
 ## Performer-inspired statistics display
-- Now frame stats and a rendering info card in [`design/graphics-system.md`](../design/graphics-system.md) (sections 3 and 7).
-- Also worth showing: `scheduler.metrics` and `scheduler.numPending` (queue depth), texture usage.
+- Now frame stats and a rendering info card (`UiRenderingCard`, ⌘⇧F) in [`design/graphics-system.md`](../design/graphics-system.md) (sections 3 and 7). The card shows the scheduler's queue, pressure and dropped frames too.
+- Also worth showing: texture usage, vertices per layer.
 - Inspiration: SGI Performer's `pfStats`/`pfFrameStats` system (Chapter 23 of Performer Programmer's Guide)
 
 ## Validator class lifecycle

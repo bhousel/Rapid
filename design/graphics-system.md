@@ -4,8 +4,9 @@ How `GraphicsSystem` turns the map into a frame, what we know about what a frame
 explorations planned to make frames cheaper. Rendering performance is where Rapid has the most room to
 improve, and until now we've had no way to see it except spot checks in Spector.
 
-> **Status:** In progress (Nov 2026). Steps 1 to 3 of the plan are done (frame stats, a script that
-> measures a set of difficult places, and where the GPU time goes); sections 4 and 5 aren't built. The first
+> **Status:** In progress (Nov 2026). Steps 1 to 4 of the plan are done (frame stats, a script that
+> measures a set of difficult places, where the GPU time goes, and a rendering info card); sections 4
+> and 5 aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
 > reproduce them. The plan is in section 7.
 
@@ -406,8 +407,25 @@ Each step is measured with frame stats on the same set of places.
    changes come out of it: skip the imagery filter at its default values (2 ms; done), render the map
    without `multiView` (1.5 to 2 ms, larger; not done), and decide whether ratio 2 needs MSAA.
    The experiments needed a temporary hook to override Pixi's options at startup; it isn't in the code.
-4. **A rendering info card** next to the measurement and history cards, showing the frame stats live
-   while panning (the "Performer-inspired statistics display" in `backlog.md`).
+4. **A rendering info card. First version done (Nov 18).** `UiRenderingCard`
+   (`modules/ui/cards/`) sits with the measurement and history cards and shows the frame stats live
+   while panning. Turn it on with ⌘⇧F, or "Show Rendering Panel" in the Map Data pane. It has:
+   - a chart of the last 120 frames, the DRAW pass stacked on the APP pass, with a line at the frame
+     budget and red for a pass that went over it;
+   - the APP and DRAW times as bars against the budget, averaged over the frames drawn in the last
+     second, and the GPU time when detailed stats are on (its button turns them on, and hiding the
+     card turns them off again);
+   - features shown, the slowest layers, Pixi's instructions by pipe, WebGL calls (with detailed
+     stats), and the scheduler's queue, pressure and dropped frames.
+
+   The first thing it showed: **panning costs more than the frames `bun run measure` measures.** In
+   Seattle, panning 6 px per animation frame from a script, a frame took 15 to 20 ms of APP and 7 to
+   10 ms of DRAW, against 10 and 0.8 for a frame where nothing changed. The script should measure pan
+   frames too.
+
+   It redraws at most four times a second. Ideas for later, from Performer's `pfFrameStats`: texture
+   and atlas use, vertices per layer (after step 5), marking restyle frames in the chart, and a
+   GPU line in the chart.
 5. **Pass a `RenderFrame` through `render()` and `cull()`**, so layers can report their own counts.
 6. **The line builder,** as plain geometry with unit tests (a band never leaves its area, never
    overlaps itself, holes, slivers, short segments). Then, one at a time and measured: partial-fill

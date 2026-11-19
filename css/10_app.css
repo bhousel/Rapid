@@ -4398,6 +4398,66 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   margin-top: 10px;
 }
 
+/* Rendering card: a chart of recent frames, then rows of times (with bars) and text */
+.card-content-rendering .rendering-chart {
+  display: block;
+  width: 100%;
+  height: 48px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.card-content-rendering .rendering-row {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+.card-content-rendering .rendering-label {
+  display: block;
+  color: #aaa;
+}
+.card-content-rendering .rendering-row-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.card-content-rendering .rendering-row-time .rendering-label {
+  flex: 0 0 36px;
+}
+.card-content-rendering .rendering-row-time .rendering-value {
+  flex: 0 0 56px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+/* The bar is two frame budgets wide, with a line at one budget */
+.card-content-rendering .rendering-bar {
+  flex: 1 1 auto;
+  position: relative;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.card-content-rendering .rendering-bar::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 50%;
+  border-left: 1px dashed rgba(255, 255, 255, 0.6);
+}
+.card-content-rendering .rendering-bar-fill {
+  display: block;
+  height: 100%;
+  background: #7092ff;
+}
+.card-content-rendering .rendering-row-draw .rendering-bar-fill {
+  background: #ffff88;
+}
+.card-content-rendering .rendering-row-gpu .rendering-bar-fill {
+  background: #88dd88;
+}
+.card-content-rendering .rendering-bar-fill.over {
+  background: #ff5555;
+}
+
 
 /* Map Footer
 ------------------------------------------------------- */
