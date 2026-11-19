@@ -98,39 +98,58 @@ What that says:
 
 `bun run measure --fresh` (`scripts/measure.ts`, plan step 2) on the same M4 and Chrome, window
 1593×1067 at ratio 2, with the points, indoor, landuse and boundaries features hidden (the debug
-profile's settings). Medians of 9 frames, in ms. "Redraw" is a frame where nothing changed, as when
-panning; "restyle" restyles every feature, as after a zoom change. Draws are WebGL draw calls, masks are
-`stencilMask` instructions, unbatched are `Graphics` drawn on their own.
+profile's settings). Medians of 9 frames, in ms. This run is from after the imagery filter fix
+(section 6), which took 1 to 2 ms off the GPU times. Three kinds of frame:
 
-| Place | Visible | APP | DRAW | GPU | Draws | Masks | Unbatched | Restyle APP | Restyle DRAW | Restyle GPU |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Seattle | 3,014 | 10.4 | 0.9 | 7.1 | 771 | 708 | 36 | 98 | 18.9 | 8.0 |
-| Nuevo León | 1,077 | 5.8 | 0.7 | 4.9 | 115 | 8 | 68 | 31 | 7.6 | 5.6 |
-| Miami-Dade | 2,596 | 8.0 | 0.6 | 5.0 | 79 | 12 | 43 | 58 | 10.3 | 6.0 |
-| Užice | 61,124 | 204 | 3.3 | 19.3 | 2,061 | 168 | 1,213 | 1,545 | 215 | 65.6 |
-| Bochum | 2,505 | 8.4 | 0.6 | 5.3 | 319 | 292 | 21 | 68 | 13.6 | 7.2 |
-| Smith Point | 784 | 4.6 | 0.7 | 5.0 | 135 | 20 | 74 | 354 | 8.5 | 5.6 |
-| DeKalb | 3,785 | 12.7 | 0.4 | 5.8 | 128 | 80 | 31 | 67 | 7.8 | 5.6 |
-| Staten Island | 15,983 | 45.7 | 0.9 | 7.1 | 521 | 88 | 277 | 280 | 31.6 | 9.1 |
-| Grant Park | 1,334 | 6.6 | 0.9 | 5.0 | 235 | 116 | 83 | 38 | 10.9 | 6.2 |
-| Golmud | 10,304 | 37.1 | 0.3 | 7.3 | 41 | 4 | 27 | 321 | 54.7 | 8.2 |
-| Jiangsu | 550 | 5.0 | 0.7 | 5.1 | 172 | 52 | 67 | 14 | 4.0 | 5.6 |
-| Heybridge | 951 | 5.3 | 0.4 | 4.7 | 25 | 4 | 12 | 25 | 4.7 | 5.3 |
+- **Redraw:** nothing changed, the scene is drawn again.
+- **Pan:** the view moved 100 px since the last frame, over an area it has shown before. So it
+  measures moving the view, not making new features or loading data.
+- **Restyle:** every feature is restyled, as after a zoom change.
 
-Numbers move 10–30% from run to run (Seattle's restyle APP was 88 to 123 ms in four runs), so compare
+Draws are WebGL draw calls, masks are `stencilMask` instructions, unbatched are `Graphics` drawn on
+their own (all three from the redraw frames).
+
+| Place | Visible | APP | DRAW | GPU | Pan APP | Pan DRAW | Restyle APP | Restyle DRAW | Draws | Masks | Unbatched |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Seattle | 3,014 | 11.0 | 0.8 | 6.0 | 9.0 | 6.8 | 79 | 16.5 | 768 | 708 | 36 |
+| Nuevo León | 1,076 | 6.3 | 0.6 | 3.7 | 5.7 | 3.9 | 30 | 8.4 | 113 | 8 | 68 |
+| Miami-Dade | 2,596 | 8.0 | 0.5 | 3.6 | 6.7 | 4.2 | 51 | 8.4 | 77 | 12 | 43 |
+| Užice | 61,124 | 194 | 3.0 | 18.0 | 218 | 109 | 1,538 | 197 | 2,059 | 168 | 1,213 |
+| Bochum | 2,505 | 9.2 | 0.6 | 4.9 | 8.4 | 5.4 | 74 | 15.8 | 318 | 292 | 21 |
+| Smith Point | 784 | 2.9 | 0.5 | 3.3 | 3.7 | 2.3 | 394 | 9.0 | 132 | 20 | 74 |
+| DeKalb | 3,785 | 9.8 | 0.3 | 3.1 | 10.6 | 5.7 | 66 | 6.9 | 127 | 80 | 31 |
+| Staten Island | 15,983 | 49.1 | 0.9 | 5.0 | 43.5 | 22.8 | 275 | 32.9 | 516 | 88 | 277 |
+| Grant Park | 1,334 | 6.2 | 0.6 | 4.1 | 6.6 | 3.6 | 40 | 11.2 | 234 | 116 | 83 |
+| Golmud | 10,304 | 37.1 | 0.3 | 5.6 | 35.5 | 27.8 | 343 | 57.9 | 40 | 4 | 27 |
+| Jiangsu | 550 | 4.1 | 0.4 | 3.1 | 3.4 | 1.6 | 14 | 3.5 | 169 | 52 | 67 |
+| Heybridge | 951 | 5.0 | 0.2 | 2.8 | 3.8 | 2.3 | 22 | 4.6 | 24 | 4 | 12 |
+
+Numbers move 10–30% from run to run (Seattle's restyle APP was 79 to 123 ms in five runs), so compare
 medians from the same session, and look for large differences.
 
 What that says:
 
 - **A frame where nothing changed still costs about 3 µs per visible feature**, almost all of it in
-  the OSM layer's `render()`: 8 ms in Seattle, 46 ms at Staten Island, 204 ms in Užice, where panning
-  runs at about 5 frames a second. A CPU profile at Staten Island (59 ms in `render()`) puts 33 ms in
+  the OSM layer's `render()`: 11 ms in Seattle, 49 ms at Staten Island, 194 ms in Užice.
+  A CPU profile at Staten Island (59 ms in `render()`) puts 33 ms in
   `FilterSystem.filterScene()`, which checks every entity in view against the hidden features on every
   frame. Each entity's matches are cached, but `isHidden()` still runs per entity (copying the matches
   into an array), and each vertex asks all of its parent ways. It runs only when some feature is hidden,
   as in this profile. The rest is `renderPolygons()`, `renderVertices()` and `entitiesInBox()`. See
   "Renderer: classify a node only when it's dirty" in `backlog.md`.
-- **Labels on long lines walk the whole line.** Smith Point's restyle takes 354 ms for 784 features:
+- **Moving the view makes Pixi rebuild everything it knows about the scene.** A pan frame's APP pass
+  costs about what a redraw's does, but its DRAW pass goes from under 1 ms to about 2 µs per visible
+  feature: 7 ms in Seattle, 23 at Staten Island, 28 at Golmud, 109 in Užice (where a pan frame takes
+  a third of a second in all). A CPU profile in Seattle puts it in Pixi's `_updateRenderGroups()`:
+  about 7 ms collecting every renderable into a new instruction list (`_buildInstructions()`), and
+  about 4 ms updating every object's transform. The whole scene is one render group, so a feature
+  that scrolls into view (culling changes its `visible`) rebuilds the list for all of them, and
+  moving `origin` moves every object. Pixi's own advice for a world that pans is to make it a render
+  group, so that moving it costs one matrix. Tried from the console
+  (`gfx.origin.enableRenderGroup()`): Seattle's pan DRAW went from 9.0 to 6.7 ms in the same session,
+  the transform part. The instruction list is still rebuilt. Worth doing properly, with a render
+  group for each scene group or layer, so a change in one doesn't rebuild the others; not done yet.
+- **Labels on long lines walk the whole line.** Smith Point's restyle takes 394 ms for 784 features:
   the labels take it, not the shapes. Five transatlantic cables (TAT13, Apollo North, …) have 4 nodes
   each but are 2.4–2.9 million pixels long at that zoom. `placeRopeLabel()` covers each line with boxes
   of about 16 px (`geomLineSegments()`), about 180,000 per cable, tests every box against the labels
@@ -139,14 +158,14 @@ What that says:
   times worse at z20. This is the same blowup that per-dash geometry had (section 5). The fix is to
   clip a line to the view, with a margin, before covering it with boxes; labels are placed once per
   zoom and kept while panning, so clipping needs a rule for placing again after a long pan.
-- **A zoom change rebuilds everything, and in dense places that's a stall:** 1.5 s of APP and 215 ms
+- **A zoom change rebuilds everything, and in dense places that's a stall:** 1.5 s of APP and 197 ms
   of DRAW in Užice, about 300 ms at Staten Island and Golmud (10,000 solar panels, each an area).
-- **What drives draw calls depends on the place.** Masks dominate in Seattle (708 of 771) and Bochum
-  (292 of 319). In Užice they're 168 of 2,061, and the 1,213 unbatched `Graphics` (ways over 200
+- **What drives draw calls depends on the place.** Masks dominate in Seattle (708 of 768) and Bochum
+  (292 of 318). In Užice they're 168 of 2,059, and the 1,213 unbatched `Graphics` (ways over 200
   vertices) dominate. Steps 6 and 7 are both needed.
-- **About 5 ms of GPU time is fixed.** Heybridge draws 25 calls and still takes 4.7 ms; only Užice goes
-  far beyond 7 ms. So the GPU question is mostly about a fixed cost per frame, not about what we draw.
-  Section 6 takes it apart.
+- **About 3 ms of GPU time is fixed** (5 before the imagery filter fix). Heybridge draws 24 calls and
+  still takes 2.8 ms; only Užice goes far beyond 6 ms. So the GPU question is mostly about a fixed
+  cost per frame, not about what we draw. Section 6 takes it apart.
 - **Užice's background work runs for minutes.** Its data loaded within the minute, but the
   scheduler's idle queue still had work after 90 seconds and took several minutes to drain. Probably
   the validator working through everything that loaded (Bryan's guess); not confirmed yet.
@@ -384,7 +403,8 @@ Each step is measured with frame stats on the same set of places.
 2. **A set of difficult places. Done (Nov 18).** Saved views that stress different things (Bryan's
    list, Nov 18). `bun run measure` (`scripts/measure.ts`) visits them in the debug Chrome and prints
    each one's frame stats, so every change below is compared the same way; `--fresh` reloads before each
-   place, `--out` saves everything as JSON. The results are in section 2. Kept out of e2e tests for now.
+   place, `--out` saves everything as JSON. It measures three kinds of frame: redraw, pan and restyle.
+   The results are in section 2. Kept out of e2e tests for now.
    OSM changes, so a place can stop being difficult (the factories may have been reverted). The script
    holds the list; keep this table in step with it.
 
@@ -420,8 +440,8 @@ Each step is measured with frame stats on the same set of places.
 
    The first thing it showed: **panning costs more than the frames `bun run measure` measures.** In
    Seattle, panning 6 px per animation frame from a script, a frame took 15 to 20 ms of APP and 7 to
-   10 ms of DRAW, against 10 and 0.8 for a frame where nothing changed. The script should measure pan
-   frames too.
+   10 ms of DRAW, against 10 and 0.8 for a frame where nothing changed. The script measures pan
+   frames now (section 2).
 
    It redraws at most four times a second. Ideas for later, from Performer's `pfFrameStats`: texture
    and atlas use, vertices per layer (after step 5), marking restyle frames in the chart, and a

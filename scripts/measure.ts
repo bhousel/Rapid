@@ -18,8 +18,10 @@ import { parseArgs, styleText } from 'node:util';
 // numbers depend on the order. Use `--fresh` to compare one build with another, but not in a loop:
 // it downloads every place again from the OSM API. A place that shows 0 visible features didn't load.
 //
-// At each place it waits for the data to load, then measures two kinds of frame:
-// - redraw:  nothing changed, the scene is drawn again (what panning costs)
+// At each place it waits for the data to load, then measures three kinds of frame:
+// - redraw:  nothing changed, the scene is drawn again
+// - pan:     the view moved 100 px since the last frame, over an area it has shown before
+//            (so it measures moving the view, not making new features or loading data)
 // - restyle: every feature is restyled (what a zoom change costs)
 //
 // OSM changes, so a place can stop being difficult. Add new ones here, and to the table in the design doc.
@@ -109,7 +111,7 @@ console.log(`${env.gpu ?? 'unknown GPU'}, window ${env.window}, ${runs} frames p
 console.log(`Layers: ${env.layers.join(', ')}. Hidden features: ${env.hiddenFilters.join(', ') || 'none'}\n`);
 
 
-// Runs in the page: moves the map to the place, waits for its data, then measures both kinds of frame.
+// Runs in the page: moves the map to the place, waits for its data, then measures each kind of frame.
 // It's sent to the page as source, so it can't use anything from this file.
 async function measurePlace(args: { loc: [number, number], zoom: number, runs: number }) {
   const context = (globalThis as any).rapidContext;
@@ -145,15 +147,43 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
   }
   const loadMs = Math.round(performance.now() - loadStart);
 
-  gfx.enableDetailedStats(true);
+  // Draws one frame after `change()`, and waits until it's done.
+  // (A frame that began before the change doesn't count: both of its passes must come after.)
+  const drawFrame = async (change?: () => void) => {
+    const since = performance.now();
+    change?.();
+    gfx.immediateRedraw();
+    while (!(gfx.lastRenderFrame?.time >= since)) await nextFrame();
+  };
 
-  const measure = async (restyle: boolean) => {
+  // Panning: the view moves by this much between frames, a few steps one way, then back, and so on.
+  const PAN_STEP = [100, 50];   // pixels
+  const PAN_LEG = 3;            // steps before turning around
+  const panStep = (i: number) => {
+    const sign = (Math.floor(i / PAN_LEG) % 2 === 0) ? 1 : -1;
+    map.pan([PAN_STEP[0] * sign, PAN_STEP[1] * sign]);
+  };
+
+  // Walk the pan path once before measuring, so everything along it is loaded and has its features.
+  // Then the pan frames measure moving the view, not making features or the network.
+  const walkPanPath = async () => {
+    for (let i = 0; i < PAN_LEG * 2; i++) {
+      await drawFrame(() => panStep(i));
+      const waitStart = performance.now();
+      while (!isIdle() && performance.now() - waitStart < 30000) await sleep(100);
+    }
+    await drawFrame();
+  };
+
+  const measure = async (kind: 'redraw' | 'restyle' | 'pan') => {
+    if (kind === 'pan') await walkPanPath();
+
     const startID = gfx.lastRenderFrame?.id ?? -1;
     for (let i = 0; i < args.runs; i++) {
-      const before = gfx.lastRenderFrame?.id ?? -1;
-      if (restyle) gfx.scene.dirtyScene();
-      gfx.immediateRedraw();
-      while ((gfx.lastRenderFrame?.id ?? -1) <= before) await nextFrame();
+      await drawFrame(() => {
+        if (kind === 'restyle') gfx.scene.dirtyScene();
+        if (kind === 'pan') panStep(i);
+      });
     }
     for (let i = 0; i < 10; i++) await nextFrame();   // GPU times arrive a few frames later
 
@@ -185,11 +215,15 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
     };
   };
 
-  const redraw = await measure(false);
-  const restyle = await measure(true);
+  gfx.enableDetailedStats(true);
+  const redraw = await measure('redraw');
+  const restyle = await measure('restyle');
+  const pan = await measure('pan');   // last: it brings more features into the scene
   gfx.enableDetailedStats(false);
 
-  return { loadMs, loaded, zoom: gfx.lastRenderFrame?.zoom, redraw, restyle };
+  await map.setMapParamsAsync(args.loc, args.zoom, 0, 0);   // back to where the place is
+
+  return { loadMs, loaded, zoom: gfx.lastRenderFrame?.zoom, redraw, pan, restyle };
 }
 
 
@@ -197,6 +231,7 @@ const results = [];
 const cols = [
   ['place', 14], ['load', 6], ['visible', 8],
   ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6],
+  ['| pan APP', 10], ['DRAW', 6], ['GPU', 6],
   ['| restyle APP', 14], ['DRAW', 6], ['GPU', 6]
 ] as const;
 const row = (vals: (string | number | null | undefined)[]) =>
@@ -230,6 +265,7 @@ for (const place of places) {
       place.id, `${(r.loadMs / 1000).toFixed(1)}s${r.loaded ? '' : '!'}`, visible,
       r.redraw.appMs, r.redraw.drawMs, r.redraw.gpuMs, r.redraw.gl?.draws,
       r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched,
+      r.pan.appMs, r.pan.drawMs, r.pan.gpuMs,
       r.restyle.appMs, r.restyle.drawMs, r.restyle.gpuMs
     ]));
     results.push({ ...place, ...r });
@@ -239,7 +275,8 @@ for (const place of places) {
   }
 }
 
-console.log('\nTimes in ms. load ends with ! if the data was still loading after a minute.');
+console.log('\nTimes in ms. The first group is a frame where nothing changed. load ends with ! if the data was');
+console.log('still loading after a minute.');
 console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch.');
 
 if (values.out) {
