@@ -429,6 +429,21 @@ export class AbstractPixiLayer {
 
 
   /**
+   * A class was set or unset on some data (`PixiScene.setClass`, `unsetClass`): a hover, a
+   * selection. A layer's pass picks that up for every feature it sees (`syncFeatureClasses`), so
+   * a layer that does its pass on every frame needs nothing here.
+   * A layer that keeps its features (see `keepFeatures`) overrides this to remember the data,
+   * and draws its features again on the next frame, pass or no pass. Then a hover costs what
+   * the hovered feature costs, and the caller can ask for a frame (`gfx.requestFrame()`)
+   * instead of a redraw of everything.
+   * @param _dataID - The data whose classes changed (it may be another layer's)
+   */
+  public classChanged(_dataID: DataID): void {
+    // nothing to do here
+  }
+
+
+  /**
    * Counts a feature of this layer being shown or hidden. `AbstractPixiFeature` calls this when
    * its `visible` changes, so the layer knows how many are visible without walking them all.
    * @param visible - Whether the feature is visible now

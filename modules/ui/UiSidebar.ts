@@ -283,7 +283,8 @@ export class UiSidebar {
       }
     }
 
-    gfx.immediateRedraw();
+    // A frame, not a redraw of everything: the scene told the layers which data changed class.
+    gfx.requestFrame();
   }
 
 

@@ -468,4 +468,161 @@ describe('PixiLayerOsm', () => {
     });
   });
 
+
+  // A hover or a selection changes the classes of a little data. The layer draws that data's
+  // features again on a frame where it keeps the rest, in place of a pass over everything.
+  describe('data whose classes changed', () => {
+    let layer, frame, entities, classes, hidden, interesting, calls, selected, tile;
+
+    const viewport = { transform: { zoom: 17 } };
+    const BOX = new Rapid.sdk.Extent([0, 0], [100, 100]);
+    const INSIDE = new Rapid.sdk.Extent([10, 10], [11, 11]);
+    const OUTSIDE = new Rapid.sdk.Extent([500, 10], [501, 11]);
+
+    function addEntity(id, geometry, extent = INSIDE) {
+      entities.set(id, { id: id, extent: extent, geometry: () => geometry });
+    }
+
+    // A stand-in feature for some data, in one of the two containers
+    function addFeature(dataID, parent = tile) {
+      const feature = {
+        id: `osm-${dataID}`,
+        lod: 2,
+        visible: true,
+        destroyed: false,
+        container: { parent: parent },
+        destroy: () => {
+          feature.destroyed = true;
+          feature.container = null;
+          layer.removeFeature(feature);
+        }
+      };
+      layer.addFeature(feature);
+      layer.bindData(feature.id, dataID);
+      return feature;
+    }
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      entities = new Map();
+      classes = { hover: [], select: [], drawing: [] };
+      hidden = new Set();
+      interesting = new Set();
+      calls = [];
+      selected = { label: 'selected' };
+      tile = { label: '0,0,16' };
+
+      const graph = {
+        hasEntity: id => entities.get(id),
+        geometry: entity => ({ world: { extent: entity.extent } }),
+        parentWays: () => []
+      };
+      context.systems.editor = { staging: { graph: graph } };
+      context.systems.filters = { isHidden: entity => (hidden.has(entity.id) ? 'hidden' : null) };
+      context.mode = { id: 'browse' };
+
+      const scene = {
+        context: context,
+        gfx: {},
+        layers: new Map([['map-ui', { selected: selected }]]),
+        getDataWithClass: classID => new Set(classes[classID])
+      };
+      layer = new PixiLayerOsm(scene);
+
+      // Stand-ins for the `render…()` functions: they see their data, and retain its features.
+      // (A vertex is only wanted if it's related to what's hovered, or interesting.)
+      const renderKind = kind => (f, viewport, data, related) => {
+        for (const entityID of data[kind].keys()) {
+          calls.push(`${kind} ${entityID}${f.urgent ? '' : ' (not urgent)'}`);
+          const feature = layer.features.get(`osm-${entityID}`);
+          const wanted = (kind !== 'vertices') || related.descendantIDs.has(entityID) || interesting.has(entityID);
+          if (feature && wanted) {
+            layer.retainFeature(feature, f);
+          }
+        }
+      };
+      layer.renderPolygons = renderKind('polygons');
+      layer.renderLines = renderKind('lines');
+      layer.renderPoints = renderKind('points');
+      layer.renderVertices = renderKind('vertices');
+
+      frame = new RenderFrame(1, 17);
+      frame.cullBox = BOX;
+
+      // Two ways and their nodes. `w1` was hovered at the last pass, so its vertices are on top.
+      // (The ways are big enough on screen for their vertices to be shown.)
+      const WAY = new Rapid.sdk.Extent([10, 10], [60, 60]);
+      addEntity('w1', 'line', WAY);
+      addEntity('w2', 'line', WAY);
+      for (const nodeID of ['n1', 'n2', 'n3']) {
+        addEntity(nodeID, 'vertex');
+      }
+      layer.addChildData('w1', ['n1', 'n2']);
+      layer.addChildData('w2', ['n3']);
+      layer._lastRelated = { descendantIDs: new Set(['w1', 'n1', 'n2']), siblingIDs: new Set() };
+    });
+
+    it('remembers the data the scene says changed class, until it has drawn it again', () => {
+      layer.classChanged('w1');
+      layer.classChanged('w1');
+      layer.classChanged('fbRoads:w-1');   // another layer's: it's told too
+      assert.deepEqual([...layer._changedIDs], ['w1', 'fbRoads:w-1']);
+
+      layer.continueWaiting(frame, viewport);
+      assert.strictEqual(layer._changedIDs.size, 0);
+      assert.notInclude(calls.join(), 'fbRoads');
+    });
+
+    it('draws again what changed class and what was or is related to it, at once', () => {
+      const line1 = addFeature('w1');
+      const line2 = addFeature('w2');
+      const plain = addFeature('n1', selected);
+      const junction = addFeature('n2', selected);
+      interesting.add('n2');
+
+      // The hover moves from `w1` to `w2`
+      classes.hover = ['w2'];
+      layer.classChanged('w1');
+      layer.classChanged('w2');
+      layer.continueWaiting(frame, viewport);
+
+      assert.sameMembers(calls, ['lines w1', 'lines w2', 'vertices n1', 'vertices n2', 'vertices n3']);
+      assert.isFalse(frame.urgent);                 // ..only while they were drawn
+      assert.isTrue(line1.visible);
+      assert.isTrue(line2.visible);
+      assert.isTrue(junction.visible);              // it's drawn whatever is hovered
+      assert.isTrue(plain.destroyed);               // it was only there for the hover
+      assert.isFalse(layer.features.has('osm-n1'));
+      assert.sameMembers([...layer._lastRelated.descendantIDs], ['w2', 'n3']);
+    });
+
+    it('leaves out what a pass would not have gathered, and hides its features', () => {
+      addEntity('w3', 'line');
+      addEntity('w4', 'line', OUTSIDE);
+      const hiddenLine = addFeature('w3');
+      const farLine = addFeature('w4');
+      const gone = addFeature('w5');   // no such entity anymore
+      hidden.add('w3');
+
+      for (const dataID of ['w3', 'w4', 'w5']) {
+        layer.classChanged(dataID);
+      }
+      layer.continueWaiting(frame, viewport);
+
+      assert.notInclude(calls.join(), 'w3');
+      assert.notInclude(calls.join(), 'w4');
+      for (const feature of [hiddenLine, farLine, gone]) {
+        assert.isFalse(feature.visible);
+        assert.isFalse(feature.destroyed);   // a pass decides when to let go of these
+      }
+    });
+
+    it('does nothing on a frame where no class changed', () => {
+      addFeature('n1', selected);
+      layer.continueWaiting(frame, viewport);
+      assert.deepEqual(calls, []);
+      assert.isTrue(layer.features.has('osm-n1'));
+    });
+  });
+
 });

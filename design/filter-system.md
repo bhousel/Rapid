@@ -188,6 +188,12 @@ and letting them appear at higher ones, instead of only sorting features into br
 are either in or out. Once the scene holds what a mapper can use at that zoom, most of the
 rendering problems at the difficult places go away at the source.
 
+**The user has to know that something was left out** (Bryan, Nov 19). In Užice someone mapped
+every bollard and tree, and a mapper who arrives there shouldn't have to wait for all of them to
+be drawn. But if they're left out silently, the next mapper adds the trees again. So whatever
+classifies features by importance also has to say, on the map or beside it, that there's more
+detail here than is shown, and what kind. This system should own that.
+
 Nothing here is designed. Questions to answer first:
 
 - **What ranks a feature?** Its tags (through rulesets, as today), its size on screen, its

@@ -681,11 +681,16 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Asks for a frame in which the layers go on with work they put off, without saying that
-   * anything changed. No layer has to do its pass for it, and it doesn't wait for a turn.
-   * For when something that the waiting work needed has arrived (see `PixiScene.texturesLoaded`).
+   * Asks for a frame on the next tick, without saying that anything changed: no layer has to do
+   * its pass for it, and it doesn't wait for a turn. A layer that keeps its features goes on with
+   * the work it knows about (see `AbstractPixiLayer.continueWaiting`): what it put off, and the
+   * data whose classes changed since (`PixiScene.setClass`). The other layers draw as on any frame.
+   *
+   * Use this after a change that the layers were told about some other way: a class was set or
+   * unset (a hover), or a texture arrived (`PixiScene.texturesLoaded`). For anything else, use
+   * `immediateRedraw()` or `deferredRedraw()`.
    */
-  public resumeWaiting(): void {
+  public requestFrame(): void {
     this._unfinished = true;
     this._appPending = true;
   }
@@ -1247,8 +1252,13 @@ export class GraphicsSystem extends AbstractSystem {
       autoDensity: this.highQuality,
       autoStart: false,     // Avoid the ticker
       canvas: this.surface,
-      events: {
-        move: false,
+      // Which pointer events Pixi handles (`PixiEvents` listens to the stage's `pointermove`,
+      // `pointerdown`, `pointerup` and `click`, and takes the wheel from the DOM).
+      // `globalMove` must stay off: with it, every pointer move walks every interactive object in
+      // the scene to tell each one that the pointer moved somewhere (50 ms a move in Užice).
+      // (Until Nov 2026 these were passed as `events`, which Pixi 8 ignores, so all four were on.)
+      eventFeatures: {
+        move: true,
         globalMove: false,
         click: true,
         wheel: false

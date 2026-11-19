@@ -637,6 +637,7 @@ export class PixiScene extends EventEmitter {
       classIDs = new Set<ClassID>();
       this._dataHasClass.set(dataID, classIDs);
     }
+    const isChange = !classIDs.has(classID);
     classIDs.add(classID);
 
     let dataIDs = this._classHasData.get(classID);
@@ -645,6 +646,10 @@ export class PixiScene extends EventEmitter {
       this._classHasData.set(classID, dataIDs);
     }
     dataIDs.add(dataID);
+
+    if (isChange) {
+      this._classChanged(dataID);
+    }
   }
 
 
@@ -655,8 +660,9 @@ export class PixiScene extends EventEmitter {
    */
   public unsetClass(classID: ClassID, dataID: DataID): void {
     const classIDs = this._dataHasClass.get(dataID);
+    let isChange = false;
     if (classIDs) {
-      classIDs.delete(classID);
+      isChange = classIDs.delete(classID);
       if (!classIDs.size) {
         this._dataHasClass.delete(dataID);
       }
@@ -668,6 +674,23 @@ export class PixiScene extends EventEmitter {
       if (!dataIDs.size) {
         this._classHasData.delete(classID);
       }
+    }
+
+    if (isChange) {
+      this._classChanged(dataID);
+    }
+  }
+
+
+  /**
+   * Tells the layers that the classes of some data changed, so that a layer that keeps its
+   * features can draw that data's again without doing its whole pass
+   * (see `AbstractPixiLayer.classChanged`).
+   * @param dataID - The data whose classes changed
+   */
+  protected _classChanged(dataID: DataID): void {
+    for (const layer of this.layers.values()) {
+      layer.classChanged(dataID);
     }
   }
 
@@ -739,7 +762,7 @@ export class PixiScene extends EventEmitter {
     for (const layer of this.layers.values()) {
       layer.texturesLoaded();
     }
-    this.gfx.resumeWaiting();
+    this.gfx.requestFrame();
   }
 
 

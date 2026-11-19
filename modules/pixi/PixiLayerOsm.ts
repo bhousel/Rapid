@@ -7,6 +7,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
@@ -185,6 +186,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _madeCount: number;
   /** Whether features outside the view may be made now (in the scene's call to `continueWaiting()`, when there's time) */
   protected _makingOutside: boolean;
+  /** Data whose classes changed since the last pass (see `classChanged`, `_renderChanged`) */
+  protected _changedIDs: Set<DataID>;
+  /** The features retained while `_renderChanged()` runs, `null` the rest of the time */
+  protected _seenFeatureIDs: Set<FeatureID> | null;
 
 
   /**
@@ -206,6 +211,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._lastRelated = { descendantIDs: new Set<EntityID>(), siblingIDs: new Set<EntityID>() };
     this._madeCount = 0;
     this._makingOutside = false;
+    this._changedIDs = new Set<DataID>();
+    this._seenFeatureIDs = null;
   }
 
 
@@ -256,6 +263,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._midpoints.clear();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
+    this._changedIDs.clear();
 
     // Add containers (`super.reset()` released the old ones), see `design/scene.md`
     const basemap = this._spatialContainer('basemap', 'osm');
@@ -280,6 +288,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (!this.enabled || !osm?.started || viewZoom < MINZOOM) {
       this._unmadeInView = this._newUnmade();    // nothing is drawn, so nothing is waiting to be made
       this._unmadeOutside = this._newUnmade();
+      this._changedIDs.clear();
       return;
     }
 
@@ -342,52 +351,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // and parent-child data links have been established.
     // We can prepare vertices and midpoints.
 
-    // Gather ids related to the selected/hovered/drawing features.
-    const selectedIDs = this.scene.getDataWithClass('select');
-    const hoveredIDs = this.scene.getDataWithClass('hover');
-    const drawingIDs = this.scene.getDataWithClass('drawing');
-    const dataIDs = new Set<EntityID>([...selectedIDs, ...hoveredIDs, ...drawingIDs]);
-
-    // Experiment: avoid showing child vertices/midpoints for too small parents
-    for (const dataID of dataIDs) {
-      const entity = graph.hasEntity(dataID);
-      if (entity?.type === 'node') continue;  // ways, relations only
-
-      const extent = entity && graph.geometry(entity).world?.extent;
-      if (!extent) continue;
-
-      // Determine dimensions in screen pixels
-      const worldScale = 2 ** (viewZoom - WORLD_ZOOM);
-      const w = Math.abs(extent.max[0] - extent.min[0]) * worldScale;
-      const h = Math.abs(extent.max[1] - extent.min[1]) * worldScale;
-
-      if (w < 25 && h < 25) {   // too small, skip this
-        dataIDs.delete(dataID);
-      }
-    }
-
-    // Expand set to include parent ways for selected/hovered/drawing nodes too..
-    const interestingIDs = new Set<EntityID>(dataIDs);
-    for (const dataID of dataIDs) {
-      const entity = graph.hasEntity(dataID);
-      if (entity?.type !== 'node') continue;   // nodes only
-      for (const parent of graph.parentWays(entity)) {
-        interestingIDs.add(parent.id);
-      }
-    }
-
-    // Create collections of the sibling and descendant IDs,
-    // These will determine which vertices and midpoints get drawn.
-    const related: RelatedIDs = {
-      descendantIDs: new Set<EntityID>(),
-      siblingIDs: new Set<EntityID>()
-    };
-    for (const interestingID of interestingIDs) {
-      this.getSelfAndDescendants(interestingID, related.descendantIDs);
-      this.getSelfAndSiblings(interestingID, related.siblingIDs);
-    }
-
+    const related = this._gatherRelated(viewZoom);
     this._lastRelated = related;
+    this._changedIDs.clear();   // the pass has seen every feature, whatever changed
     t = this._endStep('related', t);
 
     this.renderVertices(frame, viewport, data, related);
@@ -458,6 +424,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param outside - Whether to go on to what's outside the view, once what's in view is done
    */
   public override continueWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean = false): void {
+    // First what the user is looking at: the data whose classes changed (a hover, a selection)
+    if (this._changedIDs.size) {
+      this._renderChanged(frame, viewport);
+    }
+
     super.continueWaiting(frame, viewport, outside);
 
     if (!this._countUnmade(this._unmadeOutside) && !this._countUnmade(this._unmadeInView)) return;
@@ -473,6 +444,207 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._makingOutside = false;
     }
     this._catchingUp = false;
+  }
+
+
+  /**
+   * Remembers data whose classes changed, to draw its features again on the next frame
+   * (see `_renderChanged`). The scene calls this for every layer, so the data may not be ours.
+   * @param dataID - The data whose classes changed
+   */
+  public override classChanged(dataID: DataID): void {
+    this._changedIDs.add(dataID);
+  }
+
+
+  /**
+   * Retains a feature (see `AbstractPixiLayer.retainFeature`), and notes that it was seen, while
+   * `_renderChanged()` is watching for the features that aren't.
+   * @param feature - The feature
+   * @param frame - The frame being rendered
+   */
+  public override retainFeature(feature: AbstractPixiFeature, frame: RenderFrame): void {
+    super.retainFeature(feature, frame);
+    this._seenFeatureIDs?.add(feature.id);
+  }
+
+
+  /**
+   * Gathers the IDs related to what's selected, hovered or being drawn: its nodes and midpoints
+   * (descendants), and the nodes that share a way with it (siblings). These decide which vertices
+   * and midpoints are drawn, above everything else.
+   * It goes by the links between features' data, so the features must have been made.
+   * @param viewZoom - The view's zoom
+   * @return The related IDs
+   */
+  protected _gatherRelated(viewZoom: number): RelatedIDs {
+    const context = this.context;
+    const graph = context.systems.editor!.staging.graph;
+
+    // Gather ids related to the selected/hovered/drawing features.
+    const selectedIDs = this.scene.getDataWithClass('select');
+    const hoveredIDs = this.scene.getDataWithClass('hover');
+    const drawingIDs = this.scene.getDataWithClass('drawing');
+    const dataIDs = new Set<EntityID>([...selectedIDs, ...hoveredIDs, ...drawingIDs]);
+
+    // Experiment: avoid showing child vertices/midpoints for too small parents
+    for (const dataID of dataIDs) {
+      const entity = graph.hasEntity(dataID);
+      if (entity?.type === 'node') continue;  // ways, relations only
+
+      const extent = entity && graph.geometry(entity).world?.extent;
+      if (!extent) continue;
+
+      // Determine dimensions in screen pixels
+      const worldScale = 2 ** (viewZoom - WORLD_ZOOM);
+      const w = Math.abs(extent.max[0] - extent.min[0]) * worldScale;
+      const h = Math.abs(extent.max[1] - extent.min[1]) * worldScale;
+
+      if (w < 25 && h < 25) {   // too small, skip this
+        dataIDs.delete(dataID);
+      }
+    }
+
+    // Expand set to include parent ways for selected/hovered/drawing nodes too..
+    const interestingIDs = new Set<EntityID>(dataIDs);
+    for (const dataID of dataIDs) {
+      const entity = graph.hasEntity(dataID);
+      if (entity?.type !== 'node') continue;   // nodes only
+      for (const parent of graph.parentWays(entity)) {
+        interestingIDs.add(parent.id);
+      }
+    }
+
+    // Create collections of the sibling and descendant IDs,
+    // These will determine which vertices and midpoints get drawn.
+    const related: RelatedIDs = {
+      descendantIDs: new Set<EntityID>(),
+      siblingIDs: new Set<EntityID>()
+    };
+    for (const interestingID of interestingIDs) {
+      this.getSelfAndDescendants(interestingID, related.descendantIDs);
+      this.getSelfAndSiblings(interestingID, related.siblingIDs);
+    }
+
+    return related;
+  }
+
+
+  /**
+   * Draws again the features of the data whose classes changed since the last pass (a hover, a
+   * selection), without the pass: in a dense place a pass takes 200 ms, and a hover changes two
+   * features and a few vertices.
+   *
+   * What a class changes: the data's own features (a halo, a highlight), and which vertices and
+   * midpoints are shown above everything (`_gatherRelated`). So this runs the changed data, and
+   * everything that was or is now related to it, through the same `render…()` functions as a
+   * pass. Then it hides whichever of their features those functions didn't want anymore (the
+   * vertices of a line that's no longer hovered), as `cull()` does after a pass.
+   *
+   * These are drawn at once, whatever time the frame has: the user is looking at them.
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  protected _renderChanged(frame: RenderFrame, viewport: Viewport): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const filters = context.systems.filters!;
+    const graph = editor.staging.graph;
+
+    const before = this._lastRelated;
+    const related = this._gatherRelated(viewport.transform.zoom);
+    this._lastRelated = related;
+
+    const dataIDs = new Set<DataID>(this._changedIDs);
+    this._changedIDs.clear();
+    for (const ids of [before.descendantIDs, before.siblingIDs, related.descendantIDs, related.siblingIDs]) {
+      for (const dataID of ids) {
+        dataIDs.add(dataID);
+      }
+    }
+
+    // Sort them as a pass does. (Some aren't entities: midpoints, and other layers' data.)
+    const data: OsmData = {
+      polygons: new Map<EntityID, OsmWay | OsmRelation>(),
+      lines: new Map<EntityID, OsmWay>(),
+      points: new Map<EntityID, OsmNode>(),
+      vertices: new Map<EntityID, OsmNode>()
+    };
+    for (const dataID of dataIDs) {
+      const entity = graph.hasEntity(dataID);
+      if (!entity) continue;
+
+      // Only what a pass would have gathered: in the cull box, and not hidden
+      const extent = graph.geometry(entity).world?.extent;
+      if (!extent?.intersects(frame.cullBox)) continue;
+      const geom = entity.geometry(graph) as GeometryType;
+      if (filters.isHidden(entity, graph, geom)) continue;
+
+      if (geom === 'point') {
+        data.points.set(entity.id, entity as OsmNode);
+      } else if (geom === 'vertex') {
+        data.vertices.set(entity.id, entity as OsmNode);
+      } else if (geom === 'line') {
+        data.lines.set(entity.id, entity as OsmWay);
+      } else if (geom === 'area') {
+        data.polygons.set(entity.id, entity as OsmWay | OsmRelation);
+      }
+    }
+
+    // What was a midpoint before may not be one after
+    const midpointsBefore = [...this._midpoints.keys()];
+
+    const wasUrgent = frame.urgent;
+    frame.urgent = true;                // draw them in this frame
+    this._catchingUp = true;            // (their features belong to the last pass: see `retainFeature`)
+    this._madeCount = 0;
+    this._seenFeatureIDs = new Set<FeatureID>();
+
+    if (data.polygons.size)  this.renderPolygons(frame, viewport, data);
+    if (data.lines.size)     this.renderLines(frame, viewport, data);
+    if (data.points.size)    this.renderPoints(frame, viewport, data);
+    if (data.vertices.size)  this.renderVertices(frame, viewport, data, related);
+
+    if (context.mode?.id === 'select') {
+      this.renderMidpoints(frame, viewport, data, related);
+    } else {
+      this._midpoints.clear();
+    }
+
+    const seen = this._seenFeatureIDs;
+    this._seenFeatureIDs = null;
+    this._catchingUp = false;
+    frame.urgent = wasUrgent;
+
+    // Hide the features that weren't wanted this time. The ones that were drawn above everything
+    // only because they were related (plain vertices, midpoints) are destroyed: a pass would get
+    // to that after not seeing them for a while, and without passes they'd pile up.
+    const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+    const selectedContainer = mapUiLayer.selected;
+    const unwanted: AbstractPixiFeature[] = [];
+    for (const dataID of dataIDs) {
+      for (const featureID of (this._dataHasFeature.get(dataID) ?? [])) {
+        const feature = this.features.get(featureID);
+        if (feature && !seen.has(featureID)) {
+          unwanted.push(feature);
+        }
+      }
+    }
+    for (const midpointID of midpointsBefore) {
+      const featureID = `${this.layerID}-midpoint-${midpointID}`;
+      const feature = this.features.get(featureID);
+      if (feature && !seen.has(featureID)) {
+        unwanted.push(feature);
+      }
+    }
+    for (const feature of unwanted) {
+      if (!feature.container) continue;   // listed twice, and destroyed already
+      if (feature.container.parent === selectedContainer) {
+        feature.destroy();
+      } else {
+        feature.visible = false;
+      }
+    }
   }
 
 

@@ -7,8 +7,9 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > **Status:** In progress (Nov 2026). Steps 1 to 5 of the plan are done (frame stats, a script that
 > measures a set of difficult places, where the GPU time goes, a rendering info card, and the
 > `RenderFrame` passed to the layers), and so are the CULL pass for the OSM layer (section 8) and
-> frame pacing (section 9). A deadline on the frame is started (section 10), and section 11
-> compares the branch with `main`, Rapid 2.5 and iD; sections 4 and 5
+> frame pacing (section 9). A deadline on the frame is started (section 10), section 11
+> compares the branch with `main`, Rapid 2.5 and iD, and section 12 is about what a pass costs
+> and what asks for one (a hover no longer does); sections 4 and 5
 > aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
 > reproduce them. The plan is in section 7.
@@ -915,8 +916,8 @@ or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 n
 - **Another frame.** If any layer has work waiting after a frame (`frame.unfinished`), the next
   tick makes another, pass or no pass. These frames aren't paced: they're cheap by construction.
   (Except where DRAW has a big fixed cost, as in Užice: see "What a frame costs when little is
-  done in it".) `gfx.resumeWaiting()` asks for such a frame from outside, when something the
-  waiting work needed has arrived (a texture).
+  done in it".) `gfx.requestFrame()` asks for such a frame from outside, when something the
+  waiting work needed has arrived (a texture), or a class changed (a hover).
   `gfx.pending` is `true` until nothing is left, and scripts and tests wait for that.
 
 ### What it does
@@ -980,7 +981,7 @@ of which shows at Seattle or Staten Island:
    everything: 267 times during that load. A pass in Užice walks 100,000 entities (190 ms) and,
    in the middle of a load, makes its one batch of 64. Now a texture's arrival asks for a frame,
    not a pass: a feature drawn without its icon stays dirty, the layer remembers it, and
-   `scene.texturesLoaded()` has those drawn again (`gfx.resumeWaiting()`).
+   `scene.texturesLoaded()` has those drawn again (`gfx.requestFrame()`).
 2. **The budget was 6 to 13 ms, never 24.** The bigger budget needed an idle scheduler. But the
    UI's listeners to `draw` queue a task each on every frame, and the scheduler ran normal tasks
    only in what was left of a 16.7 ms tick, which was nothing: no normal task ran on 214 of the
@@ -1105,10 +1106,8 @@ refresh (a 24 ms budget plus 9 ms of DRAW is 33), and wait for the next. Not che
 ### What it doesn't do yet
 
 - **The pass is the longest frame of a pan in Užice now:** 205 to 250 ms, 8 to 11 times in the
-  first pan, most of them because a tile arrived. Two things to look at: making a pass cheaper
-  when little changed, and letting passes for arriving data wait longer where a pass is
-  expensive (`FramePacer` caps the gap at 250 ms, so there they take half the time and not the
-  third it aims for).
+  first pan, most of them because a tile arrived. See section 12 for what a pass costs and what
+  still asks for one.
 - **Labels do their part of a zoom in one frame** (160 ms in Užice, item 5), and place
   everything at once when the last feature is made (128 ms in one frame of a load there).
 - **Matching a style copies it twice** (`utilDeepMerge`, in `styleMatch()` and the `style`
@@ -1254,3 +1253,101 @@ map" column aren't comparable between iD and Rapid either: an SVG element isn't 
 - **How it looks.** A page can keep 50 frames a second and still show a stale picture: the redraw
   column says how often, not what the user sees in between.
 - **Anything but an M4 with a trackpad's events.**
+
+## 12. The pass, and what asks for it
+
+Looked at Nov 19, in Užice (z16, from a tape). A pass is the OSM layer walking everything in its
+cull box: 296,274 entities there, of which 223,044 are vertices. With nothing changed it takes
+207 ms:
+
+| Step | ms | What it is |
+|---|---|---|
+| gather | 13 | the spatial index's answer for the cull box |
+| filter | 50 | hidden or not, for each entity (the vertices ask their ways) |
+| classify | 41 | each entity's geometry, into a `Map` per kind |
+| polygons, lines, points | 30, 21, 7 | finding each entity's feature, and finding nothing to do |
+| vertices | 39 | testing each of the 223,044 for being worth drawing |
+
+About half of it is the vertices, in three of the steps. `entity.geometry(graph)` is asked twice
+per entity (once to filter, once to classify) and is 25 ms of it.
+
+**So the first question is who asks for a pass.** A redraw request without a layer does, and so
+does a view that leaves the cull box. Three kinds of request turned out to be most of them:
+
+- **Each icon that loaded** (267 in one load). Fixed in section 10.
+- **Each hover.** `UiSidebar` set the hover class and asked for a redraw of everything, every
+  time the pointer crossed onto another feature. Moving the pointer across the map in Užice for
+  what should take 4 seconds (240 pointer events, 60 a second) took 36.9 s: 116 frames, each one a
+  pass of 175 ms or more.
+- **Each tile that arrives, each edit, each click.** Still so, see below.
+
+### A hover without a pass
+
+A class changes what a few features look like, and which vertices and midpoints are drawn above
+everything. Nothing else.
+
+- `PixiScene.setClass()` and `unsetClass()` tell the layers which data changed class
+  (`AbstractPixiLayer.classChanged()`). The OSM layer remembers it.
+- The caller asks for a frame, not for a redraw: `gfx.requestFrame()`. No layer has to do its
+  pass for that. (`immediateRedraw()` still works after a class change, and still costs a pass.)
+- On a frame where the OSM layer keeps its features, `_renderChanged()` runs the changed data,
+  and whatever was or is now related to it, through the same `render…()` functions as a pass
+  does. It leaves out what a pass wouldn't have gathered (hidden, or outside the cull box), and
+  hides the features those functions didn't want anymore, as `cull()` would have. The vertices
+  that were only drawn because their way was hovered are destroyed.
+
+Checked on 152 hovers in Užice, in browse mode and with a way selected: after each, a full pass
+changed no feature that was or is shown (its visibility, its container, its classes).
+
+### Pixi was walking the scene on every pointer move
+
+With the pass gone, a pointer move still cost 66 ms, 50 of them in Pixi's own hit test.
+`GraphicsSystem` has asked Pixi to leave its `globalMove` events off since 2023, but under the key
+`events`. Pixi 8 reads `eventFeatures`, and ignores what it doesn't know, so all of its event
+features were on. With `globalMove` on, every pointer move visits every interactive object in
+the scene (to tell each one that the pointer moved somewhere), whatever is under the pointer.
+Its `wheel` events were on too: a hit test for each wheel event of a pan, for an event that
+`PixiEvents` takes from the DOM. Both are off now.
+
+| Užice: 240 pointer moves across the map | Before | Without the pass | And `globalMove` off |
+|---|---|---|---|
+| Time they took (4 s if the page keeps up) | 36.9 s | 15.7 s | 5.3 s |
+| Between animation frames, median / 90th percentile | 65 / 242 ms | 62 / 73 ms | 17 / 32 ms |
+| Animation frames over 100 ms | 117 | 1 | 1 |
+| One pointer move: Pixi's hit test | 50 ms | 50 ms | 5 ms |
+| One hover: APP + DRAW | 175 + 9 ms | 3 + 9 ms | 3 + 9 ms |
+
+`bun run compare` in Užice after this, two runs from the tape: the first pan 24.9 and 27.4 frames
+a second with a longest gap of 374 and 322 ms (it was 310 to 935 in the four runs before), and
+"drawn after" 14.9 and 13.7 s.
+
+### What still asks for a pass
+
+Each of these can go the way the hover went: the layer is told which data changed, and draws
+that. `_renderChanged()` and the features that wait (`_makeWaiting()`) already run a set of
+entities through the `render…()` functions.
+
+- **Each edit.** `MapSystem` answers `stagingchange` with `dirtyData()` for the changed entities
+  and `immediateRedraw()`. Dragging a node is an edit on every pointer move, so in Užice each
+  frame of a drag is a pass. (From the code. Not measured: the debug Chrome isn't for editing.)
+- **Each tile that arrives** (`merge`): 8 to 11 passes during the first pan there, 2.3 of its
+  4.2 s of frames. The merged IDs are known. Entities they change without being among them need
+  care: a point becomes a vertex when its way arrives.
+- **Leaving the cull box.** What enters and leaves is the difference between two answers of the
+  spatial index.
+- **A click** (select mode shows midpoints, so the mode matters too).
+
+And the pass itself, for when it's needed (the filters, the styles, a zoom):
+
+- **The vertices.** One in seven is drawn in Užice, one in twenty at Staten Island. Reaching
+  them through the ways that are drawn, not through the spatial index, would take about half of
+  the pass away (`design/filter-system.md` section 4).
+- **`entity.geometry(graph)` twice**, and a `Map` entry per entity to sort them.
+
+### Seen on the way
+
+- **Užice uses 2.4 GB of JavaScript heap** after one load (the limit is 4.4). The debug Chrome's
+  tab crashed once during this work, after about twenty loads of it and several CPU profiles.
+  Not looked into.
+- **`FramePacer` caps the gap between passes at 250 ms.** Where a pass costs that much, passes
+  for arriving data take half the time, not the third the pacer aims for.

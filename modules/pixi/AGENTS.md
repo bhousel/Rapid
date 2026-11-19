@@ -33,9 +33,16 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `_childContainer()`; each gets a render group at an anchor near the view. Never set `isRenderGroup`
   on a container whose children are in world coordinates. See "Render groups" in
   [`design/scene.md`](../../design/scene.md).
-- **Pointer events go through `PixiEvents` and Rapid's behaviors.** Pixi's `move` and `globalMove`
-  events are off, and the mode decides which subtrees can be hit (`interactiveSpatialIDs`, see
-  [`design/scene.md`](../../design/scene.md)). Don't add pointer listeners to features.
+- **Pointer events go through `PixiEvents` and Rapid's behaviors.** Pixi's `globalMove` and `wheel`
+  events are off (`eventFeatures` in `GraphicsSystem._initPixi()`), and the mode decides which
+  subtrees can be hit (`interactiveSpatialIDs`, see [`design/scene.md`](../../design/scene.md)).
+  Don't add pointer listeners to features, and don't listen for `globalpointermove`: with
+  `globalMove` on, every pointer move visits every interactive object in the scene.
+- **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
+  for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
+  that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in
+  Užice costs 3 ms of APP that way, and 175 with `immediateRedraw()`. Use a redraw request when
+  something else changed too (the mode, the data).
 - **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
 - **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
   minimap, `autoStart: false`, the renderer choice from the url).
@@ -56,7 +63,8 @@ rules that come out of it:
 - **Every change to what a layer draws needs a redraw request.** Moving the view doesn't make one,
   and the OSM layer skips its pass on frames that come only from a move. Marking features dirty
   (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their layer do its next pass, but doesn't
-  ask for a frame. Changing a class (`scene.setClass()`) does neither: follow it with a request.
+  ask for a frame. Changing a class (`scene.setClass()`) tells the layers which data it was, and
+  doesn't ask for a frame either: follow it with `gfx.requestFrame()` (above).
 - **A layer that can skip its pass gathers by `frame.cullBox`, not by the view.** The box is the
   view and padding around it. Call `this.keepFeatures(frame)` in `render()`, after anything that
   must happen on every frame (asking the service for the view's tiles), and return if it says
@@ -100,7 +108,7 @@ rules that come out of it:
 - **When a texture arrives, call `scene.texturesLoaded()`, not `deferredRedraw()`.** A feature
   drawn without its icon stays dirty (`PixiFeaturePoint.updateStyle`), and a layer that draws
   with `updateFeature()` remembers it. `texturesLoaded()` has those drawn again over the next
-  frames, and asks for a frame (`gfx.resumeWaiting()`), not for a pass.
+  frames, and asks for a frame (`gfx.requestFrame()`), not for a pass.
 - **A layer's `render()` can run 60 times a second.** While the view moves, a frame is drawn on
   every tick. Whatever a layer does before `keepFeatures()`, and everything in a layer that doesn't
   call it, is paid on each one. The same goes for listeners to `gfx`'s `draw` event: throttle them

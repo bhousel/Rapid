@@ -319,6 +319,61 @@ describe('PixiScene', () => {
   });
 
 
+  // A layer that keeps its features hears which data changed class, so it can draw that data's
+  // features again without its pass (a hover).
+  describe('classes', () => {
+    let scene, told;
+
+    beforeEach(() => {
+      told = [];
+      scene = {
+        _dataHasClass: new Map(),
+        _classHasData: new Map(),
+        layers: new Map([
+          ['osm', { classChanged: dataID => told.push(`osm ${dataID}`) }],
+          ['rapid', { classChanged: dataID => told.push(`rapid ${dataID}`) }]
+        ])
+      };
+      for (const name of ['setClass', 'unsetClass', 'clearClass', 'getDataWithClass', 'getClasses', '_classChanged']) {
+        scene[name] = PixiScene.prototype[name];
+      }
+    });
+
+    it('tells every layer when a class is set on some data, once', () => {
+      scene.setClass('hover', 'w1');
+      assert.deepEqual(told, ['osm w1', 'rapid w1']);
+      assert.deepEqual([...scene.getClasses('w1')], ['hover']);
+
+      scene.setClass('hover', 'w1');   // it has it already
+      assert.strictEqual(told.length, 2);
+    });
+
+    it('tells every layer when a class is unset, and not when the data never had it', () => {
+      scene.setClass('hover', 'w1');
+      told.length = 0;
+
+      scene.unsetClass('select', 'w1');
+      scene.unsetClass('hover', 'w2');
+      assert.deepEqual(told, []);
+
+      scene.unsetClass('hover', 'w1');
+      assert.deepEqual(told, ['osm w1', 'rapid w1']);
+      assert.strictEqual(scene.getDataWithClass('hover').size, 0);
+    });
+
+    it('tells the layers about each data that a cleared class was on', () => {
+      scene.setClass('hover', 'w1');
+      scene.setClass('hover', 'n1');
+      scene.setClass('select', 'w2');
+      told.length = 0;
+
+      scene.clearClass('hover');
+      assert.sameMembers(told, ['osm w1', 'rapid w1', 'osm n1', 'rapid n1']);
+      assert.deepEqual([...scene.getDataWithClass('select')], ['w2']);
+    });
+  });
+
+
   describe('texturesLoaded', () => {
     it('tells every layer, and asks for a frame that goes on with waiting work, not for a redraw', () => {
       const calls = [];
@@ -328,13 +383,13 @@ describe('PixiScene', () => {
           ['rapid', { texturesLoaded: () => calls.push('rapid') }]
         ]),
         gfx: {
-          resumeWaiting: () => calls.push('resumeWaiting'),
+          requestFrame: () => calls.push('requestFrame'),
           deferredRedraw: () => calls.push('deferredRedraw'),
           immediateRedraw: () => calls.push('immediateRedraw')
         }
       };
       PixiScene.prototype.texturesLoaded.call(scene);
-      assert.deepEqual(calls, ['osm', 'rapid', 'resumeWaiting']);
+      assert.deepEqual(calls, ['osm', 'rapid', 'requestFrame']);
     });
   });
 
