@@ -18,6 +18,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 | `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph |
 | `PixiEvents.ts` | Binds pointer/keyboard/wheel events once and re-dispatches them to other code |
 | `PixiTextures.ts` | Texture atlas management and sprite generation |
+| `RenderFrame.ts` | One frame of the map, with the stats gathered while it's made (see `design/graphics-system.md`) |
 | `helpers.ts` | Shared rendering helper functions |
 | `index.ts` | Barrel export file |
 
@@ -69,3 +70,4 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 | `DashLine.ts` | Dashed line rendering |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
+| `RenderStats.ts` | Frame stats from Pixi's instructions, WebGL call counts, GPU timing |

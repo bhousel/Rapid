@@ -36,7 +36,7 @@ Still to do, in about this order:
   made 707 of the 771 draw calls (64 without masks). GPU time was ~9 ms a frame in all three cases.
   **Next: [`design/graphics-system.md`](../design/graphics-system.md)** (Nov 18), the measurements and the
   plan: frame stats first, a set of difficult places to measure on, then our own line builder for
-  partial-fill bands, hit areas and dashes.
+  partial-fill bands, hit areas and dashes. Step 1 (frame stats) done; next is step 2.
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
   `directionalCombo`, which Rapid doesn't support (iD's rename and generalization of the `cycleway` field;

@@ -25,6 +25,7 @@ import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 /** Returned by `getClasses()` for data that has no classes */
@@ -283,17 +284,34 @@ export class PixiScene extends EventEmitter {
    * - For proper label placement, we really need to cull the feature layers
    *   before we render the label layer, so we do these calls in layer order.
    *
-   * @param frame - Integer frame being rendered
+   * Each layer's time and feature counts are recorded on the frame.
+   *
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     // Groups that live under `origin` render in world coordinates;
     // the `origin` container (set up in `GraphicsSystem._app`) provides the position
     // and scale that maps world coords → screen coords. Group containers themselves
     // need no extra transform (except the `labels` group which renders in screen space).
     for (const layer of this.layers.values()) {
-      layer.render(frame, viewport);
-      layer.cull(frame);
+      const t0 = performance.now();
+      layer.render(frame.id, viewport);
+      const t1 = performance.now();
+      layer.cull(frame.id);
+      const t2 = performance.now();
+
+      let visible = 0;
+      for (const feature of layer.features.values()) {
+        if (feature.visible) visible++;
+      }
+      frame.layers.set(layer.id, {
+        enabled: layer.enabled,
+        renderMs: t1 - t0,
+        cullMs: t2 - t1,
+        features: layer.features.size,
+        visible: visible
+      });
     }
   }
 

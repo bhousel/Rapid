@@ -4,8 +4,9 @@ How `GraphicsSystem` turns the map into a frame, what we know about what a frame
 explorations planned to make frames cheaper. Rendering performance is where Rapid has the most room to
 improve, and until now we've had no way to see it except spot checks in Spector.
 
-> **Status:** Proposed (Nov 2026). Nothing in sections 3–6 is built yet. The measurements in section 2
-> were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0). The plan is in section 7.
+> **Status:** In progress (Nov 2026). Step 1 of the plan (frame stats, first version) is built; the
+> rest of sections 4–6 isn't. The measurements in section 2 were taken by hand on the `pixi-8.23`
+> branch (Pixi 8.23.0), and frame stats reproduce them. The plan is in section 7.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -253,9 +254,18 @@ About 9 ms a frame on an M4, whatever the draw calls. Candidates to rule in or o
 
 Each step is measured with frame stats on the same set of places.
 
-1. **Frame stats, first version.** `GraphicsSystem` times each layer's APP work and reads Pixi's
-   instruction list after DRAW, keeping a ring buffer; debug builds add draw calls and GPU time.
-   Expose it to scripts (`bun run cdp`). Measure its own overhead.
+1. **Frame stats, first version. Done (Nov 18).** `_app()` makes a `RenderFrame`
+   (`modules/pixi/RenderFrame.ts`); `PixiScene.render()` records each layer's `render()` and `cull()`
+   time and feature counts on it; `_draw()` adds the DRAW time and Pixi's instructions
+   (`modules/pixi/lib/RenderStats.ts`). `gfx.renderFrames` keeps the last 120 frames, and
+   `gfx.lastRenderFrame` is the newest. `gfx.enableDetailedStats(true)` adds WebGL call counts and GPU
+   time (WebGL 2 only for now). Layers still receive the frame number; passing the `RenderFrame` itself
+   is step 5. `test/e2e/rendering.test.js` checks that Pixi's internals still look as expected.
+   What it showed in Seattle:
+   - The always-on part costs little: reading the instruction list takes about 0.1 ms per DRAW.
+   - **The OSM layer spends about 8 ms of every redraw even when nothing changed** (APP 9.5 ms with no
+     dirty features, against 89 ms when everything is restyled). Worth its own look: see "Renderer:
+     classify a node only when it's dirty" in `backlog.md`.
 2. **A set of difficult places.** Saved views that stress different things (Bryan's list, Nov 18). A
    script measures them all, so every change below is compared the same way. Kept out of e2e tests for
    now. OSM changes, so a place can stop being difficult (the factories may have been reverted).

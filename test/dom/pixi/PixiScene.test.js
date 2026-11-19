@@ -4,6 +4,7 @@ import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
 import { PixiLayerRapid } from '../../../modules/pixi/PixiLayerRapid.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
+import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
 
 
 describe('PixiScene', () => {
@@ -145,6 +146,36 @@ describe('PixiScene', () => {
 
       scene.releaseSpatialContainers('fbRoads');   // nothing to do, no error
       assert.notStrictEqual(scene.getSpatialContainer('basemap', 'fbRoads'), basemapRapid);   // a new one
+    });
+  });
+
+
+  describe('render', () => {
+    it('renders and culls each layer with the frame number, and records its stats on the frame', () => {
+      const calls = [];
+      const makeLayer = (id, enabled, visibility) => ({
+        id: id,
+        enabled: enabled,
+        features: new Map(visibility.map((visible, i) => [`${id}-${i}`, { visible: visible }])),
+        render: (frameID, viewport) => calls.push(`render ${id} ${frameID} ${viewport}`),
+        cull: frameID => calls.push(`cull ${id} ${frameID}`)
+      });
+      const scene = {
+        layers: new Map([
+          ['osm', makeLayer('osm', true, [true, true, false])],
+          ['keepright', makeLayer('keepright', false, [false])]
+        ])
+      };
+      const frame = new RenderFrame(7, 17);
+
+      PixiScene.prototype.render.call(scene, frame, 'viewport');
+
+      assert.deepEqual(calls, ['render osm 7 viewport', 'cull osm 7', 'render keepright 7 viewport', 'cull keepright 7']);
+      const osm = frame.layers.get('osm');
+      assert.include(osm, { enabled: true, features: 3, visible: 2 });
+      assert.isAtLeast(osm.renderMs, 0);
+      assert.isAtLeast(osm.cullMs, 0);
+      assert.include(frame.layers.get('keepright'), { enabled: false, features: 1, visible: 0 });
     });
   });
 });

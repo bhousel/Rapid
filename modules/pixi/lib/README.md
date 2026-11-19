@@ -13,6 +13,7 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 | `DashLine.ts` | Draws dashed and dotted lines on a Pixi `Graphics` object |
 | `AtlasAllocator.ts` | Manages texture atlas allocation, plus the `AtlasSource` texture source and its GPU upload handlers |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
+| `RenderStats.ts` | Reads Pixi's instruction lists for frame stats (the one place that reads those internals), counts WebGL calls, and times the GPU |
 
 ## DashLine
 

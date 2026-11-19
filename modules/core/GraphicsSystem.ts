@@ -1,9 +1,11 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import { AbstractSystem } from './AbstractSystem.ts';
+import { GLCallCounter, GLTimer, readInstructionStats } from '../pixi/lib/RenderStats.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
 import { PixiTextures } from '../pixi/PixiTextures.ts';
+import { RenderFrame } from '../pixi/RenderFrame.ts';
 import { TAU, WORLD_HALF, WORLD_ZOOM, Viewport, numWrap, vecEqual, vecLength, vecRotate, vecScale, vecSubtract } from '@rapid-sdk/math';
 import { utilExtractValues } from '../util/string.ts';
 import { utilSetTransform } from '../util/util.ts';
@@ -15,6 +17,9 @@ import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 /** Throttled rendering milliseconds (for now) */
 const THROTTLE = 250;
+
+/** How many recent frames to keep stats for (see `renderFrames`) */
+const RENDER_FRAME_HISTORY = 120;
 
 /**
  * The layers the user turns on and off.  Which of these are shown is saved in settings (in this
@@ -114,6 +119,14 @@ export class GraphicsSystem extends AbstractSystem {
   protected _defaultLayerIDs: Set<LayerID>;
   /** Whether `_hashChanged` is applying the url's layers, so the change isn't the user's: it isn't saved, and the url keeps its param */
   protected _isApplyingUrl: boolean;
+  /** Recent frames with their stats, oldest first (at most `RENDER_FRAME_HISTORY`) */
+  protected _renderFrames: RenderFrame[];
+  /** The frame whose APP pass has run and whose DRAW pass is pending */
+  protected _appFrame: RenderFrame | null;
+  /** Counts WebGL calls while detailed stats are on */
+  protected _glCounter: GLCallCounter | null;
+  /** Measures GPU time while detailed stats are on (WebGL 2 with the timer query extension) */
+  protected _glTimer: GLTimer<RenderFrame> | null;
 
 
   /**
@@ -164,6 +177,12 @@ export class GraphicsSystem extends AbstractSystem {
     this._shownLayerIDs = new Set<LayerID>();
     this._defaultLayerIDs = new Set<LayerID>();
     this._isApplyingUrl = false;
+
+    // Frame stats (see `renderFrames` and `enableDetailedStats`)
+    this._renderFrames = [];
+    this._appFrame = null;
+    this._glCounter = null;
+    this._glTimer = null;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -405,6 +424,13 @@ export class GraphicsSystem extends AbstractSystem {
 
     // console.log('FPS=' + (1000 / deltaMS).toFixed(1));
 
+    // Collect any GPU times that have arrived for earlier frames.
+    if (this._glTimer) {
+      for (const { tag: frame, ms } of this._glTimer.poll()) {
+        if (frame.draw) frame.draw.gpuMs = ms;
+      }
+    }
+
     // For now, we will perform either APP (Rapid prepares scene graph) or DRAW (Pixi render) during a tick.
     // GPU work will happen in its own thread, and we don't have direct insight into its timing.
     // For reference:
@@ -458,6 +484,62 @@ export class GraphicsSystem extends AbstractSystem {
         return;
       }
     }
+  }
+
+
+  /**
+   * Recent frames with their stats, oldest first: what each layer cost in the APP pass, and what Pixi
+   * drew in the DRAW pass. Only frames whose DRAW pass has run are included.
+   * See "Frame stats" in `design/graphics-system.md`.
+   * @return A copy of the list of recent frames
+   */
+  public get renderFrames(): RenderFrame[] {
+    return this._renderFrames.slice();
+  }
+
+
+  /**
+   * The most recent frame whose DRAW pass has run, with its stats.
+   * @return The frame, or `undefined` if nothing has been drawn yet
+   */
+  public get lastRenderFrame(): RenderFrame | undefined {
+    return this._renderFrames.at(-1);
+  }
+
+
+  /**
+   * Whether detailed frame stats are on (see `enableDetailedStats`).
+   * @return `true` if WebGL calls are being counted
+   */
+  public get detailedStats(): boolean {
+    return !!this._glCounter;
+  }
+
+
+  /**
+   * Turns detailed frame stats on or off. While on, each frame's DRAW stats also count WebGL calls
+   * (`draw.gl`) and measure GPU time (`draw.gpuMs`, if the browser has the timer query extension).
+   * They cost a little on every WebGL call, so they're off unless someone is looking at the numbers.
+   * WebGL only for now: with another renderer this does nothing.
+   * @param enable - `true` to turn them on, `false` to turn them off
+   */
+  public enableDetailedStats(enable: boolean): void {
+    if (!enable) {
+      this._glCounter?.uninstall();
+      this._glCounter = null;
+      this._glTimer?.destroy();
+      this._glTimer = null;
+      return;
+    }
+
+    if (this._glCounter) return;   // on already
+    const renderer = this.pixi?.renderer;
+    if (renderer?.type !== PIXI.RendererType.WEBGL) return;
+
+    const gl = (renderer as PIXI.WebGLRenderer).gl;
+    this._glCounter = new GLCallCounter(gl);
+    this._glCounter.install();
+    this._glTimer = GLTimer.create<RenderFrame>(gl);
   }
 
 
@@ -663,6 +745,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     const mapViewport = context.viewport;
     const pixiViewport = this._pixiViewport!;
+    const frame = new RenderFrame(this._frame, mapViewport.transform.zoom);
 
     // At this point, the map transform is settled
     // (`_tform` is called immediately before `_app`)
@@ -683,6 +766,7 @@ export class GraphicsSystem extends AbstractSystem {
       offset = [0,0];
       pixiViewport.transform = mapTransform;   // reset (sync pixi = map)
       this.scene!.dirtyScene();                // all geometry must be reprojected
+      frame.dirtyScene = true;
     } else {
       offset = vecSubtract(pixiXY, mapXY);
     }
@@ -690,6 +774,7 @@ export class GraphicsSystem extends AbstractSystem {
     if (pixiTransform.r !== mapTransform.r) {
       pixiTransform.rotation = mapTransform.r;
       this.scene!.dirtyScene();               // only really needs restyle
+      frame.dirtyScene = true;
     }
 
     // The `stage` should be positioned so that `[0,0]` is at the center of the viewport,
@@ -714,9 +799,11 @@ export class GraphicsSystem extends AbstractSystem {
     this.origin!.scale.set(worldScale, worldScale);
 
     // Let's go!
-    this.scene!.render(this._frame, pixiViewport);
+    this.scene!.render(frame, pixiViewport);
     // this._renderDebug();
 
+    frame.appMs = performance.now() - frame.time;
+    this._appFrame = frame;
     this._appPending = false;
     this._drawPending = true;
   }
@@ -748,7 +835,29 @@ export class GraphicsSystem extends AbstractSystem {
     }
 
     // Let's go!
+    // (Only this render is measured: the minimap and label textures render separately.)
+    const frame = this._appFrame;
+    const glCounter = this._glCounter;
+    const glTimer = this._glTimer;
+    const glBefore = glCounter?.snapshot();
+    if (frame) glTimer?.begin(frame);
+    const t0 = performance.now();
+
     this.pixi!.render();
+
+    const drawMs = performance.now() - t0;
+    glTimer?.end();
+    if (frame) {
+      frame.draw = { ms: drawMs, ...readInstructionStats(this.pixi!.renderer, this.stage!) };
+      if (glCounter && glBefore) {
+        frame.draw.gl = GLCallCounter.diff(glBefore, glCounter.snapshot());
+      }
+      this._renderFrames.push(frame);
+      if (this._renderFrames.length > RENDER_FRAME_HISTORY) {
+        this._renderFrames.shift();
+      }
+      this._appFrame = null;
+    }
 
 // multiview?  it renders but is not interactive
 //    this.pixi.renderer.render({
@@ -1088,6 +1197,9 @@ export class GraphicsSystem extends AbstractSystem {
    */
   protected _destroyPixi(): void {
     if (!this.pixi) return;   // already destroyed
+
+    this.enableDetailedStats(false);   // they hold the old WebGL context
+    this._appFrame = null;
 
     const renderer = this.pixi!.renderer as PIXI.WebGLRenderer;
     if (renderer.type === PIXI.RendererType.WEBGL) {
