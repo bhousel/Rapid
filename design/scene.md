@@ -30,7 +30,9 @@ origin
 ├ debug-under
 ├ basemap
 │  ├ osm                 zIndex 0
-│  │  ├ polygons         sorted by area, biggest first (zIndex = -area)
+│  │  ├ polygons
+│  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
+│  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area)
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level; lines sorted by `getzIndex(tags)`
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
@@ -163,17 +165,55 @@ there holds 11,763 parking spaces and other areas, and all of them are collected
 restyle frames cost the same as before, and there are a few more draw calls (775 against 768 in
 Seattle), one batch break per group.
 
-What's left, in order of what it would save:
+### OSM polygons are split by map tile
 
-- **A pan still rebuilds the big groups, because culling changes some feature's `visible` on every
-  frame.** At Staten Island even a 2 px pan flips 30 to 50 features, and the rebuild costs the same
-  11 ms whether 1 feature changed or 1,800. A pan frame where nothing flips costs 0.8 ms. So decide
-  visibility against a box that is padded and snapped to a grid, so that most pan frames change
-  nothing. That draws more features per frame, so it needs the APP pass's cost per feature to come
-  down first (`graphics-system.md`, section 2).
-- **Smaller groups for polygons.** By size class keeps the draw order exactly (they're sorted by
-  area), but 11,000 parking spaces are all one size. By tile needs a rule for polygons that overlap
-  across tiles.
+One `polygons` group can be huge (11,763 at Staten Island), so `PixiLayerOsm` splits its polygons
+into a container per map tile (`_polygonTileContainer()`), each with its own render group. The tiles
+are one zoom level past the view's zoom, rounded down, so a tile is 128 to 256 pixels wide on screen
+and about 110 are in view. A polygon goes in the tile its extent's center is in, and moves to
+another when the zoom changes. A tile's container is removed when it empties.
+
+**Draw order between tiles isn't kept.** Polygons used to be sorted by area across the whole view,
+small over big. Now:
+
+- A polygon bigger than a tile, in either direction, goes in the `large` container, which is drawn
+  below all the tiles and sorted by area as before. That's where landuse, water and forests end up,
+  so they're still right among themselves and still under the buildings.
+- Polygons in the same tile are sorted by area as before.
+- Two polygons smaller than a tile, in different tiles, that overlap, are drawn in the order their
+  tiles were made. That's the case that can look wrong: a small thing inside a slightly bigger one,
+  across a tile edge. In the screenshots of Seattle it changed the tint of one building; nothing at
+  Staten Island or Bochum. Decided with Bryan (Nov 18): try it, and watch for tile edges.
+
+What it changed, on top of the render groups (DRAW pass in ms; tiles at the view's zoom, then one
+level past it):
+
+| | Seattle | Staten Island | Golmud |
+|---|---|---|---|
+| Pan frame, one `polygons` group | 5.1 | 12.3 | 15.5 |
+| Pan frame, tiles of 256 to 512 px | 4.9 | 8.2 | 4.0 |
+| Pan frame, tiles of 128 to 256 px | 4.8 | 7.3 | 3.7 |
+| Draw calls, one group | 775 | 526 | 42 |
+| Draw calls, tiles of 128 to 256 px | 782 | 560 | 132 |
+
+A hover on one polygon at Staten Island went from 8 ms to about 1. The smaller tiles were chosen for
+that: with the bigger ones the fullest tile there still held 3,232 polygons, with the smaller ones
+194. GPU time didn't change with the extra draw calls.
+
+### What's left
+
+- **A pan still rebuilds the groups that have a feature scrolling in or out, and culling changes
+  some feature's `visible` on every frame.** At Staten Island even a 2 px pan flips 30 to 50
+  features, and a rebuild costs the same whether 1 feature changed or 1,800. A pan frame where
+  nothing flips costs 0.8 ms. The answer is to cull less often, not more cleverly: see "A CULL pass"
+  in `graphics-system.md`.
+- **Pixi's own culling doesn't help here.** `Culler` (and `CullerPlugin`) walks every `cullable`
+  object on every frame, tests its bounds against the screen, and sets `culled`, which marks the
+  render group changed exactly as `visible` does. We already know what's in view from the spatial
+  index without touching what isn't.
+- **Lines and points are still one group each** (per level, for lines): 1,445 lines in level 0 at
+  Staten Island, where a hover costs 4 to 6 ms. By tile, lines of different road classes that cross
+  near a tile edge would be drawn in the wrong order, and so would overlapping pins. Not decided.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
   touches a big group.
 

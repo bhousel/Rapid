@@ -19,6 +19,13 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 /** Minimum zoom level where OSM data is rendered */
 const MINZOOM = 12;
 
+/**
+ * Polygons are split into containers by map tile (see `_polygonTileContainer`). The tiles are this many
+ * zoom levels from the view's zoom (rounded down): at 1 a tile is 128 to 256 pixels wide on screen.
+ * Smaller tiles mean less to rebuild after a change, and more containers to draw (about 110 in view).
+ */
+const POLYGON_TILE_ZOOM = 1;
+
 /** Highway type z-index stacking order (motorway on top, footway on bottom) */
 const HIGHWAYSTACK: Record<string, number> = {
   motorway: 0,
@@ -319,6 +326,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       return false;   // not sure, just ignore it
     };
 
+    const tileZoom = Math.floor(viewport.transform.zoom) + POLYGON_TILE_ZOOM;
+
     const entities = data.polygons;
     for (const [entityID, entity] of entities) {
       const parts = graph.geometry(entity).parts;
@@ -338,7 +347,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
-          feature.parentContainer = this.polygonContainer;
         }
 
         // If data has changed.. Replace data and parent-child links.
@@ -363,6 +371,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
+          // A new shape, or a new zoom (and its tiles), may put it in another container
+          feature.parentContainer = this._polygonTileContainer(part, tileZoom);
+
           const preset = schema.match(entity, graph);
 
           const geometry = entity.geometry(graph);
@@ -446,6 +457,44 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       }
     }
+
+    // Remove the tile containers that have emptied (their polygons moved to other tiles after a
+    // zoom change, or were destroyed after scrolling away).
+    for (const tileContainer of this.scene.worldContainersIn(this.polygonContainer!)) {
+      if (!tileContainer.children.length) {
+        this.scene.destroyWorldContainer(tileContainer);
+      }
+    }
+  }
+
+
+  /**
+   * Returns the container for a polygon, under `polygons`. Polygons are split up by map tile, each
+   * tile's in a container with its own render group, so that a change to one polygon (a hover, or
+   * one scrolling into view) makes Pixi rebuild the instructions of that tile only, not of every
+   * polygon in view. A polygon bigger than a tile goes in the `large` container, drawn below the tiles.
+   *
+   * Within a container polygons are sorted by area, biggest first, as before. Between tiles they
+   * aren't: two polygons smaller than a tile, in different tiles, that overlap, are drawn in the
+   * order their tiles were made. (See "Render groups" in `design/scene.md`.)
+   * @param part - The polygon's geometry
+   * @param tileZoom - The zoom of the tiles to split by
+   * @return The container to put the polygon's feature in
+   */
+  protected _polygonTileContainer(part: GeometryPart, tileZoom: number): PIXI.Container {
+    const polygonContainer = this.polygonContainer!;
+    const extent = part.world!.extent;
+    const tileSize = 256 * (2 ** (WORLD_ZOOM - tileZoom));   // in world coordinates
+
+    const [minX, minY] = extent.min;
+    const [maxX, maxY] = extent.max;
+    if ((maxX - minX) > tileSize || (maxY - minY) > tileSize) {
+      return this._childContainer(polygonContainer, 'large', -1);
+    }
+
+    const x = Math.floor((minX + maxX) / 2 / tileSize);
+    const y = Math.floor((minY + maxY) / 2 / tileSize);
+    return this._childContainer(polygonContainer, `${x},${y},${tileZoom}`, 0);
   }
 
 

@@ -1,4 +1,6 @@
+import * as PIXI from 'pixi.js';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
+import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
 
 
 describe('PixiLayerOsm', () => {
@@ -97,6 +99,59 @@ describe('PixiLayerOsm', () => {
     layer.renderMidpoints(2, viewport, {}, {});
 
     assert.sameMembers([...layer.getSelfAndDescendants('w1')], ['w1', 'n1', 'n2', 'a']);
+  });
+
+
+  // Polygons are split into containers by map tile, so a change to one polygon makes Pixi rebuild
+  // one tile's instructions (see "Render groups" in `design/scene.md`).
+  describe('polygon tiles', () => {
+    let layer;
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      const scene = { context: context, gfx: {}, _anchor: [0, 0], _worldContainers: new Set() };
+      for (const name of ['worldContainer', 'worldContainersIn', 'destroyWorldContainer']) {
+        scene[name] = PixiScene.prototype[name];
+      }
+      layer = new PixiLayerOsm(scene);
+      layer.polygonContainer = scene.worldContainer(new PIXI.Container(), 'polygons');
+    });
+
+    // A polygon's geometry, as far as `_polygonTileContainer` looks: its extent in world coordinates
+    const part = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max) } });
+
+    it('puts polygons whose centers are in the same tile in one container', () => {
+      // At zoom 16 a tile is 256 world units wide
+      const a = layer._polygonTileContainer(part([10, 10], [20, 20]), 16);
+      const b = layer._polygonTileContainer(part([200, 100], [250, 140]), 16);
+      const c = layer._polygonTileContainer(part([260, 10], [270, 20]), 16);   // the next tile east
+      assert.strictEqual(a, b);
+      assert.notStrictEqual(a, c);
+      assert.strictEqual(a.label, '0,0,16');
+      assert.strictEqual(c.label, '1,0,16');
+      assert.isTrue(a.parent.isRenderGroup);
+    });
+
+    it('goes by the center of a polygon that crosses a tile edge', () => {
+      const container = layer._polygonTileContainer(part([200, 10], [290, 20]), 16);   // center x = 245
+      assert.strictEqual(container.label, '0,0,16');
+    });
+
+    it('uses smaller tiles at a higher zoom', () => {
+      const a = layer._polygonTileContainer(part([10, 10], [20, 20]), 17);     // 128 units wide
+      const b = layer._polygonTileContainer(part([200, 100], [250, 120]), 17);
+      assert.strictEqual(a.label, '0,0,17');
+      assert.strictEqual(b.label, '1,0,17');
+    });
+
+    it('puts a polygon bigger than a tile in the `large` container, drawn below the tiles', () => {
+      const wide = layer._polygonTileContainer(part([0, 0], [300, 20]), 16);
+      const tall = layer._polygonTileContainer(part([0, 0], [20, 300]), 16);
+      const small = layer._polygonTileContainer(part([0, 0], [20, 20]), 16);
+      assert.strictEqual(wide.label, 'large');
+      assert.strictEqual(tall, wide);
+      assert.isBelow(wide.parent.zIndex, small.parent.zIndex);
+    });
   });
 
 });

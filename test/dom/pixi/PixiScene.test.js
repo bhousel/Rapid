@@ -83,7 +83,7 @@ describe('PixiScene', () => {
       };
       const names = [
         'getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged',
-        'worldContainer', 'worldContainersIn', 'setAnchor'
+        'worldContainer', 'worldContainersIn', 'destroyWorldContainer', 'setAnchor'
       ];
       for (const name of names) {
         scene[name] = PixiScene.prototype[name];

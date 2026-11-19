@@ -252,16 +252,25 @@ export class PixiScene extends EventEmitter {
     if (!containers) return;
 
     for (const container of containers) {
-      const group = container.parent;   // a world container's render group
-      this._worldContainers.delete(container);
-      if (group) {
-        group.parent?.removeChild(group);
-        group.destroy({ children: true });  // recursive
-      } else {
-        container.destroy({ children: true });
-      }
+      this.destroyWorldContainer(container);
     }
     this._spatialContainers.delete(spatialID);
+  }
+
+
+  /**
+   * Removes and destroys a world container, its render group, and everything in them.
+   * @param container - A container that `worldContainer` returned
+   */
+  public destroyWorldContainer(container: PIXI.Container): void {
+    const group = container.parent;   // its render group
+    this._worldContainers.delete(container);
+    if (group) {
+      group.parent?.removeChild(group);
+      group.destroy({ children: true });  // recursive
+    } else {
+      container.destroy({ children: true });
+    }
   }
 
 

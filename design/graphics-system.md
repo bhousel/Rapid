@@ -8,7 +8,7 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > measures a set of difficult places, where the GPU time goes, and a rendering info card); sections 4
 > and 5 aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
-> reproduce them. The plan is in section 7.
+> reproduce them. The plan is in section 7, and section 8 proposes a CULL pass, which comes next.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -451,7 +451,9 @@ Each step is measured with frame stats on the same set of places.
    It redraws at most four times a second. Ideas for later, from Performer's `pfFrameStats`: texture
    and atlas use, vertices per layer (after step 5), marking restyle frames in the chart, and a
    GPU line in the chart.
-5. **Pass a `RenderFrame` through `render()` and `cull()`**, so layers can report their own counts.
+5. **Pass a `RenderFrame` through `render()` and `cull()`**, so layers can report their own counts,
+   and so a layer can tell a frame where only the view moved from one where something changed. The
+   CULL pass (section 8) needs that, so the two go together and come next.
 6. **The line builder,** as plain geometry with unit tests (a band never leaves its area, never
    overlaps itself, holes, slivers, short segments). Then, one at a time and measured: partial-fill
    bands instead of masks; hit areas, halos and label boxes instead of `lineToPoly`; dashes as one
@@ -459,3 +461,56 @@ Each step is measured with frame stats on the same set of places.
 7. **Casings and strokes in grouped batches** with Pixi's `RenderLayer` ([`scene.md`](scene.md) section 4,
    [`profiling.md`](profiling.md)), measured after the masks are gone, since the masks break batches
    today anyway.
+
+Done outside the numbered steps (Nov 18): the imagery filter fix (section 6), and render groups with
+OSM polygons split by tile ([`scene.md`](scene.md) section 3).
+
+## 8. A CULL pass
+
+**Proposed (Nov 18), nothing built.** Bryan's point: a layer doesn't need to decide what's visible
+on every frame. SGI Performer had CULL as its own stage between APP and DRAW.
+
+Today every APP pass does everything, for every layer: ask the spatial index what's in the exact
+view, visit each of those features (update it if it's dirty, mark it seen), then hide every feature
+that wasn't seen. On a pan nothing is dirty, but all of that still runs (about 3 µs per visible
+feature), and it changes some feature's `visible` on every frame, which makes Pixi rebuild the
+instructions of that feature's render group.
+
+**What a pan frame could cost.** Measured by turning off the OSM layer's `render()` and `cull()`
+from the console and panning 20 px a frame (so nothing new scrolls in, but nothing is rebuilt
+either):
+
+| | APP | DRAW |
+|---|---|---|
+| Seattle, as now | 7.6 | 4.6 |
+| Seattle, OSM layer skipped | 1.4 | 1.9 |
+| Staten Island, as now | 42.9 | 6.7 |
+| Staten Island, OSM layer skipped | 1.9 | 1.5 |
+
+A pan frame of 3 to 4 ms instead of 12 to 50.
+
+**Sketch:**
+
+- **The cull box.** A layer decides what's visible against a box bigger than the view: padded, and
+  snapped to a grid, so it stays the same while the view moves inside it. Everything in the box is
+  made and kept visible, also the part outside the view.
+- **A frame says why it's being drawn.** `GraphicsSystem` already has two ways in: a transform
+  change (the view moved), and `deferredRedraw()` / `immediateRedraw()` (something changed). The
+  `RenderFrame` passed to layers (step 5) carries which it was.
+- **A layer skips its work** when only the view moved and its cull box is the same as last time.
+  It still asks its service for the tiles of the new view (that's cheap, and data must keep loading
+  ahead of the box).
+- **Some layers run every frame anyway:** the imagery tiles (cheap, and they follow the view), and
+  the labels (the labels group is positioned from the view on every frame).
+
+**Open questions:**
+
+- How much padding. More means fewer frames that do the work, and more features made and drawn
+  outside the view. With 256 px of padding on each side the box holds about twice the features of a
+  1300×1100 view. The work per feature when nothing is dirty should come down first or with it
+  (section 2: hidden-feature filtering, node classification).
+- Does every change to a layer's content reach it through a redraw request today, or do some rely
+  on the next frame happening anyway? Each layer needs checking: edits, data arriving, classes,
+  filters, mode changes.
+- Features are destroyed after 20 frames unseen. That count should be in CULL passes, not frames.
+- Zoom and rotation changes restyle everything today, so they'd still do the full work.
