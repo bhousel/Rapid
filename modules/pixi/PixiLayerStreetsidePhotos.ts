@@ -8,6 +8,7 @@ import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 
@@ -181,10 +182,10 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
   /**
    * Renders the Streetside photo markers and sequences for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderMarkers(frame: number, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
     const streetside = this.context.services.streetside;
     if (!streetside?.started) return;
 
@@ -290,10 +291,10 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
   /**
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const streetside = this.context.services.streetside;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !streetside?.started || viewZoom < MINZOOM) return;

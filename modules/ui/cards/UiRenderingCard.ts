@@ -293,12 +293,34 @@ export class UiRenderingCard extends AbstractUiCard {
       });
     }
 
+    // The layers that kept their features as they were (only the view had moved), in how many of the frames
+    const keptLayers: [string, string][] = [];
+    for (const layerID of last.layers.keys()) {
+      const kept = sample.filter(frame => frame.layers.get(layerID)?.kept).length;
+      if (kept) keptLayers.push([layerID, `${kept}/${sample.length}`]);
+    }
+    if (keptLayers.length) {
+      rows.push({
+        id: 'kept',
+        label: l10n.t('info_panels.rendering.kept'),
+        value: pairs(keptLayers)
+      });
+    }
+
     // What Pixi drew: its instructions by pipe, and with detailed stats on, the WebGL calls
     const instructions = Object.entries(last.draw.instructions).sort((a, b) => b[1] - a[1]);
     rows.push({
       id: 'instructions',
       label: l10n.t('info_panels.rendering.instructions'),
       value: pairs(instructions.map(([pipe, num]) => [pipe, count(num)]))
+    });
+
+    // How many of Pixi's instruction lists (one per render group) it had to rebuild, per frame
+    const rebuilt = average(sample.map(frame => frame.draw?.rebuiltGroups)) ?? 0;
+    rows.push({
+      id: 'groups',
+      label: l10n.t('info_panels.rendering.groups'),
+      value: l10n.t('info_panels.rendering.groups_rebuilt', { rebuilt: rebuilt.toFixed(1), total: count(last.draw.renderGroups) })
     });
 
     const gl = last.draw.gl;

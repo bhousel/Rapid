@@ -150,6 +150,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     if (!this._geom) return;  // wrong path?
 
     if (!this.dirty) return;  // nothing to do
+    this.layer.work.updated++;
 
     const type = this._geom?.type;
     const world = this._geom?.world;

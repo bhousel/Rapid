@@ -13,6 +13,7 @@ import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/t
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Preset } from '../lib/Preset.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
@@ -187,11 +188,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Render any OSM data within view, and schedule fetching more of it to cover the view/
-   * @param frame - Integer frame being rendered
+   * Render any OSM data within the frame's cull box (the view and some padding around it), and
+   * schedule fetching more of it to cover the view.
+   * On a frame where only the view moved, inside the box this layer already has everything for,
+   * the features stay as they are (see `keepFeatures`).
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const context = this.context;
     const osm = context.services.osm;
     const viewZoom = viewport.transform.zoom;
@@ -203,8 +207,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    let entities = editor.intersects();   // Gather data in view
+    if (this.keepFeatures(frame)) return;   // only the view moved, and everything is made already
+
+    let t = performance.now();   // each step's time goes in the frame's stats
+    let entities = editor.entitiesInBox(frame.cullBox.bbox(), graph);   // Gather data in and around the view
+    t = this._endStep('gather', t);
     entities = filters.filterScene(entities, graph);   // Apply feature filters
+    t = this._endStep('filter', t);
 
     const data: OsmData = {
       polygons: new Map<EntityID, OsmWay | OsmRelation>(),
@@ -229,9 +238,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
+    t = this._endStep('classify', t);
+
     this.renderPolygons(frame, viewport, data);
+    t = this._endStep('polygons', t);
     this.renderLines(frame, viewport, data);
+    t = this._endStep('lines', t);
     this.renderPoints(frame, viewport, data);
+    t = this._endStep('points', t);
 
     // At this point, all the visible features have been accounted for,
     // and parent-child data links have been established.
@@ -282,23 +296,27 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.getSelfAndSiblings(interestingID, related.siblingIDs);
     }
 
+    t = this._endStep('related', t);
+
     this.renderVertices(frame, viewport, data, related);
+    t = this._endStep('vertices', t);
 
     if (context.mode?.id === 'select') {
       this.renderMidpoints(frame, viewport, data, related);
     } else {
       this._midpoints.clear();
     }
+    this._endStep('midpoints', t);
   }
 
 
   /**
    * Renders the visible OSM area (polygon) features for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  public renderPolygons(frame: number, viewport: Viewport, data: OsmData): void {
+  public renderPolygons(frame: RenderFrame, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const filters = context.systems.filters!;
@@ -500,11 +518,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Renders the visible OSM line features for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  public renderLines(frame: number, viewport: Viewport, data: OsmData): void {
+  public renderLines(frame: RenderFrame, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -608,12 +626,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Renders the visible OSM vertices (way nodes) for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    * @param related - Collections of related OSM IDs
    */
-  public renderVertices(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
+  public renderVertices(frame: RenderFrame, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -712,11 +730,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Renders the visible OSM standalone point features for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  public renderPoints(frame: number, viewport: Viewport, data: OsmData): void {
+  public renderPoints(frame: RenderFrame, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -855,12 +873,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Renders the midpoint handles along visible OSM ways for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    * @param related - Collections of related OSM IDs
    */
-  public renderMidpoints(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
+  public renderMidpoints(frame: RenderFrame, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
     const context = this.context;
 
     // Convert screen pixel values to world units

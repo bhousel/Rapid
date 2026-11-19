@@ -14,6 +14,7 @@ import { utilHash53 } from '../util/string.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 const CUSTOM_COLOR = 0x00ffff;
@@ -117,10 +118,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * Render the GeoJSONData custom data
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     if (!this.enabled || !(this.hasData())) return;
 
     const context = this.context;
@@ -224,11 +225,11 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * Renders the custom-data polygon features for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param polygons - Array of polygon data
    */
-  public renderPolygons(frame: number, viewport: Viewport, polygons: GeoJSONData[]): void {
+  public renderPolygons(frame: RenderFrame, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 
@@ -279,12 +280,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * Renders the custom-data line features for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param lines - Array of line data
    * @param styleOverride - Custom style
    */
-  public renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
+  public renderLines(frame: RenderFrame, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 
@@ -335,12 +336,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 //  /**
 //   * renderGridLines
 //   * Render grid lines from raw GeoJSONData features (not wrapped GeoJSONData class instances)
-//   * @param frame - Integer frame being rendered
+//   * @param frame - The frame being rendered
 //   * @param viewport - Pixi viewport to use for rendering
 //   * @param features - Array of GeoJSONData Feature objects
 //   * @param lineStyle - The line style to use
 //   */
-//  renderGridLines(frame: number, viewport: Viewport, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
+//  renderGridLines(frame: RenderFrame, viewport: Viewport, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
 //    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 //
 //    for (const d of features) {
@@ -375,11 +376,11 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * Renders the custom-data point features for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param points - Array of point data
    */
-  public renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
+  public renderPoints(frame: RenderFrame, viewport: Viewport, points: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this._spatialContainer('points', this._spatialID ?? this.id);
 

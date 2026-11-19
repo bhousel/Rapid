@@ -171,6 +171,7 @@ export class AbstractPixiFeature {
    */
   public update(viewport: Viewport): void {
     if (!this.dirty) return;   // nothing to do
+    this.layer.work.updated++;
     this._geomDirty = false;
     this._styleDirty = false;
   }
@@ -240,6 +241,11 @@ export class AbstractPixiFeature {
   public set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
+    if (val) {
+      this.layer.work.shown++;
+    } else {
+      this.layer.work.hidden++;
+    }
     if (this.halo) this.halo.visible = val;
     this._labelDirty = true;
   }

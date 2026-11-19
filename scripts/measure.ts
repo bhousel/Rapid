@@ -21,7 +21,10 @@ import { parseArgs, styleText } from 'node:util';
 // At each place it waits for the data to load, then measures three kinds of frame:
 // - redraw:  nothing changed, the scene is drawn again
 // - pan:     the view moved 100 px since the last frame, over an area it has shown before
-//            (so it measures moving the view, not making new features or loading data)
+//            (so it measures moving the view, not making new features or loading data).
+//            Most pan frames only move the view; about one in three leaves the cull box, and the
+//            OSM layer does its whole pass ("cull" in the table). No redraw is requested for these,
+//            so each waits for the 250 ms throttle, as a real drag does.
 // - restyle: every feature is restyled (what a zoom change costs)
 //
 // OSM changes, so a place can stop being difficult. Add new ones here, and to the table in the design doc.
@@ -122,7 +125,9 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
 
   const sleep = (ms: number) => new Promise(resolve => { setTimeout(resolve, ms); });
   const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
-  const isIdle = () => !network.numInflight && !network.numQueued && !scheduler.numPending;
+  // (While the OSM API has us rate limited, nothing is in flight, but the data hasn't loaded.)
+  const osm = context.services.osm;
+  const isIdle = () => !network.numInflight && !network.numQueued && !scheduler.numPending && !osm?.getRateLimit();
   const median = (vals: (number | undefined)[]) => {
     const sorted = vals.filter(v => v !== undefined).sort((a, b) => a! - b!) as number[];
     return sorted.length ? +sorted[Math.floor(sorted.length / 2)].toFixed(2) : null;
@@ -149,10 +154,13 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
 
   // Draws one frame after `change()`, and waits until it's done.
   // (A frame that began before the change doesn't count: both of its passes must come after.)
-  const drawFrame = async (change?: () => void) => {
+  // A redraw request says that something changed, so every layer does its work. A pan doesn't make
+  // one: moving the view is enough to get a frame (up to 250 ms later, as when a user drags the map),
+  // and layers that already have what the view needs can keep their features as they are.
+  const drawFrame = async (change?: () => void, request = true) => {
     const since = performance.now();
     change?.();
-    gfx.immediateRedraw();
+    if (request) gfx.immediateRedraw();
     while (!(gfx.lastRenderFrame?.time >= since)) await nextFrame();
   };
 
@@ -168,7 +176,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
   // Then the pan frames measure moving the view, not making features or the network.
   const walkPanPath = async () => {
     for (let i = 0; i < PAN_LEG * 2; i++) {
-      await drawFrame(() => panStep(i));
+      await drawFrame(() => panStep(i), false);
       const waitStart = performance.now();
       while (!isIdle() && performance.now() - waitStart < 30000) await sleep(100);
     }
@@ -183,29 +191,47 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
       await drawFrame(() => {
         if (kind === 'restyle') gfx.scene.dirtyScene();
         if (kind === 'pan') panStep(i);
-      });
+      }, kind !== 'pan');
     }
     for (let i = 0; i < 10; i++) await nextFrame();   // GPU times arrive a few frames later
 
+    // (While panning, other frames can come in between, e.g. when an imagery tile arrives.)
     const frames = gfx.renderFrames.filter((f: any) => f.id > startID && f.draw);
     const last = frames.at(-1);
 
     const layers: Record<string, any> = {};
     for (const [layerID, s] of last.layers) {
       if (!s.features && s.renderMs < 0.05) continue;
+      const stepNames = new Set<string>(frames.flatMap((f: any) => Object.keys(f.layers.get(layerID)?.steps ?? {})));
+      const steps: Record<string, number | null> = {};
+      for (const name of stepNames) {
+        steps[name] = median(frames.map((f: any) => f.layers.get(layerID)?.steps[name]));
+      }
       layers[layerID] = {
         renderMs: median(frames.map((f: any) => f.layers.get(layerID)?.renderMs)),
         cullMs: median(frames.map((f: any) => f.layers.get(layerID)?.cullMs)),
+        steps: steps,   // of the frames where the layer did its pass
         features: s.features,
         visible: s.visible
       };
     }
 
+    // The frames where the OSM layer kept its features as they were (only the view had moved, inside
+    // its cull box), and the ones where it did its whole pass. See "A CULL pass" in the design doc.
+    const times = (subset: any[]) => ({
+      frames: subset.length,
+      appMs: median(subset.map((f: any) => f.appMs)),
+      drawMs: median(subset.map((f: any) => f.draw.ms)),
+      gpuMs: median(subset.map((f: any) => f.draw.gpuMs)),
+      rebuiltGroups: median(subset.map((f: any) => f.draw.rebuiltGroups))
+    });
+    const isKept = (f: any) => !!f.layers.get('osm')?.kept;
+
     return {
-      frames: frames.length,
-      appMs: median(frames.map((f: any) => f.appMs)),
-      drawMs: median(frames.map((f: any) => f.draw.ms)),
-      gpuMs: median(frames.map((f: any) => f.draw.gpuMs)),
+      ...times(frames),
+      kept: times(frames.filter(isKept)),
+      pass: times(frames.filter((f: any) => !isKept(f))),
+      renderGroups: last.draw.renderGroups,
       gl: last.draw.gl,
       instructions: last.draw.instructions,
       batchTextures: last.draw.batchTextures,
@@ -232,6 +258,7 @@ const cols = [
   ['place', 14], ['load', 6], ['visible', 8],
   ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6],
   ['| pan APP', 10], ['DRAW', 6], ['GPU', 6],
+  ['| cull APP', 11], ['DRAW', 6], ['of', 5],
   ['| restyle APP', 14], ['DRAW', 6], ['GPU', 6]
 ] as const;
 const row = (vals: (string | number | null | undefined)[]) =>
@@ -265,7 +292,8 @@ for (const place of places) {
       place.id, `${(r.loadMs / 1000).toFixed(1)}s${r.loaded ? '' : '!'}`, visible,
       r.redraw.appMs, r.redraw.drawMs, r.redraw.gpuMs, r.redraw.gl?.draws,
       r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched,
-      r.pan.appMs, r.pan.drawMs, r.pan.gpuMs,
+      r.pan.kept.appMs, r.pan.kept.drawMs, r.pan.kept.gpuMs,
+      r.pan.pass.appMs, r.pan.pass.drawMs, `${r.pan.pass.frames}/${r.pan.frames}`,
       r.restyle.appMs, r.restyle.drawMs, r.restyle.gpuMs
     ]));
     results.push({ ...place, ...r });
@@ -276,8 +304,10 @@ for (const place of places) {
 }
 
 console.log('\nTimes in ms. The first group is a frame where nothing changed. load ends with ! if the data was');
-console.log('still loading after a minute.');
+console.log('still loading after a minute. visible = features shown, also those in the padding around the view.');
 console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch.');
+console.log('pan = pan frames where the OSM layer kept its features as they were. cull = pan frames where it');
+console.log('did its whole pass, because the view left the cull box (or something else changed); of = how many.');
 
 if (values.out) {
   writeFileSync(values.out, JSON.stringify({ date: new Date().toISOString(), runs, env, places: results }, null, 2));

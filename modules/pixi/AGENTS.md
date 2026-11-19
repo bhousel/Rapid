@@ -40,6 +40,30 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
   minimap, `autoStart: false`, the renderer choice from the url).
 
+## Frames, passes and redraw requests
+
+How a frame is made, and the CULL pass, are in [`design/graphics-system.md`](../../design/graphics-system.md)
+(sections 1, 3 and 8). The rules that come out of it:
+
+- **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
+  on to the layer's own `render…()` helpers.
+- **A redraw request means something changed. Name the layer if only one did.**
+  `gfx.deferredRedraw()` and `gfx.immediateRedraw()` make every layer do its whole pass on the next
+  frame. When what changed is drawn by one layer only (a tile of imagery arrived, a label texture
+  was made, a dataset's data loaded), pass that layer's ID: `gfx.deferredRedraw(this.id)`. Then
+  layers like OSM can keep their features as they are.
+- **Every change to what a layer draws needs a redraw request.** Moving the view doesn't make one,
+  and the OSM layer skips its pass on frames that come only from a move. Marking features dirty
+  (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their layer do its next pass, but doesn't
+  ask for a frame. Changing a class (`scene.setClass()`) does neither: follow it with a request.
+- **A layer that can skip its pass gathers by `frame.cullBox`, not by the view.** The box is the
+  view and padding around it. Call `this.keepFeatures(frame)` in `render()`, after anything that
+  must happen on every frame (asking the service for the view's tiles), and return if it says
+  `true`. Only the OSM layer does this so far. Don't use it in a layer whose features depend on the
+  view itself (the labels, the imagery tiles).
+- **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
+  it, and a layer that kept its features did no pass.
+
 ## Working with Services
 
 All services are now TypeScript. Access them via `context.services` with proper types:

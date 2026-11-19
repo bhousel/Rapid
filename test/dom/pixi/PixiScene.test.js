@@ -233,19 +233,21 @@ describe('PixiScene', () => {
 
 
   describe('render', () => {
-    it('renders and culls each layer with the frame number, and records its stats on the frame', () => {
+    it('renders and culls each layer with the frame, and records its stats on the frame', () => {
       const calls = [];
-      const makeLayer = (id, enabled, visibility) => ({
+      const makeLayer = (id, enabled, visibility, kept) => ({
         id: id,
         enabled: enabled,
         features: new Map(visibility.map((visible, i) => [`${id}-${i}`, { visible: visible }])),
-        render: (frameID, viewport) => calls.push(`render ${id} ${frameID} ${viewport}`),
-        cull: frameID => calls.push(`cull ${id} ${frameID}`)
+        render: (frame, viewport) => calls.push(`render ${id} ${frame.id} ${viewport}`),
+        cull: frame => calls.push(`cull ${id} ${frame.id}`),
+        keptFeatures: () => kept,
+        takeWork: () => ({ created: 1, destroyed: 0, updated: 2, shown: 0, hidden: 0, steps: { gather: 0.5 } })
       });
       const scene = {
         layers: new Map([
-          ['osm', makeLayer('osm', true, [true, true, false])],
-          ['keepright', makeLayer('keepright', false, [false])]
+          ['osm', makeLayer('osm', true, [true, true, false], true)],
+          ['keepright', makeLayer('keepright', false, [false], false)]
         ])
       };
       const frame = new RenderFrame(7, 17);
@@ -254,10 +256,71 @@ describe('PixiScene', () => {
 
       assert.deepEqual(calls, ['render osm 7 viewport', 'cull osm 7', 'render keepright 7 viewport', 'cull keepright 7']);
       const osm = frame.layers.get('osm');
-      assert.include(osm, { enabled: true, features: 3, visible: 2 });
+      assert.include(osm, { enabled: true, kept: true, features: 3, visible: 2, created: 1, updated: 2 });
+      assert.deepEqual(osm.steps, { gather: 0.5 });
       assert.isAtLeast(osm.renderMs, 0);
       assert.isAtLeast(osm.cullMs, 0);
-      assert.include(frame.layers.get('keepright'), { enabled: false, features: 1, visible: 0 });
+      assert.include(frame.layers.get('keepright'), { enabled: false, kept: false, features: 1, visible: 0 });
+    });
+  });
+
+
+  // The part of the world layers have features ready for: the view and some padding, kept while
+  // the view stays inside it (see "A CULL pass" in `design/graphics-system.md`).
+  describe('updateCullBox', () => {
+    let scene;
+
+    // A 1000×800 view at the given zoom, with the given world coordinate at its top left
+    function viewportAt(zoom, [x, y]) {
+      const viewport = new Rapid.sdk.Viewport({ x: 0, y: 0, z: zoom }, [1000, 800]);
+      const [x0, y0] = viewport.worldToScreen([x, y]);
+      viewport.transform.translation = [-x0, -y0];
+      return viewport;
+    }
+
+    beforeEach(() => {
+      scene = { _cullBox: null, _cullZoom: 0 };
+    });
+
+    it('pads the view by 256 pixels on each side', () => {
+      const viewport = viewportAt(16, [10000, 20000]);   // at z16 a pixel is one world unit
+      const box = PixiScene.prototype.updateCullBox.call(scene, viewport);
+      const view = viewport.visibleWorldExtent();
+
+      assert.closeTo(view.min[0] - box.min[0], 256, 1e-6);
+      assert.closeTo(view.min[1] - box.min[1], 256, 1e-6);
+      assert.closeTo(box.max[0] - view.max[0], 256, 1e-6);
+      assert.closeTo(box.max[1] - view.max[1], 256, 1e-6);
+    });
+
+    it('pads by the same number of pixels at another zoom', () => {
+      const viewport = viewportAt(18, [10000, 20000]);   // at z18 a pixel is a quarter of a world unit
+      const box = PixiScene.prototype.updateCullBox.call(scene, viewport);
+      const view = viewport.visibleWorldExtent();
+      assert.closeTo(view.min[0] - box.min[0], 64, 1e-6);
+    });
+
+    it('returns the same box while the view moves around inside it', () => {
+      const box = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10000, 20000]));
+      assert.strictEqual(PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10200, 19800])), box);
+      assert.strictEqual(PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [9750, 20250])), box);
+    });
+
+    it('makes a new box around the view once the view leaves the box', () => {
+      const box = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10000, 20000]));
+      const viewport = viewportAt(16, [10300, 20000]);
+      const moved = PixiScene.prototype.updateCullBox.call(scene, viewport);
+
+      assert.notStrictEqual(moved, box);
+      assert.closeTo(viewport.visibleWorldExtent().min[0] - moved.min[0], 256, 1e-6);
+      // and coming part of the way back stays inside the new one
+      assert.strictEqual(PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10100, 20000])), moved);
+    });
+
+    it('makes a new box when the zoom changes, even inside the old one', () => {
+      const box = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16, [10000, 20000]));
+      const zoomed = PixiScene.prototype.updateCullBox.call(scene, viewportAt(16.5, [10100, 20100]));
+      assert.notStrictEqual(zoomed, box);
     });
   });
 });

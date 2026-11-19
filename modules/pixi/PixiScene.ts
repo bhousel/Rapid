@@ -18,6 +18,7 @@ import { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
+import { Extent, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractMode } from '../modes/AbstractMode.ts';
@@ -30,6 +31,13 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 /** Returned by `getClasses()` for data that has no classes */
 const EMPTY_CLASSES: ReadonlySet<ClassID> = new Set<ClassID>();
+
+/**
+ * Pixels of padding around the view, on each side, in a new cull box (see `updateCullBox`).
+ * More padding means the view can move further before layers have work to do, and more features
+ * made and drawn outside the view (at 256, about twice what a 1300×1100 view holds).
+ */
+const CULL_PADDING = 256;
 
 
 /**
@@ -81,6 +89,10 @@ export class PixiScene extends EventEmitter {
   protected _anchor: Vec2;
   /** The containers made by `worldContainer` */
   protected _worldContainers: Set<PIXI.Container>;
+  /** The part of the world layers have features ready for, or `null` before the first frame (see `updateCullBox`) */
+  protected _cullBox: Extent | null;
+  /** The zoom the cull box was made at */
+  protected _cullZoom: number;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
   protected _interactiveSpatialIDs: ReadonlySet<SpatialID> | null;
 
@@ -108,6 +120,8 @@ export class PixiScene extends EventEmitter {
     this._interactiveSpatialIDs = null;
     this._anchor = [0, 0];
     this._worldContainers = new Set<PIXI.Container>();
+    this._cullBox = null;
+    this._cullZoom = 0;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -369,6 +383,34 @@ export class PixiScene extends EventEmitter {
 
 
   /**
+   * Returns the cull box for the given view: the part of the world, in world coordinates, that layers
+   * should have features ready for. It is the view with `CULL_PADDING` pixels around it, and it's
+   * kept (the same object) for as long as the view stays inside it at the same zoom. So while the
+   * user pans around inside the padding, a layer that has made everything in the box has nothing to
+   * do (see `AbstractPixiLayer.keepFeatures` and "A CULL pass" in `design/graphics-system.md`).
+   * `GraphicsSystem` calls this for each frame.
+   * @param viewport - The map's viewport (not Pixi's, which lags behind a pan)
+   * @return The cull box
+   */
+  public updateCullBox(viewport: Viewport): Extent {
+    const zoom = viewport.transform.zoom;
+    const view = viewport.visibleWorldExtent();
+
+    const current = this._cullBox;
+    if (current && zoom === this._cullZoom && current.contains(view)) return current;
+
+    const pad = CULL_PADDING * (2 ** (WORLD_ZOOM - zoom));   // in world coordinates
+    const box = new Extent(
+      [view.min[0] - pad, view.min[1] - pad],
+      [view.max[0] + pad, view.max[1] + pad]
+    );
+    this._cullBox = box;
+    this._cullZoom = zoom;
+    return box;
+  }
+
+
+  /**
    * Whether the pointer can reach the data with the given spatial ID in the current mode.
    * @param spatialID - The spatial ID, e.g. 'osm' or 'fbRoads'
    * @return `true` if that data's features can be hovered and clicked
@@ -419,9 +461,9 @@ export class PixiScene extends EventEmitter {
     // need no extra transform (except the `labels` group which renders in screen space).
     for (const layer of this.layers.values()) {
       const t0 = performance.now();
-      layer.render(frame.id, viewport);
+      layer.render(frame, viewport);
       const t1 = performance.now();
-      layer.cull(frame.id);
+      layer.cull(frame);
       const t2 = performance.now();
 
       let visible = 0;
@@ -430,10 +472,12 @@ export class PixiScene extends EventEmitter {
       }
       frame.layers.set(layer.id, {
         enabled: layer.enabled,
+        kept: layer.keptFeatures(frame),
         renderMs: t1 - t0,
         cullMs: t2 - t1,
         features: layer.features.size,
-        visible: visible
+        visible: visible,
+        ...layer.takeWork()
       });
     }
   }
@@ -627,8 +671,8 @@ export class PixiScene extends EventEmitter {
    * During the next "APP" pass, dirty features will be rebuilt.
    */
   public dirtyScene(): void {
-    for (const feature of this.features.values()) {
-      feature.dirty = true;
+    for (const layer of this.layers.values()) {
+      layer.dirtyLayer();
     }
   }
 
@@ -651,10 +695,7 @@ export class PixiScene extends EventEmitter {
    */
   public dirtyFeatures(featureIDs: OneOrMore<FeatureID>): void {
     for (const featureID of utilIterable(featureIDs)) {
-      const feature = this.features.get(featureID);
-      if (feature) {
-        feature.dirty = true;
-      }
+      this.features.get(featureID)?.layer.dirtyFeatures(featureID);
     }
   }
 

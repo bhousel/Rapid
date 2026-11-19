@@ -6,6 +6,7 @@ import { Tiler, vecScale, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { ImagerySource } from '../lib/ImagerySource.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Tile, Viewport } from '@rapid-sdk/math';
 
 
@@ -111,10 +112,10 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * Render all of the base and overlay imagery sources in the current view.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const imagery = this.context.systems.imagery;
     if (!imagery) return;
 
@@ -303,11 +304,11 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
           tile.sprite.texture = textureManager.allocate('tile', tile.sprite.label, w, h, bitmap) || PIXI.Texture.EMPTY;
           bitmap.close();   // tile atlas copied it into an edge-padded canvas
           tile.loaded = true;
-          this.gfx.deferredRedraw();
+          this.gfx.deferredRedraw(this.id);   // only the imagery changed
         })
         .catch(() => {
           this._failedURLs.add(tile.url);
-          this.gfx.deferredRedraw();
+          this.gfx.deferredRedraw(this.id);
         });
     }
 

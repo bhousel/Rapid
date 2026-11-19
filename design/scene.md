@@ -202,11 +202,12 @@ that: with the bigger ones the fullest tile there still held 3,232 polygons, wit
 
 ### What's left
 
-- **A pan still rebuilds the groups that have a feature scrolling in or out, and culling changes
-  some feature's `visible` on every frame.** At Staten Island even a 2 px pan flips 30 to 50
-  features, and a rebuild costs the same whether 1 feature changed or 1,800. A pan frame where
-  nothing flips costs 0.8 ms. The answer is to cull less often, not more cleverly: see "A CULL pass"
-  in `graphics-system.md`.
+- ~~A pan still rebuilds the groups that have a feature scrolling in or out, and culling changes
+  some feature's `visible` on every frame.~~ **Done for the OSM layer (Nov 19).** At Staten Island
+  even a 2 px pan flipped 30 to 50 features, and a rebuild costs the same whether 1 feature changed
+  or 1,800. The answer was to cull less often, not more cleverly: the OSM layer has features ready
+  for a box bigger than the view, and leaves them alone while the view moves inside it. See "A CULL
+  pass" in `graphics-system.md`. Other layers still cull on every frame.
 - **Pixi's own culling doesn't help here.** `Culler` (and `CullerPlugin`) walks every `cullable`
   object on every frame, tests its bounds against the screen, and sets `culled`, which marks the
   render group changed exactly as `visible` does. We already know what's in view from the spatial

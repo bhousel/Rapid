@@ -108,6 +108,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    */
   public update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
+    this.layer.work.updated++;
 
     this.updateGeometry();
     this.updateStyle(viewport);

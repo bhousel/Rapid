@@ -37,12 +37,16 @@ Still to do, in about this order:
   **Next: [`design/graphics-system.md`](../design/graphics-system.md)** (Nov 18), the measurements and the
   plan: frame stats first, a set of difficult places to measure on, then our own line builder for
   partial-fill bands, hit areas and dashes. Steps 1 (frame stats), 2 (`bun run measure` over
-  difficult places), 3 (GPU time: mostly fixed costs, see section 6) and 4 (the rendering info card,
-  ⌘⇧F) done. Also: the imagery filter no longer runs at its default settings, and the scene's
-  containers are render groups, each at an anchor near the view, with OSM polygons split by map
-  tile (`design/scene.md` section 3). Next: a CULL pass, so a layer skips its work on frames where
-  only the view moved (`graphics-system.md` section 8, proposed; a pan frame at Staten Island
-  measured 3 ms that way against 50), together with step 5 (pass the `RenderFrame` to the layers).
+  difficult places), 3 (GPU time: mostly fixed costs, see section 6), 4 (the rendering info card,
+  ⌘⇧F) and 5 (the `RenderFrame` passed to the layers, which report their work on it) done. Also:
+  the imagery filter no longer runs at its default settings, the scene's containers are render
+  groups, each at an anchor near the view, with OSM polygons split by map tile (`design/scene.md`
+  section 3), and the OSM layer has a CULL pass (Nov 19, `graphics-system.md` section 8; not
+  committed yet): it has features ready for the view plus 256 px, and skips its work on frames
+  where only the view moved inside that. A pan frame at Staten Island went from about 50 ms to 3.
+  Next, Bryan to pick (section 8, "What's left"): drop the 250 ms throttle for frames that only
+  move the view, make the pass itself cheaper (hidden-feature filtering is half of it), or give
+  the Rapid layer a CULL pass too.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

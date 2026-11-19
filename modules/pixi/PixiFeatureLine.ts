@@ -91,6 +91,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    */
   public update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
+    this.layer.work.updated++;
 
     const map = this.context.systems.map;
     const viewZoom = viewport.transform.zoom;

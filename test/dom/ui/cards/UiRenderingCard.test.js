@@ -14,12 +14,15 @@ describe('UiRenderingCard', () => {
 
 
   // A frame as `GraphicsSystem` records it, with the given times
-  function makeFrame(id, appMs, drawMs, gpuMs) {
+  function makeFrame(id, appMs, drawMs, gpuMs, osmKept = false) {
     const frame = new RenderFrame(id, 17);
     frame.appMs = appMs;
-    frame.layers.set('osm', { enabled: true, renderMs: appMs - 1, cullMs: 0.5, features: 120, visible: 100 });
-    frame.layers.set('labels', { enabled: true, renderMs: 0.2, cullMs: 0, features: 10, visible: 10 });
-    frame.draw = { ms: drawMs, instructions: { batch: 12, stencilMask: 40 }, batchTextures: { 1: 12 }, unbatched: [] };
+    frame.layers.set('osm', { enabled: true, kept: osmKept, renderMs: appMs - 1, cullMs: 0.5, features: 120, visible: 100 });
+    frame.layers.set('labels', { enabled: true, kept: false, renderMs: 0.2, cullMs: 0, features: 10, visible: 10 });
+    frame.draw = {
+      ms: drawMs, renderGroups: 98, rebuiltGroups: osmKept ? 0 : 3, rebuiltInstructions: 0,
+      instructions: { batch: 12, stencilMask: 40 }, batchTextures: { 1: 12 }, unbatched: []
+    };
     if (gpuMs !== undefined) {
       frame.draw.gpuMs = gpuMs;
       frame.draw.gl = { draws: 50, programs: 4, textureBinds: 6, bufferUploads: 0 };
@@ -64,7 +67,8 @@ describe('UiRenderingCard', () => {
   it('shows the times of the APP and DRAW passes, the features and Pixi\'s instructions', () => {
     makeCard(makeContext([makeFrame(1, 9.7, 0.8)]));
 
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'features', 'layers', 'instructions']);
+    assert.deepEqual(rowIDs(), ['app', 'draw', 'features', 'layers', 'instructions', 'groups']);
+    assert.include(valueOf('groups'), '3.0 98');      // rebuilt per frame, then all
     assert.include(valueOf('app'), '9.7');
     assert.include(valueOf('draw'), '0.8');
     assert.include(valueOf('features'), '110 130');   // shown, then all, summed over the layers
@@ -75,9 +79,18 @@ describe('UiRenderingCard', () => {
   it('shows GPU time and WebGL calls only for frames that have them', () => {
     makeCard(makeContext([makeFrame(1, 9.7, 0.8, 6.1)]));
 
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'gpu', 'features', 'layers', 'instructions', 'webgl']);
+    assert.deepEqual(rowIDs(), ['app', 'draw', 'gpu', 'features', 'layers', 'instructions', 'groups', 'webgl']);
     assert.include(valueOf('gpu'), '6.1');
     assert.include(valueOf('webgl'), 'draws 50');
+  });
+
+  it('shows which layers kept their features, in how many of the frames', () => {
+    const frames = [makeFrame(1, 9.7, 0.8), makeFrame(2, 2, 2, undefined, true), makeFrame(3, 2, 2, undefined, true)];
+    makeCard(makeContext(frames));
+
+    assert.deepEqual(rowIDs(), ['app', 'draw', 'features', 'layers', 'kept', 'instructions', 'groups']);
+    assert.strictEqual(valueOf('kept'), 'osm 2/3');
+    assert.include(valueOf('groups'), '1.0 98');   // 3, 0 and 0 rebuilt
   });
 
   it('averages the times of the frames drawn in the last second', () => {
@@ -105,7 +118,7 @@ describe('UiRenderingCard', () => {
 
     assert.strictEqual($container.select('.rendering-row-app').node(), appRow);
     assert.include(valueOf('app'), '12.5');
-    assert.deepEqual(rowIDs(), ['app', 'draw', 'gpu', 'features', 'layers', 'instructions', 'webgl']);
+    assert.deepEqual(rowIDs(), ['app', 'draw', 'gpu', 'features', 'layers', 'instructions', 'groups', 'webgl']);
   });
 
   it('shows no rows before the first frame is drawn', () => {

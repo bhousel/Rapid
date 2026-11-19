@@ -402,7 +402,7 @@ export class EsriService extends AbstractSystem {
           this._loadTileNextPage(ds, layer, tile);
         } else {  // all pages loaded
           cache.nextPage.set(tile.id, Infinity);
-          gfx?.deferredRedraw();
+          gfx?.deferredRedraw('rapid');   // only the Rapid layer draws this data
         }
       })
       .catch(e => {

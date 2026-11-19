@@ -5,9 +5,14 @@ import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { Context } from '../Context.ts';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { LayerWork, RenderFrame } from './RenderFrame.ts';
 import type { PixiScene } from './PixiScene.ts';
-import type { Viewport } from '@rapid-sdk/math';
+
+
+/** How many passes a feature can go unseen before `cull()` destroys it */
+const KEEP_UNSEEN_PASSES = 20;
 
 
 /**
@@ -27,7 +32,12 @@ import type { Viewport } from '@rapid-sdk/math';
  * - `zIndex`            - Where this Layer sits compared to other Layers
  * - `enabled`           - Whether the the user has chosen to see the Layer
  * - `features`          - `Map<featureID, Feature>` of all features on this Layer
- * - `retained`          - `Map<featureID, Integer frame>` last seen
+ * - `retained`          - `Map<featureID, Integer pass>` last seen
+ *
+ * A layer's work for a frame is one "pass": `render()` gathers the data the frame needs, updates its
+ * features and marks them seen (`retainFeature`), then `cull()` hides the features that weren't seen.
+ * A layer whose `render()` calls `keepFeatures()` skips the pass on frames where only the view moved
+ * (see "A CULL pass" in `design/graphics-system.md`).
  */
 export class AbstractPixiLayer {
 
@@ -41,11 +51,21 @@ export class AbstractPixiLayer {
   public context: Context;
   /** Map of featureID to Feature */
   public features: Map<FeatureID, AbstractPixiFeature>;
-  /** Map of featureID to frame last seen */
+  /** Map of featureID to the pass it was last seen in */
   public retained: Map<FeatureID, number>;
+  /** What the layer has done since `takeWork()`, for the frame's stats (its features count into it too) */
+  public work: LayerWork;
 
   /** Whether the user has chosen to see the layer */
   protected _enabled: boolean;
+  /** The number of the current pass: `retainFeature()` marks features with it, and `cull()` ends it */
+  protected _pass: number;
+  /** The cull box the layer's features are current for, or `null` if they need a pass (see `keepFeatures`) */
+  protected _currentBox: Extent | null;
+  /** The frame in which `keepFeatures()` last said to do a pass */
+  protected _passFrame: number;
+  /** The frame in which `keepFeatures()` last said to keep the features */
+  protected _keptFrame: number;
   /** Map of featureID to dataID */
   protected _featureHasData: Map<FeatureID, DataID>;
   /** Map of dataID to Set of featureIDs */
@@ -73,6 +93,12 @@ export class AbstractPixiLayer {
     // Collection of Features on this Layer
     this.features = new Map<FeatureID, AbstractPixiFeature>();
     this.retained = new Map<FeatureID, number>();
+    this.work = { created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} };
+
+    this._pass = 0;
+    this._currentBox = null;
+    this._passFrame = -1;
+    this._keptFrame = -1;
 
     // Feature <-> Data
     // These lookups capture which features are bound to which data.
@@ -169,6 +195,7 @@ export class AbstractPixiLayer {
 
     this.features.clear();
     this.retained.clear();
+    this._currentBox = null;
 
     for (const spatialID of this._spatialIDs) {
       this.scene.releaseSpatialContainers(spatialID);
@@ -209,31 +236,109 @@ export class AbstractPixiLayer {
   /**
    * Every Layer should have a render function that manages the Features in view.
    * Override in a subclass with needed logic. It will be passed:
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @abstract
    */
-  public render(frame?: number, viewport?: Viewport): void {
+  public render(frame?: RenderFrame, viewport?: Viewport): void {
   }
 
 
   /**
-   * Make invisible any Features that were not seen during the current frame
-   * @param frame - Integer frame being rendered
+   * Whether the layer can leave its features exactly as the last frame had them. That's so when
+   * nothing that concerns this layer asked for the frame, only a move of the view
+   * (`frame.changedFor()`), and the layer already made everything in the frame's cull box
+   * (`frame.cullBox`) in an earlier pass.
+   *
+   * A layer that gathers its data by `frame.cullBox` calls this from `render()`, once it knows it has
+   * something to draw and before it gathers anything, and returns if the answer is `true`. `cull()`
+   * then leaves the features alone too. If the answer is `false`, the layer must do the whole pass.
+   * (See "A CULL pass" in `design/graphics-system.md`.)
+   * @param frame - The frame being rendered
+   * @return `true` to skip the pass, `false` to do it
    */
-  public cull(frame: number): void {
+  public keepFeatures(frame: RenderFrame): boolean {
+    if (!frame.changedFor(this.id) && this._currentBox === frame.cullBox) {
+      this._keptFrame = frame.id;
+      return true;
+    }
+    this._currentBox = frame.cullBox;
+    this._passFrame = frame.id;
+    return false;
+  }
+
+
+  /**
+   * Whether the layer kept its features as they were in the given frame (see `keepFeatures`).
+   * @param frame - The frame to ask about
+   * @return `true` if the layer skipped its pass in that frame
+   */
+  public keptFeatures(frame: RenderFrame): boolean {
+    return this._keptFrame === frame.id;
+  }
+
+
+  /**
+   * Make invisible any Features that were not seen during the current pass, and end the pass.
+   * Features that haven't been seen for `KEEP_UNSEEN_PASSES` passes are destroyed.
+   * @param frame - The frame being rendered
+   */
+  public cull(frame: RenderFrame): void {
+    if (this._keptFrame === frame.id) return;   // the features are as the last pass left them
+
+    // If `render()` returned before `keepFeatures()` (the layer is off, or zoomed out too far),
+    // everything gets hidden below, so the features aren't current for any box.
+    if (this._passFrame !== frame.id) {
+      this._currentBox = null;
+    }
+
+    const pass = this._pass++;
     for (const [featureID, feature] of this.features) {
-      const seenFrame = this.retained.get(featureID);
-      if (seenFrame === frame) continue;
+      const seenPass = this.retained.get(featureID);
+      if (seenPass === pass) continue;
 
       // Can't see it currently, make it invisible
       feature.visible = false;
 
       // Haven't seen it in a while, remove completely
-      if (seenFrame !== undefined && frame - seenFrame > 20) {
+      if (seenPass !== undefined && pass - seenPass > KEEP_UNSEEN_PASSES) {
         feature.destroy();
       }
     }
+  }
+
+
+  /**
+   * Returns what the layer did since the last call, and starts recording again.
+   * `PixiScene.render()` calls this after each frame's pass, to put it in the frame's stats.
+   * @return The work done
+   */
+  public takeWork(): LayerWork {
+    const work = this.work;
+    this.work = { created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} };
+    return work;
+  }
+
+
+  /**
+   * Records the time a step of `render()` took, for the frame's stats (`LayerFrameStats.steps`).
+   * Call it after each step with the time the step began; it returns the time now, for the next one.
+   * ```ts
+   * let t = performance.now();
+   * const data = this._gatherData();
+   * t = this._endStep('gather', t);
+   * this._renderLines(data);
+   * t = this._endStep('lines', t);
+   * ```
+   * @param name - The step's name
+   * @param since - When the step began (`performance.now()`)
+   * @return The time now
+   */
+  protected _endStep(name: string, since: number): number {
+    const now = performance.now();
+    const steps = this.work.steps;
+    steps[name] = (steps[name] ?? 0) + (now - since);
+    return now;
   }
 
 
@@ -243,6 +348,7 @@ export class AbstractPixiLayer {
    */
   public addFeature(feature: AbstractPixiFeature): void {
     this.features.set(feature.id, feature);
+    this.work.created++;
   }
 
 
@@ -254,23 +360,24 @@ export class AbstractPixiLayer {
     this.unbindData(feature.id);
     this.retained.delete(feature.id);
     this.features.delete(feature.id);
+    this.work.destroyed++;
   }
 
 
   /**
-   * Retain the feature for the given frame.
+   * Retain the feature for the current pass.
    * Features that are not retained may be automatically culled (made invisible) or removed.
    * @param feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    */
-  public retainFeature(feature: AbstractPixiFeature, frame: number): void {
+  public retainFeature(feature: AbstractPixiFeature, frame: RenderFrame): void {
     if (feature.lod > 0) {
       feature.visible = true;
     }
     // If in user's view, retain it regardless of whether it's actually visible.
     // We want to avoid continuously creating invisible things just to dispose of them a few frames later.
     // For example points when zoomed out far.
-    this.retained.set(feature.id, frame);
+    this.retained.set(feature.id, this._pass);
   }
 
 
@@ -517,8 +624,10 @@ export class AbstractPixiLayer {
   /**
    * Mark all features on this layer as `dirty`.
    * During the next "app" pass, dirty features will be rebuilt.
+   * (So the layer does that pass, whatever the frame is for: see `keepFeatures`.)
    */
   public dirtyLayer(): void {
+    this._currentBox = null;
     for (const feature of this.features.values()) {
       feature.dirty = true;
     }
@@ -530,6 +639,7 @@ export class AbstractPixiLayer {
    * @param featureIDs - featureIDs to set dirty
    */
   public dirtyFeatures(featureIDs: OneOrMore<FeatureID>): void {
+    this._currentBox = null;
     for (const featureID of utilIterable(featureIDs)) {
       const feature = this.features.get(featureID);
       if (feature) {

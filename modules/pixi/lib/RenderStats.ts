@@ -12,20 +12,27 @@ import type { DrawFrameStats, GLCallCounts, UnbatchedGraphic } from '../RenderFr
  * release; the e2e test `rendering.test.js` checks that they still look the way this expects.
  * @param renderer - The Pixi renderer
  * @param root - The container whose render groups to read (the stage)
+ * @param rebuilt - The render groups Pixi rebuilt in this render (from `findChangedRenderGroups`, before it)
  * @return The DRAW pass stats, without timings
  */
-export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Container): Omit<DrawFrameStats, 'ms'> {
+export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Container, rebuilt: Set<PIXI.RenderGroup>): Omit<DrawFrameStats, 'ms'> {
   const instructions: Record<string, number> = {};
   const batchTextures: Record<number, number> = {};
   const unbatched: UnbatchedGraphic[] = [];
   const graphicsContext = (renderer as PIXI.WebGLRenderer).graphicsContext;  // WebGL and WebGPU have one
+  let renderGroups = 0;
+  let rebuiltInstructions = 0;
 
   const groups: PIXI.RenderGroup[] = root.renderGroup ? [root.renderGroup] : [];
   while (groups.length) {
     const group = groups.pop()!;
     groups.push(...group.renderGroupChildren);
+    renderGroups++;
 
     const set = group.instructionSet;
+    if (rebuilt.has(group)) {
+      rebuiltInstructions += set.instructionSize;
+    }
     for (let i = 0; i < set.instructionSize; i++) {
       const instruction = set.instructions[i];
       const pipeID = instruction.renderPipeId;
@@ -55,7 +62,28 @@ export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Contain
   }
 
   unbatched.sort((a, b) => b.floats - a.floats);
-  return { instructions, batchTextures, unbatched };
+  return { renderGroups, rebuiltGroups: rebuilt.size, rebuiltInstructions, instructions, batchTextures, unbatched };
+}
+
+
+/**
+ * Returns the render groups whose instruction list Pixi will rebuild in the next render, because
+ * something in them was added, removed, shown or hidden (`structureDidChange`). Pixi clears the flag
+ * as it renders, so call this just before. Like `readInstructionStats`, this reads Pixi's internals.
+ * @param root - The container whose render groups to look at (the stage)
+ * @return The render groups that changed
+ */
+export function findChangedRenderGroups(root: PIXI.Container): Set<PIXI.RenderGroup> {
+  const changed = new Set<PIXI.RenderGroup>();
+  const groups: PIXI.RenderGroup[] = root.renderGroup ? [root.renderGroup] : [];
+  while (groups.length) {
+    const group = groups.pop()!;
+    groups.push(...group.renderGroupChildren);
+    if (group.structureDidChange) {
+      changed.add(group);
+    }
+  }
+  return changed;
 }
 
 

@@ -1,7 +1,34 @@
+import { Extent } from '@rapid-sdk/math';
+
+
+/** What a layer did for a frame, recorded by the layer and its features as they work */
+export interface LayerWork {
+  /** Features made */
+  created: number;
+  /** Features destroyed */
+  destroyed: number;
+  /** Features rebuilt because they were dirty (new ones included) */
+  updated: number;
+  /** Features that went from hidden to shown */
+  shown: number;
+  /** Features that went from shown to hidden */
+  hidden: number;
+  /**
+   * Milliseconds spent in each step of the layer's `render()`, for layers that time their steps
+   * (e.g. the OSM layer's `gather`, `filter`, `polygons`, `lines`, …)
+   */
+  steps: Record<string, number>;
+}
+
 /** What one layer cost during a frame's APP pass */
-export interface LayerFrameStats {
+export interface LayerFrameStats extends LayerWork {
   /** Whether the layer was enabled (disabled layers still cull their features) */
   enabled: boolean;
+  /**
+   * Whether the layer left its features as the last frame had them, because only the view moved,
+   * within the frame's cull box (see "A CULL pass" in `design/graphics-system.md`)
+   */
+  kept: boolean;
   /** Milliseconds spent in the layer's `render()` */
   renderMs: number;
   /** Milliseconds spent in the layer's `cull()` */
@@ -32,6 +59,12 @@ export interface UnbatchedGraphic {
 export interface DrawFrameStats {
   /** Milliseconds spent in `pixi.render()` (CPU) */
   ms: number;
+  /** Render groups under the stage (each has its own instruction list) */
+  renderGroups: number;
+  /** Render groups whose instruction list Pixi rebuilt this frame, because something in them changed */
+  rebuiltGroups: number;
+  /** Instructions in the lists that were rebuilt */
+  rebuiltInstructions: number;
   /** Instructions in Pixi's instruction lists, by the pipe that runs them (`batch`, `graphics`, `stencilMask`, …) */
   instructions: Record<string, number>;
   /** Drawables merged into `batch` instructions, by how many textures their batch used */
@@ -65,7 +98,7 @@ export interface GLCallCounts {
  * See "Frame stats" in `design/graphics-system.md`.
  */
 export class RenderFrame {
-  /** The frame number (what layers use for `retainFeature()` and `cull()`) */
+  /** The frame number */
   public id: number;
   /** When the APP pass started (`performance.now()`) */
   public time: number;
@@ -73,6 +106,20 @@ export class RenderFrame {
   public zoom: number;
   /** Whether every feature was marked dirty this frame (zoom or rotation changed, or a long pan) */
   public dirtyScene: boolean;
+  /**
+   * Whether something asked for this frame without naming a layer (`deferredRedraw()` or
+   * `immediateRedraw()`), or the whole scene is dirty. Then every layer has to do its work.
+   * Layers ask `changedFor()`.
+   */
+  public contentChanged: boolean;
+  /** The layers that a redraw was requested for by name (e.g. the imagery, when a tile arrives) */
+  public changedLayerIDs: Set<LayerID>;
+  /**
+   * The part of the world to have features ready for, in world coordinates: the view and some
+   * padding around it. It stays the same object while the view moves around inside it, so a layer
+   * can tell that it already has what this frame needs (see `PixiScene.updateCullBox`).
+   */
+  public cullBox: Extent;
   /** Milliseconds spent in the APP pass */
   public appMs: number;
   /** What each layer cost during the APP pass */
@@ -90,9 +137,23 @@ export class RenderFrame {
     this.time = performance.now();
     this.zoom = zoom;
     this.dirtyScene = false;
+    this.contentChanged = true;
+    this.changedLayerIDs = new Set<LayerID>();
+    this.cullBox = new Extent();
     this.appMs = 0;
     this.layers = new Map<LayerID, LayerFrameStats>();
     this.draw = null;
+  }
+
+
+  /**
+   * Whether what the given layer draws may have changed since the last frame. `false` means that as
+   * far as this layer goes, the only thing that changed is the view.
+   * @param layerID - The layer asking
+   * @return `true` if a redraw was requested for the whole scene or for this layer
+   */
+  public changedFor(layerID: LayerID): boolean {
+    return this.contentChanged || this.changedLayerIDs.has(layerID);
   }
 
 
@@ -115,6 +176,9 @@ export class RenderFrame {
       id: this.id,
       zoom: this.zoom,
       dirtyScene: this.dirtyScene,
+      contentChanged: this.contentChanged,
+      changedLayerIDs: [...this.changedLayerIDs],
+      cullBox: this.cullBox.rectangle(),
       appMs: this.appMs,
       layers: Object.fromEntries(this.layers),
       draw: this.draw

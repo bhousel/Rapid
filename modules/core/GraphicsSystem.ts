@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import { AbstractSystem } from './AbstractSystem.ts';
-import { GLCallCounter, GLTimer, readInstructionStats } from '../pixi/lib/RenderStats.ts';
+import { findChangedRenderGroups, GLCallCounter, GLTimer, readInstructionStats } from '../pixi/lib/RenderStats.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
 import { PixiTextures } from '../pixi/PixiTextures.ts';
@@ -109,6 +109,14 @@ export class GraphicsSystem extends AbstractSystem {
   protected _appPending: boolean;
   /** Whether a full scene-graph redraw has been requested but not yet executed */
   protected _drawPending: boolean;
+  /**
+   * Whether `deferredRedraw()` or `immediateRedraw()` was called for the whole scene since the last
+   * APP pass. An APP pass that's pending without it, and without `_redrawLayerIDs`, happens only
+   * because the view moved (see `RenderFrame.contentChanged`).
+   */
+  protected _redrawRequested: boolean;
+  /** The layers that `deferredRedraw()` or `immediateRedraw()` was called for since the last APP pass */
+  protected _redrawLayerIDs: Set<LayerID>;
   /** Whether the WebGL context is currently lost */
   protected _isContextLost: boolean;
   /** Callback that resumes the GraphicsSystem after a WebGL context restore */
@@ -164,6 +172,8 @@ export class GraphicsSystem extends AbstractSystem {
     this._timeToNextRender = 0;   // milliseconds of time to defer rendering
     this._appPending = false;
     this._drawPending = false;
+    this._redrawRequested = true;   // the first frame has everything to do
+    this._redrawLayerIDs = new Set<LayerID>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -547,9 +557,15 @@ export class GraphicsSystem extends AbstractSystem {
    * Schedules an APP pass but does not reset the timer.
    * This is intended for most situations where new data is streaming in, but we can
    * allow the changes to batch up over several animation frames before rendering.
+   *
+   * A request says that something the map draws has changed. Without a layer, that can be anything,
+   * so every layer does its work for the frame. With one, the other layers may keep their features
+   * as they are (see `RenderFrame.changedFor` and "A CULL pass" in `design/graphics-system.md`).
+   * @param layerID - The one layer whose content changed, if the caller knows nothing else did
    */
-  public deferredRedraw(): void {
+  public deferredRedraw(layerID?: LayerID): void {
     this._appPending = true;
+    this._requestRedraw(layerID);
   }
 
 
@@ -558,10 +574,26 @@ export class GraphicsSystem extends AbstractSystem {
    * If there was a DRAW pending, cancel it.
    * This is intended for interactive situations where the user did a thing and we want
    * the map to update on the next available animation frame to show their change.
+   * @param layerID - The one layer whose content changed, if the caller knows nothing else did
+   *   (see `deferredRedraw`)
    */
-  public immediateRedraw(): void {
+  public immediateRedraw(layerID?: LayerID): void {
     this._timeToNextRender = 0;    // asap
     this._appPending = true;
+    this._requestRedraw(layerID);
+  }
+
+
+  /**
+   * Remembers what a redraw was requested for, for the next frame.
+   * @param layerID - The one layer whose content changed, or nothing for the whole scene
+   */
+  protected _requestRedraw(layerID?: LayerID): void {
+    if (layerID) {
+      this._redrawLayerIDs.add(layerID);
+    } else {
+      this._redrawRequested = true;
+    }
   }
 
 
@@ -805,6 +837,17 @@ export class GraphicsSystem extends AbstractSystem {
       this.scene!.setAnchor(centerWorld);
     }
 
+    // Tell the layers whether something changed, or only the view moved.
+    // (Cleared before they render, so a request made while rendering counts for the next frame.)
+    frame.contentChanged = this._redrawRequested || frame.dirtyScene;
+    frame.changedLayerIDs = this._redrawLayerIDs;
+    this._redrawRequested = false;
+    this._redrawLayerIDs = new Set<LayerID>();
+
+    // ..and which part of the world to have features ready for: the view and some padding. It stays
+    // the same while the view moves around inside it (see "A CULL pass" in `design/graphics-system.md`).
+    frame.cullBox = this.scene!.updateCullBox(mapViewport);
+
     // Let's go!
     this.scene!.render(frame, pixiViewport);
     // this._renderDebug();
@@ -847,6 +890,7 @@ export class GraphicsSystem extends AbstractSystem {
     const glCounter = this._glCounter;
     const glTimer = this._glTimer;
     const glBefore = glCounter?.snapshot();
+    const rebuilt = findChangedRenderGroups(this.stage!);
     if (frame) glTimer?.begin(frame);
     const t0 = performance.now();
 
@@ -855,7 +899,7 @@ export class GraphicsSystem extends AbstractSystem {
     const drawMs = performance.now() - t0;
     glTimer?.end();
     if (frame) {
-      frame.draw = { ms: drawMs, ...readInstructionStats(this.pixi!.renderer, this.stage!) };
+      frame.draw = { ms: drawMs, ...readInstructionStats(this.pixi!.renderer, this.stage!, rebuilt) };
       if (glCounter && glBefore) {
         frame.draw.gl = GLCallCounter.diff(glBefore, glCounter.snapshot());
       }

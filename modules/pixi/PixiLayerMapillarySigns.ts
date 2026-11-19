@@ -4,6 +4,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
@@ -87,10 +88,10 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
    * Renders the Mapillary traffic-sign markers for this frame.
-   * @param  frame     Integer frame being rendered
+   * @param  frame     The frame being rendered
    * @param  viewport  Pixi viewport to use for rendering
    */
-  public renderMarkers(frame: number, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
     const context = this.context;
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
@@ -146,10 +147,10 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame    -  Integer frame being rendered
+   * @param  frame    -  The frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const mapillary = this.context.services.mapillary;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;

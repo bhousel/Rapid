@@ -4,11 +4,12 @@ How `GraphicsSystem` turns the map into a frame, what we know about what a frame
 explorations planned to make frames cheaper. Rendering performance is where Rapid has the most room to
 improve, and until now we've had no way to see it except spot checks in Spector.
 
-> **Status:** In progress (Nov 2026). Steps 1 to 4 of the plan are done (frame stats, a script that
-> measures a set of difficult places, where the GPU time goes, and a rendering info card); sections 4
-> and 5 aren't built. The first
+> **Status:** In progress (Nov 2026). Steps 1 to 5 of the plan are done (frame stats, a script that
+> measures a set of difficult places, where the GPU time goes, a rendering info card, and the
+> `RenderFrame` passed to the layers), and so is the CULL pass for the OSM layer (section 8);
+> sections 4 and 5 aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
-> reproduce them. The plan is in section 7, and section 8 proposes a CULL pass, which comes next.
+> reproduce them. The plan is in section 7.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -19,6 +20,13 @@ Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the poi
 - **APP pass:** Rapid's half of a frame. Layers decide which features are in view, rebuild the ones that
   are dirty, and cull the rest (`GraphicsSystem._app()` → `PixiScene.render()` → each layer's `render()`
   and `cull()`).
+- **Pass (of a layer):** one layer's work in an APP pass: gather its data, update its features and mark
+  them seen, hide the ones it didn't see.
+- **Redraw request:** a call to `deferredRedraw()` or `immediateRedraw()`. It says that something the
+  map draws has changed. Moving the view isn't one.
+- **Cull box:** the part of the world a frame wants features ready for: the view, and padding around it.
+- **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view had
+  moved, inside the cull box it already had everything for (section 8).
 - **DRAW pass:** Pixi's half. `pixi.render()` walks the display tree, builds its instruction list, and
   issues the GPU calls (`GraphicsSystem._draw()`).
 - **Instruction:** one entry in a Pixi render group's instruction list. Each names the pipe that runs it:
@@ -40,7 +48,9 @@ per frame. A tick does at most one of the two passes, so a redraw takes two fram
 2. **APP**, when a redraw is pending and its delay has run out (`THROTTLE`, 250 ms after the last draw,
    unless `immediateRedraw()` asked for one now). If the zoom changed, or the map moved more than
    100,000 px, every feature is marked dirty (`scene.dirtyScene()`) and its geometry is rebuilt;
-   otherwise only the `origin` container moves. Then `scene.render(frame, viewport)`.
+   otherwise only the `origin` container moves. The frame is told why it's being drawn (a redraw
+   request, or only a move of the view) and gets its cull box (section 8). Then
+   `scene.render(frame, viewport)`.
 3. **DRAW**, on the next tick: resize the renderer if needed, `pixi.render()`, drop the CSS transform,
    emit `draw`, and count the frame.
 
@@ -151,8 +161,9 @@ What that says:
   structural container of the scene is a render group now, each at an anchor near the view because
   world coordinates don't fit in a render group's 32-bit floats (that console experiment drew
   distorted shapes, which the timings didn't show). Pan DRAW went from 6.8 to 5.1 ms in Seattle and
-  from 22.8 to 12.3 at Staten Island; a hover on one line there went from 13 ms to 1. What's left is
-  that culling flips some feature's `visible` on every pan frame. See
+  from 22.8 to 12.3 at Staten Island; a hover on one line there went from 13 ms to 1. What was left
+  is that culling flipped some feature's `visible` on every pan frame: since Nov 19 the OSM layer
+  leaves its features alone while only the view moves (section 8). See
   [`scene.md`](scene.md), section 3.
 - **Labels on long lines walk the whole line.** Smith Point's restyle takes 394 ms for 784 features:
   the labels take it, not the shapes. Five transatlantic cables (TAT13, Apollo North, …) have 4 nodes
@@ -195,31 +206,54 @@ things, so stats come from both:
 - **After DRAW**, from Pixi: the instruction list by pipe, batch sizes and texture counts, what ended
   each batch, the `Graphics` that weren't batchable and why (size, shader, `batchMode`), and GPU time.
 
-Since Rapid can't plan the frame ahead, the frame itself is the unit we gather stats on. Today an
-integer `frame` is passed from `_app()` through `PixiScene.render()` into every layer's `render()` and
-`cull()` (about 20 layers). The idea is to pass an object instead: the frame number plus whatever the frame
-gathers as it's made, compared against the frame budget (`scheduler.targetFrameTime`, 16.7 ms by
-default). This is the same idea as SGI Performer's `pfFrameStats`, which `backlog.md` already cites.
+Since Rapid can't plan the frame ahead, the frame itself is the unit we gather stats on. A
+`RenderFrame` (`modules/pixi/RenderFrame.ts`) is passed from `_app()` through `PixiScene.render()`
+into every layer's `render()` and `cull()`: the frame number plus whatever the frame gathers as it's
+made, compared against the frame budget (`scheduler.targetFrameTime`, 16.7 ms by default). This is
+the same idea as SGI Performer's `pfFrameStats`, which `backlog.md` already cites.
 
-Sketch, not settled (it can grow as needed):
+What a frame holds now (the class has the details):
 
 ```ts
-interface RenderFrame {
-  frame: number;                       // what layers use today for `retainFeature()` and `cull()`
-  app: {
+class RenderFrame {
+  id: number;
+  zoom: number;
+  dirtyScene: boolean;                 // every feature was marked dirty (zoom or rotation changed)
+  contentChanged: boolean;             // a redraw was requested for the whole scene
+  changedLayerIDs: Set<LayerID>;       // …or for these layers only
+  cullBox: Extent;                     // what to have features ready for (section 8)
+  appMs: number;
+  layers: Map<LayerID, {
+    enabled: boolean;
+    kept: boolean;                     // the layer skipped its pass (section 8)
+    renderMs: number; cullMs: number;
+    features: number; visible: number;
+    created: number; destroyed: number; updated: number; shown: number; hidden: number;
+    steps: Record<string, number>;     // ms per step of render(), for layers that time them
+  }>;
+  draw: {                              // filled in after `pixi.render()`
     ms: number;
-    layers: Map<LayerID, { renderMs: number; cullMs: number; counts: Record<string, number> }>;
-  };
-  draw?: {                             // filled in after `pixi.render()`
-    ms: number;
+    renderGroups: number; rebuiltGroups: number; rebuiltInstructions: number;
     instructions: Record<string, number>;   // by renderPipeId
-    batches: number;
-    unbatched: { label: string; reason: 'size' | 'shader' | 'batchMode'; floats: number }[];
-    drawCalls?: number;                // debug builds only (see below)
+    batchTextures: Record<number, number>;
+    unbatched: { label: string; reason: 'size' | 'shader' | 'batchMode' | 'unknown'; floats: number }[];
+    gl?: { draws; programs; textureBinds; bufferUploads };   // with detailed stats on
     gpuMs?: number;                    // arrives a few frames later, when the timer query resolves
-  };
+  } | null;
 }
 ```
+
+**How layers report (step 5, Nov 19).** A layer has a `work` record that it and its features count
+into as they go, and the scene moves it onto the frame after the layer's pass (`takeWork()`):
+
+- `created` and `destroyed` are counted where features join and leave the layer, `updated` where a
+  dirty feature is rebuilt, `shown` and `hidden` where a feature's `visible` flips. Every layer gets
+  these without changes of its own. `shown` and `hidden` are what makes Pixi rebuild instruction
+  lists, and `draw.rebuiltGroups` says how many it rebuilt.
+- `steps` is for a layer that wants to say where its time went. It calls `_endStep(name, since)`
+  after each step of `render()`. Only the OSM layer does so far: `gather` (the spatial index),
+  `filter` (hidden features), `classify` (sorting by geometry), `polygons`, `lines`, `points`,
+  `related`, `vertices`, `midpoints`.
 
 **Decisions so far**
 
@@ -245,9 +279,8 @@ interface RenderFrame {
 
 **Open questions**
 
-- Whether layers report counts through the object (needs the signature change) or the scene works them
-  out from the features it already tracks (no signature change). The timing needs neither: the scene
-  can time each layer's `render()` and `cull()` itself.
+- ~~Whether layers report counts through the object or the scene works them out.~~ Settled (Nov 19):
+  the layer and its features count as they work, and the scene collects the counts (above).
 
 ## 4. Partial fills without a stencil mask
 
@@ -451,9 +484,12 @@ Each step is measured with frame stats on the same set of places.
    It redraws at most four times a second. Ideas for later, from Performer's `pfFrameStats`: texture
    and atlas use, vertices per layer (after step 5), marking restyle frames in the chart, and a
    GPU line in the chart.
-5. **Pass a `RenderFrame` through `render()` and `cull()`**, so layers can report their own counts,
-   and so a layer can tell a frame where only the view moved from one where something changed. The
-   CULL pass (section 8) needs that, so the two go together and come next.
+5. **Pass a `RenderFrame` through `render()` and `cull()`. Done (Nov 19),** together with the CULL
+   pass for the OSM layer (section 8), which needs it. Every layer's `render()`, `cull()` and
+   `retainFeature()` take the frame. Layers report what they did to their features, the OSM layer
+   also where its time went, and the DRAW stats say how many instruction lists Pixi rebuilt
+   (section 3). `bun run measure` saves all of it with `--out`, and the rendering card shows which
+   layers kept their features and how many render groups were rebuilt.
 6. **The line builder,** as plain geometry with unit tests (a band never leaves its area, never
    overlaps itself, holes, slivers, short segments). Then, one at a time and measured: partial-fill
    bands instead of masks; hit areas, halos and label boxes instead of `lineToPoly`; dashes as one
@@ -462,23 +498,24 @@ Each step is measured with frame stats on the same set of places.
    [`profiling.md`](profiling.md)), measured after the masks are gone, since the masks break batches
    today anyway.
 
-Done outside the numbered steps (Nov 18): the imagery filter fix (section 6), and render groups with
-OSM polygons split by tile ([`scene.md`](scene.md) section 3).
+Done outside the numbered steps: the imagery filter fix (section 6), render groups with OSM
+polygons split by tile ([`scene.md`](scene.md) section 3), and the CULL pass for the OSM layer
+(section 8, Nov 19).
 
 ## 8. A CULL pass
 
-**Proposed (Nov 18), nothing built.** Bryan's point: a layer doesn't need to decide what's visible
+**Built for the OSM layer (Nov 19).** Bryan's point: a layer doesn't need to decide what's visible
 on every frame. SGI Performer had CULL as its own stage between APP and DRAW.
 
-Today every APP pass does everything, for every layer: ask the spatial index what's in the exact
+Before, every APP pass did everything, for every layer: ask the spatial index what's in the exact
 view, visit each of those features (update it if it's dirty, mark it seen), then hide every feature
-that wasn't seen. On a pan nothing is dirty, but all of that still runs (about 3 µs per visible
-feature), and it changes some feature's `visible` on every frame, which makes Pixi rebuild the
-instructions of that feature's render group.
+that wasn't seen. On a pan nothing is dirty, but all of that still ran (about 3 µs per visible
+feature), and it changed some feature's `visible` on every frame, which made Pixi rebuild the
+instructions of that feature's render group. Every layer but OSM still works that way.
 
-**What a pan frame could cost.** Measured by turning off the OSM layer's `render()` and `cull()`
-from the console and panning 20 px a frame (so nothing new scrolls in, but nothing is rebuilt
-either):
+**What a pan frame could cost.** Measured before building it, by turning off the OSM layer's
+`render()` and `cull()` from the console and panning 20 px a frame (so nothing new scrolls in, but
+nothing is rebuilt either):
 
 | | APP | DRAW |
 |---|---|---|
@@ -489,28 +526,130 @@ either):
 
 A pan frame of 3 to 4 ms instead of 12 to 50.
 
-**Sketch:**
+### How it works
 
-- **The cull box.** A layer decides what's visible against a box bigger than the view: padded, and
-  snapped to a grid, so it stays the same while the view moves inside it. Everything in the box is
-  made and kept visible, also the part outside the view.
-- **A frame says why it's being drawn.** `GraphicsSystem` already has two ways in: a transform
-  change (the view moved), and `deferredRedraw()` / `immediateRedraw()` (something changed). The
-  `RenderFrame` passed to layers (step 5) carries which it was.
-- **A layer skips its work** when only the view moved and its cull box is the same as last time.
-  It still asks its service for the tiles of the new view (that's cheap, and data must keep loading
-  ahead of the box).
-- **Some layers run every frame anyway:** the imagery tiles (cheap, and they follow the view), and
-  the labels (the labels group is positioned from the view on every frame).
+- **The cull box** (`PixiScene.updateCullBox()`, on the frame as `frame.cullBox`). The view in world
+  coordinates, with 256 px of padding on each side (`CULL_PADDING`). It's kept, as the same object,
+  for as long as the view stays inside it at the same zoom; when the view leaves it, a new one is
+  made around the view. A layer gathers its data by the box, so everything in it is made and shown,
+  also the part outside the view.
+  The first sketch snapped the box to a grid. Keeping the box until the view leaves it does the
+  same job with less: the padding is 256 px, where a grid would hold 256 to 512, and a view that
+  moves back and forth across a grid line would do a pass each time.
+- **A frame says why it's being drawn.** `GraphicsSystem` has two ways in: a transform change (the
+  view moved), and a redraw request, `deferredRedraw()` or `immediateRedraw()` (something changed).
+  A request can name the one layer whose content changed (`deferredRedraw('background')`). The
+  frame carries it: `contentChanged` (a request for the whole scene, or the whole scene is dirty),
+  `changedLayerIDs`, and `changedFor(layerID)` for a layer to ask.
+- **A layer keeps its features** when nothing changed for it and the frame's cull box is the one it
+  already did a pass for: `AbstractPixiLayer.keepFeatures(frame)`. Its `render()` returns, and
+  `cull()` leaves the features alone too. The OSM layer still asks for the view's tiles first
+  (`context.loadTiles()`), so data keeps loading as the view moves.
+- **Marking features dirty makes their layer do its next pass** (`dirtyLayer()`, `dirtyFeatures()`,
+  `dirtyData()`, and the scene's versions, which go through the layers now), whatever the frame is
+  for. So does a `render()` that returned before asking (the layer is off, or zoomed out too far).
+- **Passes are counted, not frames.** `cull()` destroys a feature that 20 passes haven't seen. A
+  frame where the layer kept its features isn't a pass.
+- **Layers that don't use it** do their pass on every frame as before: the imagery tiles and the
+  labels follow the view itself, and the data layers (Rapid, photos, QA) haven't been changed yet.
 
-**Open questions:**
+### What it does to a frame
 
-- How much padding. More means fewer frames that do the work, and more features made and drawn
-  outside the view. With 256 px of padding on each side the box holds about twice the features of a
-  1300×1100 view. The work per feature when nothing is dirty should come down first or with it
-  (section 2: hidden-feature filtering, node classification).
-- Does every change to a layer's content reach it through a redraw request today, or do some rely
-  on the next frame happening anyway? Each layer needs checking: edits, data arriving, classes,
-  filters, mode changes.
-- Features are destroyed after 20 frames unseen. That count should be in CULL passes, not frames.
-- Zoom and rotation changes restyle everything today, so they'd still do the full work.
+`bun run measure --fresh` on the same machine and settings as section 2 (Nov 19), in ms. A pan
+frame moves the view 100 px, so about one in three leaves the cull box. "Kept" is the pan frames
+where the OSM layer kept its features, "cull" the ones where it did its pass for a new box. "Before"
+is section 2's table (Nov 18), where every pan frame did the pass; it's from before the render
+groups too, which took up to half off the pan DRAW at the dense places. "Shown" counts the
+features in the padding as well.
+
+| Place | Shown, before → now | Pan APP, before → kept | Pan DRAW, before → kept | Cull APP | Cull DRAW | Restyle APP, before → now |
+|---|---|---|---|---|---|---|
+| Seattle | 3,014 → 5,443 | 9.0 → 2.5 | 6.8 → 3.1 | 26.6 | 9.1 | 79 → 141 |
+| Nuevo León | 1,076 → 1,637 | 5.7 → 1.7 | 3.9 → 1.3 | 20.7 | 5.8 | 30 → 42 |
+| Miami-Dade | 2,596 → 4,787 | 6.7 → 2.2 | 4.2 → 1.4 | 22.9 | 6.5 | 51 → 97 |
+| Užice | 61,124 → 65,798 | 218 → 11.8 | 109 → 5.4 | 224 | 52 | 1,538 → 1,690 |
+| Bochum | 2,505 → 3,631 | 8.4 → 2.0 | 5.4 → 2.5 | 23.4 | 6.2 | 74 → 99 |
+| Smith Point | 784 → 1,084 | 3.7 → 1.7 | 2.3 → 1.4 | 15.2 | 4.0 | 394 → 386 |
+| DeKalb | 3,785 → 5,161 | 10.6 → 1.8 | 5.7 → 1.3 | 26.8 | 2.7 | 66 → 92 |
+| Staten Island | 15,983 → 18,539 | 43.5 → 4.3 | 22.8 → 2.8 | 63.4 | 7.9 | 275 → 340 |
+| Grant Park | 1,334 → 2,594 | 6.6 → 2.1 | 3.6 → 3.1 | 24.1 | 5.0 | 40 → 74 |
+| Golmud | 10,304 → 14,227 | 35.5 → 3.7 | 27.8 → 1.8 | 59.6 | 3.9 | 343 → 462 |
+| Heybridge | 951 → 1,320 | 3.8 → 1.3 | 2.3 → 1.6 | 15.3 | 2.8 | 22 → 33 |
+
+(Jiangsu didn't load: the OSM API was rate limiting by then. `bun run measure` waits out a rate
+limit now, before it measures.)
+
+- **A pan frame that only moves the view costs 3 to 7 ms in all**, where it cost 6 to 66. In Užice
+  it's 17 ms against 327. About 3 render groups are rebuilt in such a frame (the imagery and the
+  labels), against 26 to 80 in a frame that does the pass.
+- **The cull frames can't be compared with the old pan frames like for like.** The old ones were
+  measured back to back; these come 250 ms apart, as in a real drag (no redraw is requested for a
+  pan, so each waits for the throttle). A pass that follows a 250 ms pause takes about twice as
+  long as the same pass straight after another: 21.6 ms against 11 in Seattle with nothing moving
+  at all (`gather` 1.9 against 0.6, `filter` 12 against 5.9). So real pans cost about twice what
+  section 2's table says, before and after, and the throttle is part of the reason.
+
+Checked by screenshot at Seattle, Staten Island and Bochum: after each of 17 pans (some inside the
+box, some out of it), the picture is the same, pixel for pixel, as after a full pass at the same
+view.
+
+**A real drag** (pointer events from a script, 600 px out and back over 2.5 s at Staten Island,
+over an area already loaded): 19 frames, 16 of them kept at 1.4 ms APP and 1.3 ms DRAW, and 3
+passes at 60 ms. Over a new area, more of the frames are passes, as OSM tiles arrive.
+
+**What it costs:**
+
+- **A pass covers more.** The box holds 1.2 to 1.8 times the features of the view, so a zoom change
+  (which restyles all of them) costs more: Seattle's restyle went from about 80–120 ms to 140, and
+  Golmud's from 343 to 460. With 128 px of padding it was 119 and 417, and Staten Island's hardly
+  differed (313 against 326): its big features reach into the padding either way.
+- **More is drawn outside the view:** 1,295 draw calls in Seattle where the view alone needed 782.
+  The DRAW pass went from 0.8 to 1.0 ms, and GPU time didn't change.
+
+### Redraw requests, checked
+
+Skipping a pass is only safe if every change to what the OSM layer draws is followed by a redraw
+request. Every path was traced (Nov 19): edits, undo and redo, restore and reset (`stagingchange`
+and `merge` in `MapSystem`), OSM data arriving, feature filters, hover and select (`UiSidebar`,
+`Context.enter()`), highlights, mode changes, wireframe and fill mode, styles, language, the
+schema, and layers being turned on. All of them make a request. What turned up:
+
+- **Imagery tiles and label textures asked for a redraw of everything**, several times a second
+  while panning, so no pan frame would have been view-only. They name their layer now, and so do
+  the Rapid layer's data (`MapWithAIService`, `EsriService`) and conflation results.
+- **Spritesheets made no request when their icons were registered** (`UiDefs`). Points drawn before
+  that waited for "the next frame, whatever it's for". Now a request is made.
+- **Left alone:** the area fill setting arriving from another tab (settings sync) makes no request
+  and marks nothing dirty; that was so before. And the effective zoom depends on latitude, so on a
+  north-south pan the line where vertices appear (effective zoom 16) can be crossed inside a cull
+  box: they show up to 256 px late.
+
+### What the steps cost
+
+The OSM layer's step times (section 3), medians of redraw frames (nothing changed, back to back),
+in ms:
+
+| Place | `render()` | gather | filter | classify | polygons | lines | vertices |
+|---|---|---|---|---|---|---|---|
+| Seattle | 16.3 | 0.9 | 7.7 | 1.1 | 0.7 | 2.7 | 3.1 |
+| Staten Island | 54.8 | 3.1 | 30.0 | 5.0 | 8.2 | 1.7 | 6.4 |
+| Golmud | 48.4 | 4.2 | 22.5 | 6.0 | 9.8 | 0 | 6.0 |
+| Užice | 211 | 12.8 | 106 | 21.2 | 18.7 | 15.4 | 34.2 |
+
+Hidden-feature filtering is about half of a pass wherever any feature is hidden (as in this
+profile). Sorting the entities by geometry (`classify`), the vertices and the spatial index come
+next. On a restyle the shapes take over: in Užice 492 ms of polygons, 533 of lines and 429 of
+vertices; at Golmud 416 ms of polygons; in Seattle 56 ms of lines and 42 of vertices.
+
+### What's left
+
+- **The 250 ms throttle** between APP passes while panning (`THROTTLE`) was there because a pass was
+  expensive. A frame that only moves the view costs about 3 ms now, so those could be drawn on
+  every animation frame, and the CSS transform would only be needed across the frames that do a
+  pass. It would also keep the passes warm (a pass after a pause costs twice as much, above). Not
+  done: it changes how panning looks, so it's Bryan's call.
+- **Make the pass cheaper**, now that the steps are measured: cache what's hidden, then the spatial
+  query and the vertices.
+- **Restyle the view first** after a zoom change, and the padding afterwards in idle time.
+- **The other data layers:** the Rapid layer does its pass on every frame still.
+- **More requests could name their layer:** the photo and QA services, `VectorTileService`.

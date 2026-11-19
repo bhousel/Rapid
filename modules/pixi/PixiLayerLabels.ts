@@ -13,6 +13,7 @@ import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
@@ -310,10 +311,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * - label placement - do the math of figuring out where labels should be
    * - label rendering - show or hide labels based on their visibility
    *
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || viewZoom < MINZOOM) {
       this.labelContainer!.visible = false;
@@ -551,8 +552,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     }
     this._pendingRasters.clear();
 
-    // Wake the scene so newly-rasterized labels appear on the next frame.
-    this.gfx.immediateRedraw();
+    // Wake the scene so newly-rasterized labels appear on the next frame. (Only the labels changed.)
+    this.gfx.immediateRedraw(this.id);
   }
 
 
@@ -1184,10 +1185,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * look up the feature by ID, create one if missing, call `update()` and `retainFeature()`.
    * Off-screen labels are automatically destroyed by `AbstractPixiLayer.cull()` (after 20 frames).
    * Their placeholders remain in `_labels` so they can be rebuilt if they scroll back into view.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderLabels(frame: number, viewport: Viewport): void {
+  public renderLabels(frame: RenderFrame, viewport: Viewport): void {
     const spatial = this.context.systems.spatial!;
     // bhousel 4/1/26:  MeshRope is not supported for
     // the new experimental Pixi Canvas renderer yet.

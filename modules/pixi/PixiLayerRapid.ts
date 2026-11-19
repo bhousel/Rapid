@@ -15,6 +15,7 @@ import type { Viewport } from '@rapid-sdk/math';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { OsmTags } from '../data/types.ts';
 
 
@@ -59,7 +60,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     // Conflation results change when OSM data changes or when a dataset's rules change.
     const conflation = this.context.systems.conflation;   // optional
-    conflation?.on('conflationchange', () => this.gfx.deferredRedraw());
+    // (Only this layer draws them, so the other layers can keep their features.)
+    conflation?.on('conflationchange', () => this.gfx.deferredRedraw(this.id));
 
 //// shader experiment:
 //this._uniforms = {
@@ -240,10 +242,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const rapid = this.context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || viewZoom < MINZOOM) return;
@@ -264,10 +266,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * Render any data we have, and schedule fetching more of it to cover the view.
    * @param ds - RapidDataset Object
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderDataset(ds: RapidDataset, frame: number, viewport: Viewport): void {
+  public renderDataset(ds: RapidDataset, frame: RenderFrame, viewport: Viewport): void {
     const context = this.context;
     const conflation = context.systems.conflation;   // optional
     const rapid = context.systems.rapid!;
@@ -414,7 +416,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     parentContainer: PIXI.Container,
     dataset: RapidDataset,
     data: RenderData,
-    frame: number,
+    frame: RenderFrame,
     viewport: Viewport
   ): void {
     const color = new PIXI.Color(dataset.color);
@@ -470,14 +472,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @param parentContainer - The Pixi container to draw the lines into
    * @param dataset - The Rapid dataset being drawn
    * @param data - The dataset's data in view, sorted by geometry type
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
   public renderLines(
     parentContainer: PIXI.Container,
     dataset: RapidDataset,
     data: RenderData,
-    frame: number,
+    frame: RenderFrame,
     viewport: Viewport
   ): void {
     const context = this.context;
@@ -571,7 +573,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @param dataset - The Rapid dataset being drawn
    * @param d - The line's data
    * @param runs - The line's runs, in order
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
   protected _renderRuns(
@@ -579,7 +581,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     dataset: RapidDataset,
     d: AbstractData,
     runs: LineRun[],
-    frame: number,
+    frame: RenderFrame,
     viewport: Viewport
   ): void {
     const context = this.context;
@@ -660,7 +662,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     parentContainer: PIXI.Container,
     dataset: RapidDataset,
     data: RenderData,
-    frame: number,
+    frame: RenderFrame,
     viewport: Viewport
   ): void {
     const color = new PIXI.Color(dataset.color);
