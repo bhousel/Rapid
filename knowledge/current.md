@@ -57,7 +57,11 @@ Still to do, in about this order:
   features are drawn again over several frames when one frame has no time for them
   (`updateFeature()`, `continueWaiting()`); labels wait for them. A zoom's frame went from 147 +
   30 ms to 17 + 10 in Seattle, and from 334 + 47 to 64 + 18 at Staten Island.
-  **The rate limit bar is back** (Nov 19; not committed yet): a 429 from the OSM API shows the
+  **Baselines** (Nov 19; not committed yet): `bun run compare` measures any editor from outside,
+  and `graphics-system.md` section 11 has this branch against `main`, Rapid 2.5.7 and iD 2.42 at
+  Seattle, Staten Island and Užice. A pinch at Staten Island: 50 frames a second on the branch,
+  18 on `main`, 8 in iD. Nine of the twelve places aren't measured (the OSM API's rate limit).
+  **The rate limit bar is back** (Nov 19): a 429 from the OSM API shows the
   red status bar with its countdown again, and the view loads by itself when the time is up
   (`OsmService.setRateLimit()`, `_rateLimitEnded()`). It had been cleared by its own status check
   since Sept 2025.

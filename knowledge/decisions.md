@@ -183,7 +183,8 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 - **Why twice the cost:** passes then take at most a third of the time, and with the 250 ms cap
   nothing waits longer than it did. Not tuned further; change it with measurements.
 - **Rejected: tying the gap to the scheduler's pressure level.** Loading Staten Island took the
-  same time (37 s while panning) with 2,163 frames drawn as with 133: loading waits on the network.
+  same time (37 s while panning, until the scheduler's queues were empty) with 2,163 frames drawn
+  as with 133.
   Add it if a case shows background work being held up.
 - **Rejected: a held frame during a zoom.** Features are styled for their zoom (stroke widths in
   world units, screen-sized markers), so the old ones can't be drawn at a new zoom. The CSS

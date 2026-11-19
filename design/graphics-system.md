@@ -7,7 +7,8 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > **Status:** In progress (Nov 2026). Steps 1 to 5 of the plan are done (frame stats, a script that
 > measures a set of difficult places, where the GPU time goes, a rendering info card, and the
 > `RenderFrame` passed to the layers), and so are the CULL pass for the OSM layer (section 8) and
-> frame pacing (section 9). A deadline on the frame is started (section 10); sections 4 and 5
+> frame pacing (section 9). A deadline on the frame is started (section 10), and section 11
+> compares the branch with `main`, Rapid 2.5 and iD; sections 4 and 5
 > aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
 > reproduce them. The plan is in section 7.
@@ -781,17 +782,22 @@ second, with 29% of the main thread's time in ticks. At 15 px a frame (900 px a 
 unloaded territory): 46 a second, with a pass frame every 280 ms or so at 45 + 14 ms, and 20 of 240
 animation frames longer than 25 ms.
 
-**Loading isn't held up.** Time until Staten Island had loaded and the scheduler was idle, one run
-each:
+**Background work isn't held up.** Time until Staten Island had loaded and the scheduler's queues
+were empty, one run each:
 
 | | Before | After |
 |---|---|---|
 | Map still | 31.9 s (7 frames) | 31.9 s (5 frames) |
 | Panning on every animation frame meanwhile | 37.9 s (133 frames, 8.8 s of main thread) | 37.4 s (2,163 frames, 13.2 s of main thread) |
 
-Loading waits on the network: of the 32 s, the main thread works for about 6 (5 on the scheduler's
-queues, 1 drawing). Sixteen times the frames made no difference to it, which is why the gap doesn't
-look at the scheduler's pressure level. That can be added if a case turns up.
+Of the 32 s, the main thread works for about 6 (5 on the scheduler's queues, 1 drawing). Sixteen
+times the frames made no difference to it, which is why the gap doesn't look at the scheduler's
+pressure level. That can be added if a case turns up.
+
+(Corrected later the same day: I first wrote that those 32 s are the network. They aren't. The 20
+map tiles have arrived 2.6 s after the page opens, and everything is drawn after 8 s (section 11).
+The rest is the scheduler working through its queues at its own pace, about 5 s of work spread
+over 25. What that work is wasn't traced; validation is the likely one.)
 
 **`bun run measure` (pan frames, ms), now that they come a tick apart:** Seattle's view-only frames
 1.2 APP + 1.3 DRAW and its pass frames 18 + 12; Staten Island 1.4 + 1.3 and 40 + 9; Užice 5.0 +
@@ -974,4 +980,113 @@ don't always end up where labels placed all at once do. That was already so afte
 **A note on measuring:** this work reloaded dense places about forty times in a day, and by the
 end the OSM API answered every map request with 429 (too many requests). Rapid then showed an empty
 map and didn't ask again until the view moved (fixed since, in `OsmService`). The numbers for making features
-below are from before that; the last change to the budget rule was measured in Seattle only.
+above are from before that; the last change to the budget rule was measured in Seattle only.
+
+## 11. Against other versions, and iD
+
+Measured Nov 19, to have a baseline to show what this branch changes. Four editors, at three of
+the difficult places:
+
+- **iD 2.42.0**, the release build at `ideditor-release.netlify.app`. It draws with SVG.
+- **Rapid 2.5.7**, the last release of the old line, at `rapideditor.org/rapid`.
+- **`main`**, Rapid 3.0.0-pre.4 as merged on Nov 16, built locally (Pixi 8.20).
+- **This branch** (`pixi-8.23`), the production bundle.
+
+### How
+
+`bun run compare` (`scripts/compare.ts`) measures from outside, because iD and the older Rapids
+have no frame stats. It opens the page in a new tab of the debug Chrome (the real GPU, an M4, a
+1593×1067 window at 2x), waits until the data has arrived and the map has stopped changing for 5
+seconds, then pans and zooms with real input events, and watches the page's animation frames:
+
+- **Pan:** 60 two-finger scroll events, 600 px in all, into an area that isn't loaded yet.
+- **Pinch:** 40 trackpad pinch events, 1.2 zoom levels in.
+- **Zoom key:** `+` and then `-`, a whole level each, eased.
+
+The events are sent 16 ms apart, and each one waits until the page has taken it, so a page that
+can't keep up makes the gesture take longer. (Sending one takes about 35 ms at best, so the best
+possible is 2.1 s for the pan and 1.4 s for the pinch.) Only boundaries are hidden, in all four:
+the other feature filters don't mean the same in the older editors, where hiding landuse hides most
+areas. So more is drawn here than in the other sections' measurements, which hide four groups.
+
+Each number is from one run. They vary: the same pan in Seattle on this branch had a longest frame
+of 39, 79 and 115 ms in three runs.
+
+### Results
+
+"Drawn after" is from opening the page until the map stopped changing. "Frames" are the page's
+animation frames while the gesture's events were sent, and "longest" the longest gap between two,
+until 2.5 s after the gesture. "Redraws" is how often the map's content was drawn again, a
+second: between redraws, all four move the last picture with a CSS transform. (Rapid reports its
+redraws. For iD it's the animation frames in which the OSM layer's elements changed, which isn't
+quite the same thing.)
+
+**Downtown Seattle** (z17.5, 6 map tiles)
+
+| | Drawn after | On the map | Pan: frames, longest, redraws | Pinch: frames, longest, took | Zoom key: longest, in / out |
+|---|---|---|---|---|---|
+| iD 2.42 | 7.0 s | 17,647 SVG elements | 49 a second, 254 ms, 18 a second | 53 a second, 143 ms, 2.3 s | 70 / 63 ms |
+| Rapid 2.5.7 | 6.4 s | 4,117 features | 55, 88 ms, 4 | 50, 186 ms, 1.6 s | 74 / 101 ms |
+| `main` | 6.3 s | 4,314 features | 56, 69 ms, 6 | 35, 154 ms, 2.5 s | 71 / 128 ms |
+| This branch | 6.9 s | 7,747 features | 58, 79 ms, 38 | 58, 71 ms, 1.6 s | 37 / 37 ms |
+
+**Staten Island Mall** (z16.5, 20 map tiles)
+
+| | Drawn after | On the map | Pan: frames, longest, redraws | Pinch: frames, longest, took | Zoom key: longest, in / out |
+|---|---|---|---|---|---|
+| iD 2.42 | 7.5 s | 142,118 SVG elements | 9 a second, 1,177 ms, 2 a second (took 30 s) | 8 a second, 1,125 ms, 23 s | 982 / 697 ms |
+| Rapid 2.5.7 | 6.9 s | 19,147 features | 45, 148 ms, 3 | 31, 576 ms, 2.7 s | 177 / 229 ms |
+| `main` | 6.4 s | 19,297 features | 41, 128 ms, 5 | 18, 396 ms, 4.7 s | 148 / 312 ms |
+| This branch | 7.9 s | 22,173 features | 54, 85 ms, 35 | 50, 104 ms, 1.9 s | 58 / 78 ms |
+
+**Užice** (z16, 36 map tiles)
+
+| | Drawn after | On the map | Pan: frames, longest, redraws | Pinch: frames, longest, took | Zoom key: longest, in / out |
+|---|---|---|---|---|---|
+| iD 2.42 | 24.6 s | 694,801 SVG elements | 0.5 a second, 11.2 s, 0.1 a second (5 of the 60 events in 53 s) | 0.6 a second, 8.1 s (6 of the 40 events in 46 s) | 1.9 / 4.1 s |
+| Rapid 2.5.7 | 8.8 s | 64,440 features | 25, 383 ms, 2 (took 5.2 s) | 9, 1,692 ms, 8.6 s | 489 / 870 ms |
+| `main` | 9.8 s | 78,708 features | 12, 803 ms, 2 (took 11.4 s) | 3, 2,405 ms, 29.5 s | 1,212 / 1,295 ms |
+| This branch | 23.9 s | 84,606 features | 19, 377 ms, 11 (took 6.7 s) | 29, 429 ms, 3.0 s | 205 / 253 ms |
+
+(This branch has more features on the map than `main` because it also makes the ones in the 256 px
+around the view. iD loads fewer tiles: 16 at Staten Island and 25 in Užice.)
+
+**The editors don't draw the same thing, so this is a baseline and not a like-for-like test**
+(Bryan, Nov 19). iD silently leaves out points and buildings beyond a certain number, so in the
+dense places it's drawing less than Rapid does, and is still the slowest. The counts in the "On the
+map" column aren't comparable between iD and Rapid either: an SVG element isn't a feature.
+
+### What it says
+
+- **The map's content is redrawn about 7 times as often while panning** at Seattle and Staten
+  Island: 35 to 38 times a second where `main` does 5 or 6 and Rapid 2.5 does 3 or 4. The page's
+  own frame rate hides this, because all of them slide the old picture along in between. It's the
+  difference between the map following the hand and catching up with it four times a second.
+- **Zooming is where the branch differs most.** A pinch at Staten Island keeps 50 frames a second
+  with nothing over 104 ms, where `main` drops to 18 with a 396 ms stall and takes 4.7 s to get
+  through a gesture that takes 1.9. In Užice the same pinch takes 3 s on this branch and 30 s on
+  `main`, with a longest stall of 0.4 s against 2.4.
+- **`main` is slower than Rapid 2.5 at the dense places.** In Užice it pans at 12 frames a second
+  to Rapid 2.5's 25, and its pinch takes 30 s to 2.5's 9. This branch is ahead of both, except
+  for Užice's first pan, where Rapid 2.5 keeps 25 frames a second to this branch's 19.
+  A possible reason (Bryan's, not measured): Rapid 2.5 didn't precompute geometry in world
+  coordinates, as Rapid 3 does. `main` also shows more of the features it has in Užice (78,708
+  against 64,440).
+- **iD stops being usable somewhere between Seattle and Staten Island.** In Seattle it's close to
+  the others. At Staten Island a 2-second pan takes 30 s with stalls over a second, and in Užice
+  it got through 5 of the 60 pan events in 53 s, with one frame 11 s long.
+- **This branch takes longer until everything is drawn:** 7.9 s against 6.4 at Staten Island, and
+  24 s against 10 in Užice. That's the features being made over many frames (section 10): the map
+  is usable meanwhile, and it's the trade Bryan chose (what the user sees happening matters more
+  than the clock). In Užice it's too long all the same, and it's the budget rule that section 10
+  says isn't growing there.
+
+### Not measured
+
+- **Nine of the twelve places.** Each place asks the OSM API for 6 to 36 tiles for each editor,
+  and the API had answered 429 earlier in the day. `bun run compare <label> <url> <place>` runs
+  any of them.
+- **Hover, select and edit.** Only moving the view.
+- **How it looks.** A page can keep 50 frames a second and still show a stale picture: the redraw
+  column says how often, not what the user sees in between.
+- **Anything but an M4 with a trackpad's events.**

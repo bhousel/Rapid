@@ -615,6 +615,10 @@ what the developer is seeing when they report a problem.
 4. To measure what a frame costs, `bun run measure` visits a set of difficult places in that Chrome and
    prints each one's frame stats (`--fresh` for numbers you can compare between builds; see
    `design/graphics-system.md`). It moves the developer's map.
+5. To compare with another build, an older Rapid or iD, `bun run compare <label> <url> <place>` pans
+   and zooms any of them with real input events, in a new tab, and reports how the page kept up.
+   Both scripts load places from the OSM API, which answers 429 after too many: name the places
+   you need, and don't run them in a loop.
 
 Tips:
 - **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`
