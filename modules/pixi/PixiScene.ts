@@ -26,7 +26,7 @@ import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 /** Returned by `getClasses()` for data that has no classes */
 const EMPTY_CLASSES: ReadonlySet<ClassID> = new Set<ClassID>();
@@ -77,6 +77,10 @@ export class PixiScene extends EventEmitter {
   protected _classHasData: Map<ClassID, Set<DataID>>;
   /** The containers made for each spatial ID, one per group it has drawn in */
   protected _spatialContainers: Map<SpatialID, Set<PIXI.Container>>;
+  /** World coordinates near the view, where the render groups are positioned (see `setAnchor`) */
+  protected _anchor: Vec2;
+  /** The containers made by `worldContainer` */
+  protected _worldContainers: Set<PIXI.Container>;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
   protected _interactiveSpatialIDs: ReadonlySet<SpatialID> | null;
 
@@ -102,6 +106,8 @@ export class PixiScene extends EventEmitter {
 
     this._spatialContainers = new Map<SpatialID, Set<PIXI.Container>>();
     this._interactiveSpatialIDs = null;
+    this._anchor = [0, 0];
+    this._worldContainers = new Set<PIXI.Container>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -166,14 +172,23 @@ export class PixiScene extends EventEmitter {
     ].forEach((groupID, i) => {
       let container = this.groups.get(groupID);
       if (!container) {
-        container = new PIXI.Container();
-        container.label = groupID;
-        container.sortableChildren = true;
-        container.zIndex = i;
+        if (groupID === 'labels') {
+          // The labels layer positions and scales this group itself, to draw in screen coordinates.
+          // Small coordinates, so it can be a render group as it is (see "Render groups" in `design/scene.md`).
+          container = new PIXI.Container({ isRenderGroup: true });
+          container.label = groupID;
+          container.sortableChildren = true;
+          container.zIndex = i;
+        } else {
+          container = this.worldContainer(origin, groupID, i);
+        }
         this.groups.set(groupID, container);
       }
-      if (!origin.getChildByLabel(groupID)) {
-        origin.addChild(container);
+
+      // A world container is attached through its render group
+      const attached = this._worldContainers.has(container) ? container.parent! : container;
+      if (attached.parent !== origin) {
+        origin.addChild(attached);
       }
     });
 
@@ -197,7 +212,7 @@ export class PixiScene extends EventEmitter {
    * OSM's container is lowest in its group; the others stack above it in the order they were made.
    * @param groupID - The group, e.g. 'basemap' or 'points'
    * @param spatialID - The spatial ID of the data drawn in it, e.g. 'osm' or 'fbRoads'
-   * @return The container, with `sortableChildren` on
+   * @return The container (a world container, see `worldContainer`)
    * @throws Error if there is no such group
    */
   public getSpatialContainer(groupID: GroupID, spatialID: SpatialID): PIXI.Container {
@@ -206,16 +221,15 @@ export class PixiScene extends EventEmitter {
       throw new Error(`PixiScene: no group '${groupID}'`);
     }
 
-    let container = group.getChildByLabel(spatialID) as PIXI.Container | null;
-    if (container) return container;
+    // (The group's children are the render groups of its world containers, labeled like them.)
+    if (group.getChildByLabel(spatialID)) {
+      return this.worldContainer(group, spatialID);
+    }
 
     const siblings = group.children.filter(child => child.label !== 'osm').length;
-    container = new PIXI.Container();
-    container.label = spatialID;
-    container.sortableChildren = true;
-    container.zIndex = (spatialID === 'osm') ? 0 : siblings + 1;
+    const zIndex = (spatialID === 'osm') ? 0 : siblings + 1;
+    const container = this.worldContainer(group, spatialID, zIndex);
     container.eventMode = this._isInteractive(spatialID) ? 'passive' : 'none';
-    group.addChild(container);
 
     let containers = this._spatialContainers.get(spatialID);
     if (!containers) {
@@ -238,10 +252,110 @@ export class PixiScene extends EventEmitter {
     if (!containers) return;
 
     for (const container of containers) {
-      container.parent?.removeChild(container);
-      container.destroy({ children: true });  // recursive
+      const group = container.parent;   // a world container's render group
+      this._worldContainers.delete(container);
+      if (group) {
+        group.parent?.removeChild(group);
+        group.destroy({ children: true });  // recursive
+      } else {
+        container.destroy({ children: true });
+      }
     }
     this._spatialContainers.delete(spatialID);
+  }
+
+
+  /**
+   * Returns the world container with the given label under the given parent, making it if needed.
+   * A world container holds features (or more world containers) positioned in world coordinates, like
+   * `origin` does. It comes with its own render group, so that a change to one of its features makes
+   * Pixi rebuild the instructions of that container only, and moving the map moves it with one matrix.
+   *
+   * A render group's vertices are kept as 32-bit floats relative to the group, and world coordinates
+   * are too big for that (they'd be off by a pixel or more). So the render group sits at the scene's
+   * anchor, a world coordinate near the view, and the container returned here sits in it at minus the
+   * anchor. What's put in the container is then a small distance from its render group.
+   * See "Render groups" in `design/scene.md`.
+   *
+   * Use the returned container like any other, except: its `zIndex` and its place in the tree belong
+   * to its parent (the render group), and its position belongs to the scene.
+   * @param parent - `origin`, or another world container
+   * @param label - The label of the container (and of its render group)
+   * @param zIndex - The `zIndex` among its siblings, if it's made
+   * @return The container, with `sortableChildren` on
+   */
+  public worldContainer(parent: PIXI.Container, label: string, zIndex = 0): PIXI.Container {
+    const existing = parent.getChildByLabel(label);
+    if (existing) return existing.children[0] as PIXI.Container;
+
+    const [x, y] = this._anchor;
+
+    const group = new PIXI.Container({ isRenderGroup: true });
+    group.label = label;
+    group.zIndex = zIndex;
+    group.position.set(x, y);
+
+    const container = new PIXI.Container();
+    container.label = label;
+    container.sortableChildren = true;
+    container.position.set(-x, -y);
+
+    group.addChild(container);
+    parent.addChild(group);
+    this._worldContainers.add(container);
+    return container;
+  }
+
+
+  /**
+   * Returns the world containers directly under the given parent.
+   * (The parent's own children are their render groups.)
+   * @param parent - `origin`, or a world container
+   * @return The world containers
+   */
+  public worldContainersIn(parent: PIXI.Container): PIXI.Container[] {
+    const results: PIXI.Container[] = [];
+    for (const group of parent.children) {
+      const container = group.children[0] as PIXI.Container | undefined;
+      if (container && this._worldContainers.has(container)) {
+        results.push(container);
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * The world coordinate that the world containers' render groups are positioned at.
+   * @return The anchor, in whole world coordinates
+   */
+  public get anchor(): Vec2 {
+    return this._anchor;
+  }
+
+
+  /**
+   * Moves the anchor: the world coordinate that the world containers' render groups are positioned at.
+   * `GraphicsSystem` calls this when the view has moved far or the zoom has changed, to keep the
+   * anchor near the view (see `worldContainer`).
+   * @param world - World coordinates near the center of the view
+   */
+  public setAnchor(world: Vec2): void {
+    const x = Math.round(world[0]);   // whole numbers, so plus and minus cancel exactly
+    const y = Math.round(world[1]);
+    if (x === this._anchor[0] && y === this._anchor[1]) return;
+
+    this._anchor = [x, y];
+
+    for (const container of this._worldContainers) {
+      const group = container.parent;
+      if (container.destroyed || !group) {   // destroyed along with something above it
+        this._worldContainers.delete(container);
+        continue;
+      }
+      group.position.set(x, y);
+      container.position.set(-x, -y);
+    }
   }
 
 

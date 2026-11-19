@@ -463,15 +463,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const lineContainer = this.lineContainer!;
 
     const _getLevelContainer = (level: string): PIXI.Container => {
-      let levelContainer = lineContainer.getChildByLabel(level);
-      if (!levelContainer) {
-        levelContainer = new PIXI.Container();
-        levelContainer.label = level.toString();
-        levelContainer.sortableChildren = true;
-        levelContainer.zIndex = parseInt(level, 10);
-        lineContainer.addChild(levelContainer);
-      }
-      return levelContainer;
+      return this._childContainer(lineContainer, level, parseInt(level, 10));
     };
 
     const ways = data.lines;

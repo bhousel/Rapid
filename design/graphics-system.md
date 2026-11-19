@@ -147,8 +147,13 @@ What that says:
   moving `origin` moves every object. Pixi's own advice for a world that pans is to make it a render
   group, so that moving it costs one matrix. Tried from the console
   (`gfx.origin.enableRenderGroup()`): Seattle's pan DRAW went from 9.0 to 6.7 ms in the same session,
-  the transform part. The instruction list is still rebuilt. Worth doing properly, with a render
-  group for each scene group or layer, so a change in one doesn't rebuild the others; not done yet.
+  the transform part. The instruction list is still rebuilt. **Done since (Nov 18):** every
+  structural container of the scene is a render group now, each at an anchor near the view because
+  world coordinates don't fit in a render group's 32-bit floats (that console experiment drew
+  distorted shapes, which the timings didn't show). Pan DRAW went from 6.8 to 5.1 ms in Seattle and
+  from 22.8 to 12.3 at Staten Island; a hover on one line there went from 13 ms to 1. What's left is
+  that culling flips some feature's `visible` on every pan frame. See
+  [`scene.md`](scene.md), section 3.
 - **Labels on long lines walk the whole line.** Smith Point's restyle takes 394 ms for 784 features:
   the labels take it, not the shapes. Five transatlantic cables (TAT13, Apollo North, …) have 4 nodes
   each but are 2.4–2.9 million pixels long at that zoom. `placeRopeLabel()` covers each line with boxes
@@ -451,6 +456,6 @@ Each step is measured with frame stats on the same set of places.
    overlaps itself, holes, slivers, short segments). Then, one at a time and measured: partial-fill
    bands instead of masks; hit areas, halos and label boxes instead of `lineToPoly`; dashes as one
    stroke per line.
-7. **Casings and strokes in grouped batches** with Pixi's `RenderLayer` ([`scene.md`](scene.md) section 3,
+7. **Casings and strokes in grouped batches** with Pixi's `RenderLayer` ([`scene.md`](scene.md) section 4,
    [`profiling.md`](profiling.md)), measured after the masks are gone, since the masks break batches
    today anyway.

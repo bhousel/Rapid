@@ -1,7 +1,8 @@
 # The scene: how features are stacked, and what the pointer can reach
 
-**Status:** In progress (Nov 2026). Step 1 (containers per spatial ID, interactivity by mode) is
-done (Nov 11). Steps 2 and 3 are ideas with nothing built.
+**Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
+mode) are done (Nov 11), and so is section 3 (render groups, Nov 18). Section 4 is ideas with nothing
+built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -20,7 +21,8 @@ done (Nov 11). Steps 2 and 3 are ideas with nothing built.
 ## 1. Containers per spatial ID
 
 The tree, with the groups `PixiScene.reset()` creates in `zIndex` order and the containers the layers
-put under them:
+put under them. (Each container shown here except `origin` and the features is really a pair, a
+render group with the container in it: see section 3.)
 
 ```
 origin
@@ -103,7 +105,79 @@ halo on a Rapid line while drawing, and a cheaper hit test in those modes.
 Not changed: the `'drawing'` class still turns off the drawing way's own hit area (Rapid#648), and
 `DragBehavior` still turns off the dragged node's.
 
-## 3. Later
+## 3. Render groups
+
+Pixi keeps one list of drawing instructions per *render group*, and until Nov 18 the whole scene was
+one group. Any change to what's drawn (a feature scrolls into view, a hover adds a halo) made Pixi
+collect every object again, and moving `origin` gave every object a new transform. On a pan frame
+that cost about 2 µs per visible feature (`design/graphics-system.md`, section 2).
+
+Now every structural container is its own render group: the groups under `origin`, each spatial
+container, and the containers a layer makes under one with `_childContainer()` (`polygons`, `lines`,
+each line level). Features aren't. A change rebuilds the instructions of the group it happened in,
+and a pan moves each group with one matrix.
+
+**World coordinates don't fit in a render group, so each one sits at an anchor.** Pixi stores a
+group's vertices as 32-bit floats relative to the group. Our features are positioned in z16 world
+coordinates (up to 16.7 million), where a 32-bit float is exact to 0.25 or 1 world unit: 4 to 16
+screen pixels at z20. (Tried first with a plain `isRenderGroup` on `origin`: circles came out as
+ovals in Bochum at z18.) Without render groups this didn't matter, because Pixi multiplied the big
+numbers together as 64-bit floats and only stored the small screen coordinates.
+
+So `PixiScene.worldContainer(parent, label, zIndex)` makes a pair:
+
+```
+<label>     render group, positioned at +anchor
+└ <label>   plain container, positioned at -anchor   ← what the caller gets, and puts features in
+```
+
+The anchor is a whole world coordinate near the view. What's in the inner container is still
+positioned in world coordinates, like under `origin`, but Pixi works out its distance from the render
+group in 64-bit floats, and that distance is small. A pair can go inside another pair: plus and
+minus the same anchor cancel. `GraphicsSystem._app()` moves the anchor (`scene.setAnchor()`) when the
+zoom changes or the view is more than 100,000 pixels from it, which keeps positions exact to about a
+hundredth of a pixel. Features and layers don't know any of this.
+
+Rules:
+
+- **Make structural containers with `scene.worldContainer()`** (layers: `_spatialContainer()` and
+  `_childContainer()`). Never set `isRenderGroup` on a container whose children are in world
+  coordinates.
+- **The container you get back is the inner one.** Its `zIndex` and its place in the tree belong to
+  its parent, the render group, and its position belongs to the scene. To list the containers under
+  one, use `scene.worldContainersIn(parent)`; `parent.children` are the render groups.
+- **`labels` is a plain render group.** The labels layer positions and scales that group itself, to
+  draw in screen coordinates, which are small.
+- **`origin` is not a render group**, for the reason above.
+
+What it changed (M4, `bun run measure --fresh`, DRAW pass in ms):
+
+| | Seattle | Bochum | Staten Island | Golmud |
+|---|---|---|---|---|
+| Pan frame, before | 6.8 | 5.4 | 22.8 | 27.8 |
+| Pan frame, after | 5.1 | 4.2 | 12.3 | 15.5 |
+
+A frame that puts the hover class on one line at Staten Island went from 13 ms of DRAW to 1 ms (the
+line's level has a few dozen lines). On one polygon it went from 13 to 8: the `polygons` container
+there holds 11,763 parking spaces and other areas, and all of them are collected again. Redraw and
+restyle frames cost the same as before, and there are a few more draw calls (775 against 768 in
+Seattle), one batch break per group.
+
+What's left, in order of what it would save:
+
+- **A pan still rebuilds the big groups, because culling changes some feature's `visible` on every
+  frame.** At Staten Island even a 2 px pan flips 30 to 50 features, and the rebuild costs the same
+  11 ms whether 1 feature changed or 1,800. A pan frame where nothing flips costs 0.8 ms. So decide
+  visibility against a box that is padded and snapped to a grid, so that most pan frames change
+  nothing. That draws more features per frame, so it needs the APP pass's cost per feature to come
+  down first (`graphics-system.md`, section 2).
+- **Smaller groups for polygons.** By size class keeps the draw order exactly (they're sorted by
+  area), but 11,000 parking spaces are all one size. By tile needs a rule for polygons that overlap
+  across tiles.
+- **Halos and other things that come and go could live in the `ui` group**, so that hovering never
+  touches a big group.
+
+## 4. Later
 
 - **Reordering spatial IDs.** With an explicit `zIndex` per spatial container, lifting OSM above the
   datasets while drawing, or a layer-order UI, is a `zIndex` write. We don't reorder while drawing by

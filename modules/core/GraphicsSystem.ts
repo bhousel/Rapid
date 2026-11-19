@@ -798,6 +798,13 @@ export class GraphicsSystem extends AbstractSystem {
     );
     this.origin!.scale.set(worldScale, worldScale);
 
+    // Keep the scene's anchor near the view: within 100,000 pixels its render groups stay exact
+    // to a hundredth of a pixel (see `PixiScene.worldContainer`).
+    const centerWorld = mapViewport.screenToWorld(mapViewport.center());
+    if (frame.dirtyScene || vecLength(centerWorld, this.scene!.anchor) * worldScale > 100000) {
+      this.scene!.setAnchor(centerWorld);
+    }
+
     // Let's go!
     this.scene!.render(frame, pixiViewport);
     // this._renderDebug();
@@ -1062,6 +1069,8 @@ export class GraphicsSystem extends AbstractSystem {
     // The `origin` container renders its children directly in world coordinates
     // (Mercator pre-scaled to z=WORLD_ZOOM, range 0..WORLD_SIZE).
     // Its position and scale are set each frame in `_app()` to map world coords → screen coords.
+    // (It can't be a render group itself: world coordinates are too big for the 32-bit floats a render
+    // group keeps its vertices in. The scene's world containers are, see `PixiScene.worldContainer`.)
     const origin = new PIXI.Container();
     origin.label = 'origin';
     origin.sortableChildren = true;

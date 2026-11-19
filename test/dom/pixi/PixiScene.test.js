@@ -77,9 +77,15 @@ describe('PixiScene', () => {
           return [id, group];
         })),
         _spatialContainers: new Map(),
-        _interactiveSpatialIDs: null
+        _interactiveSpatialIDs: null,
+        _anchor: [0, 0],
+        _worldContainers: new Set()
       };
-      for (const name of ['getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged']) {
+      const names = [
+        'getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged',
+        'worldContainer', 'worldContainersIn', 'setAnchor'
+      ];
+      for (const name of names) {
         scene[name] = PixiScene.prototype[name];
       }
     });
@@ -87,11 +93,20 @@ describe('PixiScene', () => {
     it('makes one container per spatial ID in a group, and returns the same one again', () => {
       const osm = scene.getSpatialContainer('basemap', 'osm');
       assert.strictEqual(osm.label, 'osm');
-      assert.strictEqual(osm.parent, scene.groups.get('basemap'));
       assert.isTrue(osm.sortableChildren);
       assert.strictEqual(scene.getSpatialContainer('basemap', 'osm'), osm);
       assert.notStrictEqual(scene.getSpatialContainer('points', 'osm'), osm);   // another group
       assert.strictEqual(scene.groups.get('basemap').children.length, 1);
+    });
+
+    it('puts each container in its own render group, under the group', () => {
+      const osm = scene.getSpatialContainer('basemap', 'osm');
+      const renderGroup = osm.parent;
+      assert.isTrue(renderGroup.isRenderGroup);
+      assert.isFalse(osm.isRenderGroup);
+      assert.strictEqual(renderGroup.label, 'osm');
+      assert.strictEqual(renderGroup.parent, scene.groups.get('basemap'));
+      assert.deepEqual(scene.worldContainersIn(scene.groups.get('basemap')), [osm]);
     });
 
     it('stacks OSM lowest and the other spatial IDs above it in the order they were made', () => {
@@ -146,6 +161,73 @@ describe('PixiScene', () => {
 
       scene.releaseSpatialContainers('fbRoads');   // nothing to do, no error
       assert.notStrictEqual(scene.getSpatialContainer('basemap', 'fbRoads'), basemapRapid);   // a new one
+    });
+  });
+
+
+  // A render group keeps its vertices as 32-bit floats relative to itself, and world coordinates are
+  // too big for that. So each render group sits at the anchor (a world coordinate near the view), and
+  // the container in it sits at minus the anchor (see "Render groups" in `design/scene.md`).
+  describe('world containers', () => {
+    let scene, origin;
+
+    beforeEach(() => {
+      origin = new PIXI.Container();
+      scene = { _anchor: [0, 0], _worldContainers: new Set() };
+      for (const name of ['worldContainer', 'worldContainersIn', 'setAnchor']) {
+        scene[name] = PixiScene.prototype[name];
+      }
+    });
+
+    // Where a child at the given world coordinate ends up, relative to the container's render group
+    function fromRenderGroup(container, world) {
+      const group = container.parent;
+      return [world[0] + container.x, world[1] + container.y, group.x, group.y];
+    }
+
+    it('makes a container once, with the given label and zIndex on its render group', () => {
+      const lines = scene.worldContainer(origin, 'lines', 3);
+      assert.strictEqual(lines.label, 'lines');
+      assert.strictEqual(lines.parent.label, 'lines');
+      assert.strictEqual(lines.parent.zIndex, 3);
+      assert.strictEqual(lines.parent.parent, origin);
+      assert.strictEqual(scene.worldContainer(origin, 'lines', 99), lines);   // found, not made again
+      assert.strictEqual(lines.parent.zIndex, 3);
+    });
+
+    it('keeps what is in a container a small distance from its render group', () => {
+      scene.setAnchor([8725231.4, 5581026.2]);   // Bochum
+      const lines = scene.worldContainer(origin, 'lines');
+      const level = scene.worldContainer(lines, '0');   // one inside another
+
+      // a feature 100 world units from the anchor is 100 units from its render group, wherever that is
+      assert.deepEqual(fromRenderGroup(lines, [8725331, 5581026]), [100, 0, 8725231, 5581026]);
+      assert.deepEqual(fromRenderGroup(level, [8725331, 5581026]), [100, 0, 8725231, 5581026]);
+    });
+
+    it('moves every container when the anchor moves, and a feature stays where it was in the world', () => {
+      const lines = scene.worldContainer(origin, 'lines');
+      const level = scene.worldContainer(lines, '0');
+      const feature = new PIXI.Container();
+      feature.position.set(2748500, 5712300);   // Seattle
+      level.addChild(feature);
+      origin.updateLocalTransform();
+
+      const before = feature.toGlobal({ x: 0, y: 0 });
+      scene.setAnchor([2748421, 5712345]);
+      const after = feature.toGlobal({ x: 0, y: 0 });
+
+      assert.deepEqual([after.x, after.y], [before.x, before.y]);
+      assert.deepEqual(fromRenderGroup(level, [2748500, 5712300]), [79, -45, 2748421, 5712345]);
+    });
+
+    it('forgets containers that were destroyed along with their parent', () => {
+      const lines = scene.worldContainer(origin, 'lines');
+      scene.worldContainer(lines, '0');
+      lines.parent.destroy({ children: true });
+
+      scene.setAnchor([100, 100]);   // no error
+      assert.strictEqual(scene._worldContainers.size, 0);
     });
   });
 

@@ -26,6 +26,13 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
 - **Dashed lines use Rapid's `lib/DashLine.ts`** (texture-based, works with plain `Graphics`). Pixi's
   `DashLineShader` needs `SmoothGraphics`, and a context with it is never batched.
+- **Render groups go through `PixiScene.worldContainer()`.** The skill says to put a panning world in
+  `new Container({ isRenderGroup: true })`. Ours is in z16 world coordinates, which are too big for the
+  32-bit floats a render group keeps its vertices in: shapes come out distorted, more so when zoomed
+  in and further east. Make containers for features with the layer's `_spatialContainer()` and
+  `_childContainer()`; each gets a render group at an anchor near the view. Never set `isRenderGroup`
+  on a container whose children are in world coordinates. See "Render groups" in
+  [`design/scene.md`](../../design/scene.md).
 - **Pointer events go through `PixiEvents` and Rapid's behaviors.** Pixi's `move` and `globalMove`
   events are off, and the mode decides which subtrees can be hit (`interactiveSpatialIDs`, see
   [`design/scene.md`](../../design/scene.md)). Don't add pointer listeners to features.

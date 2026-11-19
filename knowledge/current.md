@@ -38,8 +38,9 @@ Still to do, in about this order:
   plan: frame stats first, a set of difficult places to measure on, then our own line builder for
   partial-fill bands, hit areas and dashes. Steps 1 (frame stats), 2 (`bun run measure` over
   difficult places), 3 (GPU time: mostly fixed costs, see section 6) and 4 (the rendering info card,
-  ⌘⇧F) done, and the imagery filter no longer runs at its default settings; next is step 5 (pass the
-  `RenderFrame` to the layers' `render()` and `cull()`). Fixes found along the way are in `backlog.md`
+  ⌘⇧F) done. Also: the imagery filter no longer runs at its default settings, and the scene's
+  containers are render groups, each at an anchor near the view (`design/scene.md` section 3; not
+  committed yet). Next is step 5 (pass the `RenderFrame` to the layers' `render()` and `cull()`). Fixes found along the way are in `backlog.md`
   ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

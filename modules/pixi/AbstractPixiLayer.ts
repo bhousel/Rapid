@@ -193,21 +193,16 @@ export class AbstractPixiLayer {
 
   /**
    * Returns the child container with the given label, making it if needed.
-   * @param parent - The container to look in
+   * Use this for the containers that hold a layer's features (not for a feature's own container).
+   * Each has its own render group, so a change to one feature makes Pixi rebuild the instructions
+   * of its siblings only (see `PixiScene.worldContainer`).
+   * @param parent - The container to look in, itself from `_spatialContainer` or `_childContainer`
    * @param label - The child's label, e.g. 'polygons'
    * @param zIndex - The child's `zIndex` among its siblings, if it's made
    * @return The child container, with `sortableChildren` on
    */
   protected _childContainer(parent: PIXI.Container, label: string, zIndex = 0): PIXI.Container {
-    let container = parent.getChildByLabel(label) as PIXI.Container | null;
-    if (!container) {
-      container = new PIXI.Container();
-      container.label = label;
-      container.sortableChildren = true;
-      container.zIndex = zIndex;
-      parent.addChild(container);
-    }
-    return container;
+    return this.scene.worldContainer(parent, label, zIndex);
   }
 
 
