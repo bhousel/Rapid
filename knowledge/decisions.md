@@ -191,6 +191,22 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 - **`immediateRedraw(layerID)` hurries only that layer.** Label textures ask for it several times
   a second during a pan; if that hurried everything, no pass would ever wait its turn.
 
+## A deadline on the frame (Nov 2026)
+
+- **A dirty feature and a feature that needs its style worked out are two things.** `dirty` means
+  draw it again; `needsStyle` means match its style and label to its data again. A zoom sets only
+  the first (`scene.dirtyTransform()`). See `design/graphics-system.md` section 10.
+- **What waits is drawing a feature again, by where it is and why it's dirty:** outside the view
+  always; in view once the frame is out of time; and in a frame the user asked for, only if
+  nothing but the zoom made it dirty. Rejected: no deadline at all in frames the user asked for.
+  A hover during a wheel zoom asks for a frame, and it would have drawn everything at once.
+- **Labels wait for the features, then at most one frame for time.** They're placed by the
+  features' shapes, so placing them first would place them twice.
+- **The budget is 6 ms, or the last DRAW pass's cost if that's more** (up to 50 ms). Each frame
+  pays for a DRAW pass, so where that's expensive, small steps take longer in all.
+- **Frames that catch up on waiting work aren't paced** (`FramePacer` doesn't see them). They're
+  bounded by the deadline instead.
+
 ## World coordinates and their numerics
 
 - **SDK-native z16 world coordinates are the one world space** (`@rapid-sdk/math`, `WORLD_ZOOM = 16`,

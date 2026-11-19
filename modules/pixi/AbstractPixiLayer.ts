@@ -14,6 +14,12 @@ import type { PixiScene } from './PixiScene.ts';
 /** How many passes a feature can go unseen before `cull()` destroys it */
 const KEEP_UNSEEN_PASSES = 20;
 
+/**
+ * `continueWaiting()` draws at least this many of the features that are waiting, on each call,
+ * even in a frame that's out of time. So the work gets done however slow the frames are.
+ */
+const MIN_WAITING_PER_FRAME = 32;
+
 
 /**
  * AbstractPixiLayer is the base class from which all rendering Layers inherit.
@@ -66,6 +72,10 @@ export class AbstractPixiLayer {
   protected _passFrame: number;
   /** The frame in which `keepFeatures()` last said to keep the features */
   protected _keptFrame: number;
+  /** Dirty features in view that `updateFeature()` put off, to be drawn again in the coming frames */
+  protected _waitingInView: Set<AbstractPixiFeature>;
+  /** Dirty features outside the view (in the cull box's padding), drawn again when a frame has time to spare */
+  protected _waitingOutside: Set<AbstractPixiFeature>;
   /** Map of featureID to dataID */
   protected _featureHasData: Map<FeatureID, DataID>;
   /** Map of dataID to Set of featureIDs */
@@ -99,6 +109,8 @@ export class AbstractPixiLayer {
     this._currentBox = null;
     this._passFrame = -1;
     this._keptFrame = -1;
+    this._waitingInView = new Set<AbstractPixiFeature>();
+    this._waitingOutside = new Set<AbstractPixiFeature>();
 
     // Feature <-> Data
     // These lookups capture which features are bound to which data.
@@ -195,6 +207,8 @@ export class AbstractPixiLayer {
 
     this.features.clear();
     this.retained.clear();
+    this._waitingInView.clear();
+    this._waitingOutside.clear();
     this._currentBox = null;
 
     for (const spatialID of this._spatialIDs) {
@@ -362,7 +376,107 @@ export class AbstractPixiLayer {
     this.unbindData(feature.id);
     this.retained.delete(feature.id);
     this.features.delete(feature.id);
+    this._waitingInView.delete(feature);
+    this._waitingOutside.delete(feature);
     this.work.destroyed++;
+  }
+
+
+  /**
+   * Draws a feature again if it's dirty: in this frame, or in a later one if it can wait.
+   * A layer calls this where it would call `feature.update(viewport)`, after assigning the
+   * feature's data, style and label.
+   *
+   * - A feature in view is drawn now if the frame still has time (`frame.hasTime()`), or if the
+   *   user asked for the frame (`frame.urgent`) and something about the feature itself changed.
+   *   Otherwise it waits, and is drawn as it was meanwhile (after a zoom: at the old zoom's line
+   *   widths), or not at all if it's new.
+   * - A feature outside the view, in the cull box's padding, always waits: nobody sees it yet.
+   *
+   * `continueWaiting()` draws the ones that waited. A layer that calls this must call that too,
+   * on the frames where it keeps its features (see `keepFeatures`). The scene calls it once more
+   * after every layer has rendered, for the features outside the view.
+   * (See "A deadline on the frame" in `design/graphics-system.md`.)
+   * @param feature - The feature to draw again
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  public updateFeature(feature: AbstractPixiFeature, frame: RenderFrame, viewport: Viewport): void {
+    if (!feature.dirty) return;
+
+    const extent = feature.geometry?.world?.extent;
+    const inView = !extent || extent.intersects(frame.viewBox);
+
+    const mustNow = frame.urgent && !feature.onlyTransformDirty;
+
+    if (inView && (mustNow || frame.hasTime())) {
+      this._waitingInView.delete(feature);
+      this._waitingOutside.delete(feature);
+      feature.update(viewport);
+    } else if (inView) {
+      this._waitingOutside.delete(feature);
+      this._waitingInView.add(feature);
+    } else {
+      this._waitingInView.delete(feature);
+      this._waitingOutside.add(feature);
+    }
+  }
+
+
+  /**
+   * Draws again the features that `updateFeature()` put off, while the frame has time.
+   * At least a few are drawn on every call, so the work always gets done.
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param outside - Whether to go on to the features outside the view, once the ones in view are done
+   */
+  public continueWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean = false): void {
+    const inView = this._waitingInView;
+    const notInView = this._waitingOutside;
+    if (!inView.size && !notInView.size) return;
+
+    // The view may have moved since they were put off: what's in view now comes first.
+    for (const feature of notInView) {
+      const extent = feature.geometry?.world?.extent;
+      if (!extent || extent.intersects(frame.viewBox)) {
+        notInView.delete(feature);
+        inView.add(feature);
+      }
+    }
+
+    const lastPass = this._pass - 1;
+    let count = 0;
+    for (const queue of (outside ? [inView, notInView] : [inView])) {
+      for (const feature of queue) {
+        if (count >= MIN_WAITING_PER_FRAME && !frame.hasTime()) return;
+        queue.delete(feature);   // (deleting from a Set while iterating over it is safe)
+
+        // Skip what the last pass didn't see (it was culled since). If it comes back, it's still dirty.
+        if (this.retained.get(feature.id) !== lastPass) continue;
+        if (!feature.dirty) continue;
+
+        feature.update(viewport);
+        count++;
+      }
+    }
+  }
+
+
+  /**
+   * How many features are waiting to be drawn again.
+   * @return The number of features that `updateFeature()` put off
+   */
+  public get numWaiting(): number {
+    return this._waitingInView.size + this._waitingOutside.size;
+  }
+
+
+  /**
+   * How many features in view are waiting to be drawn again.
+   * @return The number of features in view that `updateFeature()` put off
+   */
+  public get numWaitingInView(): number {
+    return this._waitingInView.size;
   }
 
 
@@ -632,6 +746,18 @@ export class AbstractPixiLayer {
     this._currentBox = null;
     for (const feature of this.features.values()) {
       feature.dirty = true;
+    }
+  }
+
+  /**
+   * Mark all features on this layer as needing to be drawn again for a new zoom or rotation.
+   * Unlike `dirtyLayer()`, this says that the features themselves haven't changed, so a layer
+   * that checks `feature.needsStyle` doesn't work out their styles again.
+   */
+  public dirtyTransform(): void {
+    this._currentBox = null;
+    for (const feature of this.features.values()) {
+      feature.dirtyTransform();
     }
   }
 

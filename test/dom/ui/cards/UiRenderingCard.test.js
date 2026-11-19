@@ -110,6 +110,20 @@ describe('UiRenderingCard', () => {
     assert.strictEqual(valueOf('frames'), 'info_panels.rendering.frames_drawn 0 0');
   });
 
+  it('shows the work that the last frame put off, by layer', () => {
+    const frames = [makeFrame(1, 9.7, 0.8), makeFrame(2, 9.7, 0.8)];
+    frames[0].layers.get('osm').waiting = 5000;   // an earlier frame's doesn't count
+    const context = makeContext(frames);
+    const card = makeCard(context);
+    assert.notInclude(rowIDs(), 'waiting');
+
+    frames[1].layers.get('osm').waiting = 1234;
+    frames[1].layers.get('labels').waiting = 1;
+    card.render();
+    assert.deepEqual(rowIDs(), ['frames', 'app', 'draw', 'features', 'layers', 'waiting', 'instructions', 'groups']);
+    assert.strictEqual(valueOf('waiting'), 'osm 1,234 · labels 1');
+  });
+
   it('averages the times of the frames drawn in the last second', () => {
     makeCard(makeContext([makeFrame(1, 4, 1), makeFrame(2, 8, 3)]));
 

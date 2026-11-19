@@ -315,6 +315,19 @@ export class UiRenderingCard extends AbstractUiCard {
       });
     }
 
+    // The work that the last frame put off to the frames after it (features to draw again, labels to place)
+    const waitingLayers: [string, string][] = [];
+    for (const [layerID, layer] of last.layers) {
+      if (layer.waiting) waitingLayers.push([layerID, count(layer.waiting)]);
+    }
+    if (waitingLayers.length) {
+      rows.push({
+        id: 'waiting',
+        label: l10n.t('info_panels.rendering.waiting'),
+        value: pairs(waitingLayers)
+      });
+    }
+
     // What Pixi drew: its instructions by pipe, and with detailed stats on, the WebGL calls
     const instructions = Object.entries(last.draw.instructions).sort((a, b) => b[1] - a[1]);
     rows.push({

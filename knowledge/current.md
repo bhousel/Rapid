@@ -47,14 +47,20 @@ Still to do, in about this order:
   `FilterSystem` got quick fixes and a design doc (Nov 19, [`design/filter-system.md`](../design/filter-system.md)):
   its step of the OSM pass is a third of what it was (Staten Island's pass 55 → 32 ms). Its rethink
   (level of detail) is for after this branch.
-  **Frame pacing replaced the 250 ms throttle** (Nov 19, `graphics-system.md` section 9; not
-  committed yet): a frame that only moves the view is drawn on the next tick, and a frame with a
+  **Frame pacing replaced the 250 ms throttle** (Nov 19, `graphics-system.md` section 9):
+  a frame that only moves the view is drawn on the next tick, and a frame with a
   pass to do waits twice what the last one cost (at most 250 ms), with held frames moving the view
   meanwhile. A drag at Staten Island draws 29 frames a second (one per pointer event) where it
   drew 4, and loading takes the same time.
+  **A deadline on the frame, started** (Nov 19, section 10; not committed yet): a zoom no longer
+  works out every feature's style again (`feature.needsStyle`, `scene.dirtyTransform()`), and
+  features are drawn again over several frames when one frame has no time for them
+  (`updateFeature()`, `continueWaiting()`); labels wait for them. A zoom's frame went from 147 +
+  30 ms to 17 + 10 in Seattle, and from 334 + 47 to 64 + 18 at Staten Island.
   **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
-  Next in section 8, "What's left": a deadline on the frame so work like labels can wait and a
-  pass can be spread over frames, all layers keeping their features the same way.
+  Next (section 10, "What it doesn't do yet"): put off making new features too (the first pass
+  after a load is still a 750 ms block), a frame between passes during a zoom, the pass's own
+  cost at dense places, and the other layers.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

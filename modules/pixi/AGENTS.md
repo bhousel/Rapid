@@ -42,8 +42,9 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 
 ## Frames, passes and redraw requests
 
-How a frame is made, the CULL pass and frame pacing are in [`design/graphics-system.md`](../../design/graphics-system.md)
-(sections 1, 3, 8 and 9). The rules that come out of it:
+How a frame is made, the CULL pass, frame pacing and the frame's deadline are in
+[`design/graphics-system.md`](../../design/graphics-system.md) (sections 1, 3, 8, 9 and 10). The
+rules that come out of it:
 
 - **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
   on to the layer's own `render…()` helpers.
@@ -63,6 +64,25 @@ How a frame is made, the CULL pass and frame pacing are in [`design/graphics-sys
   view itself (the labels, the imagery tiles).
 - **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
   it, and a layer that kept its features did no pass.
+- **Work out a feature's style when `feature.needsStyle` says so, not when it's `dirty`.** A zoom
+  makes every feature dirty (it has to be drawn again), but what it is hasn't changed, and matching
+  a style to tags costs several times what drawing does. Keep under `if (feature.dirty)` only what
+  depends on the zoom or the rotation.
+  ```ts
+  if (feature.needsStyle) {
+    feature.style = styles.styleMatch(entity.tags, geometry, 'osm');
+    feature.label = l10n.displayName(entity.tags);
+  }
+  this.updateFeature(feature, frame, viewport);   // draws it now, or in a later frame
+  this.retainFeature(feature, frame);
+  ```
+- **For a new zoom or rotation, `scene.dirtyTransform()`. For anything else, `scene.dirtyScene()`**
+  (or `dirtyLayers()`, `dirtyData()`): those say the features themselves may have changed, and
+  set `needsStyle`.
+- **In a layer that keeps its features, draw with `this.updateFeature(feature, frame, viewport)`,**
+  not `feature.update(viewport)`, and call `this.continueWaiting(frame, viewport)` on the frames
+  where `keepFeatures()` says yes. A feature may then be drawn a few frames late (section 10), so
+  don't read anything off a feature that's still `dirty` (its bounds, its hit area).
 - **A layer's `render()` can run 60 times a second.** While the view moves, a frame is drawn on
   every tick. Whatever a layer does before `keepFeatures()`, and everything in a layer that doesn't
   call it, is paid on each one. The same goes for listeners to `gfx`'s `draw` event: throttle them

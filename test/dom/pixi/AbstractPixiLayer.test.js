@@ -205,6 +205,140 @@ describe('AbstractPixiLayer', () => {
       assert.isFalse(layer.features.has('b'));
     });
 
+    // Features that are dirty can be drawn again in a later frame, if this one is out of time or
+    // they're outside the view (see "A deadline on the frame" in `design/graphics-system.md`).
+    describe('features that wait', () => {
+      const viewport = {};
+      let drawn;
+
+      // A stand-in feature at the given world coordinate, that's dirty until it's drawn
+      function addDirtyFeature(id, x, props = {}) {
+        const feature = addFeature(id);
+        Object.assign(feature, {
+          dirty: true,
+          onlyTransformDirty: false,
+          geometry: { world: { extent: new Rapid.sdk.Extent([x, 0], [x + 1, 1]) } },
+          update: () => {
+            feature.dirty = false;
+            drawn.push(id);
+          }
+        }, props);
+        return feature;
+      }
+
+      // A frame whose view is the left half of the cull box, with or without time left
+      function makeTimedFrame(hasTime, props = {}) {
+        const frame = makeFrame(props);
+        frame.viewBox = new Rapid.sdk.Extent([0, 0], [50, 50]);
+        frame.deadline = hasTime ? Infinity : -Infinity;
+        return frame;
+      }
+
+      // A pass over the given features, as a layer's `render()` and the scene do it
+      function runPass(frame, features) {
+        layer.keepFeatures(frame);
+        for (const feature of features) {
+          layer.updateFeature(feature, frame, viewport);
+          layer.retainFeature(feature, frame);
+        }
+        layer.cull(frame);
+      }
+
+      beforeEach(() => {
+        drawn = [];
+      });
+
+      it('draws a dirty feature in view at once while the frame has time, and leaves a clean one alone', () => {
+        const a = addDirtyFeature('a', 10);
+        const b = addDirtyFeature('b', 20, { dirty: false });
+        runPass(makeTimedFrame(true), [a, b]);
+        assert.deepEqual(drawn, ['a']);
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
+      it('puts a dirty feature in view off when the frame is out of time, and draws it in a later frame', () => {
+        const a = addDirtyFeature('a', 10);
+        runPass(makeTimedFrame(false, { contentChanged: true }), [a]);
+        assert.deepEqual(drawn, []);
+        assert.strictEqual(layer.numWaiting, 1);
+        assert.strictEqual(layer.numWaitingInView, 1);
+
+        layer.continueWaiting(makeTimedFrame(true), viewport);
+        assert.deepEqual(drawn, ['a']);
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
+      it('always puts off a feature outside the view, and draws it only when asked to go on to those', () => {
+        const far = addDirtyFeature('far', 80);
+        runPass(makeTimedFrame(true, { contentChanged: true }), [far]);
+        assert.deepEqual(drawn, []);
+        assert.strictEqual(layer.numWaiting, 1);
+        assert.strictEqual(layer.numWaitingInView, 0);
+
+        layer.continueWaiting(makeTimedFrame(true), viewport);   // the layer's own call: the view only
+        assert.deepEqual(drawn, []);
+
+        layer.continueWaiting(makeTimedFrame(true), viewport, true);   // the scene's, after every layer
+        assert.deepEqual(drawn, ['far']);
+      });
+
+      it('in a frame the user asked for, draws what changed at once, and still puts off what only the zoom changed', () => {
+        const hovered = addDirtyFeature('hovered', 10);
+        const zoomed = addDirtyFeature('zoomed', 20, { onlyTransformDirty: true });
+        const far = addDirtyFeature('far', 80);
+        runPass(makeTimedFrame(false, { contentChanged: true, urgent: true }), [hovered, zoomed, far]);
+        assert.deepEqual(drawn, ['hovered']);
+        assert.strictEqual(layer.numWaitingInView, 1);
+        assert.strictEqual(layer.numWaiting, 2);
+      });
+
+      it('draws at least a few each time, even with no time, so the work gets done', () => {
+        const features = [];
+        for (let i = 0; i < 100; i++) {
+          features.push(addDirtyFeature(`f${i}`, 10));
+        }
+        runPass(makeTimedFrame(false, { contentChanged: true }), features);
+        assert.strictEqual(layer.numWaiting, 100);
+
+        let calls = 0;
+        while (layer.numWaiting && calls < 100) {
+          layer.continueWaiting(makeTimedFrame(false), viewport);
+          calls++;
+        }
+        assert.strictEqual(drawn.length, 100);
+        assert.isAbove(calls, 1);     // not all at once
+        assert.isBelow(calls, 10);    // 32 at a time
+      });
+
+      it('takes a feature first once the view has moved over it', () => {
+        const far = addDirtyFeature('far', 80);
+        const near = addDirtyFeature('near', 10);
+        runPass(makeTimedFrame(false, { contentChanged: true }), [far, near]);
+
+        const frame = makeTimedFrame(true);
+        frame.viewBox = new Rapid.sdk.Extent([60, 0], [100, 50]);   // the view moved to the right half
+        frame.deadline = -Infinity;
+        layer.continueWaiting(frame, viewport);
+        assert.include(drawn, 'far');
+      });
+
+      it('forgets a feature that was destroyed, or that the last pass no longer saw', () => {
+        const a = addDirtyFeature('a', 10);
+        const b = addDirtyFeature('b', 20);
+        runPass(makeTimedFrame(false, { contentChanged: true }), [a, b]);
+        assert.strictEqual(layer.numWaiting, 2);
+
+        a.destroy();
+        assert.strictEqual(layer.numWaiting, 1);
+
+        runPass(makeTimedFrame(false, { contentChanged: true }), []);   // `b` has scrolled away
+        layer.continueWaiting(makeTimedFrame(true), viewport, true);
+        assert.deepEqual(drawn, []);
+        assert.strictEqual(layer.numWaiting, 0);
+        assert.isTrue(b.dirty);   // if it comes back, it's drawn then
+      });
+    });
+
     it('counts the features made and destroyed, and hands the counts over once', () => {
       const a = addFeature('a');
       addFeature('b');

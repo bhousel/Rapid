@@ -125,14 +125,16 @@ export async function waitForOsmData(page, min = 100) {
 
 
 /**
- * Waits until Rapid has nothing left to do: no requests in flight, and no tasks waiting in the
- * scheduler (validation, for example, runs there after data loads). Wait for this before checking
- * `consoleErrors`, so errors from work that happens after data loads aren't missed.
+ * Waits until Rapid has nothing left to do: no requests in flight, no tasks waiting in the
+ * scheduler (validation, for example, runs there after data loads), and no frame of the map still
+ * to come (features are drawn over a few frames after they load, and after a zoom). Wait for this
+ * before clicking on the map, and before checking `consoleErrors`, so errors from work that
+ * happens after data loads aren't missed.
  * @param page - The Playwright page
  */
 export async function waitForIdle(page) {
   await page.waitForFunction(() => {
-    const { network, scheduler } = rapidContext.systems;
-    return !network.numInflight && !network.numQueued && !scheduler.numPending;
+    const { gfx, network, scheduler } = rapidContext.systems;
+    return !network.numInflight && !network.numQueued && !scheduler.numPending && !gfx.pending;
   }, null, { timeout: 30_000 });
 }

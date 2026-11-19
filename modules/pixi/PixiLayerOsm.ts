@@ -207,7 +207,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    if (this.keepFeatures(frame)) return;   // only the view moved, and everything is made already
+    // Only the view moved, and everything is made already.
+    // (Except features that an earlier frame had no time to draw again: go on with those.)
+    if (this.keepFeatures(frame)) {
+      this.continueWaiting(frame, viewport);
+      return;
+    }
 
     let t = performance.now();   // each step's time goes in the frame's stats
     let entities = editor.entitiesInBox(frame.cullBox.bbox(), graph);   // Gather data in and around the view
@@ -391,7 +396,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         if (feature.dirty) {
           // A new shape, or a new zoom (and its tiles), may put it in another container
           feature.parentContainer = this._polygonTileContainer(part, tileZoom);
+        }
 
+        // (Not after a change of zoom alone: what it is hasn't changed, see `needsStyle`)
+        if (feature.needsStyle) {
           const preset = schema.match(entity, graph);
 
           const geometry = entity.geometry(graph);
@@ -414,7 +422,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           }
         }
 
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport);   // now, or in a later frame if it can wait
         this.retainFeature(feature, frame);
 
         // Same as above, but for the virtual POI, if any
@@ -440,7 +448,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           this.syncFeatureClasses(poiFeature);
 
-          if (poiFeature.dirty) {
+          if (poiFeature.needsStyle) {
             // copy the polygon style, then apply customizations
             const markerStyle = structuredClone(feature.style) as MatchedStyle;
 
@@ -469,7 +477,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             poiFeature.label = feature.label;
           }
 
-          poiFeature.update(viewport);
+          this.updateFeature(poiFeature, frame, viewport);
           this.retainFeature(poiFeature, frame);
         }
 
@@ -572,7 +580,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         this.syncFeatureClasses(feature);
 
-        if (feature.dirty) {
+        if (feature.needsStyle) {
           let styleTags = way.tags;
           let styleGeometry: 'line' | 'area' = 'line';
           let isUntaggedMultipolygonEdge = false;
@@ -617,7 +625,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           feature.label = l10n.displayName(way.tags);
         }
 
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -691,7 +699,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.syncFeatureClasses(feature);
       feature.parentContainer = parentContainer;   // change layer stacking if necessary
 
-      if (feature.dirty) {
+      if (feature.needsStyle) {
         const markerStyle = styles.styleMatch(node.tags, 'vertex', 'osm');
 
         // If we have an icon, increase the size of the marker..
@@ -722,7 +730,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.label = l10n.displayName(node.tags);
       }
 
-      feature.update(viewport);
+      this.updateFeature(feature, frame, viewport);
       this.retainFeature(feature, frame);
     }
   }
@@ -767,7 +775,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       this.syncFeatureClasses(feature);
 
-      if (feature.dirty) {
+      if (feature.needsStyle) {
         const markerStyle = styles.styleMatch(node.tags, 'point', 'osm');
 
         if (hasWikidata(node)) {
@@ -797,7 +805,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.label = l10n.displayName(node.tags);
       }
 
-      feature.update(viewport);
+      this.updateFeature(feature, frame, viewport);
       this.retainFeature(feature, frame);
     }
   }

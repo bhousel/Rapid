@@ -481,12 +481,32 @@ export class PixiScene extends EventEmitter {
     // the `origin` container (set up in `GraphicsSystem._app`) provides the position
     // and scale that maps world coords → screen coords. Group containers themselves
     // need no extra transform (except the `labels` group which renders in screen space).
+    const times = new Map<LayerID, { renderMs: number, cullMs: number }>();
     for (const layer of this.layers.values()) {
       const t0 = performance.now();
       layer.render(frame, viewport);
       const t1 = performance.now();
       layer.cull(frame);
       const t2 = performance.now();
+
+      times.set(layer.id, { renderMs: t1 - t0, cullMs: t2 - t1 });
+      frame.waitingInView += layer.numWaitingInView;   // the layers after this one can see what's still to come
+    }
+
+    // With every layer done, whatever time the frame has left goes to the features that were put
+    // off because they're outside the view (see `AbstractPixiLayer.updateFeature`).
+    for (const layer of this.layers.values()) {
+      const time = times.get(layer.id)!;
+      if (layer.numWaiting) {
+        const t0 = performance.now();
+        layer.continueWaiting(frame, viewport, true);
+        time.renderMs += performance.now() - t0;
+      }
+
+      const waiting = layer.numWaiting;
+      if (waiting) {
+        frame.unfinished = true;   // another frame should follow
+      }
 
       let visible = 0;
       for (const feature of layer.features.values()) {
@@ -495,10 +515,11 @@ export class PixiScene extends EventEmitter {
       frame.layers.set(layer.id, {
         enabled: layer.enabled,
         kept: layer.keptFeatures(frame),
-        renderMs: t1 - t0,
-        cullMs: t2 - t1,
+        renderMs: time.renderMs,
+        cullMs: time.cullMs,
         features: layer.features.size,
         visible: visible,
+        waiting: waiting,
         ...layer.takeWork()
       });
     }
@@ -689,12 +710,25 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Mark the whole scene as `dirty`, for example when changing zooms.
-   * During the next "APP" pass, dirty features will be rebuilt.
+   * Mark the whole scene as `dirty`: anything about any feature may have changed (the styles, the
+   * language, how areas are filled). During the next "APP" pass, dirty features will be rebuilt.
+   * For a new zoom or rotation, use `dirtyTransform()`.
    */
   public dirtyScene(): void {
     for (const layer of this.layers.values()) {
       layer.dirtyLayer();
+    }
+  }
+
+
+  /**
+   * Mark every feature as needing to be drawn again, because the view's zoom or rotation changed.
+   * The features themselves haven't changed, so layers that check `feature.needsStyle` keep the
+   * styles they worked out before.
+   */
+  public dirtyTransform(): void {
+    for (const layer of this.layers.values()) {
+      layer.dirtyTransform();
     }
   }
 

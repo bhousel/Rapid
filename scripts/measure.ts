@@ -28,7 +28,9 @@ import { parseArgs, styleText } from 'node:util';
 //            gap after the last one (`FramePacer`), with held frames in between, as in a real drag.
 // - glide:   the view moves a little on every animation frame, along the same path. It reports how
 //            many frames a second were drawn and how many animation frames ran long.
-// - restyle: every feature is restyled (what a zoom change costs)
+// - restyle: every feature is marked to be drawn again, as a change of zoom does. The first frame
+//            draws what it has time for, and the frames after it the rest: the table has the first
+//            frame's times, how many frames it took in all, and how long until they were done.
 //
 // OSM changes, so a place can stop being difficult. Add new ones here, and to the table in the design doc.
 //
@@ -130,7 +132,8 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
   const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
   // (While the OSM API has us rate limited, nothing is in flight, but the data hasn't loaded.)
   const osm = context.services.osm;
-  const isIdle = () => !network.numInflight && !network.numQueued && !scheduler.numPending && !osm?.getRateLimit();
+  // (..and features are drawn over a few frames after they arrive: `gfx.pending` says more are coming.)
+  const isIdle = () => !network.numInflight && !network.numQueued && !scheduler.numPending && !osm?.getRateLimit() && !gfx.pending;
   const median = (vals: (number | undefined)[]) => {
     const sorted = vals.filter(v => v !== undefined).sort((a, b) => a! - b!) as number[];
     return sorted.length ? +sorted[Math.floor(sorted.length / 2)].toFixed(2) : null;
@@ -191,12 +194,25 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
   const measure = async (kind: 'redraw' | 'restyle' | 'pan') => {
     if (kind === 'pan') await walkPanPath();
 
+    // After a restyle, the features that the first frame had no time for are drawn in the frames
+    // after it. How many frames until they're all done, and how long is that?
+    const settleFrames: number[] = [];
+    const settleMs: number[] = [];
+
     const startID = gfx.lastRenderFrame?.id ?? -1;
     for (let i = 0; i < args.runs; i++) {
+      const since = performance.now();
+      const sinceID = gfx.lastRenderFrame?.id ?? -1;
       await drawFrame(() => {
-        if (kind === 'restyle') gfx.scene.dirtyScene();
+        if (kind === 'restyle') gfx.scene.dirtyTransform();   // as a change of zoom does
         if (kind === 'pan') panStep(i);
       }, kind !== 'pan');
+
+      if (kind === 'restyle') {
+        while (gfx.pending) await nextFrame();
+        settleFrames.push(gfx.lastRenderFrame.id - sinceID);
+        settleMs.push(performance.now() - since);
+      }
     }
     for (let i = 0; i < 10; i++) await nextFrame();   // GPU times arrive a few frames later
 
@@ -236,6 +252,8 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
       ...times(frames),
       kept: times(frames.filter(isKept)),
       pass: times(frames.filter((f: any) => !isKept(f))),
+      settleFrames: median(settleFrames),
+      settleMs: median(settleMs),
       renderGroups: last.draw.renderGroups,
       gl: last.draw.gl,
       instructions: last.draw.instructions,
@@ -296,7 +314,7 @@ const cols = [
   ['| pan APP', 10], ['DRAW', 6], ['GPU', 6],
   ['| cull APP', 11], ['DRAW', 6], ['of', 5],
   ['| glide fps', 11], ['long', 5], ['pass', 6],
-  ['| restyle APP', 14], ['DRAW', 6], ['GPU', 6]
+  ['| restyle APP', 14], ['DRAW', 6], ['frames', 7], ['done', 6]
 ] as const;
 const row = (vals: (string | number | null | undefined)[]) =>
   vals.map((v, i) => String(v ?? '-')[i === 0 ? 'padEnd' : 'padStart'](cols[i][1])).join(' ');
@@ -332,7 +350,7 @@ for (const place of places) {
       r.pan.kept.appMs, r.pan.kept.drawMs, r.pan.kept.gpuMs,
       r.pan.pass.appMs, r.pan.pass.drawMs, `${r.pan.pass.frames}/${r.pan.frames}`,
       r.glide.fps, r.glide.longFrames, r.glide.passMs,
-      r.restyle.appMs, r.restyle.drawMs, r.restyle.gpuMs
+      r.restyle.pass.appMs, r.restyle.pass.drawMs, r.restyle.settleFrames, Math.round(r.restyle.settleMs ?? 0)
     ]));
     results.push({ ...place, ...r });
   } catch (err) {
@@ -348,7 +366,8 @@ console.log('pan = pan frames where the OSM layer kept its features as they were
 console.log('back). cull = pan frames where it did its whole pass, because the view left the cull box (or');
 console.log('something else changed); of = how many. glide = the view moving on every animation frame for');
 console.log('240 of them: frames drawn a second, animation frames longer than 25 ms, and what a frame with');
-console.log('a pass cost (APP + DRAW) in the middle of that.');
+console.log('a pass cost (APP + DRAW) in the middle of that. restyle = every feature drawn again, as after');
+console.log('a zoom: the first frame, then how many frames and how many ms until all of them were done.');
 
 if (values.out) {
   writeFileSync(values.out, JSON.stringify({ date: new Date().toISOString(), runs, env, places: results }, null, 2));

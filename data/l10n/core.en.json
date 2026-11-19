@@ -951,6 +951,7 @@
         "features_shown": "{visible} of {total} shown",
         "layers": "Slowest layers (ms)",
         "kept": "Layers kept (frames)",
+        "waiting": "Waiting for a later frame",
         "instructions": "Pixi instructions",
         "groups": "Render groups",
         "groups_rebuilt": "{rebuilt} of {total} rebuilt",

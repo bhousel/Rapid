@@ -58,6 +58,15 @@ export class FramePacer {
 
 
   /**
+   * Whether a pass was asked for now (`hurry()`), and hasn't begun yet.
+   * @return `true` if the next pass doesn't wait
+   */
+  public get hurried(): boolean {
+    return this._hurried;
+  }
+
+
+  /**
    * Asks for the next pass now, whatever the gap. It stays asked for until a pass begins.
    */
   public hurry(): void {

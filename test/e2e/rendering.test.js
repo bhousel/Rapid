@@ -174,6 +174,74 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
 });
 
 
+// A deadline on the frame: after a zoom every feature has to be drawn again, and the ones a frame
+// has no time for are drawn in the frames after it (see `design/graphics-system.md`, section 10).
+test('after a zoom, draws the features again over the following frames, with the styles they had', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const zoomed = await page.evaluate(async () => {
+    const { gfx, map, styles } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+
+    // Count the styles worked out from tags, and give the frames no time for work that can wait.
+    let styleMatches = 0;
+    const styleMatch = styles.styleMatch;
+    styles.styleMatch = function(...args) {
+      styleMatches++;
+      return styleMatch.apply(this, args);
+    };
+    const frameProto = Object.getPrototypeOf(gfx.lastRenderFrame);
+    const hasTime = frameProto.hasTime;
+    frameProto.hasTime = () => false;
+
+    const startID = gfx.lastRenderFrame.id;
+    map.zoom(map.zoom() + 0.25);
+    while (!gfx.renderFrames.some(frame => frame.id > startID && frame.dirtyScene)) {
+      await nextFrame();
+    }
+    const dirtyAfterFirst = [...layer.features.values()].filter(feature => feature.visible && feature.dirty).length;
+    while (gfx.pending) {
+      await nextFrame();
+    }
+
+    frameProto.hasTime = hasTime;
+    styles.styleMatch = styleMatch;
+
+    const frames = gfx.renderFrames.filter(frame => frame.id > startID);
+    const first = frames.find(frame => frame.dirtyScene);
+    const features = [...layer.features.values()].filter(feature => feature.visible);
+    return {
+      features: features.length,
+      styleMatches: styleMatches,
+      first: { unfinished: first.unfinished, waiting: first.layers.get('osm').waiting },
+      dirtyAfterFirst: dirtyAfterFirst,
+      unfinishedFrames: frames.filter(frame => frame.unfinished).length,
+      last: { unfinished: frames.at(-1).unfinished, waiting: frames.at(-1).layers.get('osm').waiting },
+      dirtyAtEnd: features.filter(feature => feature.dirty).length
+    };
+  });
+
+  expect(zoomed.features).toBeGreaterThan(50);
+  // The frame of the zoom put features off, and said that more frames should follow
+  expect(zoomed.first.unfinished).toBe(true);
+  expect(zoomed.first.waiting).toBeGreaterThan(50);
+  expect(zoomed.dirtyAfterFirst).toBeGreaterThan(50);
+  // ..they came, a few features at a time, until every feature was drawn at the new zoom
+  expect(zoomed.unfinishedFrames).toBeGreaterThan(1);
+  expect(zoomed.last).toEqual({ unfinished: false, waiting: 0 });
+  expect(zoomed.dirtyAtEnd).toBe(0);
+  // What the features are didn't change, so their styles weren't worked out again
+  // (a few new features may appear at the new zoom)
+  expect(zoomed.styleMatches).toBeLessThan(zoomed.features / 4);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
 test('counts WebGL calls while detailed stats are on', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);

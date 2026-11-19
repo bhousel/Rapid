@@ -242,6 +242,8 @@ describe('PixiScene', () => {
         render: (frame, viewport) => calls.push(`render ${id} ${frame.id} ${viewport}`),
         cull: frame => calls.push(`cull ${id} ${frame.id}`),
         keptFeatures: () => kept,
+        numWaiting: 0,
+        numWaitingInView: 0,
         takeWork: () => ({ created: 1, destroyed: 0, updated: 2, shown: 0, hidden: 0, steps: { gather: 0.5 } })
       });
       const scene = {
@@ -261,6 +263,57 @@ describe('PixiScene', () => {
       assert.isAtLeast(osm.renderMs, 0);
       assert.isAtLeast(osm.cullMs, 0);
       assert.include(frame.layers.get('keepright'), { enabled: false, kept: false, features: 1, visible: 0 });
+    });
+
+    it('lets layers go on with work they put off once every layer has rendered, and says if more is left', () => {
+      const calls = [];
+      let seenByLabels = null;
+      const makeLayer = (id, waitingInView, waitingOutside, leftAfter) => {
+        const layer = {
+          id: id,
+          enabled: true,
+          features: new Map(),
+          numWaiting: waitingInView + waitingOutside,
+          numWaitingInView: waitingInView,
+          render: frame => {
+            calls.push(`render ${id}`);
+            if (id === 'labels') seenByLabels = frame.waitingInView;
+          },
+          cull: () => {},
+          continueWaiting: (frame, viewport, outside) => {
+            calls.push(`continue ${id} ${outside}`);
+            layer.numWaiting = leftAfter;
+          },
+          keptFeatures: () => false,
+          takeWork: () => ({ created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} })
+        };
+        return layer;
+      };
+
+      const scene = {
+        layers: new Map([
+          ['osm', makeLayer('osm', 40, 100, 60)],
+          ['rapid', makeLayer('rapid', 0, 0, 0)],
+          ['labels', makeLayer('labels', 0, 0, 0)]
+        ])
+      };
+      const frame = new RenderFrame(7, 17);
+      PixiScene.prototype.render.call(scene, frame, 'viewport');
+
+      // every layer renders first, then the ones with work waiting go on with it
+      assert.deepEqual(calls, ['render osm', 'render rapid', 'render labels', 'continue osm true']);
+      assert.strictEqual(seenByLabels, 40);   // the labels can tell that features in view are still to come
+      assert.strictEqual(frame.layers.get('osm').waiting, 60);
+      assert.strictEqual(frame.layers.get('rapid').waiting, 0);
+      assert.isTrue(frame.unfinished);
+
+      // ..and once nothing is left, no further frame is asked for
+      scene.layers.get('osm').numWaitingInView = 0;
+      scene.layers.get('osm').continueWaiting = (f, v, outside) => { scene.layers.get('osm').numWaiting = 0; };
+      const next = new RenderFrame(8, 17);
+      PixiScene.prototype.render.call(scene, next, 'viewport');
+      assert.isFalse(next.unfinished);
+      assert.strictEqual(next.layers.get('osm').waiting, 0);
     });
   });
 

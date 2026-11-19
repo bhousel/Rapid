@@ -37,6 +37,11 @@ export interface LayerFrameStats extends LayerWork {
   features: number;
   /** Features the layer shows after culling */
   visible: number;
+  /**
+   * Work the layer put off to a later frame: features still to be drawn again, or for the labels,
+   * 1 while placement is waiting (see "A deadline on the frame" in `design/graphics-system.md`)
+   */
+  waiting: number;
 }
 
 /** A `Graphics` that Pixi drew on its own instead of in a batch */
@@ -126,6 +131,23 @@ export class RenderFrame {
    * told nothing changed and get the cull box they had (see `FramePacer`).
    */
   public held: boolean;
+  /** The part of the world in view, in world coordinates: the cull box without its padding */
+  public viewBox: Extent;
+  /**
+   * When the APP pass should stop taking on work that can wait (`performance.now()`). Layers ask
+   * `hasTime()`. What can wait: drawing a feature again that isn't in view, or that is but isn't
+   * needed at once (see `urgent`), and placing labels.
+   */
+  public deadline: number;
+  /**
+   * Whether the user did something that asked for this frame (`immediateRedraw()`). Then what
+   * changed in view is drawn in this frame, whatever the time.
+   */
+  public urgent: boolean;
+  /** Features in view that layers have put off drawing again so far in this frame (labels wait for them) */
+  public waitingInView: number;
+  /** Whether a layer put work off to a later frame, so that another frame should follow this one */
+  public unfinished: boolean;
   /** Milliseconds spent in the APP pass */
   public appMs: number;
   /** What each layer cost during the APP pass */
@@ -147,6 +169,11 @@ export class RenderFrame {
     this.changedLayerIDs = new Set<LayerID>();
     this.cullBox = new Extent();
     this.held = false;
+    this.viewBox = new Extent();
+    this.deadline = Infinity;
+    this.urgent = false;
+    this.waitingInView = 0;
+    this.unfinished = false;
     this.appMs = 0;
     this.layers = new Map<LayerID, LayerFrameStats>();
     this.draw = null;
@@ -161,6 +188,15 @@ export class RenderFrame {
    */
   public changedFor(layerID: LayerID): boolean {
     return this.contentChanged || this.changedLayerIDs.has(layerID);
+  }
+
+
+  /**
+   * Whether the APP pass still has time for work that can wait (see `deadline`).
+   * @return `true` if the deadline hasn't passed
+   */
+  public hasTime(): boolean {
+    return performance.now() < this.deadline;
   }
 
 
@@ -187,6 +223,8 @@ export class RenderFrame {
       changedLayerIDs: [...this.changedLayerIDs],
       cullBox: this.cullBox.rectangle(),
       held: this.held,
+      urgent: this.urgent,
+      unfinished: this.unfinished,
       appMs: this.appMs,
       layers: Object.fromEntries(this.layers),
       draw: this.draw

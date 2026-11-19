@@ -22,6 +22,20 @@ import type { TransformProps, Vec2 } from '@rapid-sdk/math';
  */
 const DRAW_SAME_TICK_MS = 8;
 
+/**
+ * How long an APP pass takes on work that can wait, in milliseconds: features to draw again that
+ * aren't needed at once, and label placement (see `RenderFrame.deadline`). What it can't put off
+ * (gathering the data, anything the user just changed) takes as long as it takes. It's under
+ * `DRAW_SAME_TICK_MS`, so a frame that only catches up on work that waited draws in the same tick.
+ *
+ * Where drawing a frame is expensive whatever changed in it (a dense place, where Pixi rebuilds
+ * big instruction lists), small steps cost more than they save: each step pays for a DRAW pass.
+ * So the budget grows to what the last DRAW pass cost, up to `MAX_APP_BUDGET_MS`. Frames get
+ * longer there, and the work is done in far fewer of them.
+ */
+const APP_BUDGET_MS = 6;
+const MAX_APP_BUDGET_MS = 50;
+
 /** How many recent frames to keep stats for (see `renderFrames`) */
 const RENDER_FRAME_HISTORY = 120;
 
@@ -115,6 +129,8 @@ export class GraphicsSystem extends AbstractSystem {
   protected _appWasPass: boolean;
   /** Whether a frame is wanted: the view moved, or a redraw was requested and hasn't been drawn */
   protected _appPending: boolean;
+  /** Whether the last frame's layers put work off to a later frame (see `RenderFrame.unfinished`) */
+  protected _unfinished: boolean;
   /** Whether a full scene-graph redraw has been requested but not yet executed */
   protected _drawPending: boolean;
   /**
@@ -183,6 +199,7 @@ export class GraphicsSystem extends AbstractSystem {
     this._pacer = new FramePacer();
     this._appWasPass = false;
     this._appPending = false;
+    this._unfinished = false;
     this._drawPending = false;
     this._redrawRequested = true;   // the first frame has everything to do
     this._redrawLayerIDs = new Set<LayerID>();
@@ -566,6 +583,17 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
+   * Whether a frame is still to come: one is wanted and hasn't been made, its DRAW pass hasn't
+   * run, or the last one left work for the next (features to draw again, labels to place).
+   * Scripts and tests wait for this to be `false` before they look at the map.
+   * @return `true` if the map isn't settled yet
+   */
+  public get pending(): boolean {
+    return this._appPending || this._drawPending;
+  }
+
+
+  /**
    * Whether detailed frame stats are on (see `enableDetailedStats`).
    * @return `true` if WebGL calls are being counted
    */
@@ -865,25 +893,29 @@ export class GraphicsSystem extends AbstractSystem {
     const dist = vecLength(pixiXY, mapXY);
     let offset;
 
-    // A held frame needs a reason (the view moved, or a layer asked to be drawn now) and features
-    // that can stay as they are: the same zoom and rotation, in the cull box they were made for.
+    // A held frame needs a reason (the view moved, a layer asked to be drawn now, or the last frame
+    // left work unfinished) and features that can stay as they are: the same zoom and rotation, in
+    // the cull box they were made for.
     // Otherwise wait for the pass. (Meanwhile the CSS transform follows the view.)
     if (!mayPass) {
       const tPrev = this._prevTransform;
       const moved = tPrev.x !== mapTransform.x || tPrev.y !== mapTransform.y;
       const urgent = this._urgentLayerIDs.size > 0;
       const sameShape = pixiTransform.z === mapTransform.z && pixiTransform.r === mapTransform.r && dist <= 100000;
-      if (!(moved || urgent) || !sameShape || !scene.cullBox) return;
+      if (!(moved || urgent || this._unfinished) || !sameShape || !scene.cullBox) return;
     }
 
     const frame = new RenderFrame(this._frame, mapTransform.zoom);
+    frame.viewBox = mapViewport.visibleWorldExtent();
+    const lastDrawMs = this.lastRenderFrame?.draw?.ms ?? 0;
+    frame.deadline = frame.time + Math.min(MAX_APP_BUDGET_MS, Math.max(APP_BUDGET_MS, lastDrawMs));
 
 // worldcoordinates
 //    if (pixiTransform.k !== mapTransform.k || dist > 100000) {
     if (pixiTransform.z !== mapTransform.z || dist > 100000) {
       offset = [0,0];
       pixiViewport.transform = mapTransform;   // reset (sync pixi = map)
-      scene.dirtyScene();                      // all geometry must be reprojected
+      scene.dirtyTransform();                  // every feature must be drawn again for the new zoom
       frame.dirtyScene = true;
     } else {
       offset = vecSubtract(pixiXY, mapXY);
@@ -891,7 +923,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     if (pixiTransform.r !== mapTransform.r) {
       pixiTransform.rotation = mapTransform.r;
-      scene.dirtyScene();                     // only really needs restyle
+      scene.dirtyTransform();                 // only really needs restyle
       frame.dirtyScene = true;
     }
 
@@ -939,6 +971,9 @@ export class GraphicsSystem extends AbstractSystem {
 
       // Was there anything for a layer to do, or did only the view move?
       this._appWasPass = frame.contentChanged || frame.changedLayerIDs.size > 0 || frame.cullBox !== prevCullBox;
+
+      // Did the user ask for this frame? Then what they changed is drawn in it, whatever the time.
+      frame.urgent = this._pacer.hurried;
       this._pacer.begin();
 
     } else {
@@ -962,7 +997,11 @@ export class GraphicsSystem extends AbstractSystem {
     frame.appMs = performance.now() - frame.time;
     this._appFrame = frame;
     this._appTransform = mapTransform.props;
-    this._appPending = frame.held;   // a held frame still has its pass to come
+
+    // Another frame follows if a held frame still has its pass to come,
+    // or if a layer put work off (features to draw again, labels to place).
+    this._unfinished = frame.unfinished;
+    this._appPending = frame.held || frame.unfinished;
     this._drawPending = true;
   }
 

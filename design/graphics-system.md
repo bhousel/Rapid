@@ -7,7 +7,8 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > **Status:** In progress (Nov 2026). Steps 1 to 5 of the plan are done (frame stats, a script that
 > measures a set of difficult places, where the GPU time goes, a rendering info card, and the
 > `RenderFrame` passed to the layers), and so are the CULL pass for the OSM layer (section 8) and
-> frame pacing (section 9); sections 4 and 5 aren't built. The first
+> frame pacing (section 9). A deadline on the frame is started (section 10); sections 4 and 5
+> aren't built. The first
 > measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
 > reproduce them. The plan is in section 7.
 
@@ -33,6 +34,10 @@ Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the poi
   (section 9).
 - **Held frame:** a frame drawn while a pass frame waits for its gap. It moves the view, and every
   layer that can keeps its features.
+- **Deadline:** the time in a frame's APP pass after which work that can wait is put off to the
+  next frame (section 10).
+- **Waiting:** a feature is waiting when it's dirty and its layer put off drawing it again. It's
+  shown as it was last drawn, or not at all if it's new.
 - **DRAW pass:** Pixi's half. `pixi.render()` walks the display tree, builds its instruction list, and
   issues the GPU calls (`GraphicsSystem._draw()`).
 - **Instruction:** one entry in a Pixi render group's instruction list. Each names the pipe that runs it:
@@ -55,14 +60,15 @@ per animation frame. A tick does this:
 3. **APP**, if a frame is wanted: the view moved, or a redraw was requested. `_passAllowed()` asks the
    `FramePacer` whether this frame may do a pass (section 9).
    - If it may: when the zoom changed, or the map moved more than 100,000 px, every feature is
-     marked dirty (`scene.dirtyScene()`) and its geometry is rebuilt; otherwise only the `origin`
-     container moves. The frame takes the redraw requests made since the last one, and its cull box
+     marked to be drawn again (`scene.dirtyTransform()`); otherwise only the `origin` container
+     moves. The frame takes the redraw requests made since the last one, and its cull box
      (section 8).
    - If it may not, the frame is **held**: it only moves the view. The redraw requests stay where
      they are and the cull box stays the same. If moving the view isn't enough (the zoom or the
      rotation changed, or the view didn't move), no frame is made on this tick.
 
-   Then `scene.render(frame, viewport)`.
+   Then `scene.render(frame, viewport)`. The frame has a deadline: work that can wait is put off
+   once it has passed, and if any was, another frame follows on the next tick (section 10).
 4. **DRAW in the same tick**, if the tick has used less than 8 ms so far (`DRAW_SAME_TICK_MS`), as
    it has after a frame that only moved the view. Otherwise DRAW waits for the next tick. DRAW
    resizes the renderer if needed, calls `pixi.render()`, drops the CSS transform, emits `move` if
@@ -685,12 +691,8 @@ Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull fra
 ### What's left
 
 - **Frame pacing in place of the 250 ms throttle:** done, section 9.
-- **A deadline on the frame, and work that can wait.** A pass frame is still one block of work
-  (section 9, "What it doesn't fix"). With the frame carrying a deadline, a layer whose work can
-  come a frame late keeps what it has and asks for another frame. Labels are the first case: about
-  1 ms on a pan (5 in Užice), but 355 of the 386 ms a zoom change costs at Smith Point, and 83 ms
-  in Užice. The same deadline would restyle the view first after a zoom change, and the padding
-  afterwards, and spread the first pass after a load over several frames.
+- **A deadline on the frame, and work that can wait:** started, section 10. Drawing features again
+  and placing labels wait now. Making new features doesn't yet.
 - **All layers alike.** Only the OSM layer keeps its features today. The others do their pass on
   every frame, which is cheap at the places measured (the Rapid layer 0.1 to 0.6 ms) but is
   different code for the same job, and the deadline above needs every layer to say whether it has
@@ -819,11 +821,118 @@ the old box covers.
   spread over frames (section 8, "What's left"), does.
 - **Užice's pass frame is 240 ms.** With the longest gap after it, that's about two a second, as
   before.
-- **Zooming is as it was:** a restyle of everything, at most every 250 ms in dense places, with the
-  CSS transform in between.
+- **Zooming was as it had been:** a restyle of everything, at most every 250 ms in dense places,
+  with the CSS transform in between. (Section 10 makes the restyle much cheaper.)
 - **Layers without `keepFeatures()` do their pass in a held frame too.** Cheap so far (section 8).
 - **`draw` is emitted for every frame, up to 60 times a second** where it was 4. It has about 20
   listeners, and most throttle themselves. Together they took 0.3 ms a frame at Staten Island (cards
   closed), 0.6 with the minimap shown. A new listener should throttle itself.
 - **The OSM layer asks for the view's tiles on every frame** (`context.loadTiles()`), which is part
   of the 1 to 2 ms a view-only frame's APP pass takes.
+
+## 10. A deadline on the frame
+
+Started Nov 19. A pass frame was one block of work, however long: 140 to 350 ms for a zoom in
+Seattle or at Staten Island, 1.8 s in Užice. Now part of that work can wait for the frames after.
+
+### First, most of a zoom's work wasn't needed at all
+
+Measured before designing anything: where a restyle's 139 ms in the OSM layer go in Seattle
+(5,354 features, each marked dirty as a zoom does).
+
+| | ms |
+|---|---|
+| `styles.styleMatch()`: working out each feature's style from its tags | 65 |
+| The `style` setter: merging that style with the defaults | 20 |
+| The features' `update()`: drawing them at the new zoom | 30 |
+| The rest of the pass | 24 |
+
+A feature's style doesn't depend on the zoom. The layer worked it out again because its loops said
+`if (feature.dirty)`, and a zoom makes every feature dirty. Two things are told apart now:
+
+- **`feature.dirty`:** it has to be drawn again.
+- **`feature.needsStyle`:** the layer should work out its style and label again from its data.
+  True for a new feature, when its data is bound again, and when the layer or the scene marks it
+  dirty (`dirtyLayer()`, `dirtyScene()`, `dirtyData()`: the styles, the language, the filters or
+  the data changed). Not after a zoom or a rotation, which call `scene.dirtyTransform()`, and not
+  for a class like hover or select.
+
+The OSM layer's loops check `needsStyle` before matching a style. That alone took a zoom's APP
+pass from 148 to 47 ms in Seattle and from 327 to 102 ms at Staten Island. The other layers still
+check `dirty`, which works as before.
+
+### What can wait, and how
+
+`GraphicsSystem` gives each frame a deadline: 6 ms after its APP pass began (`APP_BUDGET_MS`), or
+as long as the last DRAW pass took if that was longer, up to 50 ms. Layers ask `frame.hasTime()`.
+
+- **Drawing a feature again.** A layer calls `this.updateFeature(feature, frame, viewport)` where
+  it called `feature.update(viewport)`.
+  - A dirty feature **in view** is drawn at once while the frame has time. After that it waits,
+    and is shown as it was: after a zoom, at the old zoom's line widths, scaled.
+  - A dirty feature **outside the view**, in the cull box's padding, always waits.
+  - In a frame **the user asked for** (`immediateRedraw()`, `frame.urgent`), a feature in view that
+    changed itself (its data, a class like hover) is drawn at once whatever the time. A feature
+    that only the zoom made dirty (`feature.onlyTransformDirty`) still waits. So a hover in the
+    middle of a zoom draws the hovered feature, not everything.
+- **Going on with it.** On a frame where the layer keeps its features, it calls
+  `continueWaiting()`, which draws the features in view that waited, at least 32 a frame and as
+  many as the deadline allows. After every layer has rendered, the scene calls it again for the
+  ones outside the view, with whatever time is left.
+- **Placing labels.** The labels wait until no feature in view is waiting (they go by the
+  features' shapes), and one more frame if that frame is out of time. The labels that exist are
+  still drawn. In a frame the user asked for, they're placed at once.
+- **Another frame.** If any layer has work waiting after a frame (`frame.unfinished`), the next
+  tick makes another, pass or no pass. These frames aren't paced: they're cheap by construction.
+  `gfx.pending` is `true` until nothing is left, and scripts and tests wait for that.
+
+The budget follows the cost of drawing because each frame pays for a DRAW pass whatever it
+changed. In Užice that's 50 ms: with 6 ms of work a frame, a restyle took 44 frames and 2.2 s. With
+the budget at the DRAW pass's cost, it takes 12 frames and 1.0 s.
+
+### What it does
+
+Old build (frame pacing) then new, Nov 19. A zoom in of one level, eased over 400 ms, and 60 steps
+of +0.02 on every animation frame, as a wheel does:
+
+| | Seattle, before | Seattle, after | Staten Island, before | Staten Island, after |
+|---|---|---|---|---|
+| Eased: frames at a new zoom | 2 at 147 + 30 ms | 5 at 17 + 10 ms | 2 at 334 + 47 ms | 3 at 64 + 18 ms |
+| Eased: longest animation frame | 133 ms | 66 ms | 333 ms | 83 ms |
+| 60 steps: time they took | 1.33 s | 1.01 s | 2.07 s | 1.22 s |
+| 60 steps: longest animation frame | 150 ms | 18 ms | 300 ms | 50 ms |
+| 60 steps: animation frames over 50 ms | 3 | 0 | 6 | 1 |
+
+(One run each. The longest animation frame varies from run to run: 33 to 66 ms in Seattle's eased
+zoom.)
+
+`bun run measure`'s restyle (every feature marked as a zoom does): the first frame, then how many
+frames and how long until every feature was drawn again.
+
+| | Before, one frame | After, first frame | Frames | Done in |
+|---|---|---|---|---|
+| Seattle | 139 + 22 ms | 21 + 3 ms | 4 | 118 ms |
+| Staten Island | 310 + 34 ms | 50 + 1 ms | 7 | 201 ms |
+| Užice | 1,600 + 197 ms | 269 + 4 ms | 12 | 992 ms |
+
+**Checked by screenshot** at Staten Island: after a jump in zoom, a rotation and a rotation back,
+the settled picture is the same, pixel for pixel, as after every style is matched again
+(`dirtyScene()`). After an eased zoom the features are the same and a label can be in another
+place: labels placed as features arrive don't always end up where labels placed all at once do.
+That was already so after a pan.
+
+### What it doesn't do yet
+
+- **Making a feature can't wait, only drawing it again.** A new feature is made, bound and styled
+  in the pass that first sees it. So the first pass after a load is still one block (750 ms at
+  Staten Island), and a pass for a new cull box costs what it did (42 + 8 ms there). Putting that
+  off means the layer running a small pass, later, over just the entities that waited.
+- **The pass itself can't wait:** gathering, filtering and sorting the data, and the loop over
+  every entity. That's the 50 to 65 ms a frame at a new zoom still takes at Staten Island, and 270
+  in Užice. Most of it is vertices (section 8, `design/filter-system.md`).
+- **No frame between passes during a zoom.** The CSS transform still carries a zoom between pass
+  frames. Now that a feature can be shown at a zoom it wasn't drawn for, a held frame could be
+  drawn at a new zoom too, sharp and with the right imagery.
+- **Only the OSM layer** checks `needsStyle` and calls `updateFeature()`.
+- **The budget is one rule** (6 ms, or the last DRAW pass's cost). It doesn't look at whether the
+  user is doing anything, or at the scheduler.

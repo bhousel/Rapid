@@ -49,11 +49,15 @@ describe('FramePacer', () => {
     pacer.passed(1000, 100);
     assert.isAbove(pacer.wait(1001, true), 0);
 
+    assert.isFalse(pacer.hurried);
+
     pacer.hurry();
+    assert.isTrue(pacer.hurried);
     assert.strictEqual(pacer.wait(1001, true), 0);
     assert.strictEqual(pacer.wait(1001, false), 0);
 
     pacer.begin();   // the hurried pass starts..
+    assert.isFalse(pacer.hurried);
     pacer.passed(1040, 20);
     assert.strictEqual(pacer.wait(1041, true), 39);   // ..and the next one waits again
   });

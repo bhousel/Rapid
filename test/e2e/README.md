@@ -73,6 +73,7 @@ Data that a test brings itself goes in `data/` too, and the dev server serves it
 - `startRapid(page, hash)` opens the dev build (with `background=none`), waits for it to start, and closes
   the welcome screen.
 - `waitForOsmData(page)` waits for OSM data in view. `waitForIdle(page)` waits until no requests or
-  scheduled work are left: wait for it before clicking on the map (so the features are drawn), and before
-  checking `consoleErrors` (validation runs after the data loads).
+  scheduled work are left and no frame of the map is still to come (`gfx.pending`): wait for it before
+  clicking on the map (so the features are drawn), and before checking `consoleErrors` (validation runs
+  after the data loads).
 - `locToPage(page, loc)` turns a `[lon, lat]` into page coordinates, for `page.mouse.click()`.
