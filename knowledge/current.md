@@ -37,8 +37,8 @@ Still to do, in about this order:
   **Next: [`design/graphics-system.md`](../design/graphics-system.md)** (Nov 18), the measurements and the
   plan: frame stats first, a set of difficult places to measure on, then our own line builder for
   partial-fill bands, hit areas and dashes. Steps 1 (frame stats), 2 (`bun run measure` over
-  difficult places) and 3 (GPU time: mostly fixed costs, see section 6) done; next is step 4 (a
-  rendering info card). Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
+  difficult places) and 3 (GPU time: mostly fixed costs, see section 6) done, and the imagery filter
+  no longer runs at its default settings; next is step 4 (a rendering info card). Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
   `directionalCombo`, which Rapid doesn't support (iD's rename and generalization of the `cycleway` field;

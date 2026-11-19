@@ -60,6 +60,10 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   protected _failedURLs: Set<string>;
   /** Tiler used to compute which tiles cover the current viewport */
   protected _tiler: Tiler;
+  /** The base imagery's container that `applyFilters` last set the filters on */
+  protected _filteredContainer: PIXI.Container | null;
+  /** The filter settings it had then, as a string to compare */
+  protected _filterKey: string;
 
 
   /**
@@ -84,6 +88,8 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     this._tileMaps = new Map<ImagerySourceID, Map<TileID, CachedTile>>();
     this._failedURLs = new Set<string>();
     this._tiler = new Tiler();
+    this._filteredContainer = null;
+    this._filterKey = '';
   }
 
 
@@ -415,6 +421,9 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     const groupContainer = this.scene.groups.get('background')!;
     const sourceContainer = groupContainer.getChildByLabel(sourceID);
     if (sourceContainer) {
+      if (this._filteredContainer === sourceContainer) {
+        this._filteredContainer = null;
+      }
       sourceContainer.destroy({ children: true });
     }
   }
@@ -469,16 +478,38 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /**
    * Adds an adjustment filter for brightness/contrast/saturation and
    * a sharpen/blur filter, depending on the UI slider settings.
+   * A setting at its default value gets no filter. Called on every render, this does
+   * nothing unless the settings or the container changed.
    * @param sourceContainer - The PIXI.Container that contains the tiles
    */
   public applyFilters(sourceContainer: PIXI.Container): void {
-    const adjustmentFilter = new AdjustmentFilter({
-      brightness: this.filters.brightness,
-      contrast: this.filters.contrast,
-      saturation: this.filters.saturation,
-    });
+    const brightness = this.filters.brightness;
+    const contrast = this.filters.contrast;
+    const saturation = this.filters.saturation;
+    const sharpness = this.filters.sharpness;
 
-    sourceContainer.filters = [adjustmentFilter];
+    // Do this only when the settings or the base imagery changed, not on every frame:
+    // assigning `filters` makes Pixi rebuild its instructions.
+    const filterKey = `${brightness},${contrast},${saturation},${sharpness}`;
+    if (this._filteredContainer === sourceContainer && this._filterKey === filterKey) return;
+
+    // The previous base imagery's container might still be shown, as an overlay
+    const prevContainer = this._filteredContainer;
+    if (prevContainer && prevContainer !== sourceContainer && !prevContainer.destroyed) {
+      prevContainer.filters = null;
+    }
+    this._filteredContainer = sourceContainer;
+    this._filterKey = filterKey;
+    this.blurFilter = null;
+    this.convolutionFilter = null;
+
+    // A filter draws the imagery into a texture the size of the screen, then draws that texture again
+    // through its shader (about 2 ms of GPU time per frame, see `design/graphics-system.md`).
+    // At the default values the adjustment changes nothing, so leave it out.
+    const filters: PIXI.Filter[] = [];
+    if (brightness !== 1 || contrast !== 1 || saturation !== 1) {
+      filters.push(new AdjustmentFilter({ brightness, contrast, saturation }));
+    }
 
     if (this.filters.sharpness > 1) {
       // The convolution filter consists of adjacent pixels with a negative factor and the central pixel being at least one.
@@ -498,7 +529,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         width: 3,
         height: 3
       });
-      sourceContainer.filters = [...sourceContainer.filters, this.convolutionFilter];
+      filters.push(this.convolutionFilter);
 
     } else if (this.filters.sharpness < 1) {
       const blurFactor = interpolateNumber(1, 8)(1 - this.filters.sharpness);
@@ -506,8 +537,10 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         strength: blurFactor,
         quality: 4
       });
-      sourceContainer.filters = [...sourceContainer.filters, this.blurFilter];
+      filters.push(this.blurFilter);
     }
+
+    sourceContainer.filters = filters.length ? filters : null;
   }
 
 

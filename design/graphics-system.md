@@ -339,11 +339,14 @@ there's a lot to draw; the GPU probably runs at a lower clock when it has little
 
 What that says:
 
-- **The imagery filter costs 2 ms and does nothing.** `PixiLayerBackgroundTiles.applyFilters()` puts an
-  `AdjustmentFilter` on the base imagery whenever it renders, also when brightness, contrast and
-  saturation are all 1. A filter makes Pixi draw the imagery into a full-size texture and then draw
-  that texture through the filter's shader (0.6 ms without MSAA). It also makes a new filter object on
-  every frame. Skipping the filter at the default values takes a third off the GPU time in most places.
+- **The imagery filter cost 2 ms and did nothing. Fixed (Nov 18).**
+  `PixiLayerBackgroundTiles.applyFilters()` put an `AdjustmentFilter` on the base imagery on every
+  frame, also when brightness, contrast and saturation were all 1, and made a new filter object each
+  time. A filter makes Pixi draw the imagery into a full-size texture and then draw that texture
+  through the filter's shader (0.6 ms without MSAA). Now a setting at its default gets no filter, and
+  the filters are set only when the settings or the base imagery change. In frame stats, Seattle went
+  from 7.1 to 6.0 ms and Heybridge from 4.7 to 3.5. The tables above are from before the fix. A user
+  who changes a display setting still pays for the pass.
 - **MSAA at ratio 2 triples everything.** Turning either one off brings Seattle from 6.1 to 2.1 ms, and
   both off to 0.8. At ratio 2 a pixel is small enough that 4× MSAA may not be worth it; that's a
   decision to make by looking at screenshots, not from these numbers.
@@ -400,8 +403,8 @@ Each step is measured with frame stats on the same set of places.
    | Heybridge, England | `18.00/51.72229/0.67766` | fences |
 3. **GPU time. Done (Nov 18).** The toggles are in section 6: most of the GPU time is fixed (MSAA at
    ratio 2, the imagery filter, `multiView`'s copy), and the features are about 1 ms of it. Three
-   changes come out of it, none made yet: skip the imagery filter at its default values (2 ms, small),
-   render the map without `multiView` (1.5 to 2 ms, larger), and decide whether ratio 2 needs MSAA.
+   changes come out of it: skip the imagery filter at its default values (2 ms; done), render the map
+   without `multiView` (1.5 to 2 ms, larger; not done), and decide whether ratio 2 needs MSAA.
    The experiments needed a temporary hook to override Pixi's options at startup; it isn't in the code.
 4. **A rendering info card** next to the measurement and history cards, showing the frame stats live
    while panning (the "Performer-inspired statistics display" in `backlog.md`).
