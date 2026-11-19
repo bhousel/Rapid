@@ -972,6 +972,6 @@ don't always end up where labels placed all at once do. That was already so afte
   DRAW costs). They're measured on one machine, an M4.
 
 **A note on measuring:** this work reloaded dense places about forty times in a day, and by the
-end the OSM API answered every map request with 429 (too many requests). Rapid then shows an empty
-map and doesn't ask again until the view moves (`backlog.md`). The numbers for making features
+end the OSM API answered every map request with 429 (too many requests). Rapid then showed an empty
+map and didn't ask again until the view moved (fixed since, in `OsmService`). The numbers for making features
 below are from before that; the last change to the budget rule was measured in Seattle only.

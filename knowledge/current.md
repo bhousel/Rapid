@@ -57,7 +57,11 @@ Still to do, in about this order:
   features are drawn again over several frames when one frame has no time for them
   (`updateFeature()`, `continueWaiting()`); labels wait for them. A zoom's frame went from 147 +
   30 ms to 17 + 10 in Seattle, and from 334 + 47 to 64 + 18 at Staten Island.
-  **Making features waits too** (Nov 19; not committed yet): `PixiLayerOsm._waitToMake()`, and
+  **The rate limit bar is back** (Nov 19; not committed yet): a 429 from the OSM API shows the
+  red status bar with its countdown again, and the view loads by itself when the time is up
+  (`OsmService.setRateLimit()`, `_rateLimitEnded()`). It had been cleared by its own status check
+  since Sept 2025.
+  **Making features waits too** (Nov 19): `PixiLayerOsm._waitToMake()`, and
   the budget is bigger (24 ms) when the view is still and the scheduler idle. The longest frame of
   a load at Staten Island went from 753 ms to about 145.
   **To pick up:** Užice's restyle takes 64 frames and 2.1 s since features' DRAW cost counts

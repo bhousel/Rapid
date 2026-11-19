@@ -450,6 +450,102 @@ describe('OsmService', () => {
     });
 
 
+    // The OSM API answers 429 to map requests when one address has downloaded too much.
+    // Its other calls (capabilities, user details) go on working meanwhile.
+    describe('rate limits', () => {
+      const tooMany = seconds => ({
+        status: 429,
+        body: `You have downloaded too much data. Please try again in ${seconds} seconds.`,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      const mapCalls = () => fetchMock.callHistory.calls().filter(c => /map\.json/.test(c.url));
+      let statuses;
+      const onStatusChange = status => statuses.push(status);
+
+      beforeEach(() => {
+        const v = context.viewport;
+        v.transform.zoom = 20;
+        v.transform.translation = [55212042.434589595, 33248879.510193843];  // -74.0444216, 40.6694299
+        v.dimensions = [64, 64];
+        statuses = [];
+        _osm.on('apistatuschange', onStatusChange);
+      });
+
+      afterEach(() => {
+        _osm.off('apistatuschange', onStatusChange);
+      });
+
+      it('reports a rate limit for as long as the API said, though its status check succeeds', async () => {
+        fetchMock.route(/map\.json/, tooMany(30), { delay: 1 });
+        _osm.loadTiles();
+
+        await Bun.sleep(10);  // the tile's 429, then the status check it sets off
+        assert.deepEqual(statuses, ['ratelimit']);
+        const rateLimit = _osm.getRateLimit();
+        assert.isOk(rateLimit, 'the rate limit is still on');
+        assert.strictEqual(rateLimit.duration, 30);
+        assert.isAtMost(rateLimit.remaining, 30);
+      });
+
+      it('asks for no tiles while the rate limit is on', async () => {
+        fetchMock.route(/map\.json/, tooMany(30), { delay: 1 });
+        _osm.loadTiles();
+        await Bun.sleep(10);
+        assert.lengthOf(mapCalls(), 1);
+
+        context.viewport.transform.v++;  // touch viewport
+        _osm.loadTiles();
+        await Bun.sleep(5);
+        assert.lengthOf(mapCalls(), 1, 'no second request');
+      });
+
+      it('keeps the longer of two rate limits', async () => {
+        _osm.setRateLimit(30);
+        _osm.setRateLimit(5);
+        assert.strictEqual(_osm.getRateLimit().duration, 30);
+        _osm.setRateLimit(60);
+        assert.strictEqual(_osm.getRateLimit().duration, 60);
+      });
+
+      it('when the time is up, says the API is back and loads the view again by itself', async () => {
+        fetchMock.route(/map\.json/, tooMany(1), { delay: 1 });
+        _osm.loadTiles();
+        await Bun.sleep(10);
+        assert.deepEqual(statuses, ['ratelimit']);
+        assert.isFalse(_osm.isDataLoaded([-74.0444216, 40.6694299]));
+
+        // The API answers again..
+        fetchMock.removeRoutes();
+        fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
+        spyRedraw.mockClear();
+
+        await Bun.sleep(1700);  // ..and the second is over
+        assert.isNull(_osm.getRateLimit());
+        assert.deepEqual(statuses, ['ratelimit', 'online']);
+        assert.isAtLeast(spyRedraw.mock.calls.length, 1, 'a redraw was requested');
+
+        // The redraw asks for the view's tiles, as the map does on every frame. The view hasn't moved.
+        _osm.loadTiles();
+        await Bun.sleep(10);
+        assert.lengthOf(mapCalls(), 2, 'the tile was asked for again');
+        assert.isTrue(_osm.isDataLoaded([-74.0444216, 40.6694299]), 'and loaded');
+      });
+
+      it('does nothing when the time is up after a reset', async () => {
+        fetchMock.route(/map\.json/, tooMany(1), { delay: 1 });
+        _osm.loadTiles();
+        await Bun.sleep(10);
+        await _osm.resetAsync();
+        statuses = [];
+        spyRedraw.mockClear();
+
+        await Bun.sleep(1700);
+        assert.deepEqual(statuses, []);
+        assert.lengthOf(spyRedraw.mock.calls, 0);
+      });
+    });
+
+
 ////    it('isDataLoaded', () => {
 ////      expect(_osm.isDataLoaded([-74.0444216, 40.6694299])).to.be.false;
 ////
