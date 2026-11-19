@@ -28,13 +28,22 @@ const DRAW_SAME_TICK_MS = 8;
  * (gathering the data, anything the user just changed) takes as long as it takes. It's under
  * `DRAW_SAME_TICK_MS`, so a frame that only catches up on work that waited draws in the same tick.
  *
- * Where drawing a frame is expensive whatever changed in it (a dense place, where Pixi rebuilds
- * big instruction lists), small steps cost more than they save: each step pays for a DRAW pass.
- * So the budget grows to what the last DRAW pass cost, up to `MAX_APP_BUDGET_MS`. Frames get
- * longer there, and the work is done in far fewer of them.
+ * Where a frame is expensive whatever changed in it (a dense place, where Pixi rebuilds big
+ * instruction lists), small steps cost more than they save: each step pays for a whole frame.
+ * So the budget is at least half of what recent frames cost, up to `MAX_APP_BUDGET_MS`. It
+ * settles where a frame spends as long catching up as it costs anyway: frames get longer there,
+ * and the work is done in far fewer of them.
  */
 const APP_BUDGET_MS = 6;
 const MAX_APP_BUDGET_MS = 50;
+
+/**
+ * The budget when nothing else wants the time: the view has been still for `STILL_AFTER_MS`, and
+ * the scheduler has no tasks waiting. Then catching up sooner matters more than 60 frames a
+ * second, and the frames come at about 30 until it's done.
+ */
+const STILL_BUDGET_MS = 24;
+const STILL_AFTER_MS = 150;
 
 /** How many recent frames to keep stats for (see `renderFrames`) */
 const RENDER_FRAME_HISTORY = 120;
@@ -131,6 +140,8 @@ export class GraphicsSystem extends AbstractSystem {
   protected _appPending: boolean;
   /** Whether the last frame's layers put work off to a later frame (see `RenderFrame.unfinished`) */
   protected _unfinished: boolean;
+  /** When a frame was last made at a transform other than the one drawn before it (the view was moving) */
+  protected _viewMovedTime: number;
   /** Whether a full scene-graph redraw has been requested but not yet executed */
   protected _drawPending: boolean;
   /**
@@ -200,6 +211,7 @@ export class GraphicsSystem extends AbstractSystem {
     this._appWasPass = false;
     this._appPending = false;
     this._unfinished = false;
+    this._viewMovedTime = 0;
     this._drawPending = false;
     this._redrawRequested = true;   // the first frame has everything to do
     this._redrawLayerIDs = new Set<LayerID>();
@@ -872,6 +884,7 @@ export class GraphicsSystem extends AbstractSystem {
     if (!this._started || this._paused) return;
 
     const context = this.context;
+    const scheduler = context.systems.scheduler!;
 
     // If the user is currently resizing, skip rendering until the size has settled
     if (context.container().classed('resizing')) return;
@@ -907,8 +920,19 @@ export class GraphicsSystem extends AbstractSystem {
 
     const frame = new RenderFrame(this._frame, mapTransform.zoom);
     frame.viewBox = mapViewport.visibleWorldExtent();
-    const lastDrawMs = this.lastRenderFrame?.draw?.ms ?? 0;
-    frame.deadline = frame.time + Math.min(MAX_APP_BUDGET_MS, Math.max(APP_BUDGET_MS, lastDrawMs));
+
+    // How long may this frame spend on work that can wait?
+    // Little while the view is moving or background work is waiting, more when nothing else wants the time.
+    const tDrawn = this._prevTransform;
+    if (tDrawn.x !== mapTransform.x || tDrawn.y !== mapTransform.y || tDrawn.z !== mapTransform.z || tDrawn.r !== mapTransform.r) {
+      this._viewMovedTime = frame.time;
+    }
+    const isStill = (frame.time - this._viewMovedTime > STILL_AFTER_MS) && !scheduler.numPending;
+    // ..and at least half of what a frame costs here anyway. (The cheaper of the last two frames:
+    // one slow frame on its own, like a pass or the first DRAW of a session, doesn't count.)
+    const recentMs = Math.min(this._renderFrames.at(-1)?.cpuMs ?? 0, this._renderFrames.at(-2)?.cpuMs ?? 0);
+    const budget = Math.max(isStill ? STILL_BUDGET_MS : APP_BUDGET_MS, recentMs / 2);
+    frame.deadline = frame.time + Math.min(MAX_APP_BUDGET_MS, budget);
 
 // worldcoordinates
 //    if (pixiTransform.k !== mapTransform.k || dist > 100000) {

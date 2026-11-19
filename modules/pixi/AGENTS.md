@@ -83,6 +83,13 @@ rules that come out of it:
   not `feature.update(viewport)`, and call `this.continueWaiting(frame, viewport)` on the frames
   where `keepFeatures()` says yes. A feature may then be drawn a few frames late (section 10), so
   don't read anything off a feature that's still `dirty` (its bounds, its hit area).
+- **A feature may not exist yet for data the layer has seen.** The OSM layer puts off making
+  features that aren't needed at once (`_waitToMake()`), and makes them over the next frames.
+  Code that looks a feature up right after data arrives should wait for `gfx.pending` to be
+  `false`, or handle it not being there.
+- **Go easy on the OSM API when measuring.** `bun run measure --fresh` and every reload of the
+  debug Chrome ask it for 20 to 36 map tiles. After about forty in a day it answers 429, and the
+  map stays empty. To make features again without the network, use `layer.reset()`.
 - **A layer's `render()` can run 60 times a second.** While the view moves, a frame is drawn on
   every tick. Whatever a layer does before `keepFeatures()`, and everything in a layer that doesn't
   call it, is paid on each one. The same goes for listeners to `gfx`'s `draw` event: throttle them

@@ -144,7 +144,14 @@ export class RenderFrame {
    * changed in view is drawn in this frame, whatever the time.
    */
   public urgent: boolean;
-  /** Features in view that layers have put off drawing again so far in this frame (labels wait for them) */
+  /**
+   * Milliseconds that the DRAW pass is expected to spend on the features drawn in this APP pass
+   * so far. Drawing a feature costs little in the APP pass: Pixi builds its geometry in the DRAW
+   * pass, where a feature drawn for the first time costs about ten times one drawn again. Layers
+   * add to this as they draw (see `AbstractPixiLayer.updateFeature`), and `hasTime()` counts it.
+   */
+  public drawDebt: number;
+  /** Features in view that layers have put off making or drawing again so far in this frame (labels wait for them) */
   public waitingInView: number;
   /** Whether a layer put work off to a later frame, so that another frame should follow this one */
   public unfinished: boolean;
@@ -172,6 +179,7 @@ export class RenderFrame {
     this.viewBox = new Extent();
     this.deadline = Infinity;
     this.urgent = false;
+    this.drawDebt = 0;
     this.waitingInView = 0;
     this.unfinished = false;
     this.appMs = 0;
@@ -193,10 +201,12 @@ export class RenderFrame {
 
   /**
    * Whether the APP pass still has time for work that can wait (see `deadline`).
+   * The DRAW pass's share counts too: what the features drawn so far will cost there (`drawDebt`)
+   * is time this frame has already spent.
    * @return `true` if the deadline hasn't passed
    */
   public hasTime(): boolean {
-    return performance.now() < this.deadline;
+    return performance.now() + this.drawDebt < this.deadline;
   }
 
 

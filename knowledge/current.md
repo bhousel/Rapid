@@ -52,15 +52,22 @@ Still to do, in about this order:
   pass to do waits twice what the last one cost (at most 250 ms), with held frames moving the view
   meanwhile. A drag at Staten Island draws 29 frames a second (one per pointer event) where it
   drew 4, and loading takes the same time.
-  **A deadline on the frame, started** (Nov 19, section 10; not committed yet): a zoom no longer
+  **A deadline on the frame** (Nov 19, section 10): a zoom no longer
   works out every feature's style again (`feature.needsStyle`, `scene.dirtyTransform()`), and
   features are drawn again over several frames when one frame has no time for them
   (`updateFeature()`, `continueWaiting()`); labels wait for them. A zoom's frame went from 147 +
   30 ms to 17 + 10 in Seattle, and from 334 + 47 to 64 + 18 at Staten Island.
+  **Making features waits too** (Nov 19; not committed yet): `PixiLayerOsm._waitToMake()`, and
+  the budget is bigger (24 ms) when the view is still and the scheduler idle. The longest frame of
+  a load at Staten Island went from 753 ms to about 145.
+  **To pick up:** Užice's restyle takes 64 frames and 2.1 s since features' DRAW cost counts
+  against the budget (it was 12 frames and 1.0 s), and the rule meant to let the budget grow there
+  isn't doing it. Not looked into: the OSM API was answering 429 after about forty reloads of
+  dense places in a day. **Go easy on `--fresh` and reloads**, and don't measure Užice more than
+  once or twice in a session.
   **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
-  Next (section 10, "What it doesn't do yet"): put off making new features too (the first pass
-  after a load is still a 750 ms block), a frame between passes during a zoom, the pass's own
-  cost at dense places, and the other layers.
+  Next (section 10, "What it doesn't do yet"): a frame between passes during a zoom, the pass's
+  own cost at dense places, and the other layers.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

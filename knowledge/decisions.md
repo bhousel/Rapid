@@ -202,8 +202,17 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
   A hover during a wheel zoom asks for a frame, and it would have drawn everything at once.
 - **Labels wait for the features, then at most one frame for time.** They're placed by the
   features' shapes, so placing them first would place them twice.
-- **The budget is 6 ms, or the last DRAW pass's cost if that's more** (up to 50 ms). Each frame
-  pays for a DRAW pass, so where that's expensive, small steps take longer in all.
+- **The budget is 6 ms while the view moves or the scheduler has work waiting, 24 ms when
+  neither, and at least half of what recent frames cost** (up to 50 ms). Catching up fast matters
+  more than 60 frames a second only when nothing else wants the time. And each frame pays a fixed
+  cost, so where that's high, small steps take longer in all.
+- **What a feature will cost in the DRAW pass counts against the frame's budget** (fixed
+  estimates per feature, `RenderFrame.drawDebt`). Rejected: estimating it from recent frames.
+  DRAW has a fixed part and a part per feature, one frame doesn't tell them apart, and a wrong
+  estimate feeds back into the next frame's budget.
+- **Making a feature waits by the same rules as drawing one**, except in a frame the user asked
+  for: there, only what the user needs at once is made (something they drew, a vertex of their
+  selection). Otherwise a hover during a load would make every feature in view at once.
 - **Frames that catch up on waiting work aren't paced** (`FramePacer` doesn't see them). They're
   bounded by the deadline instead.
 

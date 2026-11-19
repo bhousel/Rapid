@@ -242,6 +242,63 @@ test('after a zoom, draws the features again over the following frames, with the
 });
 
 
+// ..and when there are many features to make, as after a load, they're made over several frames too.
+test('makes features over several frames when there are many to make, and ends up with all of them', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const made = await page.evaluate(async () => {
+    const { gfx } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+    const shownIDs = () => [...layer.features.values()].filter(feature => feature.visible).map(feature => feature.id).sort();
+    const before = shownIDs();
+
+    // Give the frames no time for work that can wait, and make the layer start from nothing.
+    const frameProto = Object.getPrototypeOf(gfx.lastRenderFrame);
+    const hasTime = frameProto.hasTime;
+    frameProto.hasTime = () => false;
+
+    const startID = gfx.lastRenderFrame.id;
+    layer.reset();
+    gfx.deferredRedraw();
+    while (gfx.pending) {
+      await nextFrame();
+    }
+    frameProto.hasTime = hasTime;
+
+    const frames = gfx.renderFrames.filter(frame => frame.id > startID);
+    const pass = frames.find(frame => !frame.layers.get('osm').kept);
+    const after = shownIDs();
+    return {
+      shownBefore: before.length,
+      shownAfter: after.length,
+      sameFeatures: JSON.stringify(before) === JSON.stringify(after),
+      pass: { unfinished: pass.unfinished, waiting: pass.layers.get('osm').waiting },
+      mostMadeInAFrame: Math.max(...frames.map(frame => frame.layers.get('osm').created)),
+      unfinishedFrames: frames.filter(frame => frame.unfinished).length,
+      last: { unfinished: frames.at(-1).unfinished, waiting: frames.at(-1).layers.get('osm').waiting },
+      dirtyAtEnd: [...layer.features.values()].filter(feature => feature.visible && feature.dirty).length
+    };
+  });
+
+  expect(made.shownBefore).toBeGreaterThan(150);
+  // The pass made a batch of features, and left the rest waiting
+  expect(made.pass.unfinished).toBe(true);
+  expect(made.pass.waiting).toBeGreaterThan(50);
+  // ..and the frames after it made a couple of batches each, until all of them were there
+  expect(made.mostMadeInAFrame).toBeLessThan(made.shownBefore);
+  expect(made.unfinishedFrames).toBeGreaterThan(1);
+  expect(made.last).toEqual({ unfinished: false, waiting: 0 });
+  expect(made.sameFeatures).toBe(true);
+  expect(made.dirtyAtEnd).toBe(0);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
 test('counts WebGL calls while detailed stats are on', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);

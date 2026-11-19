@@ -14,7 +14,7 @@ import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Preset } from '../lib/Preset.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Vec2, Viewport } from '@rapid-sdk/math';
+import type { Extent, Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /** Minimum zoom level where OSM data is rendered */
@@ -58,6 +58,29 @@ interface RelatedIDs {
   descendantIDs: Set<EntityID>;
   siblingIDs: Set<EntityID>;
 }
+
+/** The kinds of OSM data the layer draws, as it sorts them in `OsmData` */
+type OsmDataKind = keyof OsmData;
+
+/** Entities that a pass saw and made no features for yet, by kind (see `PixiLayerOsm._waitToMake`) */
+type UnmadeIDs = Record<OsmDataKind, Set<EntityID>>;
+
+/** The geometry that the entities of each kind have */
+const KIND_GEOMETRY: Record<OsmDataKind, GeometryType> = {
+  polygons: 'area',
+  lines: 'line',
+  points: 'point',
+  vertices: 'vertex'
+};
+
+/**
+ * When the layer makes features after its pass (see `_makeWaiting`), it takes this many entities
+ * at a time, and checks the frame's time between them. At least one batch is made on every call.
+ */
+const MAKE_BATCH = 64;
+
+/** While the view moves, entities waiting outside it are checked this often (ms) for having come into view */
+const RECHECK_OUTSIDE_MS = 100;
 
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
@@ -115,7 +138,18 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /** collection of calculated midpoints */
   protected _midpoints: Map<DataID, Midpoint>;
-
+  /** Entities in view that the last pass saw, whose features aren't made yet (see `_waitToMake`) */
+  protected _unmadeInView: UnmadeIDs;
+  /** The same, for entities outside the view (in the cull box's padding) */
+  protected _unmadeOutside: UnmadeIDs;
+  /** The related IDs that the last pass worked out, for the vertices made after it */
+  protected _lastRelated: RelatedIDs;
+  /** Features made after the pass, in the current call to `continueWaiting()` */
+  protected _madeCount: number;
+  /** Whether features outside the view may be made now (in the scene's call to `continueWaiting()`, when there's time) */
+  protected _makingOutside: boolean;
+  /** When the entities waiting outside the view were last checked for having come into view */
+  protected _recheckedOutside: number;
 
 
   /**
@@ -131,6 +165,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.pointContainer = null;
 
     this._midpoints = new Map<DataID, Midpoint>();
+    this._unmadeInView = this._newUnmade();
+    this._unmadeOutside = this._newUnmade();
+    this._lastRelated = { descendantIDs: new Set<EntityID>(), siblingIDs: new Set<EntityID>() };
+    this._madeCount = 0;
+    this._makingOutside = false;
+    this._recheckedOutside = 0;
   }
 
 
@@ -178,6 +218,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     super.reset();
 
     this._midpoints.clear();
+    this._unmadeInView = this._newUnmade();
+    this._unmadeOutside = this._newUnmade();
 
     // Add containers (`super.reset()` released the old ones), see `design/scene.md`
     const basemap = this._spatialContainer('basemap', 'osm');
@@ -199,7 +241,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const osm = context.services.osm;
     const viewZoom = viewport.transform.zoom;
-    if (!this.enabled || !osm?.started || viewZoom < MINZOOM) return;
+    if (!this.enabled || !osm?.started || viewZoom < MINZOOM) {
+      this._unmadeInView = this._newUnmade();    // nothing is drawn, so nothing is waiting to be made
+      this._unmadeOutside = this._newUnmade();
+      return;
+    }
 
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
@@ -207,12 +253,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    // Only the view moved, and everything is made already.
-    // (Except features that an earlier frame had no time to draw again: go on with those.)
+    // Only the view moved, and the last pass saw everything there is.
+    // (Go on with what an earlier frame had no time for: features to make, and to draw again.)
     if (this.keepFeatures(frame)) {
       this.continueWaiting(frame, viewport);
       return;
     }
+
+    // A pass sees every entity again, and says which ones wait this time.
+    this._unmadeInView = this._newUnmade();
+    this._unmadeOutside = this._newUnmade();
 
     let t = performance.now();   // each step's time goes in the frame's stats
     let entities = editor.entitiesInBox(frame.cullBox.bbox(), graph);   // Gather data in and around the view
@@ -301,6 +351,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.getSelfAndSiblings(interestingID, related.siblingIDs);
     }
 
+    this._lastRelated = related;
     t = this._endStep('related', t);
 
     this.renderVertices(frame, viewport, data, related);
@@ -312,6 +363,213 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._midpoints.clear();
     }
     this._endStep('midpoints', t);
+  }
+
+
+  /**
+   * Decides whether an entity that has no feature yet gets one now, or in a later frame.
+   * Making a feature (its Pixi objects, its style) and drawing it for the first time is the most
+   * expensive thing the layer does per feature, and after a load there are thousands to make.
+   *
+   * - Outside the view (in the cull box's padding), it waits until the view's are made and a frame
+   *   has time to spare.
+   * - In view, it's made while the frame has time. In a frame the user asked for, it's made
+   *   whatever the time if the user needs it at once (`needed`: they just drew it, or it's a
+   *   vertex of what they selected).
+   *
+   * An entity that waits is remembered, and `continueWaiting()` makes its feature in a later
+   * frame (see "A deadline on the frame" in `design/graphics-system.md`).
+   * @param kind - Which of the layer's kinds of data the entity is
+   * @param entityID - The entity
+   * @param extent - Where it is, in world coordinates
+   * @param frame - The frame being rendered
+   * @param needed - Whether the user needs to see it at once
+   * @return `true` if the caller should skip the entity for now
+   */
+  protected _waitToMake(kind: OsmDataKind, entityID: EntityID, extent: Extent | undefined, frame: RenderFrame, needed: boolean): boolean {
+    const inView = !extent || extent.intersects(frame.viewBox);
+    // After the pass, a few are made on every call even with no time left, so the work always gets done.
+    const hasTime = frame.hasTime() || (this._catchingUp && this._madeCount < MAKE_BATCH);
+
+    let wait: boolean;
+    if (!inView) {
+      wait = !(this._makingOutside && hasTime);
+    } else if (needed && frame.urgent) {
+      wait = false;
+    } else {
+      wait = !hasTime;
+    }
+
+    if (wait) {
+      (inView ? this._unmadeInView : this._unmadeOutside)[kind].add(entityID);
+    } else {
+      this._madeCount++;
+    }
+    return wait;
+  }
+
+
+  /**
+   * Goes on with what earlier frames put off: the features to draw again (see
+   * `AbstractPixiLayer.continueWaiting`), then the features to make, for the entities that
+   * `_waitToMake()` remembered. The ones in view come first.
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param outside - Whether to go on to what's outside the view, once what's in view is done
+   */
+  public override continueWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean = false): void {
+    super.continueWaiting(frame, viewport, outside);
+
+    const numOutside = this._countUnmade(this._unmadeOutside);
+    if (!numOutside && !this._countUnmade(this._unmadeInView)) return;
+
+    // The view may have moved over entities that waited outside it. Look now and then.
+    if (numOutside && frame.time - this._recheckedOutside > RECHECK_OUTSIDE_MS) {
+      this._recheckedOutside = frame.time;
+      this._recheckOutside(frame);
+    }
+
+    this._catchingUp = true;
+    this._madeCount = 0;
+    this._makeWaiting(frame, viewport, false);
+
+    // ..and with time to spare (or nothing else to do), the ones outside the view
+    if (outside && (frame.hasTime() || !this._countUnmade(this._unmadeInView))) {
+      this._makingOutside = true;
+      this._makeWaiting(frame, viewport, true);
+      this._makingOutside = false;
+    }
+    this._catchingUp = false;
+  }
+
+
+  /**
+   * Makes features for entities that waited, a batch at a time, by running them through the same
+   * `render…()` functions as a pass does. Each function asks `_waitToMake()` again, so an entity
+   * that still can't be made goes back to waiting.
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param outside - `true` for the entities outside the view, `false` for the ones in view
+   */
+  protected _makeWaiting(frame: RenderFrame, viewport: Viewport, outside: boolean): void {
+    const context = this.context;
+    const graph = context.systems.editor!.staging.graph;
+
+    // Take them all, and put back the ones there's no time for.
+    const waiting = outside ? this._unmadeOutside : this._unmadeInView;
+    const putBack = this._newUnmade();
+    if (outside) {
+      this._unmadeOutside = putBack;
+    } else {
+      this._unmadeInView = putBack;
+    }
+
+    const newBatch = (): OsmData => ({
+      polygons: new Map<EntityID, OsmWay | OsmRelation>(),
+      lines: new Map<EntityID, OsmWay>(),
+      points: new Map<EntityID, OsmNode>(),
+      vertices: new Map<EntityID, OsmNode>()
+    });
+
+    let batch = newBatch();
+    let batchSize = 0;
+    let stopped = false;
+
+    const makeBatch = (): void => {
+      if (batch.polygons.size)  this.renderPolygons(frame, viewport, batch);
+      if (batch.lines.size)     this.renderLines(frame, viewport, batch);
+      if (batch.points.size)    this.renderPoints(frame, viewport, batch);
+      if (batch.vertices.size)  this.renderVertices(frame, viewport, batch, this._lastRelated);
+      batch = newBatch();
+      batchSize = 0;
+      stopped = !frame.hasTime();
+    };
+
+    for (const kind of Object.keys(waiting) as OsmDataKind[]) {
+      for (const entityID of waiting[kind]) {
+        if (stopped) {
+          putBack[kind].add(entityID);
+          continue;
+        }
+
+        // Is it still there, and still the same kind of thing? If not, the next pass sorts it out.
+        const entity = graph.hasEntity(entityID);
+        if (!entity || entity.geometry(graph) !== KIND_GEOMETRY[kind]) continue;
+
+        (batch[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
+        if (++batchSize >= MAKE_BATCH) {
+          makeBatch();
+        }
+      }
+    }
+
+    if (batchSize) {
+      makeBatch();
+    }
+  }
+
+
+  /**
+   * Moves the entities that waited outside the view, and are in view now, to the ones in view.
+   * @param frame - The frame being rendered
+   */
+  protected _recheckOutside(frame: RenderFrame): void {
+    const context = this.context;
+    const graph = context.systems.editor!.staging.graph;
+
+    for (const kind of Object.keys(this._unmadeOutside) as OsmDataKind[]) {
+      const outside = this._unmadeOutside[kind];
+      for (const entityID of outside) {
+        const entity = graph.hasEntity(entityID);
+        const extent = entity && graph.geometry(entity).world?.extent;
+        if (extent?.intersects(frame.viewBox)) {
+          outside.delete(entityID);   // (deleting from a Set while iterating over it is safe)
+          this._unmadeInView[kind].add(entityID);
+        }
+      }
+    }
+  }
+
+
+  /**
+   * How many entities are waiting for their features to be made, and features to be drawn again.
+   * @return The number waiting
+   */
+  public override get numWaiting(): number {
+    return super.numWaiting + this._countUnmade(this._unmadeInView) + this._countUnmade(this._unmadeOutside);
+  }
+
+
+  /**
+   * How many of those are in view.
+   * @return The number waiting in view
+   */
+  public override get numWaitingInView(): number {
+    return super.numWaitingInView + this._countUnmade(this._unmadeInView);
+  }
+
+
+  /**
+   * Makes an empty collection of waiting entities.
+   * @return Empty sets, one per kind of data
+   */
+  protected _newUnmade(): UnmadeIDs {
+    return {
+      polygons: new Set<EntityID>(),
+      lines: new Set<EntityID>(),
+      points: new Set<EntityID>(),
+      vertices: new Set<EntityID>()
+    };
+  }
+
+
+  /**
+   * Counts the entities in a collection of waiting entities.
+   * @param unmade - The collection to count
+   * @return How many entities it holds
+   */
+  protected _countUnmade(unmade: UnmadeIDs): number {
+    return unmade.polygons.size + unmade.lines.size + unmade.points.size + unmade.vertices.size;
   }
 
 
@@ -369,6 +627,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         }
 
         if (!feature) {
+          // (If it isn't needed at once, it's made in a later frame)
+          if (this._waitToMake('polygons', entityID, part.world.extent, frame, entity.isNew())) continue;
           feature = new PixiFeaturePolygon(this, featureID);
         }
 
@@ -563,6 +823,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         }
 
         if (!feature) {
+          if (this._waitToMake('lines', wayID, part.world.extent, frame, way.isNew())) continue;
           feature = new PixiFeatureLine(this, featureID);
         }
 
@@ -686,6 +947,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
 
       if (!feature) {
+        // (The vertices of what's selected or hovered are needed at once: the user is about to grab one)
+        const extent = graph.geometry(node).parts[0]?.world?.extent;
+        if (this._waitToMake('vertices', nodeID, extent, frame, node.isNew() || isRelatedVertex(nodeID))) continue;
         feature = new PixiFeaturePoint(this, featureID);
       }
 
@@ -762,6 +1026,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
 
       if (!feature) {
+        const extent = graph.geometry(node).parts[0]?.world?.extent;
+        if (this._waitToMake('points', nodeID, extent, frame, node.isNew())) continue;
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = pointsContainer;
       }

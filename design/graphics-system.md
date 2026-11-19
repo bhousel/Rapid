@@ -691,8 +691,8 @@ Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull fra
 ### What's left
 
 - **Frame pacing in place of the 250 ms throttle:** done, section 9.
-- **A deadline on the frame, and work that can wait:** started, section 10. Drawing features again
-  and placing labels wait now. Making new features doesn't yet.
+- **A deadline on the frame, and work that can wait:** section 10. Making features, drawing them
+  again and placing labels wait now. The pass itself doesn't.
 - **All layers alike.** Only the OSM layer keeps its features today. The others do their pass on
   every frame, which is cheap at the places measured (the Rapid layer 0.1 to 0.6 ms) but is
   different code for the same job, and the deadline above needs every layer to say whether it has
@@ -863,9 +863,32 @@ check `dirty`, which works as before.
 
 ### What can wait, and how
 
-`GraphicsSystem` gives each frame a deadline: 6 ms after its APP pass began (`APP_BUDGET_MS`), or
-as long as the last DRAW pass took if that was longer, up to 50 ms. Layers ask `frame.hasTime()`.
+`GraphicsSystem` gives each frame a deadline, and layers ask `frame.hasTime()`. The budget:
 
+- **6 ms** (`APP_BUDGET_MS`) while the view is moving, or while the scheduler has tasks waiting.
+- **24 ms** (`STILL_BUDGET_MS`) when nothing else wants the time: the view has been still for
+  150 ms and the scheduler's queues are empty. The frames then come at about 30 a second until
+  the work is done.
+- **At least half of what recent frames cost anyway,** up to 50 ms. Where a frame is expensive
+  whatever changed in it, small steps cost more than they save.
+
+The DRAW pass's share counts against the budget too. Drawing a feature takes little time in the
+APP pass, because Pixi builds the geometry when it renders. So each feature drawn adds what it's
+expected to cost there (`frame.drawDebt`: 4 µs for one drawn again after a zoom, 10 µs for a new
+or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 new features in
+19 ms of APP pass and then spent 212 ms in DRAW.
+
+- **Making a feature.** After a load there are thousands to make, and making one (its Pixi
+  objects, its style) costs about 35 µs. Where the OSM layer's loops find an entity with no
+  feature, they ask `_waitToMake()`:
+  - **Outside the view,** it waits until the view's are made and a frame has time to spare.
+  - **In view,** it's made while the frame has time.
+  - In a frame **the user asked for,** it's made whatever the time only if the user needs it at
+    once: they just drew it, or it's a vertex of what they selected.
+
+  The layer remembers the entities that waited. On later frames `continueWaiting()` runs them
+  through the same `render…()` functions as a pass does, 64 at a time, the ones in view first.
+  At least one batch is made on each call.
 - **Drawing a feature again.** A layer calls `this.updateFeature(feature, frame, viewport)` where
   it called `feature.update(viewport)`.
   - A dirty feature **in view** is drawn at once while the frame has time. After that it waits,
@@ -879,16 +902,12 @@ as long as the last DRAW pass took if that was longer, up to 50 ms. Layers ask `
   `continueWaiting()`, which draws the features in view that waited, at least 32 a frame and as
   many as the deadline allows. After every layer has rendered, the scene calls it again for the
   ones outside the view, with whatever time is left.
-- **Placing labels.** The labels wait until no feature in view is waiting (they go by the
-  features' shapes), and one more frame if that frame is out of time. The labels that exist are
-  still drawn. In a frame the user asked for, they're placed at once.
+- **Placing labels.** The labels wait until no feature in view is waiting to be made or drawn
+  (they go by the features' shapes), and one more frame if that frame is out of time. The labels
+  that exist are still drawn. In a frame the user asked for, they're placed at once.
 - **Another frame.** If any layer has work waiting after a frame (`frame.unfinished`), the next
   tick makes another, pass or no pass. These frames aren't paced: they're cheap by construction.
   `gfx.pending` is `true` until nothing is left, and scripts and tests wait for that.
-
-The budget follows the cost of drawing because each frame pays for a DRAW pass whatever it
-changed. In Užice that's 50 ms: with 6 ms of work a frame, a restyle took 44 frames and 2.2 s. With
-the budget at the DRAW pass's cost, it takes 12 frames and 1.0 s.
 
 ### What it does
 
@@ -911,28 +930,48 @@ frames and how long until every feature was drawn again.
 
 | | Before, one frame | After, first frame | Frames | Done in |
 |---|---|---|---|---|
-| Seattle | 139 + 22 ms | 21 + 3 ms | 4 | 118 ms |
-| Staten Island | 310 + 34 ms | 50 + 1 ms | 7 | 201 ms |
-| Užice | 1,600 + 197 ms | 269 + 4 ms | 12 | 992 ms |
+| Seattle | 139 + 22 ms | 25 + 8 ms | 4 | 130 ms |
+| Staten Island | 310 + 34 ms | 50 + 3 ms | 8 | 237 ms |
+| Užice | 1,600 + 197 ms | 287 + 5 ms | 64 | 2,080 ms |
+
+(Seattle's first frame and frame count vary by run: 21 to 30 ms, 4 frames, 112 to 130 ms.)
+
+**Making features, at Staten Island (18,587 features, map still).** While the page loads, the
+longest frame of the map was 753 ms and is now about 145 (the first pass and the first DRAW,
+see below). The content passes took 876 ms in two frames, and take about 300 ms in four, with
+about 100 frames of 10 ms catching up between and after them. Loading takes the same 32 s. With
+every feature destroyed and made again (`layer.reset()`): a first frame of 49 + 2 ms, then 47
+frames of about 20 + 2 ms, done in 1.3 s. The longest frame was 360 ms before.
 
 **Checked by screenshot** at Staten Island: after a jump in zoom, a rotation and a rotation back,
 the settled picture is the same, pixel for pixel, as after every style is matched again
-(`dirtyScene()`). After an eased zoom the features are the same and a label can be in another
-place: labels placed as features arrive don't always end up where labels placed all at once do.
-That was already so after a pan.
+(`dirtyScene()`), and after each of 6 pans it's the same as after a full pass. After an eased zoom
+the features are the same and a label can be in another place: labels placed as features arrive
+don't always end up where labels placed all at once do. That was already so after a pan.
 
 ### What it doesn't do yet
 
-- **Making a feature can't wait, only drawing it again.** A new feature is made, bound and styled
-  in the pass that first sees it. So the first pass after a load is still one block (750 ms at
-  Staten Island), and a pass for a new cull box costs what it did (42 + 8 ms there). Putting that
-  off means the layer running a small pass, later, over just the entities that waited.
 - **The pass itself can't wait:** gathering, filtering and sorting the data, and the loop over
   every entity. That's the 50 to 65 ms a frame at a new zoom still takes at Staten Island, and 270
-  in Užice. Most of it is vertices (section 8, `design/filter-system.md`).
+  in Užice. It's also why a pass for a new cull box costs what it did (42 to 59 ms APP and 9 to
+  14 DRAW at Staten Island): putting off the new features didn't change it. Most of it is vertices
+  (section 8, `design/filter-system.md`).
+- **The first pass after a load pays two things once:** `FilterSystem` matching every entity for
+  the first time (87 of that pass's 141 ms at Staten Island), and the first DRAW pass that has
+  anything in it (76 to 128 ms, whatever it draws).
+- **Užice's restyle takes longer in all than it did before features' DRAW cost was counted:** 64
+  frames and 2.1 s, where it was 12 frames and 1.0 s (and one block of 1.8 s before any of this).
+  The frames are short now and there are many of them. The rule that should let the budget grow
+  there (half of what recent frames cost) isn't doing it, and I couldn't look into why: the OSM
+  API was answering 429 by then (below).
 - **No frame between passes during a zoom.** The CSS transform still carries a zoom between pass
   frames. Now that a feature can be shown at a zoom it wasn't drawn for, a held frame could be
   drawn at a new zoom too, sharp and with the right imagery.
-- **Only the OSM layer** checks `needsStyle` and calls `updateFeature()`.
-- **The budget is one rule** (6 ms, or the last DRAW pass's cost). It doesn't look at whether the
-  user is doing anything, or at the scheduler.
+- **Only the OSM layer** checks `needsStyle`, calls `updateFeature()` and puts off making features.
+- **The numbers in the budget are first guesses** (6 and 24 ms, 150 ms of stillness, the two
+  DRAW costs). They're measured on one machine, an M4.
+
+**A note on measuring:** this work reloaded dense places about forty times in a day, and by the
+end the OSM API answered every map request with 429 (too many requests). Rapid then shows an empty
+map and doesn't ask again until the view moves (`backlog.md`). The numbers for making features
+below are from before that; the last change to the budget rule was measured in Seattle only.

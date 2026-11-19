@@ -20,6 +20,18 @@ const KEEP_UNSEEN_PASSES = 20;
  */
 const MIN_WAITING_PER_FRAME = 32;
 
+/**
+ * What drawing a feature costs later, in the frame's DRAW pass, in milliseconds. Pixi builds a
+ * shape's geometry when it first renders it, so a feature that's new or has changed costs more
+ * there than one drawn again after a zoom. Measured Nov 2026 on an M4 at Staten Island: a
+ * restyle of 18,500 features took 34 ms of DRAW (2 µs each), and new features 5 µs each when a
+ * few hundred were made in a frame, but 30 µs each when 7,000 were (212 ms).
+ * They don't need to be exact: they keep one frame from drawing thousands of features in a few
+ * milliseconds of APP pass, and then spending a quarter of a second in DRAW.
+ */
+const DRAW_MS_PER_REDRAW = 0.004;
+const DRAW_MS_PER_NEW = 0.01;
+
 
 /**
  * AbstractPixiLayer is the base class from which all rendering Layers inherit.
@@ -76,6 +88,11 @@ export class AbstractPixiLayer {
   protected _waitingInView: Set<AbstractPixiFeature>;
   /** Dirty features outside the view (in the cull box's padding), drawn again when a frame has time to spare */
   protected _waitingOutside: Set<AbstractPixiFeature>;
+  /**
+   * Whether the layer is making features after its pass has ended (in a later frame, or after
+   * `cull()`), for data that the pass put off. `retainFeature()` then counts them as seen by that pass.
+   */
+  protected _catchingUp: boolean;
   /** Map of featureID to dataID */
   protected _featureHasData: Map<FeatureID, DataID>;
   /** Map of dataID to Set of featureIDs */
@@ -111,6 +128,7 @@ export class AbstractPixiLayer {
     this._keptFrame = -1;
     this._waitingInView = new Set<AbstractPixiFeature>();
     this._waitingOutside = new Set<AbstractPixiFeature>();
+    this._catchingUp = false;
 
     // Feature <-> Data
     // These lookups capture which features are bound to which data.
@@ -412,7 +430,7 @@ export class AbstractPixiLayer {
     if (inView && (mustNow || frame.hasTime())) {
       this._waitingInView.delete(feature);
       this._waitingOutside.delete(feature);
-      feature.update(viewport);
+      this._drawFeature(feature, frame, viewport);
     } else if (inView) {
       this._waitingOutside.delete(feature);
       this._waitingInView.add(feature);
@@ -455,10 +473,24 @@ export class AbstractPixiLayer {
         if (this.retained.get(feature.id) !== lastPass) continue;
         if (!feature.dirty) continue;
 
-        feature.update(viewport);
+        this._drawFeature(feature, frame, viewport);
         count++;
       }
     }
+  }
+
+
+  /**
+   * Draws a dirty feature, and counts what that will cost in the frame's DRAW pass against the
+   * frame's time (see `RenderFrame.drawDebt`).
+   * @param feature - The feature to draw
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  protected _drawFeature(feature: AbstractPixiFeature, frame: RenderFrame, viewport: Viewport): void {
+    const drawMs = feature.onlyTransformDirty ? DRAW_MS_PER_REDRAW : DRAW_MS_PER_NEW;
+    feature.update(viewport);
+    frame.drawDebt += drawMs;
   }
 
 
@@ -493,7 +525,8 @@ export class AbstractPixiLayer {
     // If in user's view, retain it regardless of whether it's actually visible.
     // We want to avoid continuously creating invisible things just to dispose of them a few frames later.
     // For example points when zoomed out far.
-    this.retained.set(feature.id, this._pass);
+    // (A feature made after the pass, by a layer catching up on what waited, belongs to that pass.)
+    this.retained.set(feature.id, this._catchingUp ? this._pass - 1 : this._pass);
   }
 
 

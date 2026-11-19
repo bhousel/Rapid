@@ -322,6 +322,46 @@ describe('AbstractPixiLayer', () => {
         assert.include(drawn, 'far');
       });
 
+      it('counts what each feature it draws will cost in the DRAW pass against the frame\'s time', () => {
+        const changed = addDirtyFeature('changed', 10);
+        const zoomed = addDirtyFeature('zoomed', 20, { onlyTransformDirty: true });
+        const frame = makeTimedFrame(true, { contentChanged: true });
+
+        layer.keepFeatures(frame);
+        layer.updateFeature(zoomed, frame, viewport);
+        const afterRedraw = frame.drawDebt;
+        assert.isAbove(afterRedraw, 0);
+        layer.updateFeature(changed, frame, viewport);
+        assert.isAbove(frame.drawDebt - afterRedraw, afterRedraw);   // a new or changed one costs more
+
+        // ..so a frame runs out of time sooner than its clock says
+        frame.deadline = performance.now() + 60000;
+        assert.isTrue(frame.hasTime());
+        frame.drawDebt = 120000;
+        assert.isFalse(frame.hasTime());
+      });
+
+      it('counts a feature made after the pass as seen by that pass', () => {
+        const a = addDirtyFeature('a', 10);
+        runPass(makeTimedFrame(true, { contentChanged: true }), [a]);
+
+        // A layer catching up makes a feature in a later frame, where it keeps its features
+        const late = addDirtyFeature('late', 20);
+        const kept = makeTimedFrame(false);
+        assert.isTrue(layer.keepFeatures(kept));
+        layer._catchingUp = true;
+        layer.updateFeature(late, kept, viewport);   // no time: it waits
+        layer.retainFeature(late, kept);
+        layer._catchingUp = false;
+        layer.cull(kept);
+
+        layer.continueWaiting(makeTimedFrame(true), viewport);   // ..and is drawn, not skipped as unseen
+        assert.include(drawn, 'late');
+
+        runPass(makeTimedFrame(true, { contentChanged: true }), [a]);   // the next pass doesn't see it
+        assert.isFalse(late.visible);
+      });
+
       it('forgets a feature that was destroyed, or that the last pass no longer saw', () => {
         const a = addDirtyFeature('a', 10);
         const b = addDirtyFeature('b', 20);
