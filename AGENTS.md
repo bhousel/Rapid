@@ -612,6 +612,9 @@ what the developer is seeing when they report a problem.
      a value to get it back as JSON (the snippet is an async function body, so it can `await`)
    - `bun run cdp reload [setup.js]`: reload, wait for Rapid to start, then run an optional setup snippet
    - `bun run cdp press <key>`: press a key (e.g. `Escape` closes the welcome screen after a reload)
+4. To measure what a frame costs, `bun run measure` visits a set of difficult places in that Chrome and
+   prints each one's frame stats (`--fresh` for numbers you can compare between builds; see
+   `design/graphics-system.md`). It moves the developer's map.
 
 Tips:
 - **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`

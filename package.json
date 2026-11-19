@@ -30,6 +30,7 @@
     "cdp": "bun ./scripts/cdp.ts",
     "clean": "bun ./scripts/clean.ts",
     "imagery": "bun ./scripts/build_imagery.ts",
+    "measure": "bun ./scripts/measure.ts",
     "start": "bun run --sequential build start:server",
     "start:chrome": "bun ./scripts/chrome.ts",
     "start:server": "bun ./scripts/server.ts",

@@ -43,6 +43,8 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 ## Pixi rendering follow-ups
 - **Profiling pass** (see [`design/profiling.md`](../design/profiling.md)): baseline numbers for heap, GPU resources, the worker heap and listeners; a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and reports what grows. Prompted by a 6 GB debug Chrome renderer with a 100 MB Rapid heap after a long driven session (Nov 2026); probably the browser, not measured yet.
 - **Rendering cost** has its own design and plan: [`design/graphics-system.md`](../design/graphics-system.md) (frame stats, partial fills without stencil masks, our own line builder, dashed lines, GPU time, and batching casings and strokes with `RenderLayer`).
+- **Labels on long lines walk the whole line** (found with `bun run measure`, Nov 18): five transatlantic cables at Smith Point cost 350 ms per zoom change, about 180,000 label boxes each. Clip a line to the view before `placeRopeLabel()` covers it with boxes. Details in `graphics-system.md` section 2.
+- **Hidden features are checked on every frame:** `FilterSystem.filterScene()` took 33 of 59 ms of an unchanged frame at Staten Island Mall. Cache whether each entity is hidden, or skip filtering when nothing changed. Same section.
 - **Scene follow-ups** (see [`design/scene.md`](../design/scene.md) section 3): reordering spatial IDs (lift OSM while drawing, or a layer-order UI), now that each spatial container has an explicit `zIndex`; and hit-testing by geometry instead of Pixi, which would make snapping independent of stroke width and z-order.
 - **Text rasterization without Pixi.Text**: move text drawing onto an `OffscreenCanvas` worker, or bypass `Pixi.Text` with main-thread canvas2D rasterization first. Main thread can feed the resulting `HTMLCanvasElement`, `ImageBitmap`, or `ImageData` to `PixiTextures.allocate('text', ...)`, avoiding both nested `renderer.generateTexture()` and `readPixels`. Worker font loading needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
 - **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
@@ -115,7 +117,8 @@ its harnesses lived in a session's scratch folder and are gone. Make it a suite:
   the backup after an edit, a merge over edits, a validator pass over a real tile, a render-like pass.
 - Both engines: Bun (JavaScriptCore) directly, and V8 through a Bun bundle of `modules/headless.js`
   run in Node (`bun build --target=node`; Node can't load the TS sources). Chrome over CDP for
-  rendering, which needs WebGL.
+  rendering, which needs WebGL: `bun run measure` (Nov 18) does this for frame stats on a set of
+  difficult places.
 - Count operations where we can (copies per derive, recomputes per merge, O(L) scans per event), and
   keep wall-clock numbers for reports: timing limits in CI are flaky.
 - A baseline to compare a branch against, and a plan for which numbers each design doc tracks.
