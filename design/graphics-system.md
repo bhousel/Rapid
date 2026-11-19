@@ -145,7 +145,8 @@ What that says:
   `FilterSystem.filterScene()`, which checks every entity in view against the hidden features on every
   frame. Each entity's matches are cached, but `isHidden()` still runs per entity (copying the matches
   into an array), and each vertex asks all of its parent ways. It runs only when some feature is hidden,
-  as in this profile. The rest is `renderPolygons()`, `renderVertices()` and `entitiesInBox()`. See
+  as in this profile. (Both fixed on Nov 19: section 8, "What the steps cost".) The rest is
+  `renderPolygons()`, `renderVertices()` and `entitiesInBox()`. See
   "Renderer: classify a node only when it's dirty" in `backlog.md`.
 - **Moving the view makes Pixi rebuild everything it knows about the scene.** A pan frame's APP pass
   costs about what a redraw's does, but its DRAW pass goes from under 1 ms to about 2 µs per visible
@@ -636,20 +637,56 @@ in ms:
 | Golmud | 48.4 | 4.2 | 22.5 | 6.0 | 9.8 | 0 | 6.0 |
 | Užice | 211 | 12.8 | 106 | 21.2 | 18.7 | 15.4 | 34.2 |
 
-Hidden-feature filtering is about half of a pass wherever any feature is hidden (as in this
-profile). Sorting the entities by geometry (`classify`), the vertices and the spatial index come
+Hidden-feature filtering was about half of a pass wherever any feature is hidden (boundaries are,
+by default). Sorting the entities by geometry (`classify`), the vertices and the spatial index come
 next. On a restyle the shapes take over: in Užice 492 ms of polygons, 533 of lines and 429 of
 vertices; at Golmud 416 ms of polygons; in Seattle 56 ms of lines and 42 of vertices.
 
+**After the filter's quick fixes** (Nov 19, `design/filter-system.md` section 4: its cache is keyed
+by the entity, not by a string built on every call, and it remembers each feature's answer):
+
+| Place | `render()` | gather | filter | classify | polygons | lines | vertices |
+|---|---|---|---|---|---|---|---|
+| Seattle | 8.2 | 0.6 | 2.2 | 0.7 | 0.5 | 2.0 | 2.5 |
+| Staten Island | 32.3 | 2.8 | 9.8 | 4.2 | 7.4 | 1.4 | 5.4 |
+| Užice | 144 | 12.4 | 39.4 | 22.1 | 19.8 | 15.6 | 34.3 |
+
+Most of what's left in `filter`, `classify` and `vertices` is the vertices: 65,695 of the 84,641
+entities in Staten Island's cull box, of which the layer draws about 3,500.
+
+**Compare builds in one session.** The same build measured hours apart differs by more than some
+of these changes: Seattle's redraw frame was 10.8 and 17.5 ms in two runs of one build, and Staten
+Island's cull frames 63 ms one night and 100 the next morning. Old build then new, back to back at
+Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull frame's from 100 to
+72, and a kept frame's didn't change (6.0 and 5.8).
+
 ### What's left
 
-- **The 250 ms throttle** between APP passes while panning (`THROTTLE`) was there because a pass was
-  expensive. A frame that only moves the view costs about 3 ms now, so those could be drawn on
-  every animation frame, and the CSS transform would only be needed across the frames that do a
-  pass. It would also keep the passes warm (a pass after a pause costs twice as much, above). Not
-  done: it changes how panning looks, so it's Bryan's call.
-- **Make the pass cheaper**, now that the steps are measured: cache what's hidden, then the spatial
-  query and the vertices.
-- **Restyle the view first** after a zoom change, and the padding afterwards in idle time.
-- **The other data layers:** the Rapid layer does its pass on every frame still.
+- **Frame pacing in place of the 250 ms throttle** (`THROTTLE`). The number is a rough guess
+  carried over from iD. It does two jobs: it keeps an expensive pass from running too often, and it
+  leaves time for input and for background work (tiles, validation; `SchedulerSystem` owns that).
+  Bryan's direction (Nov 19): let the frame rate float with what's going on, so that 60, 30 or 20
+  frames a second are reached when the work allows. Rapid isn't a game and needn't hold 60; at 10
+  it's usable and visibly laggy. Proposed, not built:
+  - A frame that only moves the view (every layer kept its features) runs on every tick, APP and
+    DRAW together. Today they take a tick each, so 30 a second is the most a pan could reach. At 3
+    to 7 ms such a frame leaves about 10 ms of a 60 fps frame to the scheduler's queues.
+  - A frame that does a pass waits its turn: the gap after a pass grows with what the pass cost, so
+    passes take a set share of the time. `immediateRedraw()` (hover, select, drag) still skips the
+    wait. The scheduler's pressure level can stretch the gap.
+  - Užice's 150 to 220 ms pass is 4 to 7 a second with nothing else running. Pacing can't fix
+    that; a cheaper pass or a pass spread over frames can.
+  - To measure first: why a pass after a pause costs twice as much (above), and how long the
+    background work takes to finish under each policy (`bun run measure` doesn't record it yet).
+- **A deadline on the frame, and work that can wait.** With the frame carrying a deadline, a layer
+  whose work can come a frame late keeps what it has and asks for another frame. Labels are the
+  first case: about 1 ms on a pan (5 in Užice), but 355 of the 386 ms a zoom change costs at Smith
+  Point, and 83 ms in Užice. The same deadline would restyle the view first after a zoom change, and the padding
+  afterwards.
+- **All layers alike.** Only the OSM layer keeps its features today. The others do their pass on
+  every frame, which is cheap at the places measured (the Rapid layer 0.1 to 0.6 ms) but is
+  different code for the same job, and the deadline above needs every layer to say whether it has
+  work.
+- **Make the pass cheaper.** The filter's quick fixes are done (above). Next, the vertices: don't
+  gather, filter, sort and test each one when few are drawn (`design/filter-system.md` section 4).
 - **More requests could name their layer:** the photo and QA services, `VectorTileService`.

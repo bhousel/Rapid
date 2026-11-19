@@ -305,13 +305,13 @@ describe('MapSystem', () => {
 
       filters.getMatches(n1, graph, 'point');
       const oldKey = n1.key;
-      assert.property(filters._cache, oldKey);
+      assert.isTrue(filters._cache.has(n1));
 
       const difference = { complete: () => new Map([['n1', n1]]), didChange: {} };
       editor.emit('stagingchange', difference);
 
       assert.strictEqual(n1.key, oldKey);   // other graphs share the object, so it isn't touched
-      assert.notProperty(filters._cache, oldKey);
+      assert.isFalse(filters._cache.has(n1));
       assert.deepEqual(dirtied, ['osm', 'n1']);
     });
   });

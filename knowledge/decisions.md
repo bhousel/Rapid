@@ -50,7 +50,7 @@ Details and measurements are in `design/graph-geometry.md`; these are the choice
   a changed shape is a new `Geometry`, so identity already says what a `graph.version()` would. Numbers
   would be one more thing to keep right through savepoints, rebases and restores.
 - **Data is never changed in place.** Services and editors store `update()`'d copies. `v` stays as a
-  stamp `update()` gives each copy, because `key` (`${id}v${v}`) feeds d3 joins and `FilterSystem`;
+  stamp `update()` gives each copy, because `key` (`${id}v${v}`) feeds d3 joins (and fed `FilterSystem`'s cache until Nov 19);
   `touch()` and `AbstractPixiFeature.v` are gone.
 - **After a rebase, stable and staging catch up at once; other graphs when they become current.** No
   per-read "update on first use" check. Safe because rebase and validators are synchronous, and the only

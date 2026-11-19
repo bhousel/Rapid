@@ -1,4 +1,4 @@
-import { beforeAll, describe, it, mock } from 'bun:test';
+import { beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import osmRulesets from '../../../data/osm_rulesets.json5';
@@ -191,11 +191,11 @@ describe('FilterSystem', () => {
 
         // First call will populate cache
         _filters.getMatches(entity, graph, geometry);
-        assert.isDefined(_filters._cache[entity.key]);
+        assert.isTrue(_filters._cache.has(entity));
 
         // Clear should remove from cache
         _filters.clearEntity(entity);
-        assert.isUndefined(_filters._cache[entity.key]);
+        assert.isFalse(_filters._cache.has(entity));
       });
 
       it('clear clears cache for multiple entities', () => {
@@ -209,13 +209,108 @@ describe('FilterSystem', () => {
         // Populate cache
         _filters.getMatches(a, graph, a.geometry(graph));
         _filters.getMatches(b, graph, b.geometry(graph));
-        assert.isDefined(_filters._cache[a.key]);
-        assert.isDefined(_filters._cache[b.key]);
+        assert.isTrue(_filters._cache.has(a));
+        assert.isTrue(_filters._cache.has(b));
 
         // Clear both
         _filters.clear([a, b]);
-        assert.isUndefined(_filters._cache[a.key]);
-        assert.isUndefined(_filters._cache[b.key]);
+        assert.isFalse(_filters._cache.has(a));
+        assert.isFalse(_filters._cache.has(b));
+      });
+
+      it('keeps a separate record for a new version of an entity', () => {
+        const a = new Rapid.OsmWay(context, { id: 'a', tags: { highway: 'path' }, version: 1 });
+        const a2 = a.update({ tags: { highway: 'residential' } });
+        const graph = new Rapid.Graph(context, [a]);
+
+        assert.deepEqual([..._filters.getMatches(a, graph, 'line')], ['paths']);
+        assert.deepEqual([..._filters.getMatches(a2, graph, 'line')], ['traffic_roads']);
+        assert.deepEqual([..._filters.getMatches(a, graph, 'line')], ['paths']);
+      });
+    });
+
+
+    describe('remembering what is hidden', () => {
+      // `isHidden` keeps its answer for an entity until the hidden filters change, or the entity is cleared.
+      let a, b, path, graph;
+
+      beforeEach(() => {
+        _filters.enableAll();
+        _filters.forceVisible([]);
+        a = new Rapid.OsmNode(context, { id: 'a', version: 1 });
+        b = new Rapid.OsmNode(context, { id: 'b', version: 1 });
+        path = new Rapid.OsmWay(context, { id: 'path', nodes: ['a', 'b'], tags: { highway: 'path', power: 'line' }, version: 1 });
+        graph = new Rapid.Graph(context, [a, b, path]);
+      });
+
+      it('answers again after the hidden filters change', () => {
+        _filters.disable('points');   // something is hidden, but not this
+        assert.isNull(_filters.isHidden(path, graph, 'line'));
+        assert.isNull(_filters.isHidden(a, graph, 'vertex'));
+
+        _filters.disable('paths');    // matched 'paths' and 'power': only one of them is hidden
+        assert.isNull(_filters.isHidden(path, graph, 'line'));
+
+        _filters.disable('power');
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+        assert.strictEqual(_filters.isHidden(a, graph, 'vertex'), 'paths');
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');   // asked twice, same answer
+
+        _filters.enable('paths');
+        assert.isNull(_filters.isHidden(path, graph, 'line'));
+        assert.isNull(_filters.isHidden(a, graph, 'vertex'));
+      });
+
+      it('answers again for the same hidden filters, toggled off and on', () => {
+        _filters.disable('paths');
+        _filters.disable('power');
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+
+        _filters.enableAll();
+        assert.isNull(_filters.isHidden(path, graph, 'line'));
+
+        _filters.disable('paths');
+        _filters.disable('power');
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+      });
+
+      it('forcing an entity visible wins over a remembered answer, and stops when it ends', () => {
+        _filters.disable('paths');
+        _filters.disable('power');
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+
+        _filters.forceVisible(['path']);
+        assert.isNull(_filters.isHidden(path, graph, 'line'));
+        assert.isNull(_filters.isHidden(a, graph, 'vertex'));   // its only parent way is shown
+
+        _filters.forceVisible([]);
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+        assert.strictEqual(_filters.isHidden(a, graph, 'vertex'), 'paths');
+      });
+
+      it('answers again after the entity is cleared', () => {
+        _filters.disable('paths');
+        _filters.disable('power');
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+
+        _filters.clearEntity(path);
+        assert.isFalse(_filters._cache.has(path));
+        assert.strictEqual(_filters.isHidden(path, graph, 'line'), 'paths');
+      });
+
+      it('filterScene gives the same result and counts each time', () => {
+        _filters.disable('paths');
+        _filters.disable('power');
+        const road = new Rapid.OsmWay(context, { id: 'road', nodes: ['b', 'c'], tags: { highway: 'residential' }, version: 1 });
+        const c = new Rapid.OsmNode(context, { id: 'c', tags: { highway: 'crossing' }, version: 1 });
+        const graph2 = new Rapid.Graph(context, [a, b, c, path, road]);
+        const all = [a, b, c, path, road];
+
+        for (let i = 0; i < 3; i++) {
+          const resultIDs = _filters.filterScene(all, graph2).map(entity => entity.id);
+          assert.deepEqual(resultIDs, ['b', 'c', 'road']);   // `b` is shared with a road that's shown
+          assert.strictEqual(_filters.getStats().paths.count, 1);   // the path (not `a`, an uninteresting vertex)
+        }
       });
     });
 
@@ -834,13 +929,13 @@ describe('FilterSystem', () => {
       });
 
       it('hides uninteresting (e.g. untagged or "other") member ways on a hidden multipolygon relation', () => {
-        const outer = new Rapid.OsmWay(context, { id: 'outer', tags: { area: 'yes', natural: 'wood' }, version: 1 });
+        const outer = new Rapid.OsmWay(context, { id: 'outer', version: 1 });
         const inner1 = new Rapid.OsmWay(context, { id: 'inner1', tags: { barrier: 'fence' }, version: 1 });
         const inner2 = new Rapid.OsmWay(context, { id: 'inner2', version: 1 });
         const inner3 = new Rapid.OsmWay(context, { id: 'inner3', tags: { highway: 'residential' }, version: 1 });
         const r = new Rapid.OsmRelation(context, {
           id: 'r',
-          tags: { type: 'multipolygon' },
+          tags: { type: 'multipolygon', natural: 'wood' },
           members: [
             { id: outer.id, role: 'outer', type: 'way' },
             { id: inner1.id, role: 'inner', type: 'way' },

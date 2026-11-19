@@ -41,12 +41,15 @@ Still to do, in about this order:
   ⌘⇧F) and 5 (the `RenderFrame` passed to the layers, which report their work on it) done. Also:
   the imagery filter no longer runs at its default settings, the scene's containers are render
   groups, each at an anchor near the view, with OSM polygons split by map tile (`design/scene.md`
-  section 3), and the OSM layer has a CULL pass (Nov 19, `graphics-system.md` section 8; not
-  committed yet): it has features ready for the view plus 256 px, and skips its work on frames
+  section 3), and the OSM layer has a CULL pass (Nov 19, `graphics-system.md` section 8):
+  it has features ready for the view plus 256 px, and skips its work on frames
   where only the view moved inside that. A pan frame at Staten Island went from about 50 ms to 3.
-  Next, Bryan to pick (section 8, "What's left"): drop the 250 ms throttle for frames that only
-  move the view, make the pass itself cheaper (hidden-feature filtering is half of it), or give
-  the Rapid layer a CULL pass too.
+  `FilterSystem` got quick fixes and a design doc (Nov 19, [`design/filter-system.md`](../design/filter-system.md);
+  not committed yet): its step of the OSM pass is a third of what it was (Staten Island's pass 55
+  → 32 ms). Its rethink (level of detail) is for after this branch.
+  **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
+  Next in section 8, "What's left": frame pacing in place of the 250 ms throttle, a deadline on the
+  frame so work like labels can wait, all layers keeping their features the same way.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
