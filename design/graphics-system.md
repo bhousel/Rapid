@@ -1011,7 +1011,7 @@ of which shows at Seattle or Staten Island:
    Pixi collects a whole group again when anything in it is added, removed, or has new geometry
    (86% of such a DRAW is `_buildInstructions`). After the fixed cost, a feature costs what the
    budget assumes: 4 to 5 µs. So a frame that makes 64 lines and one that makes 5,000 pay the
-   same 44 ms first. **Not fixed:** see below.
+   same 44 ms first. **Fixed after the others** (see "Then the groups", below).
 5. **The first frame after a zoom** (not part of a load) takes 365 to 400 ms here, and sometimes
    twice that after a pause (section 9). With the profiler on it's 480: the pass's usual 190,
    about 130 more in its loops because every feature is dirty, and 160 in the labels layer,
@@ -1072,13 +1072,43 @@ in that frame; not explained, and the longest gap of each `compare` run is proba
 thing). The scheduler's tasks took 143 ms in all, of which `UiContributors-render` 128 ms in 10
 calls.
 
+**Then the groups (item 4).** OSM lines and points are split into containers by map tile, as
+polygons were: lines by level, road class and tile, points by tile (`design/scene.md` section 3
+has how, and what it does to the draw order). From the same tape:
+
+| Užice | Before the split | After |
+|---|---|---|
+| DRAW for one line drawn again, or one line or point made | 35 ms | 8 to 10 ms |
+| First pan, dev build: time its events took | 8.5 s | 5.8 to 6.5 s (three runs) |
+| First pan, dev build: frames a second | 18 | 28 to 31 |
+| First pan: DRAW of a frame that makes features (median) | 80 to 95 ms | 11 ms |
+| First pan: time in frames | 8.1 s | 4.2 s |
+| `bun run compare`, first pan: frames a second | 18.0, 18.4 | 29.4, 24.8, 24.1, 19.6 |
+| `bun run compare`, first pan: time its events took | 7.3, 7.4 s | 5.2, 5.7, 6.1, 7.4 s |
+| `bun run compare`, first pan: longest gap | 506, 520 ms | 310, 519, 604, 935 ms |
+| `bun run compare`, drawn after | 14.8, 14.7 s | 14.9, 14.8, 14.6, 14.6 s |
+| Every feature made again: time, and DRAW in all | 8.6 s, 3.0 s | 7.0 s, 1.5 s |
+| A frame that only moves the view: DRAW | 5.8 ms | 7.4 ms |
+
+(Rapid 2.5.7's first pan there, live: 25 frames a second, 5.2 s.) The first two `compare` runs
+after the split had tiles half the size; the frame costs were the same with either.
+
+What a pan's time goes to now is passes: 8 to 11 of them at 205 to 250 ms each, 2.3 s of the
+4.2 s. The longest gap of a `compare` run didn't improve and varies a lot (310 to 935 ms). In
+the dev build's frame logs of the same pan it's 336 to 383 ms, and no frame is longer than a
+pass (255 ms), so the long ones aren't the map's frames. Not looked into.
+
+"Drawn after" didn't move, though the frames of a load got shorter (28 ms, where they were 35).
+A load's 171 frames come 44 ms apart on average. Probably they're landing just past a display
+refresh (a 24 ms budget plus 9 ms of DRAW is 33), and wait for the next. Not checked.
+
 ### What it doesn't do yet
 
-- **Big render groups make every changed frame expensive** (item 4 above): in Užice 38 to 85 ms
-  of DRAW for a frame that makes or redraws anything among the points or the lines. That's also
-  what a hover, a selection or a drag costs there. Smaller groups would fix it, and they can keep
-  the draw order: points by rows of tiles (they're sorted by latitude), lines by level and
-  `zIndex`, then by tile. See "What's left" in `design/scene.md`.
+- **The pass is the longest frame of a pan in Užice now:** 205 to 250 ms, 8 to 11 times in the
+  first pan, most of them because a tile arrived. Two things to look at: making a pass cheaper
+  when little changed, and letting passes for arriving data wait longer where a pass is
+  expensive (`FramePacer` caps the gap at 250 ms, so there they take half the time and not the
+  third it aims for).
 - **Labels do their part of a zoom in one frame** (160 ms in Užice, item 5), and place
   everything at once when the last feature is made (128 ms in one frame of a load there).
 - **Matching a style copies it twice** (`utilDeepMerge`, in `styleMatch()` and the `style`

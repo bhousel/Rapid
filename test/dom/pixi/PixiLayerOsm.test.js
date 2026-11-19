@@ -153,6 +153,94 @@ describe('PixiLayerOsm', () => {
       assert.strictEqual(tall, wide);
       assert.isBelow(wide.parent.zIndex, small.parent.zIndex);
     });
+
+    it('orders the tiles by row and then by column, whatever order they were made in', () => {
+      const southEast = layer._polygonTileContainer(part([260, 260], [270, 270]), 16);   // made first
+      const northEast = layer._polygonTileContainer(part([260, 10], [270, 20]), 16);
+      const northWest = layer._polygonTileContainer(part([10, 10], [20, 20]), 16);
+      assert.isBelow(northWest.parent.zIndex, northEast.parent.zIndex);
+      assert.isBelow(northEast.parent.zIndex, southEast.parent.zIndex);
+    });
+  });
+
+
+  // Lines and points are split the same way, without changing the order they're drawn in:
+  // lines by road class first, points from north to south.
+  describe('line and point tiles', () => {
+    let layer, level;
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      const scene = { context: context, gfx: {}, _anchor: [0, 0], _worldContainers: new Set() };
+      for (const name of ['worldContainer', 'worldContainersIn', 'destroyWorldContainer']) {
+        scene[name] = PixiScene.prototype[name];
+      }
+      layer = new PixiLayerOsm(scene);
+      level = scene.worldContainer(new PIXI.Container(), '0');
+      layer.pointContainer = scene.worldContainer(new PIXI.Container(), 'points');
+    });
+
+    const part = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max) } });
+    const pointAt = (x, y) => part([x, y], [x, y]);
+
+    it('puts lines of one road class whose centers are in the same tile in one container', () => {
+      const a = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+      const b = layer._lineTileContainer(level, -9, part([200, 100], [250, 140]), 16);
+      const otherTile = layer._lineTileContainer(level, -9, part([260, 10], [270, 20]), 16);
+      const otherClass = layer._lineTileContainer(level, -8, part([10, 10], [20, 20]), 16);
+      assert.strictEqual(a, b);
+      assert.notStrictEqual(a, otherTile);
+      assert.notStrictEqual(a, otherClass);
+      assert.strictEqual(a.label, '-9/0,0,16');
+      assert.strictEqual(a.parent.parent, level);
+      assert.isTrue(a.parent.isRenderGroup);
+    });
+
+    it('keeps the order between road classes, wherever their tiles are', () => {
+      const footwayFarSouth = layer._lineTileContainer(level, -20, part([900, 900], [910, 910]), 16);
+      const residential = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+      const residentialLong = layer._lineTileContainer(level, -9, part([0, 0], [600, 20]), 16);
+      const tertiary = layer._lineTileContainer(level, -8, part([10, 10], [20, 20]), 16);
+      const fence = layer._lineTileContainer(level, 0, part([10, 10], [20, 20]), 16);
+      const order = [footwayFarSouth, residentialLong, residential, tertiary, fence].map(c => c.parent.zIndex);
+      assert.deepEqual(order, order.slice().sort((a, b) => a - b));
+      assert.strictEqual(new Set(order).size, 5);
+      assert.strictEqual(residentialLong.label, '-9/large');   // below the tiles of its class, above the class below
+    });
+
+    it('puts points in the container of their tile, the rows from north to south', () => {
+      const north = layer._pointTileContainer(pointAt(300, 10), false, 16);
+      const same = layer._pointTileContainer(pointAt(400, 200), false, 16);
+      const south = layer._pointTileContainer(pointAt(10, 300), false, 16);
+      const west = layer._pointTileContainer(pointAt(10, 10), false, 16);
+      assert.strictEqual(north, same);
+      assert.strictEqual(north.label, '1,0,16');
+      assert.isBelow(north.parent.zIndex, south.parent.zIndex);   // a pin overlaps the ones north of it
+      assert.isBelow(west.parent.zIndex, north.parent.zIndex);    // side by side: the same order on every load
+    });
+
+    it('puts a point with viewfields above every tile', () => {
+      const south = layer._pointTileContainer(pointAt(10, 100000), false, 16);
+      const withViewfields = layer._pointTileContainer(pointAt(10, 10), true, 16);
+      assert.strictEqual(withViewfields.label, 'viewfields');
+      assert.isAbove(withViewfields.parent.zIndex, south.parent.zIndex);
+    });
+
+    it('removes the containers that have emptied, and makes them again when asked', () => {
+      const a = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+      const b = layer._pointTileContainer(pointAt(10, 10), false, 16);
+      b.addChild(new PIXI.Container());   // a feature
+
+      layer._removeEmptyContainers();
+      assert.isTrue(a.destroyed);
+      assert.isFalse(b.destroyed);
+      assert.isNull(level.getChildByLabel('-9/0,0,16'));
+      assert.strictEqual(layer._pointTileContainer(pointAt(10, 10), false, 16), b);
+
+      const again = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+      assert.notStrictEqual(again, a);
+      assert.isFalse(again.destroyed);
+    });
   });
 
 

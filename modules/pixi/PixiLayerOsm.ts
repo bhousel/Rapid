@@ -27,6 +27,18 @@ const MINZOOM = 12;
  */
 const POLYGON_TILE_ZOOM = 1;
 
+/**
+ * Lines and points are split the same way (see `_lineTileContainer`, `_pointTileContainer`), with
+ * tiles this many zoom levels from the view's zoom: at 0 a tile is 256 to 512 pixels wide.
+ * Bigger tiles than the polygons', because lines are split by road class as well, and every
+ * container costs a few microseconds on every frame. Measured Nov 2026 in Užice (18,882 lines in
+ * level 0, 49,259 points): at 0 there are 580 render groups in the scene and at 1 there are
+ * 1,026, and a changed line or a new point costs the same 8 ms of DRAW either way (36 before
+ * the split).
+ */
+const LINE_TILE_ZOOM = 0;
+const POINT_TILE_ZOOM = 0;
+
 /** Highway type z-index stacking order (motorway on top, footway on bottom) */
 const HIGHWAYSTACK: Record<string, number> = {
   motorway: 0,
@@ -105,6 +117,32 @@ function getzIndex(tags: OsmTags): number {
 
 
 /**
+ * Returns a number between 0 and 1 that puts a tile in order among the tiles of its zoom: by row
+ * from north to south, then by column. Added to a tile container's `zIndex`, it makes the order
+ * between tiles the same on every load, where it would otherwise be the order they were made in.
+ * (Within 1,024 tiles each way, far more than a scene holds.)
+ * @param tile - The tile's `[x, y]`
+ * @returns A number between 0 and 1, not including either
+ */
+function tileOrder(tile: Vec2): number {
+  return (((tile[1] % 1024) * 1024) + (tile[0] % 1024) + 1) / 1048578;
+}
+
+
+/**
+ * Returns a number between 0 and 1 that puts an entity in order among others, by its ID. Added to
+ * a feature's `zIndex`, it makes the order between features that are otherwise equal the same on
+ * every load, where it would otherwise be the order they were made in.
+ * @param entityID - The entity's ID, e.g. 'w123'
+ * @returns A number from 0 to 1, not including 1
+ */
+function entityOrder(entityID: EntityID): number {
+  const num = Math.abs(parseInt(entityID.slice(1), 10)) || 0;
+  return (num % 1048576) / 1048576;
+}
+
+
+/**
  * Checks if entity has any wikidata tags (deserves special styling)
  * @param entity - OSM entity to check
  * @returns true if entity has wikidata tags
@@ -128,11 +166,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /** Container for polygon features (`basemap/osm/polygons`) */
   public polygonContainer: PIXI.Container | null;
-  /** Container for line features (`basemap/osm/lines`, with a child per level) */
+  /** Container for line features (`basemap/osm/lines`, with a child per level, split by tile) */
   public lineContainer: PIXI.Container | null;
-  /** Container for points, vertices and virtual POI pins (`points/osm`) */
+  /** Container for points, vertices and virtual POI pins (`points/osm`, split by tile) */
   public pointContainer: PIXI.Container | null;
 
+  /** The containers that features are split into, by parent and label (see `_tileContainer`) */
+  protected _tileContainers: Map<PIXI.Container, Map<string, PIXI.Container>>;
   /** collection of calculated midpoints */
   protected _midpoints: Map<DataID, Midpoint>;
   /** Entities in view that the last pass saw, whose features aren't made yet (see `_waitToMake`) */
@@ -159,6 +199,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.lineContainer = null;
     this.pointContainer = null;
 
+    this._tileContainers = new Map<PIXI.Container, Map<string, PIXI.Container>>();
     this._midpoints = new Map<DataID, Midpoint>();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
@@ -211,6 +252,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   public reset(): void {
     super.reset();
 
+    this._tileContainers.clear();
     this._midpoints.clear();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
@@ -356,7 +398,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     } else {
       this._midpoints.clear();
     }
-    this._endStep('midpoints', t);
+    t = this._endStep('midpoints', t);
+
+    // Features may have moved to other tiles' containers, or been destroyed since the last pass.
+    this._removeEmptyContainers();
+    this._endStep('containers', t);
   }
 
 
@@ -575,7 +621,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const schema = context.systems.schema!;
     const styles = context.systems.styles!;
 
-    const pointsContainer = this.pointContainer!;
     const showPoints = filters.isEnabled('points');
 
     // For deciding if an unlabeled polygon feature is interesting enough to show a virtual pin.
@@ -596,6 +641,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     };
 
     const tileZoom = Math.floor(viewport.transform.zoom) + POLYGON_TILE_ZOOM;
+    const pointTileZoom = Math.floor(viewport.transform.zoom) + POINT_TILE_ZOOM;
 
     const entities = data.polygons;
     for (const [entityID, entity] of entities) {
@@ -682,7 +728,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           if (!poiFeature) {
             poiFeature = new PixiFeaturePoint(this, poiFeatureID);
             poiFeature.props.isVirtual = true;
-            poiFeature.parentContainer = pointsContainer;
           }
 
           if (poiFeature.data !== entity || poiFeature.props.polygonPart !== part) {
@@ -725,6 +770,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             poiFeature.label = feature.label;
           }
 
+          if (poiFeature.dirty) {
+            this._placePoint(poiFeature, pointTileZoom);
+          }
+
           this.updateFeature(poiFeature, frame, viewport);
           this.retainFeature(poiFeature, frame);
         }
@@ -732,13 +781,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-    // Remove the tile containers that have emptied (their polygons moved to other tiles after a
-    // zoom change, or were destroyed after scrolling away).
-    for (const tileContainer of this.scene.worldContainersIn(this.polygonContainer!)) {
-      if (!tileContainer.children.length) {
-        this.scene.destroyWorldContainer(tileContainer);
-      }
-    }
   }
 
 
@@ -750,25 +792,138 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    *
    * Within a container polygons are sorted by area, biggest first, as before. Between tiles they
    * aren't: two polygons smaller than a tile, in different tiles, that overlap, are drawn in the
-   * order their tiles were made. (See "Render groups" in `design/scene.md`.)
+   * order of their tiles (by row, then by column: `tileOrder`). (See "Render groups" in
+   * `design/scene.md`.)
    * @param part - The polygon's geometry
    * @param tileZoom - The zoom of the tiles to split by
    * @return The container to put the polygon's feature in
    */
   protected _polygonTileContainer(part: GeometryPart, tileZoom: number): PIXI.Container {
     const polygonContainer = this.polygonContainer!;
-    const extent = part.world!.extent;
-    const tileSize = 256 * (2 ** (WORLD_ZOOM - tileZoom));   // in world coordinates
+    const tile = this._tileOf(part.world!.extent, tileZoom);
+    if (!tile) {
+      return this._tileContainer(polygonContainer, 'large', -1);
+    }
+    return this._tileContainer(polygonContainer, `${tile[0]},${tile[1]},${tileZoom}`, tileOrder(tile));
+  }
 
+
+  /**
+   * Returns the container for a line, under its level's container. Lines are split up like polygons
+   * (see `_polygonTileContainer`), and for the same reason: all the lines of a level in one render
+   * group meant that a hover, a drag or a new line made Pixi collect every one of them again
+   * (44 ms for the 18,882 of level 0 in Užice).
+   *
+   * Lines are drawn in the order of their road class (`getzIndex`), so they're split by that first
+   * and then by tile: each container holds the lines of one class whose centers are in one tile.
+   * A line bigger than a tile goes in its class's `large` container. So the order between road
+   * classes is what it was.
+   *
+   * Lines of the same class used to be drawn in the order they were made, which differs from
+   * one load to the next. Now it's: the `large` container, then the tiles by row and column
+   * (`tileOrder`), and within a container by the way's ID (`entityOrder`). That's no more right
+   * than before, but it's the same picture every time.
+   * @param levelContainer - The container of the line's level (`way.layer()`)
+   * @param zIndex - The line's road class (a whole number, see `getzIndex`)
+   * @param part - The line's geometry
+   * @param tileZoom - The zoom of the tiles to split by
+   * @return The container to put the line's feature in
+   */
+  protected _lineTileContainer(levelContainer: PIXI.Container, zIndex: number, part: GeometryPart, tileZoom: number): PIXI.Container {
+    const tile = this._tileOf(part.world!.extent, tileZoom);
+    if (!tile) {
+      return this._tileContainer(levelContainer, `${zIndex}/large`, zIndex);
+    }
+    return this._tileContainer(levelContainer, `${zIndex}/${tile[0]},${tile[1]},${tileZoom}`, zIndex + tileOrder(tile));
+  }
+
+
+  /**
+   * Returns the container for a point (or a vertex, or a virtual POI pin), under `points`.
+   * Points are split up by map tile too: in one render group, making one point among Užice's
+   * 49,259 cost 38 ms.
+   *
+   * Points are drawn from north to south, so that each pin overlaps the ones above it on the map.
+   * A tile's container is ordered among its siblings by the tile's row, and within a tile points
+   * are sorted as before, so that still holds between rows and within a tile. It doesn't hold
+   * between two tiles side by side: where pins overlap across the edge between them, the eastern
+   * tile's are on top (about 1 overlapping pair in 100 in Užice). (See "Render groups" in
+   * `design/scene.md`.)
+   *
+   * A point with viewfields goes in a container above all the tiles, as it was above the other
+   * points before.
+   * @param part - The point's geometry
+   * @param hasViewfields - Whether the point is drawn with viewfields
+   * @param tileZoom - The zoom of the tiles to split by
+   * @return The container to put the point's feature in
+   */
+  protected _pointTileContainer(part: GeometryPart, hasViewfields: boolean, tileZoom: number): PIXI.Container {
+    const pointContainer = this.pointContainer!;
+    const tile = part.world && this._tileOf(part.world.extent, tileZoom);
+    if (hasViewfields || !tile) {
+      return this._tileContainer(pointContainer, 'viewfields', Number.MAX_SAFE_INTEGER);
+    }
+    return this._tileContainer(pointContainer, `${tile[0]},${tile[1]},${tileZoom}`, tile[1] + tileOrder(tile));
+  }
+
+
+  /**
+   * Finds the map tile that a shape belongs in, by its center.
+   * @param extent - The shape's extent, in world coordinates
+   * @param tileZoom - The zoom of the tiles
+   * @return The tile's `[x, y]`, or `null` if the shape is bigger than a tile in either direction
+   */
+  protected _tileOf(extent: Extent, tileZoom: number): Vec2 | null {
+    const tileSize = 256 * (2 ** (WORLD_ZOOM - tileZoom));   // in world coordinates
     const [minX, minY] = extent.min;
     const [maxX, maxY] = extent.max;
-    if ((maxX - minX) > tileSize || (maxY - minY) > tileSize) {
-      return this._childContainer(polygonContainer, 'large', -1);
-    }
+    if ((maxX - minX) > tileSize || (maxY - minY) > tileSize) return null;
 
-    const x = Math.floor((minX + maxX) / 2 / tileSize);
-    const y = Math.floor((minY + maxY) / 2 / tileSize);
-    return this._childContainer(polygonContainer, `${x},${y},${tileZoom}`, 0);
+    return [Math.floor((minX + maxX) / 2 / tileSize), Math.floor((minY + maxY) / 2 / tileSize)];
+  }
+
+
+  /**
+   * Returns the container with the given label under the given parent, making it if needed, like
+   * `_childContainer`. This remembers the ones it made: there can be hundreds under one parent,
+   * and it's asked once for every feature that's drawn again.
+   * `_removeEmptyContainers()` removes them again.
+   * @param parent - The container to look in
+   * @param label - The container's label
+   * @param zIndex - The container's `zIndex` among its siblings, if it's made
+   * @return The container
+   */
+  protected _tileContainer(parent: PIXI.Container, label: string, zIndex: number): PIXI.Container {
+    let byLabel = this._tileContainers.get(parent);
+    if (!byLabel) {
+      byLabel = new Map<string, PIXI.Container>();
+      this._tileContainers.set(parent, byLabel);
+    }
+    let container = byLabel.get(label);
+    if (!container) {
+      container = this._childContainer(parent, label, zIndex);
+      byLabel.set(label, container);
+    }
+    return container;
+  }
+
+
+  /**
+   * Removes the containers that features were split into and that have emptied: their features
+   * moved to other tiles after a change of zoom, or were destroyed after scrolling away.
+   */
+  protected _removeEmptyContainers(): void {
+    for (const [parent, byLabel] of this._tileContainers) {
+      for (const [label, container] of byLabel) {
+        if (!container.children.length) {
+          this.scene.destroyWorldContainer(container);
+          byLabel.delete(label);    // (deleting from a Map while iterating over it is safe)
+        }
+      }
+      if (!byLabel.size) {
+        this._tileContainers.delete(parent);
+      }
+    }
   }
 
 
@@ -788,6 +943,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const _getLevelContainer = (level: string): PIXI.Container => {
       return this._childContainer(lineContainer, level, parseInt(level, 10));
     };
+
+    const tileZoom = Math.floor(viewport.transform.zoom) + LINE_TILE_ZOOM;
 
     const ways = data.lines;
     for (const [wayID, way] of ways) {
@@ -819,8 +976,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         // (A changed shape is a new Geometry, so its parts are new objects too.)
         if (feature.data !== way || feature.geometry !== part) {
           feature.geometry = part;
-          feature.parentContainer = levelContainer;    // Change layer stacking if necessary
-          feature.container.zIndex = zindex;
+          feature.container.zIndex = zindex + entityOrder(wayID);   // by road class, then by ID
 
           feature.data = way;
           feature.clearChildData(wayID);
@@ -828,6 +984,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
+
+        if (feature.dirty) {
+          // A new shape, level or road class, or a new zoom (and its tiles), may put it in another container
+          feature.parentContainer = this._lineTileContainer(levelContainer, zindex, part, tileZoom);
+        }
 
         if (feature.needsStyle) {
           let styleTags = way.tags;
@@ -901,7 +1062,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // Vertices related to the selection/hover should be drawn above everything
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
     const selectedContainer = mapUiLayer.selected;
-    const pointsContainer = this.pointContainer!;
 
     const isInterestingVertex = (node: OsmNode): boolean => {
       return node.hasInterestingTags() || node.isEndpoint(graph) || node.isIntersection(graph);
@@ -912,18 +1072,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     };
 
 
+    const tileZoom = Math.floor(viewZoom) + POINT_TILE_ZOOM;
+
     const nodes = data.vertices;
     for (const [nodeID, node] of nodes) {
-      let parentContainer: PIXI.Container | null = null;
+      const isRelated = isRelatedVertex(nodeID);   // major importance: drawn above everything
+      const isInteresting = (styleZoom >= 16 && isInterestingVertex(node));   // minor importance: drawn with the points
 
-      if (styleZoom >= 16 && isInterestingVertex(node) ) {  // minor importance
-        parentContainer = pointsContainer;
-      }
-      if (isRelatedVertex(nodeID)) {   // major importance
-        parentContainer = selectedContainer;
-      }
-
-      if (!parentContainer) continue;   // this vertex isn't important enough to render
+      if (!isRelated && !isInteresting) continue;   // this vertex isn't important enough to render
 
       const featureID = `${this.layerID}-${nodeID}`;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
@@ -937,7 +1093,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (!feature) {
         // (The vertices of what's selected or hovered are needed at once: the user is about to grab one)
         const extent = graph.geometry(node).parts[0]?.world?.extent;
-        if (this._waitToMake('vertices', nodeID, extent, frame, node.isNew() || isRelatedVertex(nodeID))) continue;
+        if (this._waitToMake('vertices', nodeID, extent, frame, node.isNew() || isRelated)) continue;
         feature = new PixiFeaturePoint(this, featureID);
       }
 
@@ -949,7 +1105,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.parentContainer = parentContainer;   // change layer stacking if necessary
 
       if (feature.needsStyle) {
         const markerStyle = styles.styleMatch(node.tags, 'vertex', 'osm');
@@ -982,9 +1137,32 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.label = l10n.displayName(node.tags);
       }
 
+      // Change layer stacking if necessary: above everything, or among the points in its tile.
+      // (A new shape or a new zoom may put it in another tile.)
+      if (isRelated) {
+        feature.parentContainer = selectedContainer;
+      } else if (feature.dirty || feature.container.parent === selectedContainer) {
+        this._placePoint(feature, tileZoom);
+      }
+
       this.updateFeature(feature, frame, viewport);
       this.retainFeature(feature, frame);
     }
+  }
+
+
+  /**
+   * Puts a point's feature in the container of its tile (see `_pointTileContainer`).
+   * Call this once the feature has its geometry and style.
+   * @param feature - The point's feature
+   * @param tileZoom - The zoom of the tiles to split by
+   */
+  protected _placePoint(feature: PixiFeaturePoint, tileZoom: number): void {
+    const part = feature.geometry;
+    if (!part) return;
+
+    const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;
+    feature.parentContainer = this._pointTileContainer(part, hasViewfields, tileZoom);
   }
 
 
@@ -1000,7 +1178,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
     const styles = context.systems.styles!;
-    const pointsContainer = this.pointContainer!;
+
+    const tileZoom = Math.floor(viewport.transform.zoom) + POINT_TILE_ZOOM;
 
     const nodes = data.points;
     for (const [nodeID, node] of nodes) {
@@ -1017,7 +1196,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const extent = graph.geometry(node).parts[0]?.world?.extent;
         if (this._waitToMake('points', nodeID, extent, frame, node.isNew())) continue;
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = pointsContainer;
       }
 
       // If data has changed, replace it. (A node's geometry is its own, so a new shape is a new node.)
@@ -1057,6 +1235,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         feature.style = markerStyle;
         feature.label = l10n.displayName(node.tags);
+      }
+
+      if (feature.dirty) {
+        this._placePoint(feature, tileZoom);   // a new shape or a new zoom may put it in another tile
       }
 
       this.updateFeature(feature, frame, viewport);

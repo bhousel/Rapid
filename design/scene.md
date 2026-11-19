@@ -1,8 +1,8 @@
 # The scene: how features are stacked, and what the pointer can reach
 
 **Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
-mode) are done (Nov 11), and so is section 3 (render groups, Nov 18). Section 4 is ideas with nothing
-built.
+mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines and points split by
+tile, Nov 19). Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -34,14 +34,18 @@ origin
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area)
 │  │  └ lines
-│  │     └ <level>       one per `way.layer()`, zIndex = level; lines sorted by `getzIndex(tags)`
+│  │     └ <level>       one per `way.layer()`, zIndex = level
+│  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
+│  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
 │  │  ├ polygons         the order they first draw (so external data is above OSM, and a dataset's
 │  │  └ lines            polygons are above OSM lines, as before)
 │  └ …
 ├ points
-│  ├ osm                 OSM points, interesting vertices and the virtual POI pins, sorted by latitude
-│  └ <spatialID>         as above
+│  ├ osm                 OSM points, interesting vertices and the virtual POI pins
+│  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude
+│  │  └ viewfields       points with viewfields, above the tiles
+│  └ <spatialID>         other layers' points, straight in the container
 ├ debug-over
 ├ streetview
 │  └ <spatialID>         one per photo layer (`mapillary`, `kartaview`, `streetside`)
@@ -180,10 +184,12 @@ small over big. Now:
   below all the tiles and sorted by area as before. That's where landuse, water and forests end up,
   so they're still right among themselves and still under the buildings.
 - Polygons in the same tile are sorted by area as before.
-- Two polygons smaller than a tile, in different tiles, that overlap, are drawn in the order their
-  tiles were made. That's the case that can look wrong: a small thing inside a slightly bigger one,
-  across a tile edge. In the screenshots of Seattle it changed the tint of one building; nothing at
-  Staten Island or Bochum. Decided with Bryan (Nov 18): try it, and watch for tile edges.
+- Two polygons smaller than a tile, in different tiles, that overlap, are drawn in the order of
+  their tiles: by row, then by column (at first it was the order the tiles were made in, which
+  changed from one load to the next). That's the case that can look wrong: a small thing inside a
+  slightly bigger one, across a tile edge. In the screenshots of Seattle it changed the tint of one
+  building; nothing at Staten Island or Bochum. Decided with Bryan (Nov 18): try it, and watch for
+  tile edges.
 
 What it changed, on top of the render groups (DRAW pass in ms; tiles at the view's zoom, then one
 level past it):
@@ -200,6 +206,75 @@ A hover on one polygon at Staten Island went from 8 ms to about 1. The smaller t
 that: with the bigger ones the fullest tile there still held 3,232 polygons, with the smaller ones
 194. GPU time didn't change with the extra draw calls.
 
+### OSM lines and points are split too
+
+Since Nov 19. In Užice all 49,259 points were one group and level 0 of the lines held 18,882, and
+Pixi collected the whole group again whenever one of its features was made, removed, shown, hidden
+or (for a line) drawn again: 35 ms of DRAW for one changed line or one new point, on every frame
+that had one. That's a hover, each frame of a drag, and every frame of a load or a pan that makes
+features (`graphics-system.md` section 10).
+
+**What a render group costs, and what it saves.** Pixi's DRAW pass does two things with a group:
+- It **builds** the group's list of instructions and its vertex buffer, only when the group's
+  structure changed. That walks everything in the group, so it costs what the group holds, not
+  what changed.
+- It **replays** the list, on every frame: the group's matrix, a vertex array to bind, one draw
+  call per batch. No vertices are touched. Each group costs a few microseconds here.
+
+So more, smaller groups cost a little on every frame and save a lot on the frames where something
+changed. A frame of Užice replays about 3,400 draw calls in 6 ms.
+
+**Lines** (`_lineTileContainer()`): a container per level, road class and tile.
+- Lines are drawn in the order of their road class (`zIndex`, from `HIGHWAYSTACK`; 0 for whatever
+  isn't a highway). The containers of one level are ordered by class first, so that's kept exactly.
+- Within a class: lines bigger than a tile (`<class>/large`), then the tiles by row and column,
+  and within a tile by the way's ID. Before, lines of one class were drawn in the order their
+  features were made.
+
+**Points** (`_pointTileContainer()`): a container per tile, for points, vertices and the POI pins.
+- Points are drawn from north to south, so that a pin overlaps the pins above it on the map. The
+  tiles' containers are ordered by row, and points within a tile as before.
+- **Not kept: two tiles side by side.** Where points overlap across the edge between them, the
+  eastern tile's are on top, whichever is further south. In Užice at z16 that's 21,332 of the
+  2,248,374 pairs of points that overlap (1%). Rows of tiles would have kept the order exactly,
+  and were measured first: Užice's points are in a few rows (12,870 of them in one row of 128 px),
+  and a pan sideways shows and hides points in every row at once.
+- Points with viewfields go in a `viewfields` container above the tiles, as they were above the
+  other points.
+
+The tiles are at the view's zoom, rounded down (256 to 512 px on screen): twice the polygons'
+size, because lines are split by class too.
+
+**The picture is the same on every load now.** Tile containers used to be drawn in the order they
+were made, and so were lines of one class. Since features are made over several frames, that order
+depended on timing: two loads of the same place differed in 15,000 to 34,000 of 5 million pixels
+(overlapping polygons from different tiles, lines of one class that cross, pins). Polygon tiles
+are ordered by row and column now too, and two loads differ in 4 to 660 pixels.
+
+What it changed (dev build, from tapes; DRAW in ms):
+
+| Užice | Before | After |
+|---|---|---|
+| One line drawn again (a hover, a frame of a drag) | 36 | 8 |
+| One line made | 35 | 8 |
+| One point made | 35 | 10 |
+| One point drawn again | 5 | 6 |
+| A frame of the first pan that makes features (median) | 80 to 95 | 11 |
+| Every feature made again (`layer.reset()`): DRAW in all | 3.0 s | 1.5 s |
+| A frame that only moves the view | 5.8 | 7.4 |
+| Render groups in the scene | 207 | 581 |
+| Draw calls | 3,193 | 3,437 |
+
+| A frame that only moves the view (`bun run measure`) | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| DRAW before | 1.6 | 2.5 | 6.1 |
+| DRAW after | 2.9 | 4.3 | 7.2 |
+| A frame with a pass, while gliding: before | 37 | 86 | 241 |
+| A frame with a pass, while gliding: after | 26 | 62 | 210 |
+
+(One run each, medians of 9 frames. In another session Seattle's view-only frame measured 1.4 to
+2.2 ms after the split, over 300 frames.)
+
 ### What's left
 
 - ~~A pan still rebuilds the groups that have a feature scrolling in or out, and culling changes
@@ -212,24 +287,12 @@ that: with the bigger ones the fullest tile there still held 3,232 polygons, wit
   object on every frame, tests its bounds against the screen, and sets `culled`, which marks the
   render group changed exactly as `visible` does. We already know what's in view from the spatial
   index without touching what isn't.
-- **Lines and points are still one group each** (per level, for lines): 1,445 lines in level 0 at
-  Staten Island, where a hover costs 4 to 6 ms. By tile, lines of different road classes that cross
-  near a tile edge would be drawn in the wrong order, and so would overlapping pins. Not decided.
-  **Measured in Užice (Nov 19):** its points group holds 49,259 features and level 0 of its lines
-  18,882. A frame that makes one point there costs 38 ms of DRAW, and one that makes or redraws a
-  line 44 ms, whatever else it does (`graphics-system.md` section 10, "What a frame costs when
-  little is done in it"). It's the biggest cost left in making Užice's features, and the same is
-  paid for a hover or a drag. **A split that keeps the draw order** (an idea, not tried):
-  - Points are ordered by latitude (`zIndex` is the latitude, negated). Split by rows of map
-    tiles, each row's group ordered by its `y`, they'd be drawn exactly as now. Points with
-    viewfields (`zIndex` + 1000) need a group of their own on top.
-  - Lines are ordered by level, then by `zIndex`, which is the road class (0 for anything that
-    isn't a highway). Lines of the same level and `zIndex` are in no particular order today, so
-    those could be split by tile freely: a group per level, `zIndex` and tile.
-  - It only helps if a frame's work lands in few groups. The waiting work is in the order the
-    pass found it, which is roughly by place. To check.
-  - More groups means more draw calls. Polygons went from 526 to 560 at Staten Island with no
-    change in GPU time, but this would be hundreds more in a dense place.
+- ~~Lines and points are still one group each.~~ **Split by tile (Nov 19)**, see "OSM lines and
+  points are split too" above.
+- **Every render group costs a few microseconds on every frame**, changed or not (its matrix, a
+  vertex array to bind, at least one draw call). The split added 1 to 2 ms to a frame that only
+  moves the view, at Seattle as much as in Užice. A class of lines with a handful of members doesn't need a container per tile:
+  splitting only the classes that are big would get most of that back. Not tried.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
   touches a big group.
 

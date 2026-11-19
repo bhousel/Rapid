@@ -68,22 +68,29 @@ Still to do, in about this order:
   **Making features waits too** (Nov 19): `PixiLayerOsm._waitToMake()`, and
   the budget is bigger (24 ms) when the view is still and the scheduler idle. The longest frame of
   a load at Staten Island went from 753 ms to about 145.
-  **Užice's budget** (Nov 19; not committed yet, section 10 "What a frame costs when little is
+  **Užice's budget** (Nov 19, section 10 "What a frame costs when little is
   done in it"): everything is drawn 15 s after the page opens there, where it was 24 (`main`:
   10). The extra time was 27 passes that made nothing (each icon's texture asked for a redraw of
   everything; now `scene.texturesLoaded()`), a budget that never grew (it waited for an idle
   scheduler, whose queues the frames' own `draw` listeners kept full; now it goes by the view,
   and `SchedulerSystem` gives normal tasks 4 ms of every tick), and bookkeeping that grew with
-  the waiting work. Moving the view measures the same as before. What's left is in `backlog.md`:
-  first the points and lines render groups, which cost 38 to 85 ms of DRAW on every frame that
-  touches them in Užice.
+  the waiting work. What's left is in `backlog.md`.
+  **OSM lines and points are split by map tile** (Nov 19; not committed yet, `scene.md` section
+  3), each tile's container with its own render group, as polygons were: lines by level, road
+  class and tile (the order between classes is kept), points by tile (from north to south between
+  rows; side by side, the eastern tile is on top). In Užice a changed line or a new point costs 8
+  ms of DRAW where it cost 35, and the first pan there draws 20 to 31 frames a second where it
+  drew 18. A frame that only moves the view costs 1 to 2 ms more, everywhere. Tiles are ordered
+  by row and column now, and lines of one class by ID, so the picture is the same on every load
+  (two loads used to differ in up to 34,000 pixels).
   **Measure dense places from a tape** (`--tape file.tape.json` on `bun run measure` and
   `bun run compare`, `scripts/tape.ts`): the OSM API answered 429 again after five loads of Užice
   in an hour and a half. A tape of Užice (119 MB, not in the repo) has to be recorded once on each
   machine.
   **Goal now: get `pixi-8.23` merged**, keeping to Pixi and `GraphicsSystem` work (Bryan, Nov 19).
-  Next (section 10, "What it doesn't do yet"): smaller render groups for points and lines, a
-  frame between passes during a zoom, the pass's own cost at dense places, and the other layers.
+  Next (section 10, "What it doesn't do yet"): the pass's own cost at dense places (now the
+  longest frame of a pan in Užice, 8 to 11 times in one pan), a frame between passes during a
+  zoom, and the other layers.
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

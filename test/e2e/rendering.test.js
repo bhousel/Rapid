@@ -299,6 +299,65 @@ test('makes features over several frames when there are many to make, and ends u
 });
 
 
+// Lines and points are split into containers by map tile, each with its own render group, so that
+// a change to one feature makes Pixi rebuild a small group. The order they're drawn in stays.
+test('keeps lines in the order of their road class, and points from north to south, across tile containers', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(() => {
+    const { gfx } = rapidContext.systems;
+    const layer = gfx.scene.layers.get('osm');
+    const visible = [...layer.features.values()].filter(feature => feature.visible);
+
+    // A feature's container is in its tile's container, which is in that container's render group.
+    const groupOf = feature => feature.container.parent.parent;
+    const lines = visible.filter(feature => feature.type === 'LineString');
+    const points = visible.filter(feature => feature.type === 'Point' && feature.container.parent.label !== 'selected');
+
+    // In draw order, the lines' containers go from the lowest road class to the highest.
+    let outOfOrder = 0;
+    const lineGroups = new Set();
+    for (const level of layer.lineContainer.children) {
+      const groups = level.children[0].children;
+      for (let i = 0; i < groups.length; i++) {
+        lineGroups.add(groups[i]);
+        if (i > 0 && groups[i].zIndex < groups[i - 1].zIndex) outOfOrder++;
+      }
+    }
+    const pointGroups = layer.pointContainer.children;
+    for (let i = 1; i < pointGroups.length; i++) {
+      if (pointGroups[i].zIndex < pointGroups[i - 1].zIndex) outOfOrder++;
+    }
+
+    return {
+      lines: lines.length,
+      lineGroups: lineGroups.size,
+      // every line is in a container of its own road class (the whole part of its `zIndex`)
+      linesInAnotherClass: lines.filter(feature => Math.floor(groupOf(feature).zIndex) !== Math.floor(feature.container.zIndex)).length,
+      linesInRenderGroups: lines.filter(feature => groupOf(feature).isRenderGroup).length,
+      points: points.length,
+      pointGroups: pointGroups.length,
+      pointsInRenderGroups: points.filter(feature => groupOf(feature).isRenderGroup).length,
+      outOfOrder: outOfOrder
+    };
+  });
+
+  expect(result.lines).toBeGreaterThan(10);
+  expect(result.lineGroups).toBeGreaterThan(1);
+  expect(result.linesInRenderGroups).toBe(result.lines);
+  expect(result.linesInAnotherClass).toBe(0);
+  expect(result.points).toBeGreaterThan(10);
+  expect(result.pointGroups).toBeGreaterThan(0);
+  expect(result.pointsInRenderGroups).toBe(result.points);
+  expect(result.outOfOrder).toBe(0);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
 // An icon's texture is made the first time a feature asks for it, and arrives a little later.
 // The features drawn without it are drawn again then, and no layer does its pass for that.
 test('draws a point again when its icon arrives, without another pass', async ({ page, consoleErrors }) => {
