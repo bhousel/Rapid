@@ -165,7 +165,6 @@ describe('OsmService', () => {
         url: 'https://www.openstreetmap.org',
         apiUrl: 'https://api.openstreetmap.org',
         client_id: 'O3g0mOUuA2WY5Fs826j5tP260qR3DDX7cIIE2R2WWSc',
-        client_secret: 'b4aeHD1cNeapPPQTrvpPoExqQRjybit6JBlNnxh62uE',
         access_token: 'foo'  // preauth
       });
     }

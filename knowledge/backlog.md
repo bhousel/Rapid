@@ -2,21 +2,6 @@
 
 Items planned but not yet started.
 
-## Upgrade to osm-auth 4.0
-When osm-auth 4.0.0 is on npm (in progress Nov 2026; see its
-[CHANGELOG](https://github.com/osmlab/osm-auth/blob/main/CHANGELOG.md)), `OsmService.ts` needs:
-- `new osmAuth({…})`: it's a class now, and calling it as a function (our cast in the constructor)
-  throws a `TypeError`.
-- Drop `client_secret`. Nothing has read it since PKCE (osm-auth 2.2.0), and it's no longer in the
-  options type.
-- Drop our own `OsmAuthOptions`/`OsmAuthInstance` interfaces, and use the types osm-auth exports
-  (`OSMAuthOptions`, `osmAuth`, `OSMAuthError`).
-- In `switchAsync`, replace `utilObjectOmit(this._oauth.options(), ['access_token'])` with a plain
-  spread. `options()` no longer returns `access_token` (osm-auth #164), so the omit isn't needed,
-  and with osm-auth's types it won't compile (`utilObjectOmit` wants a key of the type).
-- Login errors are an `OSMAuthError` now (`err.code`, plus `err.status` for HTTP errors). Our
-  callers ignore the details, so nothing else should need to change.
-
 ## Editing a multiselection
 Designed in `design/multiselection.md` (proposed Oct 2026): a selection pane (the list plus commands)
 that slides to a command pane, like `UiInspector`; replace geometry first. It follows the data IDs work,

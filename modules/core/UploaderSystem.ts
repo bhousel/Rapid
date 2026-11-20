@@ -429,7 +429,7 @@ export class UploaderSystem extends AbstractSystem {
     } catch (err: any) {
       if (attempt !== this._attempt) return;
       this._errors.push({
-        msg: err?.message || err?.responseText,
+        msg: err?.message,
         details: [ l10n.t('save.status_code', { code: err?.status }) ]
       });
       this._didResultInErrors();
@@ -918,7 +918,7 @@ export class UploaderSystem extends AbstractSystem {
       return { msg: l10n.t('save.unknown_error_details'), details: [ err.message ].filter(Boolean) };
     }
     return {
-      msg: err.message || err.responseText,
+      msg: err.message,
       details: [ l10n.t('save.status_code', { code: err.status }) ]
     };
   }

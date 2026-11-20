@@ -4,7 +4,7 @@ import { OsmEntity, MarkerData } from '../data/index.ts';
 import { osmAuth } from 'osm-auth';
 import { osmServiceListeners } from './OsmService.worker.ts';
 import { Extent, numClamp, projWgs84ToWorld, projWorldToWgs84, Tiler, WORLD_SIZE } from '@rapid-sdk/math';
-import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
+import { utilArrayChunk, utilArrayUniq, utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { EntityType } from '../data/types.ts';
@@ -151,60 +151,6 @@ interface CachesObject {
 }
 
 /**
- * Options passed to `osmAuth()` factory.
- * The shipped `osm-auth` types declare this as a class constructor, but at
- * runtime it's a plain factory function.  We define our own interface here
- * because the bundled `.d.ts` is missing `client_secret` and other fields.
- */
-interface OsmAuthOptions {
-  /** Base URL for the OSM website (e.g. 'https://www.openstreetmap.org') */
-  url: string;
-  /** Base URL for the OSM API (e.g. 'https://api.openstreetmap.org') */
-  apiUrl: string;
-  /** OAuth2 client identifier */
-  client_id: string;
-  /** OAuth2 client secret */
-  client_secret: string;
-  /** OAuth2 authorization scopes (space-separated) */
-  scope: string;
-  /** OAuth2 redirect URI after authorization */
-  redirect_uri: string;
-  /** Pre-authorized access token (for pre-auth scenarios) */
-  access_token?: string;
-  /** Whether to automatically authenticate */
-  auto?: boolean;
-  /** Whether to use single-page auth flow (no popup) */
-  singlepage?: boolean;
-  /** Callback invoked when the auth popup opens */
-  loading?: () => void;
-  /** Callback invoked when the auth popup closes */
-  done?: () => void;
-  /** Locale code for the auth page */
-  locale?: string;
-}
-
-/** The object returned by `osmAuth()` */
-interface OsmAuthInstance {
-  /** Performs an authenticated fetch request */
-  fetch(resource: string, options?: RequestInit): Promise<Response>;
-  /** Returns whether the user is currently authenticated */
-  authenticated(): boolean;
-  /** Returns the access token if the user is authenticated, empty string if not */
-  getAccessToken(): string;
-  /** Initiates the OAuth2 authentication flow */
-  authenticate(callback: Errback, options?: { switchUser?: boolean }): void;
-  /** Brings the auth popup window to front, if open */
-  bringPopupWindowToFront(): boolean;
-  /** Logs the user out and clears stored credentials */
-  logout(): OsmAuthInstance;
-  /** Gets the current auth options */
-  options(): OsmAuthOptions;
-  /** Sets auth options (merges with existing) */
-  options(val: Partial<OsmAuthOptions>): OsmAuthInstance;
-}
-
-
-/**
  * `OsmService` connects to the OpenStreetMap editing API to perform queries,
  *  fetch data, upload changesets, and more.
  * @see https://wiki.openstreetmap.org/wiki/API
@@ -257,7 +203,7 @@ export class OsmService extends AbstractSystem {
   /** Cached preferences of the authenticated user, or null */
   protected _userPreferences: Record<string, string> | null;
   /** The `osm-auth` instance used for OAuth2 authentication */
-  protected _oauth: OsmAuthInstance;
+  protected _oauth: osmAuth;
 
 
   /**
@@ -352,11 +298,10 @@ export class OsmService extends AbstractSystem {
       redirect_uri = `${origin}${pathname}land.html`;
     }
 
-    this._oauth = (osmAuth as unknown as (o: OsmAuthOptions) => OsmAuthInstance)({
+    this._oauth = new osmAuth({
       url: this._wwwroot,
       apiUrl: this._apiroot,
       client_id: 'O3g0mOUuA2WY5Fs826j5tP260qR3DDX7cIIE2R2WWSc',
-      client_secret: 'b4aeHD1cNeapPPQTrvpPoExqQRjybit6JBlNnxh62uE',
       scope: 'read_prefs write_prefs write_api read_gpx write_notes',
       redirect_uri: redirect_uri,
       loading: this._authLoading,
@@ -453,10 +398,9 @@ export class OsmService extends AbstractSystem {
     this._userPreferences = null;
     // apistatus, ratelimit, connectionID are all reset by `resetAsync` below.
 
-    // Copy the existing options without 'access_token'.
+    // Copy the existing options, which don't include 'access_token'.
     // (if we did preauth, access_token won't work on a different server)
-    const oldOptions = utilObjectOmit(this._oauth.options(), ['access_token']);
-    this._oauth.options(Object.assign(oldOptions, newOptions));
+    this._oauth.options({ ...this._oauth.options(), ...newOptions });
 
     return this.resetAsync()
       .then(() => {

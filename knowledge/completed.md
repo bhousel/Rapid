@@ -4,6 +4,11 @@ Newest first, by month. Details live in git history and the design docs; these a
 
 ## November 2026
 
+- **Bryan's own packages, ESM-only now** (Nov 20 2026): country-coder 6, location-conflation 4,
+  osm-community-index 7, node-diff3 4 and osm-auth 4, with patch bumps (maplibre-gl 6.19, marked,
+  togeojson, oxlint). osm-auth is a class now (`new osmAuth()`), with its own types; `OsmService`
+  dropped its copies of them and the unused `client_secret`.
+
 - **Version 3.0.0-pre.4** (Nov 18 2026) — `package.json` and `Context.ts`; `package.json`'s project links
   point at bhousel/Rapid now.
 
