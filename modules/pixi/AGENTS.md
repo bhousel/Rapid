@@ -53,6 +53,12 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   destroyed, or until its own collector finds them unused a minute later. After a zoom that
   was 550 MB. (`for (const child of parent.removeChildren()) child.destroy();`, and
   `geometry.destroy(true)`: a `Mesh` doesn't destroy its geometry either.)
+- **Make a feature's Pixi objects when they're first shown.** A feature that exists isn't
+  always drawn (too small at this zoom, no icon), and every `Container`, `Sprite` or `Graphics`
+  is about 0.7 KB before it draws anything. `PixiFeaturePolygon` makes its sprite or its shapes
+  in `update()`, for the level of detail it's at, and destroys what the level doesn't show.
+  A point's `icon` and a line's `casing` are `null` while there's none to draw: a layer that
+  touches them does so after `update()`, with `?.`.
 - **In a loop over every feature, don't make an object per feature.** Iterate
   `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
   hover or a click needs (`BufferHitArea`). Garbage is what brings the half-second collections

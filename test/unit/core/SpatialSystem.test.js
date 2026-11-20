@@ -435,6 +435,15 @@ describe('SpatialSystem', () => {
         assert.lengthOf(_spatial.getItemsAtBox(spatialID, worldBox([10, 0], 1000)), 0);
       });
 
+      it('stores an OSM node at its location, without building the node\'s geometry', () => {
+        const spatialID = 'test-replaceData-node';
+        const node = new Rapid.OsmNode(context, { id: 'n1', loc: [10, 0] });
+        _spatial.replaceData(spatialID, node);
+        assert.isNotOk(node._geoms);
+        assert.deepEqual(_spatial.getItemsAtBox(spatialID, worldBox([10, 0], 1000)).map(item => item.id), ['n1']);
+        assert.lengthOf(_spatial.getItemsAtBox(spatialID, worldBox([20, 0], 1000)), 0);
+      });
+
       it('replaces an older version that had an extent with one that has none', () => {
         const spatialID = 'test-replaceData-loseextent';
         const before = createMockData('d3', [10, 0]);

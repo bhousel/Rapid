@@ -54,6 +54,36 @@ describe('OsmNode', () => {
       assert.deepEqual(a.geoms.orig.extent.min, [1, 2]);
     });
 
+    // A node's `Geometry` is most of what the node takes, and most nodes only shape a way.
+    it('builds its geometry when it is first asked for', () => {
+      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
+      assert.isNotOk(a._geoms);
+      const geoms = a.geoms;
+      assert.instanceOf(geoms, Rapid.Geometry);
+      assert.deepEqual(geoms.parts[0].orig.coords, [1, 2]);
+      assert.strictEqual(a.geoms, geoms);     // once
+    });
+
+    it('answers extent, intersects and worldCoord without building its geometry', () => {
+      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
+      assert.deepEqual(a.extent().min, [1, 2]);
+      assert.deepEqual(a.extent().max, [1, 2]);
+      assert.isTrue(a.intersects(new Rapid.sdk.Extent([0, 0], [5, 5])));
+      assert.isFalse(a.intersects(new Rapid.sdk.Extent([3, 3], [5, 5])));
+      assert.deepEqual(a.worldCoord(), Rapid.sdk.projWgs84ToWorld([1, 2]));
+      assert.isNotOk(a._geoms);
+
+      assert.deepEqual(a.worldCoord(), a.geoms.parts[0].world.coords);    // the same answers as the geometry's
+      assert.strictEqual(a.extent(), a.geoms.orig.extent);
+    });
+
+    it('has no extent or world coordinate without a location', () => {
+      const a = new Rapid.OsmNode(context);
+      assert.isUndefined(a.extent());
+      assert.isUndefined(a.worldCoord());
+      assert.isFalse(a.intersects(new Rapid.sdk.Extent([0, 0], [5, 5])));
+    });
+
     it('constructs an OsmNode from another OsmNode', () => {
       const a = new Rapid.OsmNode(context);
       const b = new Rapid.OsmNode(a);

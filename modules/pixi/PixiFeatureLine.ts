@@ -23,13 +23,13 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  * This class renders a Line feature.
  *
  * Properties available:
- * - `casing`     - `PIXI.Graphic` for the casing (below)
+ * - `casing`     - `PIXI.Graphic` for the casing (below), or `null` while there's none to draw
  * - `stroke`     - `PIXI.Graphic` for the stroke (above)
  * -  (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
 
-  /** PIXI.Graphics for the casing (below) */
+  /** PIXI.Graphics for the casing (below), or null while there's none to draw (see `update`) */
   public casing: PIXI.Graphics | null;
   /** PIXI.Graphics for the stroke (above) */
   public stroke: PIXI.Graphics | null;
@@ -47,11 +47,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     this._hitBuffer = null;
 
-    const casing = new PIXI.Graphics();
-    casing.label = 'casing';
-    casing.eventMode = 'none';
-    casing.sortableChildren = false;
-    this.casing = casing;
+    this.casing = null;   // add later only if needed (see `update`)
 
     const stroke = new PIXI.Graphics();
     stroke.label = 'stroke';
@@ -59,7 +55,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     stroke.sortableChildren = false;
     this.stroke = stroke;
 
-    this.container.addChild(casing, stroke);
+    this.container.addChild(stroke);
   }
 
 
@@ -127,12 +123,22 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this.visible = true;
     this.stroke!.renderable = true;
 
-    if (styleZoom < 16) {
-      this.lod = 1;
-      this.casing!.renderable = false;
-    } else {
-      this.lod = 2;
-      this.casing!.renderable = true;
+    // The casing is drawn from zoom 16, if the style has one that can be seen. Its `Graphics`
+    // exists only then: the lines of the photo and data layers have none, nor has any line
+    // below zoom 16.
+    const casingStyle = style.casing;
+    const showCasing = (styleZoom >= 16) && !!casingStyle && casingStyle.opacity !== 0;
+    this.lod = (styleZoom < 16) ? 1 : 2;
+    if (showCasing && !this.casing) {
+      const casing = new PIXI.Graphics();
+      casing.label = 'casing';
+      casing.eventMode = 'none';
+      casing.sortableChildren = false;
+      this.casing = casing;
+      container.addChildAt(casing, 0);   // below the stroke
+    } else if (!showCasing && this.casing) {
+      this.casing.destroy();
+      this.casing = null;
     }
 
     // Update line markers (oneway arrows, sided markers)
@@ -229,10 +235,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       container.hitArea = null;
     }
 
-    if (this.casing!.renderable) {
-      this.updateGraphic('casing', this.casing!, points, styleZoom, viewZoom, isWireframe);
-    } else {
-      this.casing!.clear();
+    if (this.casing) {
+      this.updateGraphic('casing', this.casing, points, styleZoom, viewZoom, isWireframe);
     }
     if (this.stroke!.renderable) {
       this.updateGraphic('stroke', this.stroke!, points, styleZoom, viewZoom, isWireframe);

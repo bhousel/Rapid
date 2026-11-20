@@ -1672,16 +1672,59 @@ Sampled with what was collected included (18.1 GB in 51 s). The biggest, and wha
 
 So the half-second stalls are half as frequent and a quarter shorter. They're still there.
 
+### Keeping less alive (Nov 19)
+
+Marking takes as long as there is to mark, so the next thing was the 2.27 GB after a load.
+
+- **A node's `Geometry` is built when it's first asked for** (`OsmEntity.geoms`). It was 1.2 KB
+  of the 1.4 KB a node takes, and four nodes in five only give a way its shape, which the way
+  builds from their locations. What looked at every node now asks for less: the spatial index
+  for `node.worldCoord()`, validation for `graph.extent(node)`, which answers from the location.
+  Of 243,565 nodes in Užice, 49,153 have a geometry after a load: the ones that are drawn.
+  (This is "slim nodes" in `design/graph-geometry.md`, without moving the coordinates.)
+- **A `GeometryPart` of a way took 3.1 KB before anything read it**, 2.3 KB of that for the
+  closures and accessors of its lazy products (hull, centroid, pole of inaccessability, area,
+  surround, flat), made for every part. They're getters on two classes now (`LocalFrame`,
+  `WorldFrame`): a part of five coordinates takes 1.5 KB.
+- **A polygon feature makes its Pixi objects for the level of detail it's drawn at.** It made
+  a sprite, a fill, a mask with its source, and a container of strokes for every polygon. Of
+  the 36,000 around the view at z16, 1,900 are drawn in full and 12,000 as a sprite; the rest
+  are too small to draw. Now `update()` makes what the level needs and destroys the rest.
+
+- **The other features, the same way** (smaller: their objects are mostly ones they draw).
+  A point's icon sprite is made when its style has an icon; two points in three around the
+  view have none (vertices). A line's casing `Graphics` is made from zoom 16, for a style whose
+  casing can be seen: the photo and data layers' lines have none. A label already made its
+  display object when it was first drawn. Every feature also made a copy of the default style
+  before it got its own; they share the defaults now until one is assigned (a label never is).
+  Together 30 MB of the heap after a load.
+
+| Užice | Before | After |
+|---|---|---|
+| Heap after a load, collected | 2.26 GB | 1.69 GB |
+| ..the OSM data in it | 764 MB | 434 MB |
+| ..what polygon features hold | 357 MB | 111 MB |
+| Heap after sixteen zooms | 2.34 GB | 1.94 GB |
+| A major collection while zooming: main thread | 420 to 480 ms | 340 to 400 ms |
+| ..how often | every 12 s | every 15 s |
+| From the last tile until every feature is made | 6.1 to 6.8 s | 5.6 s |
+
+Screenshots of Seattle, Staten Island and Užice (z16 and z18) differ from the build before by
+no more than two loads of one build differ from each other (dashes start at another phase).
+
 ### What's left
 
-- **A major collection every 12 s of zooming.** Each zoom replaces what Pixi built for every
+- **A major collection every 15 s of zooming, of 340 to 400 ms.** Each zoom replaces what Pixi built for every
   feature, and what's replaced has lived long enough to be in the old generation: a gigabyte
   of it every two or three zooms. Less per feature would mean fewer collections (the line
   builder of section 4 would say how many vertices a line needs; round joins on a line 2 px
   wide make most of them).
-- **2.2 GB alive.** Marking takes the time it takes because of it. The data is the place to
-  look first: a node that's only a vertex doesn't need three copies of its location. Then the
-  features: an icon sprite for the points that have no icon.
+- **1.7 GB alive.** Still the reason marking takes a third of a second. By size: the OSM
+  layer's features (about 520 MB; every feature has a full copy of its style, 51 MB in all,
+  where features of one kind could share one; a Pixi `Container` is 0.7 KB before anything is
+  drawn, and a point is two or three of them), the OSM data (434
+  MB; a way's part keeps its coordinates three times as arrays of pairs, where `Float64Array`s
+  would take a quarter), and what Pixi built for drawing (235 MB).
 - **V8 marks in idle time when there is any.** After a load the scheduler's queues keep every
   tick busy for another 25 s (`backlog.md`). Whether that keeps collections from happening at
   the quiet moments wasn't measured.

@@ -1,5 +1,6 @@
 import { AbstractData } from '../data/AbstractData.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
+import { OsmNode } from '../data/OsmNode.ts';
 import { projWgs84ToWorld, projWorldToWgs84, vecAdd, vecEqual, vecScale, WORLD_SCALE } from '@rapid-sdk/math';
 import RBush from 'rbush';
 import { splitDataID } from '../data/dataID.ts';
@@ -246,9 +247,17 @@ export class SpatialSystem extends AbstractSystem {
     for (const d of utilIterable(data)) {
       if (!d) continue;
 
-      const geoms = graph ? graph.geometry(d as OsmEntity) : d.geoms;
-      const extent = geoms.world?.extent;
-      const bbox = extent?.bbox() ?? { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
+      // (A node's box is its location: asking for its geometry would build and keep one for
+      // every node there is, see `OsmNode.worldCoord`.)
+      let bbox: BBox;
+      if (d instanceof OsmNode) {
+        const coord = d.worldCoord();
+        bbox = coord ? { minX: coord[0], minY: coord[1], maxX: coord[0], maxY: coord[1] } : { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
+      } else {
+        const geoms = graph ? graph.geometry(d as OsmEntity) : d.geoms;
+        const extent = geoms.world?.extent;
+        bbox = extent?.bbox() ?? { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
+      }
       const item = Object.assign({ id: d.id, contents: d }, bbox) as SpatialItem;
       items.push(item);
     }

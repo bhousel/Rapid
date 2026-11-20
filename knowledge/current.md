@@ -133,8 +133,20 @@ Still to do, in about this order:
   they didn't show: the heap went from 2.27 GB to 3 after some zooms, and stays at 2.35 now.
   `BufferHitArea` works out a line's hit buffer only when the pointer is near (19% of what a
   zoom allocated). Sixteen zooms: 3 major collections where there were 6.
+  **A smaller heap** (Nov 19, same section): a node's `Geometry` is built
+  when it's asked for (one node in five has one after a load), `GeometryPart`'s lazy products
+  are getters on classes (a way's part is 1.5 KB, was 3.1), and a polygon feature makes its Pixi
+  objects for the level of detail it's at. Užice after a load: 1.72 GB, was 2.26. A major
+  collection is 340 to 400 ms now, every 15 s of zooming. Points make their icon sprite and
+  lines their casing only when there's one to draw, and features share the default style until
+  they get their own (1.69 GB).
+  **⌘Z and ⌘⇧Z work from an empty text field** (Nov 19; Bryan's decision,
+  `keyboard-system.md`): the sidebar's search fields take the focus by themselves, and a key
+  in a field wasn't a shortcut, so undo right after drawing depended on timing (found through
+  `draw.test.js` failing one run in three).
   Next: what's left of the garbage (Pixi's line builder with round joins is a quarter of it;
-  `syncShader`), the 2.2 GB alive (a node is 1.3 KB), labels placed in one
+  `syncShader`), the 1.7 GB alive (a copy of the style per feature; ways' coordinates as
+  arrays of pairs), labels placed in one
   frame (50 ms, half of it `getBounds()` for every point), following the box by the spatial
   index, what's left of the pass for a filter or a
   change of style (71 ms of looking at each feature), the other layers, merging a tile (80 to 134 ms on the main thread, the

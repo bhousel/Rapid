@@ -119,7 +119,7 @@ export class AbstractPixiFeature {
 
     this._geom = null;
     this._geomDirty = true;
-    this._style = utilDeepMerge({}, styleDefaults) as MinimalStyleProps;
+    this._style = styleDefaults;   // shared until a style is assigned (nothing changes a style in place)
     this._styleDirty = true;
     this._needsStyle = true;
     this._transformOnly = false;

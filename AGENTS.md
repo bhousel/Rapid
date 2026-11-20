@@ -144,6 +144,7 @@ Fetch the raw files with `curl -fsSL` (or `gh api`), so you get the exact text. 
 ### Data and Graphs
 - **Data elements are immutable.** Never change a data element's `props` in place. Make a new one with `d.update(props)`, and store it where the old one was (e.g. `spatial.replaceData(...)`, or the editor's datum). Renderers redraw a feature when its data is a different object, and selections find the newest version by data ID.
 - **A way's or relation's shape belongs to a graph.** Read it with `graph.geometry(entity)` / `graph.extent(entity)`; `entity.geoms` and `entity.extent()` throw for them. A node's shape is its own.
+- **A node's `Geometry` is built when it's first asked for, and then kept** (1.2 KB a node). Code that visits every node asks for `node.loc`, `node.extent()` / `graph.extent(node)` or `node.worldCoord()`, which don't build it. `node.geoms` and `graph.geometry(node)` are for the nodes you'll draw or measure.
 - **Search OSM data through `EditSystem`**, for the graph you mean: `editor.entitiesInBox(box, graph)`, `editor.waySegments(extent, graph)`, `editor.intersects(graph)`. They answer for any graph of the editor's lineage, including one inside an action.
 - See [`design/graph-geometry.md`](design/graph-geometry.md) for why, and `test/unit/lib/graph_model.test.js` (run it with `GRAPH_MODEL_SEEDS=3000`) after changing `Graph`.
 

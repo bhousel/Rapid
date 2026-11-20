@@ -57,42 +57,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._hitBuffer = null;
     this._hasFill = false;
 
-    const lowRes = new PIXI.Sprite();
-    lowRes.label = 'lowRes';
-    lowRes.anchor.set(0.5, 0.5);  // middle, middle
-    lowRes.interactive = false;
-    lowRes.eventMode = 'static';
-    lowRes.visible = false;
-    this.lowRes = lowRes;
-
-    const fill = new PIXI.Graphics();
-    fill.label = 'fill';
-    fill.eventMode = 'static';
-    fill.sortableChildren = false;
-    fill.visible = false;
-    this.fill = fill;
-
-    // When partially filling areas: we really want to define the mask as a stroke
-    // drawn within the inside of the area shape.  Graphics defined as a stroke
-    // _can_ be used as a mask, but they do not participate in hit testing!
-    // (note: in pixi v8 they now do, but they don't yet respect the `alignment` property)
-    // So we'll create the mask graphic and then copy its attributes into a mesh
-    // which _does_ hit test properly.
-    const mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({}) });
-    mask.label = 'mask';
-    mask.eventMode = 'static';
-    mask.visible = false;
-    this.mask = mask;
-    this.maskSource = new PIXI.Graphics();  // not added to scene
-
-    const strokes = new PIXI.Container();
-    strokes.label = 'strokes';
-    strokes.eventMode = 'static';
-    strokes.sortableChildren = false;
-    strokes.visible = false;
-    this.strokes = strokes;
-
-    this.container.addChild(lowRes, fill, strokes, mask);
+    // The Pixi objects are made when a level of detail first needs them (see `update`): of
+    // 36,000 polygons around a view of Užice at z16, 1,900 are drawn in full, 12,000 as a
+    // `lowRes` sprite, and the rest are too small to draw at all.
+    this.lowRes = null;
+    this.fill = null;
+    this.mask = null;
+    this.maskSource = null;
+    this.strokes = null;
 
     // // Debug surrounding rectangle
     // const debugSurround = new PIXI.Graphics();
@@ -193,18 +165,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     const style = this._style;
     const color = style.fill?.color ?? 0xaaaaaa;
-    const opacity = style.fill?.opacity ?? 0.3;
     const pattern = style.fill?.pattern;
-    const dash = style.stroke?.dash ?? null;
 
     const fillPreference = settings?.get('map.areaFill') ?? 'partial';
     let doFullFill = (style.fill?.type ?? fillPreference) === 'full';
-
-    const lowRes = this.lowRes!;
-    const fill = this.fill!;
-    const mask = this.mask!;
-    const maskSource = this.maskSource!;
-    const strokes = this.strokes!;
 
     let texture = pattern && textureManager.getPatternTexture(pattern) || PIXI.Texture.WHITE;    // WHITE turns off the texture
     // textureSpace:'global' tiles the pattern at consistent world-space density rather than stretching it per shape.
@@ -229,19 +193,16 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     if (screenW < 4 && screenH < 4) {  // so tiny
       this.lod = 0;
       this.visible = false;
-      lowRes.visible = false;
-      fill.visible = false;
-      mask.visible = false;
-      strokes.visible = false;
+      this._dropLowRes();
+      this._dropShapes();
 
     // Very small, swap with lowRes sprite
     } else if (local.surround && (screenW < 20 && screenH < 20)) {
       this.lod = 1;
       this.visible = true;
+      this._dropShapes();
+      const lowRes = this._needLowRes();
       lowRes.visible = true;
-      fill.visible = false;
-      mask.visible = false;
-      strokes.visible = false;
 
       // Use surrounding rectangle data in local coords.
       // (Scale of parent container will apply to it)
@@ -280,16 +241,150 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     } else {
       this.lod = 2;
       this.visible = true;
-      lowRes.visible = false;
-      fill.visible = !isWireframe;
-      mask.visible = !isWireframe;
-      strokes.visible = true;
+      this._dropLowRes();
+      this._needShapes();
     }
 
-    // Redraw the shapes
+    // Redraw the shapes. (Only the full level of detail has any.)
+    if (this.lod === 2) {
+      this._drawShapes(viewport, texture, textureMatrix, doFullFill);
+    }
 
-    // What isn't shown at this level of detail holds no geometry. (A polygon that was drawn in
-    // full at a higher zoom kept all of it while it showed a `lowRes` sprite, or nothing.)
+    // Debug surrounding rectangle
+    if (this.debugSurround) {
+      this.debugSurround.clear();
+      const p = local.surround?.polygon;
+      if (p) {
+        this.debugSurround
+          .poly(p.flat(), true)
+          .stroke({ width: 2 * localScale, color: 0x00ff00 });
+      }
+    }
+
+    this._geomDirty = false;
+    this._styleDirty = false;
+    this.updateHalo(viewport);
+  }
+
+
+  /**
+   * Makes the `lowRes` sprite, if this feature has none.
+   * @return The sprite
+   */
+  protected _needLowRes(): PIXI.Sprite {
+    if (!this.lowRes) {
+      const lowRes = new PIXI.Sprite();
+      lowRes.label = 'lowRes';
+      lowRes.anchor.set(0.5, 0.5);  // middle, middle
+      lowRes.interactive = false;
+      lowRes.eventMode = 'static';
+      this.lowRes = lowRes;
+      this.container.addChildAt(lowRes, 0);
+    }
+    return this.lowRes;
+  }
+
+
+  /**
+   * Destroys the `lowRes` sprite, if this feature has one.
+   */
+  protected _dropLowRes(): void {
+    this.lowRes?.destroy();
+    this.lowRes = null;
+  }
+
+
+  /**
+   * Makes the objects that draw the polygon in full, if this feature has none: the fill, its
+   * mask, and the container of the strokes.
+   */
+  protected _needShapes(): void {
+    if (this.fill) return;
+
+    const fill = new PIXI.Graphics();
+    fill.label = 'fill';
+    fill.eventMode = 'static';
+    fill.sortableChildren = false;
+    fill.visible = false;
+    this.fill = fill;
+
+    // When partially filling areas: we really want to define the mask as a stroke
+    // drawn within the inside of the area shape.  Graphics defined as a stroke
+    // _can_ be used as a mask, but they do not participate in hit testing!
+    // (note: in pixi v8 they now do, but they don't yet respect the `alignment` property)
+    // So we'll create the mask graphic and then copy its attributes into a mesh
+    // which _does_ hit test properly.
+    const mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({}) });
+    mask.label = 'mask';
+    mask.eventMode = 'static';
+    mask.visible = false;
+    this.mask = mask;
+    this.maskSource = new PIXI.Graphics();  // not added to scene
+
+    const strokes = new PIXI.Container();
+    strokes.label = 'strokes';
+    strokes.eventMode = 'static';
+    strokes.sortableChildren = false;
+    strokes.visible = false;
+    this.strokes = strokes;
+
+    this.container.addChild(fill, strokes, mask);
+  }
+
+
+  /**
+   * Destroys the objects that draw the polygon in full, if this feature has them, and with them
+   * everything Pixi built for them. A polygon that showed a `lowRes` sprite, or nothing, used to
+   * keep them, with the geometry of the last zoom they were drawn at.
+   */
+  protected _dropShapes(): void {
+    if (!this.fill) return;
+
+    this.fill.mask = null;
+    this.fill.destroy();
+    this.fill = null;
+    if (this.mask) {
+      this.mask.geometry?.destroy(true);   // (the mesh doesn't destroy its geometry)
+      this.mask.destroy();
+      this.mask = null;
+    }
+    this.maskSource?.destroy();
+    this.maskSource = null;
+    this.strokes?.destroy({ children: true });
+    this.strokes = null;
+    this._hasFill = false;
+  }
+
+
+  /**
+   * Draws the polygon in full: its strokes, and its fill with the mask for a partial fill.
+   * @param viewport - Pixi viewport to use for rendering
+   * @param texture - The fill's pattern, or `PIXI.Texture.WHITE` for none
+   * @param textureMatrix - How the pattern is laid out
+   * @param doFullFill - Whether to fill the whole polygon, not only along its edge
+   */
+  protected _drawShapes(viewport: Viewport, texture: PIXI.Texture, textureMatrix: PIXI.Matrix, doFullFill: boolean): void {
+    const context = this.context;
+    const map = context.systems.map;
+    const isWireframe = !!map?.wireframeMode;
+    const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
+    const local = this._geom!.local!;
+    const flat = local.flat as number[][];
+    const style = this._style;
+    const color = style.fill?.color ?? 0xaaaaaa;
+    const opacity = style.fill?.opacity ?? 0.3;
+    const dash = style.stroke?.dash ?? null;
+
+    const fill = this.fill!;
+    const mask = this.mask!;
+    const maskSource = this.maskSource!;
+    const strokes = this.strokes!;
+
+    fill.visible = !isWireframe;
+    mask.visible = !isWireframe;
+    strokes.visible = true;
+
+    // In wireframe there's no fill: it holds no geometry then.
     if (!fill.visible && this._hasFill) {
       fill.clear();
       fill.mask = null;
@@ -431,20 +526,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       }
     }
 
-    // Debug surrounding rectangle
-    if (this.debugSurround) {
-      this.debugSurround.clear();
-      const p = local.surround?.polygon;
-      if (p) {
-        this.debugSurround
-          .poly(p.flat(), true)
-          .stroke({ width: 2 * localScale, color: 0x00ff00 });
-      }
-    }
-
-    this._geomDirty = false;
-    this._styleDirty = false;
-    this.updateHalo(viewport);
   }
 
 

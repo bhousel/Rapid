@@ -28,7 +28,7 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
  *
  * Properties available:
  * - `marker`      - `PIXI.Sprite` for the marker
- * - `icon`        - `PIXI.Sprite` for the icon
+ * - `icon`        - `PIXI.Sprite` for the icon (or `null` if the style has none)
  * - `viewfields`  - `PIXI.Container` containing the viewfields (or `null` if none)
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
@@ -36,7 +36,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /** PIXI.Sprite for the marker */
   public marker: PIXI.Sprite | null;
-  /** PIXI.Sprite for the icon */
+  /** PIXI.Sprite for the icon (or null while the style has no icon: most vertices) */
   public icon: PIXI.Sprite | null;
   /** PIXI.Container containing the viewfields (or null if none) */
   public viewfields: PIXI.Container | null;
@@ -67,16 +67,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     marker.visible = true;
     this.marker = marker;
 
-    const icon = new PIXI.Sprite();
-    icon.label = 'icon';
-    icon.eventMode = 'none';
-    icon.sortableChildren = false;
-    icon.visible = false;
-    this.icon = icon;
-
+    this.icon = null;         // add later only if needed (see `updateStyle`)
     this.viewfields = null;   // add later only if needed
 
-    this.container.addChild(marker, icon);
+    this.container.addChild(marker);
   }
 
 
@@ -165,7 +159,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     const container = this.container;
     const marker = this.marker!;
-    const icon = this.icon!;
 
     // Use y-coordinate as the z-index.
     const z = container.position.y;
@@ -215,7 +208,19 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     }
 
     // Show icon, if any..
+    // (The sprite is made for a point that has one. Of the points and vertices around a view
+    // of Užice, two in three have none.)
+    let icon = this.icon;
     if (style.icon.image) {
+      if (!icon) {
+        icon = new PIXI.Sprite();
+        icon.label = 'icon';
+        icon.eventMode = 'none';
+        icon.sortableChildren = false;
+        this.icon = icon;
+        container.addChildAt(icon, container.getChildIndex(marker) + 1);   // above the marker
+      }
+
       // anchor, default to middle,middle
       let [anchorX, anchorY] = style.icon.anchor || [];
       if (!Number.isFinite(anchorX)) anchorX = 0.5;
@@ -235,8 +240,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       icon.alpha = style.icon.opacity ?? 1;
       icon.tint = style.icon.color ?? 0x111111;
       icon.visible = true;
-    } else {  // No icon
-      icon.visible = false;
+    } else if (icon) {  // Had an icon before and now should not
+      icon.destroy();
+      icon = null;
+      this.icon = null;
     }
 
     // Update viewfields, if any..
@@ -337,7 +344,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       this.props.isCircular = /(circle|midpoint)$/i.test(markerID);
       marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       marker.anchor.set(0.5, 0.5);  // middle, middle
-      icon.position.set(0, 0);      // middle, middle
+      icon?.position.set(0, 0);     // middle, middle
 
     } else {  // z >= 17 - Show the requested marker (circles OR pins)
       this.lod = 2;  // full
@@ -352,16 +359,16 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       if (isPin && !this.props.isCircular) {
         marker.anchor.set(0.5, 1);    // middle, bottom
-        icon.position.set(0, -14);    // mathematically 0,-15 is center of pin, but looks nicer moved down slightly
+        icon?.position.set(0, -14);   // mathematically 0,-15 is center of pin, but looks nicer moved down slightly
       } else {
         marker.anchor.set(0.5, 0.5);  // middle, middle
-        icon.position.set(0, 0);      // middle, middle
+        icon?.position.set(0, 0);     // middle, middle
       }
     }
 
     // If we are waiting on a texure to load, stay dirty.
     const missingMarker = marker.visible && marker.texture === PIXI.Texture.EMPTY;
-    const missingIcon = icon.visible && icon.texture === PIXI.Texture.EMPTY;
+    const missingIcon = !!icon && icon.texture === PIXI.Texture.EMPTY;
     const missingViewfields = this.viewfields && vfTexture === PIXI.Texture.EMPTY;
     this._styleDirty = !!(missingMarker || missingIcon || missingViewfields);
   }

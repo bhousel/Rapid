@@ -497,6 +497,7 @@ export class Graph {
    * @return  Its Extent, or `undefined`
    */
   public extent(entity: OsmEntity): Extent | undefined {
+    if (entity.type === 'node') return entity.extent();   // (without building the node's geometry)
     return this.geometry(entity).orig?.extent;
   }
 
