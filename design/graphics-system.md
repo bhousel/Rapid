@@ -4,15 +4,14 @@ How `GraphicsSystem` turns the map into a frame, what we know about what a frame
 explorations planned to make frames cheaper. Rendering performance is where Rapid has the most room to
 improve, and until now we've had no way to see it except spot checks in Spector.
 
-> **Status:** In progress (Nov 2026). Steps 1 to 5 of the plan are done (frame stats, a script that
-> measures a set of difficult places, where the GPU time goes, a rendering info card, and the
-> `RenderFrame` passed to the layers), and so are the CULL pass for the OSM layer (section 8) and
-> frame pacing (section 9). A deadline on the frame is started (section 10), section 11
-> compares the branch with `main`, Rapid 2.5 and iD, and section 12 is about what a pass costs
-> and what asks for one (a hover no longer does); sections 4 and 5
-> aren't built. The first
-> measurements in section 2 were taken by hand on the `pixi-8.23` branch (Pixi 8.23.0), and frame stats
-> reproduce them. The plan is in section 7.
+> **Status:** In progress (Nov 2026). Merged to `main` with `pixi-8.23` (PR #10) and `label-avoids`
+> (PR #11), Nov 20. Built: steps 1 to 5 of the plan (frame stats, `bun run measure` over a set of
+> difficult places, where the GPU time goes, the rendering info card, the `RenderFrame` passed to the
+> layers), the CULL pass (section 8), frame pacing (section 9), a deadline on the frame (section 10),
+> fewer passes (section 12), less garbage (section 13) and label placement (section 14). Section 11
+> compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
+> without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
+> rendering follow-ups". The plan is in section 7.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -323,6 +322,14 @@ copies its triangles into a `Mesh` (`PIXI.buildContextBatches`), and uses that m
 mask and as the area's hit target ([meta/Rapid#1636](https://github.com/meta/Rapid/issues/1636#issuecomment-2557848323)).
 Pixi 8 can hit-test a stroke now (`Polygon.strokeContains(x, y, width, alignment)`), so that reason is
 gone.
+
+**The mask is always batched** (`batchMode = 'batch'` in `PixiFeaturePolygon._setMaskGeometry()`, Nov
+20). In Pixi's `'auto'` mode a mesh is batched up to 100 vertices, and a mask that crossed that line in a
+frame where its tile was rebuilt crashed every later frame that moved the tile (pixijs#12437; the same
+cause as Rapid#1636). Measured with `bun run measure`: always batching costs the same as `'auto'`; never
+batching costs about 1 ms of DRAW a frame in Seattle, where 261 of 300 masks are small enough to batch.
+A mask is visible only while it masks a visible fill, because Pixi still writes a visible mask that
+nothing draws into an old batch (pixijs#12388).
 
 **What the mask does for us**, which any replacement has to keep:
 
@@ -1754,10 +1761,10 @@ no more than two loads of one build differ from each other (dashes start at anot
 - `design/profiling.md` has the plan for a profile of the heap by kind of object, which this
   section didn't do (a snapshot of 2 GB is a risk to the tab).
 
-## 14. Label placement (a plan)
+## 14. Label placement
 
-Written Nov 20, after `pixi-8.23` merged. Steps 1 to 4 and 7 are built (see "Order of work",
-at the end, and "What was built"); 5 and 6 aren't.
+Written Nov 20, after `pixi-8.23` merged. All seven steps are built and merged (PR #11; see "What
+was built" and "Order of work"). What's still open is under "Open questions".
 
 ### Words used here
 

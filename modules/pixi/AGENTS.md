@@ -20,7 +20,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `PixiLayerLabels`).
 - **Textures come from `PixiTextures`**, which packs icons, symbols and tiles into its own atlas. Don't
   use `Texture.from()` or `Assets.load()` for them (only area patterns use an `Assets` bundle).
-- **Features draw in z16 world coordinates**, under the `origin` and `world` containers, positioned at
+- **Features draw in z16 world coordinates**, under the `origin` container (which scales them), positioned at
   their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
   counter-scale to stay screen-sized. The skill's screen-pixel examples need converting. See
   "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).

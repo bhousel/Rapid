@@ -569,7 +569,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    *
    * Decoupling sizing from rasterization lets us do placement math during the layer's render()
    * without triggering `renderer.generateTexture()` (which would recursively call `renderer.render()`
-   * and corrupt batcher state — see lessons.md "Pixi v8 renderer is NOT re-entrant").
+   * and corrupt batcher state — see `knowledge/lessons/pixi.md`, "Pixi v8 renderer is NOT re-entrant").
    *
    * @param str - The label text
    * @param style - 'normal' or 'italic'
@@ -619,7 +619,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * `SchedulerSystem.schedule()` queues the task to run during `_drainQueues()`, which
    * fires AFTER all per-frame callbacks (including layer rendering) complete.  That means
    * any `renderer.generateTexture()` call inside the drain is a TOP-LEVEL render call,
-   * not nested inside another `renderer.render()` pass — see lessons.md
+   * not nested inside another `renderer.render()` pass — see `knowledge/lessons/pixi.md`,
    * "Pixi v8 renderer is NOT re-entrant".
    *
    * The `_rasterDrainScheduled` flag dedups within a frame so we don't enqueue N drain

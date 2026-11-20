@@ -4,6 +4,28 @@ Newest first, by month. Details live in git history and the design docs; these a
 
 ## November 2026
 
+- **Partial fill masks are always batched** (Nov 20 2026) — a mask that crossed Pixi's 100-vertex
+  batching line in a frame where its tile was rebuilt crashed every later frame that moved the tile
+  (seen loading Newark). Same cause as Rapid#1636, whose workaround had been removed in May when
+  pixijs#11207 looked fixed. Filed as pixijs#12437; `batchMode = 'batch'` measured the same as `'auto'`.
+  E2e tests for the crash and for a mask never showing without its fill (pixijs#12388).
+
+- **Label placement against a grid, over several frames** (Nov 20 2026, PR #11, `graphics-system.md`
+  section 14) — points mark what labels avoid in `scene.avoidGrid` as they're drawn (they had stopped
+  being avoided one by one when points were split by tile), features tell the scene when they change
+  so the labels layer walks nothing, a hover moves no label, and labels are placed from a queue, not
+  during a zoom or rotation. In Užice the frame that placed everything after a zoom went from 104 to
+  132 ms to about 27, then into frames of 2 to 8 ms; a pan frame from 5 ms to 0.1.
+
+- **pixi.js 8.23 and the frame work** (Nov 20 2026, PR #10, `design/graphics-system.md`,
+  `design/scene.md`) — frame stats, the rendering card and `bun run measure`/`compare` with tapes; the
+  scene's containers are render groups at an anchor, OSM polygons, lines and points split by map tile;
+  a CULL pass, frame pacing in place of the 250 ms throttle, and a deadline on the frame. A hover, an
+  edit, a change of mode, arriving tiles and a zoom no longer do the OSM layer's whole pass, and a
+  smaller heap (Užice 2.26 → 1.69 GB) means fewer, shorter collections. Against `main` in Užice: a pan
+  into new data at 38 to 44 frames a second (was 12), a pinch in 2 s (was 32). Also: the rate limit bar
+  is back, ⌘Z works from an empty text field, and Pixi's `globalMove` events are really off.
+
 - **Bryan's own packages, ESM-only now** (Nov 20 2026): country-coder 6, location-conflation 4,
   osm-community-index 7, node-diff3 4 and osm-auth 4, with patch bumps (maplibre-gl 6.19, marked,
   togeojson, oxlint). osm-auth is a class now (`new osmAuth()`), with its own types; `OsmService`
@@ -112,7 +134,7 @@ Newest first, by month. Details live in git history and the design docs; these a
 
 - **NSI startup off the main startup chain** (Oct 2026) — `NsiService` now starts on its own promise chain, so it no longer blocks Rapid startup.
 
-- **Global-symbol leak in browser bundles** (Oct 2026) — `scripts/build_js.ts` sets `format: 'iife'` on every browser bundle. Bun's default `esm` left our export-less entry points' top-level declarations on `window`, and d3-selection's `dispatchEvent` clobbered the native one. See `lessons.md` (Build / Bundling) and `decisions.md`.
+- **Global-symbol leak in browser bundles** (Oct 2026) — `scripts/build_js.ts` sets `format: 'iife'` on every browser bundle. Bun's default `esm` left our export-less entry points' top-level declarations on `window`, and d3-selection's `dispatchEvent` clobbered the native one. See `lessons/build.md` and `decisions.md`.
 
 - **`DatabaseSystem` phase 4, storage management** (Oct 2026) — `estimateQuotaAsync` / `canStoreAsync` / `requestPersistentAsync`. Write-time per-store stats counters were tried and reverted (a `JSON.stringify` on the hot path, and drift on overwrites). See `design/database-system.md`.
 

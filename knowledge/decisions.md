@@ -41,6 +41,15 @@ The structure and the reasoning are in `design/scene.md`; these are the choices 
 - **No reordering while drawing.** With the datasets non-interactive the OSM line is reachable anyway;
   lifting OSM visually is a preference for a layer-order UI later (`zIndex` per container makes it cheap).
 
+## Partial fill masks are always batched (Nov 2026)
+Pixi's `'auto'` batch mode batches a `Mesh` up to 100 vertices, and a mask that crossed that line in a
+frame where its tile was rebuilt crashed Pixi (pixijs#12437, Rapid#1636). Chosen: `batchMode = 'batch'`
+on every mask geometry (`PixiFeaturePolygon._setMaskGeometry()`), which measured the same as `'auto'`.
+Rejected: `'no-batch'` (about 1 ms more DRAW a frame in Seattle, where 261 of 300 masks were batched),
+and replacing the mask when `mask.batched` would change (the old #1636 workaround; more code, and only
+keeps `'auto'`'s batching). Revisit when Pixi fixes #12437, or when partial fills stop using a mask
+(`design/graphics-system.md` section 4).
+
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
 Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.
@@ -164,15 +173,15 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 
 ## Pixi World-Coord Rendering (render_worldcoord)
 
-- **Scene graph hierarchy**: `stage → origin → world → groups → features`. `stage` centers [0,0] at screen center for rotation. `origin` shifts back to top-left and absorbs panning offset (via Pixi's own `x/y`). `world` maps z16 world coordinates to screen pixels via `world.scale = 2^(pixiTransform.z - WORLD_ZOOM)` and `world.position = (pixiTransform.x - WORLD_HALF * scale, pixiTransform.y - WORLD_HALF * scale)`. All layers that render entity geometry live under `world`.
-- **Use `pixiTransform` not `mapTransform` for `world`** — Panning is absorbed by the `origin` container. `pixiTransform` already includes all pending panning deltas. `mapTransform` lags behind by one frame during drags. Using `pixiTransform` means small panning moves don't dirty `world` at all.
-- **`background` (tile imagery) stays under `origin`** — Tile textures are in screen space; there is no benefit to putting them under `world`. Only entity-geometry layers move.
+- **Scene graph hierarchy**: `stage → origin → groups → features`. `stage` centers [0,0] on the screen for rotation. `origin` maps z16 world coordinates to screen pixels (`origin.scale = 2^(pixiTransform.z - WORLD_ZOOM)`, positioned to match `projWorldToScreen`), and its groups are render groups at an anchor near the view (`design/scene.md` section 3). Until Nov 2026 a separate `world` container did the scaling.
+- **Use `pixiTransform`, not `mapTransform`, for `origin`**: the pan offset between them is absorbed by `origin.position`, so small pans don't change `origin.scale`, and `mapTransform` lags a frame during drags.
+- **Imagery tiles are in world coordinates too** (`PixiLayerBackgroundTiles` places each sprite at its tile's world extent).
 - **Container position = `world.origin` (extent center)** — Each feature's `container.position` is set to the extent center of its geometry in z16 world coordinates. All vertex drawing is then origin-relative. This keeps vertex magnitudes small (~thousands not ~8 million), making float32 drawing safe and d3-polygon numerics stable.
-- **Points: counter-scale + counter-rotate** — The `world` container scales geometry up with zoom. Point sprites are fixed-size in screen pixels. Fix: set `container.scale = baseScale / worldScale` and `container.rotation = -bearing`. This keeps child sprites screen-sized regardless of zoom/bearing. Halos and hit areas live in the counter-scaled local space, so they work unchanged.
-- **Lines + polygons: world-local stroke widths** — Instead of counter-scaling (which would shrink geometry), express stroke widths in world-local units: `localWidth = pixelWidth * 2^(WORLD_ZOOM - zoom)`. At render time the `world` container's scale inverts this back to screen pixels. Dash patterns and buffer widths use the same conversion.
+- **Points: counter-scale + counter-rotate** — `origin` scales geometry up with zoom. Point sprites are fixed-size in screen pixels. Fix: set `container.scale = baseScale / worldScale` and `container.rotation = -bearing`. This keeps child sprites screen-sized regardless of zoom/bearing. Halos and hit areas live in the counter-scaled local space, so they work unchanged.
+- **Lines + polygons: world-local stroke widths** — Instead of counter-scaling (which would shrink geometry), express stroke widths in world-local units: `localWidth = pixelWidth * 2^(WORLD_ZOOM - zoom)`. At render time `origin`'s scale inverts this back to screen pixels. Dash patterns and buffer widths use the same conversion.
 - **Hit areas are in container-local space** — `container.hitArea = new PIXI.Polygon(...)` coordinates must be in the container's local frame. For world-path features the local frame is world-local (origin-relative). `lineToPoly()` is called with world-local points and a world-local buffer width. Pixi composes the container transform when doing hit testing, so no extra projection is needed.
-- **DashLine halos: `scale` only, no per-caller workaround** — DashLine's `scale` option multiplies `width` and each `dash[i]` to convert drawing-coord units to screen pixels. Line/Polygon halo containers have `scale=1` (drawing in world units), so they pass `scale: 2^(WORLD_ZOOM - zoom)` (a.k.a. `localScale`) to keep dashes at fixed screen-pixel sizes. Point halo containers have a counter-scale (`1/worldScale`) that puts halo-local units in CSS pixels, so `scale=1` (default) is correct. DashLine itself uses `textureSpace: 'global'` (normalizes UV by texture pixel dimensions, no per-segment stretch), keeps pow2 padding for WebGL1 REPEAT-wrap, and compensates in the per-segment matrix using `texW`/`texH` instance fields so one full cycle covers exactly `dashSize * userScale` local units. Matrix composed scale-then-rotate for non-uniform scale correctness.
-- **`viewZoom` vs `styleZoom` naming convention** — Throughout the Pixi layer and feature files: `viewZoom = viewport.transform.zoom` is used for scale chain math (world↔screen scale factors, `worldScale = 2^(viewZoom - WORLD_ZOOM)`). `styleZoom = map?.effectiveZoom() ?? viewZoom` is the latitude-adjusted zoom used only for LOD thresholds (`< 16`, `< 17`) and styling decisions. The two are explicitly named at the top of each method that needs both. `PixiFeaturePolygon` has no LOD thresholds so it only has `viewZoom` — intentional.
+- **DashLine halos: `scale` only, no per-caller workaround** — lines and polygons pass `scale: localScale`, points `1` (their container is counter-scaled). DashLine uses `textureSpace: 'global'` and keeps pow2 padding for WebGL1, compensated in its matrix. The details are in `lessons/pixi.md`.
+- **`viewZoom` vs `styleZoom` naming convention** — named at the top of each method that needs both: `viewZoom` for scale math, `styleZoom` (latitude-adjusted) only for level-of-detail thresholds and styling (`lessons/pixi.md`).
 
 ## Frame pacing (Nov 2026)
 
@@ -229,11 +238,11 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 ## Spatial System — buffers / conflation (Step 3)
 
 - **Buffers are quantized "coverage boxes", not exact geometry** — A mathematically exact buffer is the Minkowski sum of a geometry with a disk. We don't need exactness, we need speed. Turf/JTS don't compute Minkowski either (they offset-curve + node + polygonize; same family as `PIXI.buildLine` / `lineToPoly`). For conflation we cover the geometry in boxes (a quantization). Coverage boxes double as the RBush query boxes.
-- **`geomCoverageBoxes` is for conflation, not rope labels** — Rope labels need a *uniform arc-length sampler* (`geomLineSegments`) so that `scaleX = lWidth / ((numBoxes-1)*boxsize)` holds. `geomCoverageBoxes` subdivides each segment independently and produces denser, non-uniform spacing, which breaks `scaleX` and squishes text. The two helpers serve different purposes despite both "sampling along a line".
+- **`geomCoverageBoxes` is for conflation, not rope labels** — see `lessons/runtime.md`.
 - **Coverage representation is per geometry type** — Point → one box of half-size `r`; LineString → boxes sampled every ~`r` along the line (partial matching falls out for free, per-box); Polygon → grown extent box (box-filling a 2D region is wasteful; phase-2 uses real polygon overlap instead). Don't force everything into box-fills.
 - **Radius is a recompute parameter, not baked into `setData`** — `setData()` computes the radius-independent core projection; a separate `computeCoverage(r)` produces coverage for a given radius and is re-called when the user tweaks the conflation distance (e.g. 3 m → 2.5 m).
-- **Two-phase querying with a caller-supplied predicate** — RBush indexes bboxes only, so queries are bbox-prefilter then precise-refine. `SpatialSystem` owns the generic mechanics (`getItemsAtBox(es)`, refine) but takes the predicate from the caller; "match" semantics live in a `Conflation` module. Phase-2 predicates already exist in `@rapid-sdk/math` (`geomPointInPolygon`, `geomPolygon{Contains,Intersects}Polygon`, `geomLineIntersection`, `vecProject`/`vecLength`), so we almost certainly never need `jsts`. New helpers can start in `modules/geo` and migrate to the SDK later (we control `rapid-sdk`).
-- **Lazy `GeometryPart` derived products (Step 3a)** — `update()` keeps only the cheap core eager (projected coords, extent, origin, outer); `hull`/`centroid`/`poi`/`area`/`winding`/`surround`/`flat` are lazy memoized getters computed on first access. This shrinks the memory/compute footprint for large datasets (Overture-scale) where most features are never rendered or conflated. Because `centroid`/`poi` derive from `hull` (stabilization trick), they share the same laziness. `clone()` re-derives from `orig` (cheap now) rather than deep-copying computed arrays, which also avoids the lazy-getter-vs-`structuredClone` interaction.
+- **Two-phase querying with a caller-supplied predicate** — RBush indexes bboxes only, so queries prefilter by box and refine with a predicate the caller gives; "match" semantics live in a `Conflation` module, not in `SpatialSystem`. The precise tests already exist in `@rapid-sdk/math` (point in polygon, polygon overlap, line intersection), so no `jsts`. New helpers start in `modules/geo` and can move to the SDK.
+- **Lazy `GeometryPart` derived products (Step 3a)** — `update()` keeps only the cheap core eager (projected coords, extent, origin, outer); `hull`/`centroid`/`poi`/`area`/`winding`/`surround`/`flat` are computed on first access, as getters on classes with a field per product since Nov 19 (a closure per product cost 2.3 KB a part). Most features of a large dataset are never rendered or conflated.
 
 ## actionMove: frame-of-reference in `replaceMovedVertex`
 
@@ -346,7 +355,7 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 ## Pixi Labels and Atlas Textures
 
 - **Measure labels during render, rasterize after render** — `PixiLayerLabels` uses `PIXI.CanvasTextMetrics.measureText()` for placement math inside `render()`, then queues texture creation through `SchedulerSystem.schedule()` so `renderer.generateTexture()` runs in the scheduler drain phase after all frame callbacks complete. This fixes Pixi v8 renderer re-entry corruption while preserving the existing Pixi.Text rasterizer for now.
-- **Labels are managed features, placement data is not** — `PixiLayerLabels` owns RBush placement and stores `LabelProps` placeholders. `PixiFeatureLabel` is created lazily only for visible placeholders and owns the actual `Sprite` / `BitmapText` / `MeshRope` display object. Off-screen culling destroys display objects without losing placement records.
+- **Labels are managed features, placement data is not** — `PixiLayerLabels` places labels (their boxes in its spatial cache, avoids in `scene.avoidGrid`, `graphics-system.md` section 14) and keeps `PixiFeatureLabelProps` placeholders. A `PixiFeatureLabel` is made only for a visible placeholder and owns its `Sprite` / `BitmapText` / `MeshRope`; culling destroys display objects, not placements.
 - **Atlas items store uploadable sources, not just ImageData** — `AtlasAllocator` accepts `ImageData`, `HTMLCanvasElement`, `HTMLImageElement`, and `ImageBitmap`. WebGL uploads use the 7-arg `texSubImage2D` DOM-source overload, WebGPU uses `copyExternalImageToTexture`, and the canvas renderer blits the same source into its backing canvas. This avoids the previous `drawImage` → `getImageData` readback for images, bitmaps, and canvases.
 - **Tile-only edge replication** — The atlas still reserves a 1px ring around every texture frame, but only tile imagery needs that ring filled with edge-replicated pixels to prevent seams under bilinear sampling. `PixiTextures._fromEdgePaddedCanvas()` builds a `(w+2) x (h+2)` source for tile atlas entries with two `drawImage` passes. Symbol/text/icon entries upload at the inner frame position and leave the reserved ring transparent.
 
@@ -423,7 +432,13 @@ Fixes where Bryan picked the behavior, which someone might undo by accident.
 
 ## `build_js.ts` forces `format: 'iife'` on every browser bundle
 
-- **Why not rely on Bun's default?** Bun defaults to `format: 'esm'`. Our `main_*.js` / `worker.ts` entry points have no `export`s — they only side-effect-attach globals — so ESM-format output is just unwrapped top-level declarations. Loaded as a classic `<script>`, those names leak onto `window` (clobbered native `window.dispatchEvent` via d3-selection). esbuild (the previous `facebook/Rapid` bundler) defaulted to `iife` for the browser platform, so this is a regression we re-closed by being explicit.
-- **Why not just load via `<script type="module">`?** It would fix the symptom (module scope), but pushes a workaround onto every embedding app's loader, leaves the artifact a footgun for classic-`<script>` users, and protects nothing — these bundles have zero exports, so there's no ESM API to preserve. IIFE is the semantically honest format for a "load me, I attach a global" bundle (same shape the old UMD/esbuild build produced).
-- **Worker builds are iife as defense-in-depth, not a fix.** `WorkerSystem` spawns the worker as a **module** worker (`{ type: 'module' }`), so top-level names are already module-scoped and can't leak into `self`. iife is harmless here and guards against a future switch to a classic worker. Confirmed the iife worker output has no top-level `import`/`export`, so it still loads as a module worker and stays importable via the cross-origin blob `import` shim in `_resolveWorkerURL`.
-- **If we ever want real ESM consumers**, that's a *separate, additive* build output: `format: 'esm'` with `modules/index.js` (which has real exports) as the entrypoint, wired via a `package.json` `"exports"` map — not a reason to unwrap the global-attach bundles.
+- **Why not Bun's default `esm`?** Our entry points have no exports and only attach globals, so ESM
+  output is bare top-level declarations, which a classic `<script>` puts on `window` (d3-selection's
+  `dispatchEvent` replaced the native one). esbuild, the old bundler, defaulted to `iife` for browsers.
+  Details in `lessons/build.md`.
+- **Why not `<script type="module">`?** It would push a workaround onto every embedding app's loader for
+  bundles that have no ESM API to preserve. IIFE is the honest format for "load me, I attach a global".
+- **Workers are iife as defense-in-depth**: they're module workers already, so nothing leaks into `self`;
+  iife guards a future switch to a classic worker and still loads as a module.
+- **Real ESM consumers** would be a separate, additive build (`modules/index.js`, which has exports, with a
+  `package.json` `"exports"` map), not a reason to unwrap these bundles.
