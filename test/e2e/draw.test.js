@@ -104,18 +104,23 @@ test('draws a line, and undo takes it away', async ({ page, consoleErrors }) => 
   });
   expect(line).toEqual({ id: line.id, nodes: 3, isNew: true });
 
-  // Each click was an edit: the first undo takes away the last node, the second takes away the line
-  // (Finishing a feature, and each undo, puts the focus in a search field of the sidebar a moment
-  // later. ⌘Z undoes from there too, while nothing has been typed in the field: wait for the
-  // focus, so that this is what's tested.)
+  // Each click was an edit: the first undo takes away the last node, the second takes away the line.
+  // (The key for undo goes by the platform the page thinks it's on: ⌘Z on a Mac, ⌃Z elsewhere,
+  // and the test browser doesn't say it's a Mac even when it runs on one. Playwright's
+  // `ControlOrMeta` goes by the machine, and so pressed a key that isn't bound. That looked like
+  // an undo that worked now and then: the preset list has its own undo for either key, while its
+  // search field has the focus.)
   const nodeCount = id => page.evaluate(id => rapidContext.systems.editor.staging.graph.hasEntity(id)?.nodes.length ?? 0, id);
-  const focusInSearchField = () => page.evaluate(() => document.activeElement?.tagName === 'INPUT' && document.activeElement.value === '');
-  await expect.poll(focusInSearchField).toBe(true);
-  await page.keyboard.press('ControlOrMeta+z');
+  const undoKey = await page.evaluate(() => (rapidContext.systems.keyboard.global.bindings.has('⌘Z-bubble') ? 'Meta+z' : 'Control+z'));
+
+  // Finishing a feature puts the focus in the preset list's search field a moment later. Undo
+  // works from there, while nothing has been typed in it: wait for the focus, so that this is tested.
+  await expect.poll(() => page.evaluate(() => document.activeElement?.tagName === 'INPUT' && document.activeElement.value === '')).toBe(true);
+  await page.keyboard.press(undoKey);
   await expect.poll(() => nodeCount(line.id)).toBe(2);
 
-  await expect.poll(focusInSearchField).toBe(true);
-  await page.keyboard.press('ControlOrMeta+z');
+  await mapSettled(page);
+  await page.keyboard.press(undoKey);
   await expect.poll(() => nodeCount(line.id)).toBe(0);
   expect(await page.evaluate(() => rapidContext.systems.editor.hasChanges())).toBe(false);
 

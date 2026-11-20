@@ -1145,12 +1145,12 @@ above are from before that; the last change to the budget rule was measured in S
 
 ## 11. Against other versions, and iD
 
-Measured Nov 19, to have a baseline to show what this branch changes. Four editors, at three of
-the difficult places:
+Measured Nov 19 to have a baseline, and again Nov 20 from tapes, after sections 12 and 13: the
+tables below are the second measurement. Four editors, at three of the difficult places:
 
 - **iD 2.42.0**, the release build at `ideditor-release.netlify.app`. It draws with SVG.
 - **Rapid 2.5.7**, the last release of the old line, at `rapideditor.org/rapid`.
-- **`main`**, Rapid 3.0.0-pre.4 as merged on Nov 16, built locally (Pixi 8.20).
+- **`main`**, Rapid 3.0.0-pre.4 as merged on Nov 16 (`ec180e880`), built locally (Pixi 8.20).
 - **This branch** (`pixi-8.23`), the production bundle.
 
 ### How
@@ -1170,16 +1170,18 @@ possible is 2.1 s for the pan and 1.4 s for the pinch.) Only boundaries are hidd
 the other feature filters don't mean the same in the older editors, where hiding landuse hides most
 areas. So more is drawn here than in the other sections' measurements, which hide four groups.
 
-Each number is from one run. They vary: the same pan in Seattle on this branch had a longest frame
-of 39, 79 and 115 ms in three runs.
+Each number is from one run, except this branch's, which are from three. They vary: the same pan
+in Seattle on this branch had a longest frame of 38, 46 and 104 ms.
 
 **Record a place once.** With `--tape file.tape.json` (`scripts/tape.ts`, also on `bun run
 measure`), the API's answers to map requests are kept in that file the first time, and later
 runs are answered from it, each tile after the time it really took. A run from a tape costs the
 API nothing, and two builds see the same data arrive at the same pace, which two live runs
 don't: in Užice the first pan measured 14 to 19 frames a second live and 18 to 20 from the tape,
-for the same builds. A tape of Užice is 119 MB (57 tiles); `*.tape.json` is gitignored. The
-tables below were measured live, before the tape existed.
+for the same builds. A tape of Užice is 119 MB (57 tiles); `*.tape.json` is gitignored. Each
+editor asks for the tiles in its own way, so a tape has each one's requests (a tape answers a
+page on any origin). The tables below are from tapes: every editor saw the same answers arrive,
+after the time they took when they were recorded.
 
 ### Results
 
@@ -1194,66 +1196,75 @@ quite the same thing.)
 
 | | Drawn after | On the map | Pan: frames, longest, redraws | Pinch: frames, longest, took | Zoom key: longest, in / out |
 |---|---|---|---|---|---|
-| iD 2.42 | 7.0 s | 17,647 SVG elements | 49 a second, 254 ms, 18 a second | 53 a second, 143 ms, 2.3 s | 70 / 63 ms |
-| Rapid 2.5.7 | 6.4 s | 4,117 features | 55, 88 ms, 4 | 50, 186 ms, 1.6 s | 74 / 101 ms |
-| `main` | 6.3 s | 4,314 features | 56, 69 ms, 6 | 35, 154 ms, 2.5 s | 71 / 128 ms |
-| This branch | 6.9 s | 7,747 features | 58, 79 ms, 38 | 58, 71 ms, 1.6 s | 37 / 37 ms |
+| iD 2.42 | 7.6 s | 17,646 SVG elements | 50 a second, 194 ms, 20 a second | 53 a second, 137 ms, 2.3 s | 97 / 89 ms |
+| Rapid 2.5.7 | 9.7 s | 4,117 features | 55, 87 ms, 4 | 52, 166 ms, 1.6 s | 68 / 107 ms |
+| `main` | 8.6 s | 4,314 features | 55, 98 ms, 6 | 33, 152 ms, 2.8 s | 70 / 129 ms |
+| This branch | 8.0 to 8.5 s | 7,747 features | 57 to 59, 38 to 104 ms, 37 to 41 | 60, 36 to 38 ms, 1.4 s | 30 to 40 / 27 to 32 ms |
 
 **Staten Island Mall** (z16.5, 20 map tiles)
 
 | | Drawn after | On the map | Pan: frames, longest, redraws | Pinch: frames, longest, took | Zoom key: longest, in / out |
 |---|---|---|---|---|---|
-| iD 2.42 | 7.5 s | 142,118 SVG elements | 9 a second, 1,177 ms, 2 a second (took 30 s) | 8 a second, 1,125 ms, 23 s | 982 / 697 ms |
-| Rapid 2.5.7 | 6.9 s | 19,147 features | 45, 148 ms, 3 | 31, 576 ms, 2.7 s | 177 / 229 ms |
-| `main` | 6.4 s | 19,297 features | 41, 128 ms, 5 | 18, 396 ms, 4.7 s | 148 / 312 ms |
-| This branch | 7.9 s | 22,173 features | 54, 85 ms, 35 | 50, 104 ms, 1.9 s | 58 / 78 ms |
+| iD 2.42 | 6.8 s | 142,117 SVG elements | 8 a second, 1,414 ms, 2 a second (took 30 s) | 12 a second, 1,082 ms, 16 s | 950 / 756 ms |
+| Rapid 2.5.7 | 7.6 s | 19,147 features | 45, 149 ms, 3 | 32, 570 ms, 2.7 s | 125 / 233 ms |
+| `main` | 8.6 s | 19,297 features | 40, 138 ms, 5 (took 3.3 s) | 15, 397 ms, 6.1 s | 183 / 343 ms |
+| This branch | 8.6 to 8.9 s | 22,173 features | 59, 52 to 60 ms, 40 to 42 | 59 to 60, 40 to 46 ms, 1.5 s | 36 to 40 / 38 to 46 ms |
 
 **Užice** (z16, 36 map tiles)
 
 | | Drawn after | On the map | Pan: frames, longest, redraws | Pinch: frames, longest, took | Zoom key: longest, in / out |
 |---|---|---|---|---|---|
-| iD 2.42 | 24.6 s | 694,801 SVG elements | 0.5 a second, 11.2 s, 0.1 a second (5 of the 60 events in 53 s) | 0.6 a second, 8.1 s (6 of the 40 events in 46 s) | 1.9 / 4.1 s |
-| Rapid 2.5.7 | 8.8 s | 64,440 features | 25, 383 ms, 2 (took 5.2 s) | 9, 1,692 ms, 8.6 s | 489 / 870 ms |
-| `main` | 9.8 s | 78,708 features | 12, 803 ms, 2 (took 11.4 s) | 3, 2,405 ms, 29.5 s | 1,212 / 1,295 ms |
-| This branch | 23.9 s | 84,606 features | 19, 377 ms, 11 (took 6.7 s) | 29, 429 ms, 3.0 s | 205 / 253 ms |
+| iD 2.42 | 26.8 s | 694,735 SVG elements | 1 a second, 10.8 s, 0.1 a second (5 of the 60 events in 55 s) | 0.6 a second, 7.6 s (6 of the 40 events in 48 s) | 6.2 / 3.7 s |
+| Rapid 2.5.7 | 10.2 s | 64,440 features | 18, 579 ms, 2 (took 8.4 s) | 8, 2,089 ms, 9.8 s | 522 / 1,002 ms |
+| `main` | 11.2 s | 78,708 features | 12, 780 ms, 2 (took 10.9 s) | 3, 2,369 ms, 32.5 s | 566 / 1,340 ms |
+| This branch | 12.3 to 12.6 s | 84,606 features | 38 to 44, 130 to 437 ms, 26 to 29 (took 3.3 to 3.9 s) | 46 to 51, 84 to 103 ms, 1.9 to 2.1 s | 66 to 380 / 64 to 587 ms |
 
 (This branch has more features on the map than `main` because it also makes the ones in the 256 px
-around the view. iD loads fewer tiles: 16 at Staten Island and 25 in Užice.)
+around the view. iD loads fewer tiles: 16 at Staten Island and 25 in Užice. "Drawn after" includes
+the 4 to 7 s the tapes take to deliver the tiles.)
 
 **The editors don't draw the same thing, so this is a baseline and not a like-for-like test**
 (Bryan, Nov 19). iD silently leaves out points and buildings beyond a certain number, so in the
 dense places it's drawing less than Rapid does, and is still the slowest. The counts in the "On the
 map" column aren't comparable between iD and Rapid either: an SVG element isn't a feature.
 
+**The first measurement (Nov 19, live, before sections 12 and 13), for this branch:** Seattle
+58 frames a second with a longest of 79 ms in the pan, 71 ms in the pinch; Staten Island 54 and
+85 ms, pinch 50 and 104 ms; Užice drawn after 23.9 s, pan 19 frames a second with 377 ms and 11
+redraws a second (took 6.7 s), pinch 29 frames a second with 429 ms (3.0 s), zoom key 205 / 253
+ms. The other editors' numbers were close to the ones above, except Rapid 2.5.7's first pan in
+Užice: 25 frames a second then (its events took 5.2 s), 18 now (8.4 s). One run each, and the
+tiles of the pan arrived at another pace.
+
 ### What it says
 
-- **The map's content is redrawn about 7 times as often while panning** at Seattle and Staten
-  Island: 35 to 38 times a second where `main` does 5 or 6 and Rapid 2.5 does 3 or 4. The page's
-  own frame rate hides this, because all of them slide the old picture along in between. It's the
-  difference between the map following the hand and catching up with it four times a second.
-- **Zooming is where the branch differs most.** A pinch at Staten Island keeps 50 frames a second
-  with nothing over 104 ms, where `main` drops to 18 with a 396 ms stall and takes 4.7 s to get
-  through a gesture that takes 1.9. In Užice the same pinch takes 3 s on this branch and 30 s on
-  `main`, with a longest stall of 0.4 s against 2.4.
+- **The map's content is redrawn 7 to 14 times as often while panning:** 37 to 42 times a
+  second at Seattle and Staten Island where `main` does 5 or 6 and Rapid 2.5 does 3 or 4, and
+  26 to 29 in Užice where both do 2. The page's own frame rate hides this, because all of them
+  slide the old picture along in between. It's the difference between the map following the hand
+  and catching up with it a few times a second.
+- **Zooming is where the branch differs most.** A pinch at Staten Island keeps 60 frames a second
+  with nothing over 46 ms, where `main` drops to 15 with a 397 ms stall and takes 6.1 s to get
+  through a gesture that takes 1.5. In Užice the same pinch takes 2 s on this branch and 32 s on
+  `main`, with a longest stall of 0.1 s against 2.4.
 - **`main` is slower than Rapid 2.5 at the dense places.** In Užice it pans at 12 frames a second
-  to Rapid 2.5's 25, and its pinch takes 30 s to 2.5's 9. This branch is ahead of both, except
-  for Užice's first pan, where Rapid 2.5 keeps 25 frames a second to this branch's 19.
-  A possible reason (Bryan's, not measured): Rapid 2.5 didn't precompute geometry in world
-  coordinates, as Rapid 3 does. `main` also shows more of the features it has in Užice (78,708
-  against 64,440).
+  to Rapid 2.5's 18, and its pinch takes 32 s to 2.5's 10. This branch is ahead of both
+  everywhere now, Užice's first pan included: 38 to 44 frames a second, and the pan's events
+  take 3.3 to 3.9 s where they take 8.4 s in Rapid 2.5 and 10.9 on `main`.
+  A possible reason for `main` (Bryan's, not measured): Rapid 2.5 didn't precompute geometry in
+  world coordinates, as Rapid 3 does. `main` also shows more of the features it has in Užice
+  (78,708 against 64,440).
 - **iD stops being usable somewhere between Seattle and Staten Island.** In Seattle it's close to
   the others. At Staten Island a 2-second pan takes 30 s with stalls over a second, and in Užice
-  it got through 5 of the 60 pan events in 53 s, with one frame 11 s long.
-- **This branch takes longer until everything is drawn:** 7.9 s against 6.4 at Staten Island, and
-  24 s against 10 in Užice. That's the features being made over many frames (section 10): the map
-  is usable meanwhile, and it's the trade Bryan chose (what the user sees happening matters more
-  than the clock). In Užice it was too long all the same. **Looked into since, and now 15 s**
-  (section 10, "What a frame costs when little is done in it"): most of the extra time was
-  passes that made nothing and bookkeeping, not the features. The table above still has the
-  24 s it was measured with.
-- **Užice's first pan (19 frames a second to Rapid 2.5's 25) is render groups and passes.** Every
-  frame that makes a feature there pays 80 to 95 ms of DRAW for the two biggest groups, and
-  each tile that arrives brings a pass of 210 ms (same section). Not fixed.
+  it got through 5 of the 60 pan events in 55 s, with one frame 11 s long.
+- **Until everything is drawn, the branch takes about as long as the others now:** 8.6 to 8.9 s
+  against `main`'s 8.6 at Staten Island, and 12.5 s against 11.2 in Užice, where it was 24 s
+  at the first measurement. It makes its features over many frames, and the map is usable
+  meanwhile.
+- **What's left in Užice is garbage collection.** One of the three runs there had a pan with a
+  stall of 437 ms and zoom keys with 380 and 587 ms; the other two had nothing over 150 ms.
+  That's what a major collection looks like (section 13: every long frame traced during zooms
+  was one), though these weren't traced.
 
 ### Not measured
 
@@ -1537,6 +1548,13 @@ way"). That's where the animation frames of 450 ms in some runs come from.
 between. `FramePacer` waits twice what a zoom frame cost before the next, as for any frame
 with layer work, and a zoom frame costs 55 to 100 ms. Before, it was every 450 ms or more.
 
+**Labels wait for the drawing** (Bryan, Nov 20: they're placed around the points and
+vertices, so those have to be there first). They're placed when nothing in view is waiting:
+no feature to draw again, none to make, and nothing that arrived and hasn't been looked at
+(`numWaitingInView`; the last was missing while arrivals and zooms were drawn without a pass,
+so labels could be placed before the vertices of a tile that had just arrived). A point that
+appears later still pushes a label out of its way on the next placement (`gatherAvoids()`).
+
 **Labels are still placed in one frame**, after the features in view are drawn: 37 to 55 ms
 in Užice. About half is `gatherAvoids()` asking Pixi for the bounds of every point
 (`getBounds()`), a quarter placing the points' labels. They're gone from the zoom until then.
@@ -1565,10 +1583,12 @@ And the pass itself, for when it's needed. In Užice it's 134 ms with nothing to
   their ways.
 - **`entity.geometry(graph)` twice** for what's left (once to filter, once to classify), and a
   `Map` entry per entity to sort them: 30 ms.
-- **Following the box is a walk over every feature** (the `box` step: about 10 ms at z16 in
-  Užice when nothing has left, 40 to 60 with what a zoom adds to it: every entity that stays is
-  remembered as having arrived). Asking the spatial index for what the box left behind would
-  make it cost what moved, not what's there.
+- **Following the box** (the `box` step) is 5 to 19 ms for a pan in Užice and 12 to 24 for a
+  zoom. After a pan, the spatial index says what the box left behind (the parts of the old box
+  that the new one doesn't cover), as it says what the box moved over; nodes are asked for
+  their location, so that moving over them doesn't build their geometry. After a zoom every
+  feature that stays is walked, to be drawn again. Most of what's left is the index's answer
+  for the part moved over, which includes every vertex there.
 
 ### Seen on the way
 

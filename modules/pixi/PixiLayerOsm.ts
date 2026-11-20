@@ -9,6 +9,7 @@ import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } 
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { Graph } from '../lib/Graph.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
@@ -225,6 +226,25 @@ function extentMinus(a: Extent, b: Extent): Extent[] {
   if (by1 < ay1)  parts.push(new Extent([x0, by1], [x1, ay1]));
 
   return parts;
+}
+
+
+/**
+ * Whether an entity's shape reaches into a box (in world coordinates).
+ * A node is asked for its location, not its geometry: asking for that builds and keeps one, and
+ * the cull box moves over thousands of nodes that are never drawn (see `OsmEntity.geoms`).
+ * @param entity - The entity
+ * @param graph - The graph it's in
+ * @param box - The box
+ * @return `true` or `false`, or `undefined` if the entity has no shape
+ */
+function reachesInto(entity: OsmEntity, graph: Graph, box: Extent): boolean | undefined {
+  if (entity.type === 'node') {
+    const coord = (entity as OsmNode).worldCoord();
+    if (!coord) return undefined;
+    return coord[0] >= box.min[0] && coord[0] <= box.max[0] && coord[1] >= box.min[1] && coord[1] <= box.max[1];
+  }
+  return graph.geometry(entity).world?.extent?.intersects(box);
 }
 
 
@@ -1138,10 +1158,32 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const left = new Map<DataID, boolean>();
     const inView: EntityID[] = [];
     const outside: EntityID[] = [];
-    for (const feature of this.features.values()) {
-      // (After a zoom the hidden ones count too: a feature hides itself at a zoom where it's
-      // too small to see, and may be big enough now.)
-      if (!feature.visible && !zoomed) continue;
+
+    // After a pan, what the box left behind is in the parts of the old box that the new one
+    // doesn't cover, and the spatial index knows what's there: that costs what moved, where a
+    // walk over every feature costs what there is. (After a zoom the walk is needed anyway, to
+    // have every feature that stays drawn again.)
+    if (!zoomed) {
+      for (const part of extentMinus(prevBox, box)) {
+        for (const entity of editor.entitiesInBox(part.bbox(), graph)) {
+          const featureIDs = this._dataHasFeature.get(entity.id);
+          if (!featureIDs?.size) continue;
+          const extent = graph.geometry(entity).world?.extent;
+          if (!extent || extent.intersects(box)) continue;    // it reaches into the new box
+          for (const featureID of featureIDs) {
+            const feature = this.features.get(featureID);
+            if (!feature) continue;
+            feature.visible = false;
+            this._waitingInView.delete(feature);   // (drawing it again could show it)
+            this._waitingOutside.delete(feature);
+          }
+        }
+      }
+    }
+
+    for (const feature of (zoomed ? this.features.values() : [])) {
+      // (The hidden ones count too: a feature hides itself at a zoom where it's too small to
+      // see, and may be big enough now.)
 
       // Most features are still in the box, and their own shape says so: then their entity's is
       // too, and there's nothing to look up. (Not a midpoint: those go with their ways.)
@@ -1186,9 +1228,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // (An entity that reaches into the old box was there already.)
     for (const part of extentMinus(box, prevBox)) {
       for (const entity of editor.entitiesInBox(part.bbox(), graph)) {
-        const extent = graph.geometry(entity).world?.extent;
-        if (!extent || extent.intersects(prevBox)) continue;
-        (extent.intersects(frame.viewBox) ? inView : outside).push(entity.id);
+        const wasThere = reachesInto(entity, graph, prevBox);
+        if (wasThere === undefined || wasThere) continue;
+        (reachesInto(entity, graph, frame.viewBox) ? inView : outside).push(entity.id);
       }
     }
     for (const entityID of inView) {
@@ -1330,7 +1372,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @return The number waiting in view
    */
   public override get numWaitingInView(): number {
-    return super.numWaitingInView + this._countUnmade(this._unmadeInView);
+    // (What arrived counts as in view until it's been looked at: the labels wait for this to be
+    // zero before they're placed, because they're placed around the points and vertices.)
+    return super.numWaitingInView + this._countUnmade(this._unmadeInView) + this._arrivedIDs.size;
   }
 
 

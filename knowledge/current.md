@@ -142,8 +142,16 @@ Still to do, in about this order:
   they get their own (1.69 GB).
   **⌘Z and ⌘⇧Z work from an empty text field** (Nov 19; Bryan's decision,
   `keyboard-system.md`): the sidebar's search fields take the focus by themselves, and a key
-  in a field wasn't a shortcut, so undo right after drawing depended on timing (found through
-  `draw.test.js` failing one run in three).
+  in a field wasn't a shortcut, and the feature list's search field had no way to undo from it. (`draw.test.js` failing one run
+  in three turned out to be the test pressing ⌘Z in a browser where undo is ⌃Z: see `backlog.md`.)
+  **Baselines measured again** (Nov 20, `graphics-system.md` section 11, from tapes): in Užice the branch pans into unloaded data at 38 to 44 frames a second
+  (`main` 12, Rapid 2.5.7 18), a pinch takes 2 s (`main` 32 s), and everything is drawn 12.5 s
+  after the page opens (`main` 11.2). A tape answers any editor now (`scripts/tape.ts`).
+  Also Nov 20: after a pan the spatial index says what the cull box left behind;
+  moving over nodes doesn't build their geometry; labels wait for what arrived.
+  Bryan's calls on the list (Nov 20): 5, 7, 9, 18, 22 to the backlog (all there now, with the
+  things found on the way); 13 (other layers keep their features) and 11 (styles) worth doing;
+  20, 21, 23 not now.
   Next: what's left of the garbage (Pixi's line builder with round joins is a quarter of it;
   `syncShader`), the 1.7 GB alive (a copy of the style per feature; ways' coordinates as
   arrays of pairs), labels placed in one

@@ -17,6 +17,9 @@ import type { Page, Request } from '@playwright/test';
 // - A request that isn't goes to the API, and its answer is added to the tape.
 //
 // So the first run records and later runs replay, and panning somewhere new adds to the tape.
+// Each editor asks for the tiles in its own way (other tile sizes, other urls), so a tape that
+// several are measured from has each one's requests. An answer is replayed to whichever page
+// asks, whatever origin recorded it.
 // What comes off a tape is what the API said when it was recorded: delete the file to record again.
 //
 // A tape holds OSM data and can be large (tens of megabytes). Keep it out of the repository.
@@ -88,7 +91,14 @@ export async function useTape(page: Page, file: string): Promise<Tape> {
     answered.add(request);
     tape.replayed++;
     await new Promise(resolve => { setTimeout(resolve, taped.ms); });
-    await route.fulfill({ status: taped.status, headers: taped.headers, body: taped.body }).catch(() => { /* the page went away */ });
+    // (The API allowed the origin that recorded the tape. Allow whichever page is asking now:
+    // another build on another port, or another editor.)
+    const headers = { ...taped.headers };
+    const origin = request.headers()['origin'];
+    if (origin) {
+      headers['access-control-allow-origin'] = origin;
+    }
+    await route.fulfill({ status: taped.status, headers: headers, body: taped.body }).catch(() => { /* the page went away */ });
   });
 
   page.on('requestfinished', async request => {

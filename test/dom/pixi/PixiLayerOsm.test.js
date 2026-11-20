@@ -1018,6 +1018,36 @@ describe('PixiLayerOsm', () => {
         assert.deepEqual([...layer._arrivedIDs], ['n130', 'n140']);
       });
 
+      it('asks a node it moves over for its location, not its geometry', () => {
+        // (Asking for a node's geometry builds and keeps one, and most nodes are never drawn.)
+        const node = { id: 'n130', type: 'node', extent: MOVED_OVER, worldCoord: () => [130, 10], geometry: () => 'vertex' };
+        entities.set('n130', node);
+        layer.context.systems.editor.staging.graph.geometry = entity => {
+          if (entity === node) throw new Error('asked for the geometry of a node');
+          return { world: { extent: entity.extent } };
+        };
+        layer._moveBox(frame, BOX);
+        assert.deepEqual([...layer._arrivedIDs], ['n130']);
+      });
+
+      it('finds what the box left behind through the index, without looking at every feature', () => {
+        addEntity('n20', 'point', LEFT_BEHIND);
+        addEntity('n70', 'point', BOTH);
+        const gone = addFeature('n20');
+        const stays = addFeature('n70');
+        let walked = 0;
+        const features = layer.features;
+        layer.features = new Proxy(features, { get: (target, key) => {
+          if (key === 'values') walked++;
+          const value = Reflect.get(target, key);
+          return (typeof value === 'function') ? value.bind(target) : value;
+        } });
+        layer._moveBox(frame, BOX);
+        assert.isFalse(gone.visible);
+        assert.isTrue(stays.visible);
+        assert.strictEqual(walked, 0);
+      });
+
       it('destroys what has been hidden for more than 20 moves, unless it was shown again', () => {
         addEntity('n20', 'point', LEFT_BEHIND);
         addEntity('n21', 'point', LEFT_BEHIND);
