@@ -3,6 +3,165 @@
 Guidelines for working with the `modules/pixi/` folder.
 (For an overview of what's in this folder, see [`README.md`](README.md).)
 
+## Pixi's reference skill, and where Rapid differs
+
+Pixi ships an agent skill with the version we have installed: `node_modules/pixi.js/skills/pixijs/SKILL.md`.
+Before you write or change Pixi API code, read `SKILL.md` and the topic files it routes you to (e.g.
+`references/scene-graphics.md`). It knows the v8 API, its silent pitfalls and its performance traps
+better than memory does, and it matches the installed version.
+
+The skill is written for a typical Pixi app. Rapid departs from that on purpose in a few places. Where the
+skill and Rapid disagree, follow Rapid, and don't "fix" these:
+- **No Pixi ticker.** `GraphicsSystem` destroys the `Application` ticker; `SchedulerSystem` runs the frame
+  loop, and Rapid renders only when something changed. Don't add `app.ticker` callbacks or call
+  `app.render()` from a layer or feature: mark it dirty and let the next frame draw it.
+- **Nothing renders inside `render()`.** `renderer.generateTexture()` calls `renderer.render()`, which
+  corrupts a render already in progress, so texture work is queued through the scheduler (see
+  `PixiLayerLabels`).
+- **Textures come from `PixiTextures`**, which packs icons, symbols and tiles into its own atlas. Don't
+  use `Texture.from()` or `Assets.load()` for them (only area patterns use an `Assets` bundle).
+- **Features draw in z16 world coordinates**, under the `origin` and `world` containers, positioned at
+  their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
+  counter-scale to stay screen-sized. The skill's screen-pixel examples need converting. See
+  "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
+- **Dashed lines use Rapid's `lib/DashLine.ts`** (texture-based, works with plain `Graphics`). Pixi's
+  `DashLineShader` needs `SmoothGraphics`, and a context with it is never batched.
+- **Render groups go through `PixiScene.worldContainer()`.** The skill says to put a panning world in
+  `new Container({ isRenderGroup: true })`. Ours is in z16 world coordinates, which are too big for the
+  32-bit floats a render group keeps its vertices in: shapes come out distorted, more so when zoomed
+  in and further east. Make containers for features with the layer's `_spatialContainer()` and
+  `_childContainer()`; each gets a render group at an anchor near the view. Never set `isRenderGroup`
+  on a container whose children are in world coordinates. See "Render groups" in
+  [`design/scene.md`](../../design/scene.md).
+- **Pointer events go through `PixiEvents` and Rapid's behaviors.** Pixi's `globalMove` and `wheel`
+  events are off (`eventFeatures` in `GraphicsSystem._initPixi()`), and the mode decides which
+  subtrees can be hit (`interactiveSpatialIDs`, see [`design/scene.md`](../../design/scene.md)).
+  Don't add pointer listeners to features, and don't listen for `globalpointermove`: with
+  `globalMove` on, every pointer move visits every interactive object in the scene.
+- **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
+  for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
+  that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in
+  Užice costs 3 ms of APP that way, and 175 with `immediateRedraw()`.
+- **For an edit, `scene.dataChanged('osm', ids)` and `gfx.requestFrame()`,** with everything the
+  edit affects (`Difference.complete()`). `MapSystem` does this for `stagingchange`. The layer
+  draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
+- **For data that arrived, `scene.dataArrived('osm', ids)` and `gfx.requestFrame()`.**
+  `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
+  A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
+- **Destroy the Pixi objects you replace.** `removeChildren()` and assigning a new
+  `mesh.geometry` leave the old ones alive: Pixi keeps what it built for them until they're
+  destroyed, or until its own collector finds them unused a minute later. After a zoom that
+  was 550 MB. (`for (const child of parent.removeChildren()) child.destroy();`, and
+  `geometry.destroy(true)`: a `Mesh` doesn't destroy its geometry either.)
+- **Make a feature's Pixi objects when they're first shown.** A feature that exists isn't
+  always drawn (too small at this zoom, no icon), and every `Container`, `Sprite` or `Graphics`
+  is about 0.7 KB before it draws anything. `PixiFeaturePolygon` makes its sprite or its shapes
+  in `update()`, for the level of detail it's at, and destroys what the level doesn't show.
+  A point's `icon` and a line's `casing` are `null` while there's none to draw: a layer that
+  touches them does so after `update()`, with `?.`.
+- **In a loop over every feature, don't make an object per feature.** Iterate
+  `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
+  hover or a click needs (`BufferHitArea`). Garbage is what brings the half-second collections
+  (`design/graphics-system.md` section 13).
+- **Put an OSM feature in its tile's container with `_setTile()`**, not by setting
+  `parentContainer`. After the view crosses a whole zoom level, features move to the new zoom's
+  tiles a whole old tile at a time (`_retile()`), and a feature moved on its own in between
+  makes Pixi rebuild both tiles.
+- **The OSM layer's pass doesn't see every vertex.** It leaves out the ones that only shape
+  their way (`OsmNode.vertexKind()`), and adds the ones related to what's selected or hovered
+  afterwards (`_addRelatedVertices()`). Something new that should draw such a vertex has to say
+  so there, and in `_isIdleVertex()` for the ones that arrive.
+- **The OSM layer rarely does its whole pass now**, so don't count on one to pick something up.
+  It does one when it's marked dirty (`dirtyLayer()`, `dirtyData()`: a filter, the styles) or
+  when a redraw is asked for without a layer. A view that leaves the cull box isn't one, and
+  neither is a zoom or a rotation: the layer follows the box (`_moveBox()`), and after a zoom
+  it runs its features through `render…()` again over the next frames. So what a `render…()`
+  function decides from the zoom is picked up there, a batch at a time, not all in one frame.
+- **A change of mode asks for a frame, not a redraw** (`Context.enter()`). If a mode changes
+  what the map shows, it has to reach the layers: through a class, an edit, a redraw request of
+  its own, or (for something a layer draws in one mode only, like the OSM layer's midpoints)
+  `AbstractPixiLayer.modeChanged()`.
+- **Check work done without a pass against a pass.** After it, `gfx.immediateRedraw()` should
+  change nothing that's shown: `osmSceneState()` in `test/e2e/fixtures.js` describes what's
+  shown, for comparing before and after.
+- **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
+- **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
+  minimap, `autoStart: false`, the renderer choice from the url).
+
+## Frames, passes and redraw requests
+
+How a frame is made, the CULL pass, frame pacing and the frame's deadline are in
+[`design/graphics-system.md`](../../design/graphics-system.md) (sections 1, 3, 8, 9 and 10). The
+rules that come out of it:
+
+- **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
+  on to the layer's own `render…()` helpers.
+- **A redraw request means something changed. Name the layer if only one did.**
+  `gfx.deferredRedraw()` and `gfx.immediateRedraw()` make every layer do its whole pass on the next
+  frame. When what changed is drawn by one layer only (a tile of imagery arrived, a label texture
+  was made, a dataset's data loaded), pass that layer's ID: `gfx.deferredRedraw(this.id)`. Then
+  layers like OSM can keep their features as they are.
+- **Every change to what a layer draws needs a redraw request.** Moving the view doesn't make one,
+  and the OSM layer skips its pass on frames that come only from a move. Marking features dirty
+  (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their layer do its next pass, but doesn't
+  ask for a frame. Changing a class (`scene.setClass()`) tells the layers which data it was, and
+  doesn't ask for a frame either: follow it with `gfx.requestFrame()` (above).
+- **A layer that can skip its pass gathers by `frame.cullBox`, not by the view.** The box is the
+  view and padding around it. Call `this.keepFeatures(frame)` in `render()`, after anything that
+  must happen on every frame (asking the service for the view's tiles), and return if it says
+  `true`. Only the OSM layer does this so far. Don't use it in a layer whose features depend on the
+  view itself (the labels, the imagery tiles).
+- **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
+  it, and a layer that kept its features did no pass.
+- **Work out a feature's style when `feature.needsStyle` says so, not when it's `dirty`.** A zoom
+  makes every feature dirty (it has to be drawn again), but what it is hasn't changed, and matching
+  a style to tags costs several times what drawing does. Keep under `if (feature.dirty)` only what
+  depends on the zoom or the rotation.
+  ```ts
+  if (feature.needsStyle) {
+    feature.style = styles.styleMatch(entity.tags, geometry, 'osm');
+    feature.label = l10n.displayName(entity.tags);
+  }
+  this.updateFeature(feature, frame, viewport);   // draws it now, or in a later frame
+  this.retainFeature(feature, frame);
+  ```
+- **For a new zoom or rotation, `scene.dirtyTransform()`. For anything else, `scene.dirtyScene()`**
+  (or `dirtyLayers()`, `dirtyData()`): those say the features themselves may have changed, and
+  set `needsStyle`.
+- **In a layer that keeps its features, draw with `this.updateFeature(feature, frame, viewport)`,**
+  not `feature.update(viewport)`, and call `this.continueWaiting(frame, viewport)` on the frames
+  where `keepFeatures()` says yes. A feature may then be drawn a few frames late (section 10), so
+  don't read anything off a feature that's still `dirty` (its bounds, its hit area).
+- **A feature may not exist yet for data the layer has seen.** The OSM layer puts off making
+  features that aren't needed at once (`_waitToMake()`), and makes them over the next frames.
+  Code that looks a feature up right after data arrives should wait for `gfx.pending` to be
+  `false`, or handle it not being there.
+- **Go easy on the OSM API when measuring.** `bun run measure --fresh` and every reload of the
+  debug Chrome ask it for 20 to 36 map tiles. After enough of them it answers 429 (five loads of
+  Užice in an hour and a half did it), and the map stays empty until the time it gives is up. To
+  make features again without the network, use `layer.reset()`. To load a place again and again,
+  record it once: `--tape places.tape.json` on `bun run measure` and `bun run compare`
+  (`scripts/tape.ts`).
+- **A redraw request without a layer is a pass in every layer.** In a dense place that's 200 ms
+  of the OSM layer walking everything it has, to find the little that changed. Don't make one
+  for each item of something that arrives in hundreds (each icon, each tile of another layer):
+  name the layer, or go on with waiting work (below).
+- **When a texture arrives, call `scene.texturesLoaded()`, not `deferredRedraw()`.** A feature
+  drawn without its icon stays dirty (`PixiFeaturePoint.updateStyle`), and a layer that draws
+  with `updateFeature()` remembers it. `texturesLoaded()` has those drawn again over the next
+  frames, and asks for a frame (`gfx.requestFrame()`), not for a pass.
+- **A layer's `render()` can run 60 times a second.** While the view moves, a frame is drawn on
+  every tick. Whatever a layer does before `keepFeatures()`, and everything in a layer that doesn't
+  call it, is paid on each one. The same goes for listeners to `gfx`'s `draw` event: throttle them
+  (`scheduler.throttle()`).
+- **`immediateRedraw()` is for something the user did.** It skips the wait that spaces out
+  expensive frames. With a layer's ID, only that layer is drawn at once (in a held frame, if a pass
+  is waiting). For data that arrived, use `deferredRedraw()`.
+- **Don't change the frame loop's timing without measuring it.** `bun run measure` reports frames
+  a second and long animation frames while the view moves on every animation frame (`glide`), and
+  section 9 has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
+  tests; `test/e2e/rendering.test.js` checks it in a browser.
+
 ## Working with Services
 
 All services are now TypeScript. Access them via `context.services` with proper types:

@@ -483,7 +483,14 @@ export class PixiTextures {
       const h = image.naturalHeight;
       this.allocate('symbol', textureID, w, h, image);
       this._svgIcons.delete(textureID);
-      this.gfx.deferredRedraw();
+      // Draw again the features that were drawn without it. (Not a redraw request: in a busy place
+      // hundreds of icons arrive while features are made, and each would make every layer do its pass.)
+      const scene = this.gfx.scene;
+      if (scene) {
+        scene.texturesLoaded();
+      } else {
+        this.gfx.deferredRedraw();
+      }
       image = null!;
     };
 

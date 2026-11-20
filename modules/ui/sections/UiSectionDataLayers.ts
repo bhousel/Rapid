@@ -502,7 +502,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
 
   /**
-   * Draws the History/Measurement panel toggle checkboxes.
+   * Draws the History/Measurement/Rendering panel toggle checkboxes.
    * @param $selection - d3-selection to render the list into
    */
   protected _drawPanelItems($selection: D3Selection): void {
@@ -512,6 +512,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
     const HistoryCard = ui.InfoCards.HistoryCard;
     const MeasurementCard = ui.InfoCards.MeasurementCard;
+    const RenderingCard = ui.InfoCards.RenderingCard;
 
     const $$panelsList = $selection.selectAll('.md-extras-list')
       .data([0])
@@ -557,6 +558,25 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $$measurementPanelLabel
       .append('span');
 
+    const $$renderingPanelLabel = $$panelsList
+      .append('li')
+      .attr('class', 'rendering-panel-toggle-item')
+      .append('label')
+      .call(new UiTooltip(context)
+        .title(l10n.t('map_data.rendering_panel.tooltip'))
+        .shortcut(utilCmd('⌘⇧' + l10n.t('shortcuts.command.toggle_rendering_card.key')))
+        .placement('top')
+        .attach
+      );
+
+    $$renderingPanelLabel
+      .append('input')
+      .attr('type', 'checkbox')
+      .on('change', RenderingCard.toggle);
+
+    $$renderingPanelLabel
+      .append('span');
+
 
     // update
     // Set localized titles on the update selection so they re-localize on language change.
@@ -564,6 +584,8 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .text(l10n.t('map_data.history_panel.title'));
     $selection.selectAll('.measurement-panel-toggle-item span')
       .text(l10n.t('map_data.measurement_panel.title'));
+    $selection.selectAll('.rendering-panel-toggle-item span')
+      .text(l10n.t('map_data.rendering_panel.title'));
 
     $selection.selectAll('.history-panel-toggle-item')
       .classed('active', HistoryCard.visible)
@@ -574,6 +596,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .classed('active', MeasurementCard.visible)
       .selectAll('input')
       .property('checked', MeasurementCard.visible);
+
+    $selection.selectAll('.rendering-panel-toggle-item')
+      .classed('active', RenderingCard.visible)
+      .selectAll('input')
+      .property('checked', RenderingCard.visible);
   }
 
 

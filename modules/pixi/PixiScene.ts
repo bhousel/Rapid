@@ -18,6 +18,7 @@ import { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
+import { Extent, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractMode } from '../modes/AbstractMode.ts';
@@ -25,10 +26,18 @@ import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { RenderFrame } from './RenderFrame.ts';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 /** Returned by `getClasses()` for data that has no classes */
 const EMPTY_CLASSES: ReadonlySet<ClassID> = new Set<ClassID>();
+
+/**
+ * Pixels of padding around the view, on each side, in a new cull box (see `updateCullBox`).
+ * More padding means the view can move further before layers have work to do, and more features
+ * made and drawn outside the view (at 256, about twice what a 1300×1100 view holds).
+ */
+const CULL_PADDING = 256;
 
 
 /**
@@ -76,6 +85,14 @@ export class PixiScene extends EventEmitter {
   protected _classHasData: Map<ClassID, Set<DataID>>;
   /** The containers made for each spatial ID, one per group it has drawn in */
   protected _spatialContainers: Map<SpatialID, Set<PIXI.Container>>;
+  /** World coordinates near the view, where the render groups are positioned (see `setAnchor`) */
+  protected _anchor: Vec2;
+  /** The containers made by `worldContainer` */
+  protected _worldContainers: Set<PIXI.Container>;
+  /** The part of the world layers have features ready for, or `null` before the first frame (see `updateCullBox`) */
+  protected _cullBox: Extent | null;
+  /** The zoom the cull box was made at */
+  protected _cullZoom: number;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
   protected _interactiveSpatialIDs: ReadonlySet<SpatialID> | null;
 
@@ -101,6 +118,10 @@ export class PixiScene extends EventEmitter {
 
     this._spatialContainers = new Map<SpatialID, Set<PIXI.Container>>();
     this._interactiveSpatialIDs = null;
+    this._anchor = [0, 0];
+    this._worldContainers = new Set<PIXI.Container>();
+    this._cullBox = null;
+    this._cullZoom = 0;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -165,14 +186,23 @@ export class PixiScene extends EventEmitter {
     ].forEach((groupID, i) => {
       let container = this.groups.get(groupID);
       if (!container) {
-        container = new PIXI.Container();
-        container.label = groupID;
-        container.sortableChildren = true;
-        container.zIndex = i;
+        if (groupID === 'labels') {
+          // The labels layer positions and scales this group itself, to draw in screen coordinates.
+          // Small coordinates, so it can be a render group as it is (see "Render groups" in `design/scene.md`).
+          container = new PIXI.Container({ isRenderGroup: true });
+          container.label = groupID;
+          container.sortableChildren = true;
+          container.zIndex = i;
+        } else {
+          container = this.worldContainer(origin, groupID, i);
+        }
         this.groups.set(groupID, container);
       }
-      if (!origin.getChildByLabel(groupID)) {
-        origin.addChild(container);
+
+      // A world container is attached through its render group
+      const attached = this._worldContainers.has(container) ? container.parent! : container;
+      if (attached.parent !== origin) {
+        origin.addChild(attached);
       }
     });
 
@@ -196,7 +226,7 @@ export class PixiScene extends EventEmitter {
    * OSM's container is lowest in its group; the others stack above it in the order they were made.
    * @param groupID - The group, e.g. 'basemap' or 'points'
    * @param spatialID - The spatial ID of the data drawn in it, e.g. 'osm' or 'fbRoads'
-   * @return The container, with `sortableChildren` on
+   * @return The container (a world container, see `worldContainer`)
    * @throws Error if there is no such group
    */
   public getSpatialContainer(groupID: GroupID, spatialID: SpatialID): PIXI.Container {
@@ -205,16 +235,15 @@ export class PixiScene extends EventEmitter {
       throw new Error(`PixiScene: no group '${groupID}'`);
     }
 
-    let container = group.getChildByLabel(spatialID) as PIXI.Container | null;
-    if (container) return container;
+    // (The group's children are the render groups of its world containers, labeled like them.)
+    if (group.getChildByLabel(spatialID)) {
+      return this.worldContainer(group, spatialID);
+    }
 
     const siblings = group.children.filter(child => child.label !== 'osm').length;
-    container = new PIXI.Container();
-    container.label = spatialID;
-    container.sortableChildren = true;
-    container.zIndex = (spatialID === 'osm') ? 0 : siblings + 1;
+    const zIndex = (spatialID === 'osm') ? 0 : siblings + 1;
+    const container = this.worldContainer(group, spatialID, zIndex);
     container.eventMode = this._isInteractive(spatialID) ? 'passive' : 'none';
-    group.addChild(container);
 
     let containers = this._spatialContainers.get(spatialID);
     if (!containers) {
@@ -237,10 +266,169 @@ export class PixiScene extends EventEmitter {
     if (!containers) return;
 
     for (const container of containers) {
-      container.parent?.removeChild(container);
-      container.destroy({ children: true });  // recursive
+      this.destroyWorldContainer(container);
     }
     this._spatialContainers.delete(spatialID);
+  }
+
+
+  /**
+   * Removes and destroys a world container, its render group, and everything in them.
+   * @param container - A container that `worldContainer` returned
+   */
+  public destroyWorldContainer(container: PIXI.Container): void {
+    const group = container.parent;   // its render group
+    this._worldContainers.delete(container);
+    if (group) {
+      group.parent?.removeChild(group);
+      group.destroy({ children: true });  // recursive
+    } else {
+      container.destroy({ children: true });
+    }
+  }
+
+
+  /**
+   * Returns the world container with the given label under the given parent, making it if needed.
+   * A world container holds features (or more world containers) positioned in world coordinates, like
+   * `origin` does. It comes with its own render group, so that a change to one of its features makes
+   * Pixi rebuild the instructions of that container only, and moving the map moves it with one matrix.
+   *
+   * A render group's vertices are kept as 32-bit floats relative to the group, and world coordinates
+   * are too big for that (they'd be off by a pixel or more). So the render group sits at the scene's
+   * anchor, a world coordinate near the view, and the container returned here sits in it at minus the
+   * anchor. What's put in the container is then a small distance from its render group.
+   * See "Render groups" in `design/scene.md`.
+   *
+   * Use the returned container like any other, except: its `zIndex` and its place in the tree belong
+   * to its parent (the render group), and its position belongs to the scene.
+   * @param parent - `origin`, or another world container
+   * @param label - The label of the container (and of its render group)
+   * @param zIndex - The `zIndex` among its siblings, if it's made
+   * @return The container, with `sortableChildren` on
+   */
+  public worldContainer(parent: PIXI.Container, label: string, zIndex = 0): PIXI.Container {
+    const existing = parent.getChildByLabel(label);
+    if (existing) return existing.children[0] as PIXI.Container;
+
+    const [x, y] = this._anchor;
+
+    const group = new PIXI.Container({ isRenderGroup: true });
+    group.label = label;
+    group.zIndex = zIndex;
+    group.position.set(x, y);
+
+    const container = new PIXI.Container();
+    container.label = label;
+    container.sortableChildren = true;
+    container.position.set(-x, -y);
+
+    group.addChild(container);
+    parent.addChild(group);
+    this._worldContainers.add(container);
+    return container;
+  }
+
+
+  /**
+   * Returns the world containers directly under the given parent.
+   * (The parent's own children are their render groups.)
+   * @param parent - `origin`, or a world container
+   * @return The world containers
+   */
+  public worldContainersIn(parent: PIXI.Container): PIXI.Container[] {
+    const results: PIXI.Container[] = [];
+    for (const group of parent.children) {
+      const container = group.children[0] as PIXI.Container | undefined;
+      if (container && this._worldContainers.has(container)) {
+        results.push(container);
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * The world coordinate that the world containers' render groups are positioned at.
+   * @return The anchor, in whole world coordinates
+   */
+  public get anchor(): Vec2 {
+    return this._anchor;
+  }
+
+
+  /**
+   * Moves the anchor: the world coordinate that the world containers' render groups are positioned at.
+   * `GraphicsSystem` calls this when the view has moved far or the zoom has changed, to keep the
+   * anchor near the view (see `worldContainer`).
+   * @param world - World coordinates near the center of the view
+   */
+  public setAnchor(world: Vec2): void {
+    const x = Math.round(world[0]);   // whole numbers, so plus and minus cancel exactly
+    const y = Math.round(world[1]);
+    if (x === this._anchor[0] && y === this._anchor[1]) return;
+
+    this._anchor = [x, y];
+
+    for (const container of this._worldContainers) {
+      const group = container.parent;
+      if (container.destroyed || !group) {   // destroyed along with something above it
+        this._worldContainers.delete(container);
+        continue;
+      }
+      group.position.set(x, y);
+      container.position.set(-x, -y);
+    }
+  }
+
+
+  /**
+   * The cull box that the last frame's layers worked from, or `null` before the first.
+   * @return The current cull box
+   */
+  public get cullBox(): Extent | null {
+    return this._cullBox;
+  }
+
+
+  /**
+   * Whether the current cull box still has what the given view needs: the view is inside it, at the
+   * zoom it was made for. If not, the next `updateCullBox()` makes a new one, and layers that
+   * gather by it do a pass.
+   * @param viewport - The map's viewport
+   * @return `true` if the view is covered
+   */
+  public cullBoxCovers(viewport: Viewport): boolean {
+    const current = this._cullBox;
+    if (!current || viewport.transform.zoom !== this._cullZoom) return false;
+    return current.contains(viewport.visibleWorldExtent());
+  }
+
+
+  /**
+   * Returns the cull box for the given view: the part of the world, in world coordinates, that layers
+   * should have features ready for. It is the view with `CULL_PADDING` pixels around it, and it's
+   * kept (the same object) for as long as the view stays inside it at the same zoom. So while the
+   * user pans around inside the padding, a layer that has made everything in the box has nothing to
+   * do (see `AbstractPixiLayer.keepFeatures` and "A CULL pass" in `design/graphics-system.md`).
+   * `GraphicsSystem` calls this for each frame.
+   * @param viewport - The map's viewport (not Pixi's, which lags behind a pan)
+   * @return The cull box
+   */
+  public updateCullBox(viewport: Viewport): Extent {
+    const current = this._cullBox;
+    if (current && this.cullBoxCovers(viewport)) return current;
+
+    const zoom = viewport.transform.zoom;
+    const view = viewport.visibleWorldExtent();
+    const pad = CULL_PADDING * (2 ** (WORLD_ZOOM - zoom));   // in world coordinates
+    const box = new Extent(
+      [view.min[0] - pad, view.min[1] - pad],
+      [view.max[0] + pad, view.max[1] + pad]
+    );
+    this._cullBox = box;
+    this._cullZoom = zoom;
+    return box;
   }
 
 
@@ -268,6 +456,11 @@ export class PixiScene extends EventEmitter {
         container.eventMode = eventMode;
       }
     }
+
+    // A layer that keeps its features may draw something for the mode (the OSM layer's midpoints)
+    for (const layer of this.layers.values()) {
+      layer.modeChanged();
+    }
   }
 
 
@@ -283,17 +476,53 @@ export class PixiScene extends EventEmitter {
    * - For proper label placement, we really need to cull the feature layers
    *   before we render the label layer, so we do these calls in layer order.
    *
-   * @param frame - Integer frame being rendered
+   * Each layer's time and feature counts are recorded on the frame.
+   *
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     // Groups that live under `origin` render in world coordinates;
     // the `origin` container (set up in `GraphicsSystem._app`) provides the position
     // and scale that maps world coords → screen coords. Group containers themselves
     // need no extra transform (except the `labels` group which renders in screen space).
+    const times = new Map<LayerID, { renderMs: number, cullMs: number }>();
     for (const layer of this.layers.values()) {
+      const t0 = performance.now();
       layer.render(frame, viewport);
+      const t1 = performance.now();
       layer.cull(frame);
+      const t2 = performance.now();
+
+      times.set(layer.id, { renderMs: t1 - t0, cullMs: t2 - t1 });
+      frame.waitingInView += layer.numWaitingInView;   // the layers after this one can see what's still to come
+    }
+
+    // With every layer done, whatever time the frame has left goes to the features that were put
+    // off because they're outside the view (see `AbstractPixiLayer.updateFeature`).
+    for (const layer of this.layers.values()) {
+      const time = times.get(layer.id)!;
+      if (layer.numWaiting) {
+        const t0 = performance.now();
+        layer.continueWaiting(frame, viewport, true);
+        time.renderMs += performance.now() - t0;
+      }
+
+      const waiting = layer.numWaiting;
+      if (waiting) {
+        frame.unfinished = true;   // another frame should follow
+      }
+
+      frame.layers.set(layer.id, {
+        enabled: layer.enabled,
+        kept: layer.keptFeatures(frame),
+        renderMs: time.renderMs,
+        cullMs: time.cullMs,
+        features: layer.features.size,
+        visible: layer.numVisible,
+        waiting: waiting,
+        ...layer.takeWork()
+      });
     }
   }
 
@@ -413,6 +642,7 @@ export class PixiScene extends EventEmitter {
       classIDs = new Set<ClassID>();
       this._dataHasClass.set(dataID, classIDs);
     }
+    const isChange = !classIDs.has(classID);
     classIDs.add(classID);
 
     let dataIDs = this._classHasData.get(classID);
@@ -421,6 +651,10 @@ export class PixiScene extends EventEmitter {
       this._classHasData.set(classID, dataIDs);
     }
     dataIDs.add(dataID);
+
+    if (isChange) {
+      this._classChanged(dataID);
+    }
   }
 
 
@@ -431,8 +665,9 @@ export class PixiScene extends EventEmitter {
    */
   public unsetClass(classID: ClassID, dataID: DataID): void {
     const classIDs = this._dataHasClass.get(dataID);
+    let isChange = false;
     if (classIDs) {
-      classIDs.delete(classID);
+      isChange = classIDs.delete(classID);
       if (!classIDs.size) {
         this._dataHasClass.delete(dataID);
       }
@@ -444,6 +679,23 @@ export class PixiScene extends EventEmitter {
       if (!dataIDs.size) {
         this._classHasData.delete(classID);
       }
+    }
+
+    if (isChange) {
+      this._classChanged(dataID);
+    }
+  }
+
+
+  /**
+   * Tells the layers that the classes of some data changed, so that a layer that keeps its
+   * features can draw that data's again without doing its whole pass
+   * (see `AbstractPixiLayer.classChanged`).
+   * @param dataID - The data whose classes changed
+   */
+  protected _classChanged(dataID: DataID): void {
+    for (const layer of this.layers.values()) {
+      layer.classChanged(dataID);
     }
   }
 
@@ -482,13 +734,40 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Mark the whole scene as `dirty`, for example when changing zooms.
-   * During the next "APP" pass, dirty features will be rebuilt.
+   * Mark the whole scene as `dirty`: anything about any feature may have changed (the styles, the
+   * language, how areas are filled). During the next "APP" pass, dirty features will be rebuilt.
+   * For a new zoom or rotation, use `dirtyTransform()`.
    */
   public dirtyScene(): void {
-    for (const feature of this.features.values()) {
-      feature.dirty = true;
+    for (const layer of this.layers.values()) {
+      layer.dirtyLayer();
     }
+  }
+
+
+  /**
+   * Mark every feature as needing to be drawn again, because the view's zoom or rotation changed.
+   * The features themselves haven't changed, so layers that check `feature.needsStyle` keep the
+   * styles they worked out before.
+   */
+  public dirtyTransform(): void {
+    for (const layer of this.layers.values()) {
+      layer.dirtyTransform();
+    }
+  }
+
+
+  /**
+   * A texture has loaded that some features were drawn without (an icon, see `PixiTextures`).
+   * Those features are still dirty, and they're drawn again over the next frames. Nothing about
+   * the data changed, so this asks for a frame and not for a redraw: a layer that keeps its
+   * features doesn't do its pass again for every icon.
+   */
+  public texturesLoaded(): void {
+    for (const layer of this.layers.values()) {
+      layer.texturesLoaded();
+    }
+    this.gfx.requestFrame();
   }
 
 
@@ -510,10 +789,7 @@ export class PixiScene extends EventEmitter {
    */
   public dirtyFeatures(featureIDs: OneOrMore<FeatureID>): void {
     for (const featureID of utilIterable(featureIDs)) {
-      const feature = this.features.get(featureID);
-      if (feature) {
-        feature.dirty = true;
-      }
+      this.features.get(featureID)?.layer.dirtyFeatures(featureID);
     }
   }
 
@@ -526,6 +802,32 @@ export class PixiScene extends EventEmitter {
    */
   public dirtyData(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
     this.layers.get(layerID)?.dirtyData(dataIDs);
+  }
+
+
+  /**
+   * Says that some of a layer's data changed (an edit), and nothing else in it did. The layer
+   * draws that data again on the next frame, without doing its whole pass if it can
+   * (see `AbstractPixiLayer.dataChanged`). Follow it with `gfx.requestFrame()`.
+   * @param layerID - layerID that is rendering the data
+   * @param dataIDs - Everything the change affects: what changed, was added or was removed, and
+   *   whatever is drawn differently because of it (for an OSM edit, `Difference.complete()`)
+   */
+  public dataChanged(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
+    this.layers.get(layerID)?.dataChanged(dataIDs);
+  }
+
+
+  /**
+   * Says that more of a layer's data arrived (a tile loaded), and nothing else in it changed. The
+   * layer makes and draws that data over the next frames, without doing its whole pass if it can
+   * (see `AbstractPixiLayer.dataArrived`). Follow it with `gfx.requestFrame()`.
+   * @param layerID - layerID that is rendering the data
+   * @param dataIDs - What arrived, and whatever it changes the look of (for OSM, what the `merge`
+   *   event lists)
+   */
+  public dataArrived(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
+    this.layers.get(layerID)?.dataArrived(dataIDs);
   }
 
 

@@ -4,6 +4,7 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
 import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { StyleProps } from '../lib/Style.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -43,10 +44,10 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
   /**
    * Render any edit blocking polygons that are visible in the viewport
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
@@ -90,11 +91,11 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
   /**
    * Renders the edit-block overlay polygons for this frame.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param blocks - Array of block data visible in the view
    */
-  public renderEditBlocks(frame: number, viewport: Viewport, blocks: GeoJSONData[]): void {
+  public renderEditBlocks(frame: RenderFrame, viewport: Viewport, blocks: GeoJSONData[]): void {
     const parentContainer = this.scene.groups.get('blocks')!;
     if (!parentContainer) return;
 

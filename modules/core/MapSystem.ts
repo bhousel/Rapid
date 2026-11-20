@@ -144,11 +144,14 @@ export class MapSystem extends AbstractSystem {
                   filters?.clearEntity(entity);
                 }
               }
-              scene.dirtyData('osm', entityIDs);
+              // A frame, not a redraw of everything: the OSM layer makes and draws what arrived
+              // as its frames have time. (`entityIDs` is everything on the tile, also what we had
+              // already, and what the new data reshaped. See `PixiLayerOsm.dataArrived`.)
+              scene.dataArrived('osm', entityIDs);
+              gfx.requestFrame();
+            } else {
+              gfx.deferredRedraw();
             }
-            // Do we need this here?  OsmService calls `deferredRedraw` as tiles are loaded.
-            // We would only need it if there can be delay between when tiles are loaded 'merge' is emitted.
-            gfx.deferredRedraw();
           })
           .on('stagingchange', (difference: Difference) => {
             // `EditSystem` emits with staging's geometry already current, so there's nothing to recompute.
@@ -161,8 +164,10 @@ export class MapSystem extends AbstractSystem {
                 filters?.clearEntity(entity);  // clear feature filter cache
               }
             }
-            scene.dirtyData('osm', [...complete.keys()]);
-            gfx.immediateRedraw();
+            // (A frame, not a redraw of everything: the OSM layer draws what the edit affects, and
+            // a drag makes an edit on every pointer move. See `PixiLayerOsm._renderChanged`.)
+            scene.dataChanged('osm', [...complete.keys()]);
+            gfx.requestFrame();
           })
           .on('historyjump', (prevIndex: number, currIndex: number) => {
             this._historyJumped(prevIndex, currIndex);

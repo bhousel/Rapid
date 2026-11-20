@@ -50,7 +50,7 @@ Details and measurements are in `design/graph-geometry.md`; these are the choice
   a changed shape is a new `Geometry`, so identity already says what a `graph.version()` would. Numbers
   would be one more thing to keep right through savepoints, rebases and restores.
 - **Data is never changed in place.** Services and editors store `update()`'d copies. `v` stays as a
-  stamp `update()` gives each copy, because `key` (`${id}v${v}`) feeds d3 joins and `FilterSystem`;
+  stamp `update()` gives each copy, because `key` (`${id}v${v}`) feeds d3 joins (and fed `FilterSystem`'s cache until Nov 19);
   `touch()` and `AbstractPixiFeature.v` are gone.
 - **After a rebase, stable and staging catch up at once; other graphs when they become current.** No
   per-read "update on first use" check. Safe because rebase and validators are synchronous, and the only
@@ -173,6 +173,49 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 - **Hit areas are in container-local space** — `container.hitArea = new PIXI.Polygon(...)` coordinates must be in the container's local frame. For world-path features the local frame is world-local (origin-relative). `lineToPoly()` is called with world-local points and a world-local buffer width. Pixi composes the container transform when doing hit testing, so no extra projection is needed.
 - **DashLine halos: `scale` only, no per-caller workaround** — DashLine's `scale` option multiplies `width` and each `dash[i]` to convert drawing-coord units to screen pixels. Line/Polygon halo containers have `scale=1` (drawing in world units), so they pass `scale: 2^(WORLD_ZOOM - zoom)` (a.k.a. `localScale`) to keep dashes at fixed screen-pixel sizes. Point halo containers have a counter-scale (`1/worldScale`) that puts halo-local units in CSS pixels, so `scale=1` (default) is correct. DashLine itself uses `textureSpace: 'global'` (normalizes UV by texture pixel dimensions, no per-segment stretch), keeps pow2 padding for WebGL1 REPEAT-wrap, and compensates in the per-segment matrix using `texW`/`texH` instance fields so one full cycle covers exactly `dashSize * userScale` local units. Matrix composed scale-then-rotate for non-uniform scale correctness.
 - **`viewZoom` vs `styleZoom` naming convention** — Throughout the Pixi layer and feature files: `viewZoom = viewport.transform.zoom` is used for scale chain math (world↔screen scale factors, `worldScale = 2^(viewZoom - WORLD_ZOOM)`). `styleZoom = map?.effectiveZoom() ?? viewZoom` is the latitude-adjusted zoom used only for LOD thresholds (`< 16`, `< 17`) and styling decisions. The two are explicitly named at the top of each method that needs both. `PixiFeaturePolygon` has no LOD thresholds so it only has `viewZoom` — intentional.
+
+## Frame pacing (Nov 2026)
+
+- **Frames that only move the view aren't paced; frames with a pass to do are, by their cost.**
+  After a pass frame the next waits twice what it cost, at most 250 ms (`FramePacer`,
+  `design/graphics-system.md` section 9). A deferred redraw request alone waits at least 250 ms, as
+  it did under the fixed throttle, so data that streams in still batches up.
+- **Why twice the cost:** passes then take at most a third of the time, and with the 250 ms cap
+  nothing waits longer than it did. Not tuned further; change it with measurements.
+- **Rejected: tying the gap to the scheduler's pressure level.** Loading Staten Island took the
+  same time (37 s while panning, until the scheduler's queues were empty) with 2,163 frames drawn
+  as with 133.
+  Add it if a case shows background work being held up.
+- **Rejected: a held frame during a zoom.** Features are styled for their zoom (stroke widths in
+  world units, screen-sized markers), so the old ones can't be drawn at a new zoom. The CSS
+  transform still covers that.
+- **`immediateRedraw(layerID)` hurries only that layer.** Label textures ask for it several times
+  a second during a pan; if that hurried everything, no pass would ever wait its turn.
+
+## A deadline on the frame (Nov 2026)
+
+- **A dirty feature and a feature that needs its style worked out are two things.** `dirty` means
+  draw it again; `needsStyle` means match its style and label to its data again. A zoom sets only
+  the first (`scene.dirtyTransform()`). See `design/graphics-system.md` section 10.
+- **What waits is drawing a feature again, by where it is and why it's dirty:** outside the view
+  always; in view once the frame is out of time; and in a frame the user asked for, only if
+  nothing but the zoom made it dirty. Rejected: no deadline at all in frames the user asked for.
+  A hover during a wheel zoom asks for a frame, and it would have drawn everything at once.
+- **Labels wait for the features, then at most one frame for time.** They're placed by the
+  features' shapes, so placing them first would place them twice.
+- **The budget is 6 ms while the view moves or the scheduler has work waiting, 24 ms when
+  neither, and at least half of what recent frames cost** (up to 50 ms). Catching up fast matters
+  more than 60 frames a second only when nothing else wants the time. And each frame pays a fixed
+  cost, so where that's high, small steps take longer in all.
+- **What a feature will cost in the DRAW pass counts against the frame's budget** (fixed
+  estimates per feature, `RenderFrame.drawDebt`). Rejected: estimating it from recent frames.
+  DRAW has a fixed part and a part per feature, one frame doesn't tell them apart, and a wrong
+  estimate feeds back into the next frame's budget.
+- **Making a feature waits by the same rules as drawing one**, except in a frame the user asked
+  for: there, only what the user needs at once is made (something they drew, a vertex of their
+  selection). Otherwise a hover during a load would make every feature in view at once.
+- **Frames that catch up on waiting work aren't paced** (`FramePacer` doesn't see them). They're
+  bounded by the deadline instead.
 
 ## World coordinates and their numerics
 

@@ -7,6 +7,7 @@ import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { ConflationStatus } from '../core/ConflationSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { StyleProps } from '../lib/Style.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
@@ -63,10 +64,10 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
   /**
    * Render any data we have for this layer
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     if (!this.enabled) return;
 
     const context = this.context;
@@ -104,10 +105,10 @@ export class PixiLayerDebug extends AbstractPixiLayer {
    * @param featureID - Unique id for the marker
    * @param loc - Where to draw it (WGS84)
    * @param kind - A conflation status, or `'join'`
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  protected _renderMarker(featureID: string, loc: Vec2, kind: ConflationStatus | 'join', frame: number, viewport: Viewport): void {
+  protected _renderMarker(featureID: string, loc: Vec2, kind: ConflationStatus | 'join', frame: RenderFrame, viewport: Viewport): void {
     let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
     if (!feature) {
       feature = new PixiFeaturePoint(this, featureID);

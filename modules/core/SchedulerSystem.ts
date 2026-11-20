@@ -79,6 +79,15 @@ const MAX_DELTA_MS = 100;
 const DEFAULT_TARGET_FRAME_TIME = 1000 / 60;
 
 /**
+ * Normal tasks get at least this long (ms) on every tick, even when the frame callbacks have
+ * used the whole tick. Without it, a run of long frames kept them from running at all: measured
+ * Nov 2026 in Užice, while the map made 100,000 features over 10 s, no normal task ran on 214 of
+ * the 258 ticks that had one waiting, and the UI's own updates waited up to 2.4 s.
+ * (Idle tasks have no such share: under pressure they wait, by design.)
+ */
+const MIN_NORMAL_MS = 4;
+
+/**
  * EMA smoothing factor for frame timing metrics.
  * alpha = 2 / (N + 1) where N is the effective window.
  * 0.05 ≈ 39-frame window — responsive without jitter.
@@ -808,7 +817,9 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Processes queued tasks in priority order within the frame budget.
    * Urgent tasks always drain (even if over budget).  Normal and idle
-   * tasks only run while `performance.now()` is below the deadline.
+   * tasks only run while `performance.now()` is below the deadline,
+   * except that normal tasks always get `MIN_NORMAL_MS`: a tick that the
+   * frame callbacks used up still runs a few of them.
    *
    * Under backpressure, idle queue draining is reduced or skipped:
    * - `'light'`    — idle tasks get half the remaining budget
@@ -820,8 +831,10 @@ export class SchedulerSystem extends AbstractSystem {
     // Urgent: always drain fully, regardless of budget
     this._drainQueue(this._urgentQueue, Infinity);
 
-    // Normal: drain within budget
-    this._drainQueue(this._normalQueue, deadline);
+    // Normal: drain within budget, and for a minimum share of every tick
+    if (this._normalQueue.length > 0) {
+      this._drainQueue(this._normalQueue, Math.max(deadline, performance.now() + MIN_NORMAL_MS));
+    }
 
     // Idle: respect pressure level
     const pressure = this._pressure;

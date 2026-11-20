@@ -151,7 +151,7 @@ export class GeoScribbleService extends AbstractSystem {
     }
 
     spatial.addData('geoscribble', toLoad);
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('geoscribble');
   }
 
 }

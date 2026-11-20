@@ -3,6 +3,7 @@ import { UiBackgroundCard } from './cards/UiBackgroundCard.ts';
 import { UiHistoryCard } from './cards/UiHistoryCard.ts';
 import { UiLocationCard } from './cards/UiLocationCard.ts';
 import { UiMeasurementCard } from './cards/UiMeasurementCard.ts';
+import { UiRenderingCard } from './cards/UiRenderingCard.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { AbstractUiCard } from './cards/AbstractUiCard.ts';
@@ -23,6 +24,7 @@ export class UiInfoCards {
   public HistoryCard: UiHistoryCard;
   public LocationCard: UiLocationCard;
   public MeasurementCard: UiMeasurementCard;
+  public RenderingCard: UiRenderingCard;
   public cards: AbstractUiCard[];
 
   // D3 selections
@@ -46,13 +48,15 @@ export class UiInfoCards {
     this.HistoryCard = new UiHistoryCard(context);
     this.LocationCard = new UiLocationCard(context);
     this.MeasurementCard = new UiMeasurementCard(context);
+    this.RenderingCard = new UiRenderingCard(context);
 
     // Info Cards
     this.cards = [
       this.BackgroundCard,
       this.HistoryCard,
       this.LocationCard,
-      this.MeasurementCard
+      this.MeasurementCard,
+      this.RenderingCard
     ];
 
     // D3 selections

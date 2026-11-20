@@ -1,4 +1,4 @@
-import { test, expect, startRapid, waitForIdle, waitForOsmData, TEST_MAP } from './fixtures.js';
+import { test, expect, locToPage, osmSceneState, startRapid, waitForIdle, waitForOsmData, TEST_MAP } from './fixtures.js';
 
 
 /**
@@ -48,6 +48,37 @@ async function findEmptyPoints(page, count, clearance = 40) {
 }
 
 
+/**
+ * Waits until the map has drawn everything it was asked to (not for the network or the scheduler:
+ * with something selected, the sidebar's lookups can take a long time to give up here).
+ * @param page - The Playwright page
+ */
+async function mapSettled(page) {
+  await page.evaluate(() => new Promise(resolve => { requestAnimationFrame(() => requestAnimationFrame(resolve)); }));
+  await page.waitForFunction(() => !rapidContext.systems.gfx.pending);
+}
+
+
+/**
+ * Checks that what the OSM layer shows is what a full pass would show. Edits and changes of mode
+ * are drawn without a pass (`PixiLayerOsm._renderChanged`), so after one of them a pass should
+ * find nothing to change.
+ * @param page - The Playwright page
+ * @return What the layer shows (see `osmSceneState`)
+ */
+async function expectSameAsFullPass(page) {
+  await mapSettled(page);
+  const shown = await osmSceneState(page);
+  expect(shown.filter(feature => feature.includes('| dirty |'))).toEqual([]);
+  expect(shown.filter(feature => feature.includes('bound: false'))).toEqual([]);
+
+  await page.evaluate(() => rapidContext.systems.gfx.immediateRedraw());
+  await mapSettled(page);
+  expect(await osmSceneState(page)).toEqual(shown);
+  return shown;
+}
+
+
 test('draws a line, and undo takes it away', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -73,14 +104,160 @@ test('draws a line, and undo takes it away', async ({ page, consoleErrors }) => 
   });
   expect(line).toEqual({ id: line.id, nodes: 3, isNew: true });
 
-  // Each click was an edit: the first undo takes away the last node, the second takes away the line
+  // Each click was an edit: the first undo takes away the last node, the second takes away the line.
+  // (The key for undo goes by the platform the page thinks it's on: ⌘Z on a Mac, ⌃Z elsewhere,
+  // and the test browser doesn't say it's a Mac even when it runs on one. Playwright's
+  // `ControlOrMeta` goes by the machine, and so pressed a key that isn't bound. That looked like
+  // an undo that worked now and then: the preset list has its own undo for either key, while its
+  // search field has the focus.)
   const nodeCount = id => page.evaluate(id => rapidContext.systems.editor.staging.graph.hasEntity(id)?.nodes.length ?? 0, id);
-  await page.keyboard.press('ControlOrMeta+z');
+  const undoKey = await page.evaluate(() => (rapidContext.systems.keyboard.global.bindings.has('⌘Z-bubble') ? 'Meta+z' : 'Control+z'));
+
+  // Finishing a feature puts the focus in the preset list's search field a moment later. Undo
+  // works from there, while nothing has been typed in it: wait for the focus, so that this is tested.
+  await expect.poll(() => page.evaluate(() => document.activeElement?.tagName === 'INPUT' && document.activeElement.value === '')).toBe(true);
+  await page.keyboard.press(undoKey);
   await expect.poll(() => nodeCount(line.id)).toBe(2);
 
-  await page.keyboard.press('ControlOrMeta+z');
+  await mapSettled(page);
+  await page.keyboard.press(undoKey);
   await expect.poll(() => nodeCount(line.id)).toBe(0);
   expect(await page.evaluate(() => rapidContext.systems.editor.hasChanges())).toBe(false);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
+// Each click of a drawing is an edit, and finishing it is a change of mode. None of them asks for a
+// redraw of everything: the OSM layer draws what each one affects.
+test('shows each step of drawing a line as a full pass would, without doing one', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const points = await findEmptyPoints(page, 3);
+  expect(points).toHaveLength(3);
+
+  await page.evaluate(() => {
+    const gfx = rapidContext.systems.gfx;
+    globalThis.__passes = 0;
+    globalThis.__counting = true;
+    gfx.on('draw', () => {
+      if (globalThis.__counting && !gfx.lastRenderFrame.layers.get('osm').kept) globalThis.__passes++;
+    });
+  });
+  // (The checks ask for passes of their own, which don't count.)
+  const check = async () => {
+    await mapSettled(page);
+    await page.evaluate(() => { globalThis.__counting = false; });
+    const shown = await expectSameAsFullPass(page);
+    await page.evaluate(() => { globalThis.__counting = true; });
+    return shown;
+  };
+
+  await page.getByRole('button', { name: 'Line', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => rapidContext.mode.id)).toBe('draw-line');
+  await check();
+
+  for (const point of points) {
+    await page.mouse.click(point.x, point.y);
+    await check();
+  }
+  await page.keyboard.press('Enter');   // finish the line
+  await expect.poll(() => page.evaluate(() => rapidContext.mode.id)).toBe('select');
+
+  // The line is on the map, selected, with its three vertices above everything
+  const wayID = await page.evaluate(() => rapidContext.selectedIDs()[0]);
+  const drawn = await check();
+  expect(drawn.filter(feature => feature.startsWith(`osm-${wayID}-0 `) && feature.includes('| select |'))).toHaveLength(1);
+  expect(drawn.filter(feature => feature.includes('| selected |') && !feature.includes('midpoint'))).toHaveLength(3);
+
+  expect(await page.evaluate(() => globalThis.__passes)).toBe(0);
+
+  // Undo all of it, and it's gone from the map too
+  await page.evaluate(() => {
+    const { editor } = rapidContext.systems;
+    rapidContext.enter('browse');
+    while (editor.hasChanges()) {
+      editor.undo();
+    }
+  });
+  const undone = await check();
+  expect(undone.filter(feature => feature.includes(wayID))).toEqual([]);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
+// A drag is an edit on every pointer move. The OSM layer draws what each edit affects (the node,
+// its ways) on a frame where it keeps everything else, not with a pass over everything.
+test('dragging a vertex moves its road with it, without a pass', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // A place with nothing near it to drag to, and the vertex of a road that's nearest to it
+  const [target] = await findEmptyPoints(page, 1, 50);
+  const vertex = await page.evaluate(target => {
+    const editor = rapidContext.systems.editor;
+    const graph = editor.staging.graph;
+    const rect = document.querySelector('.main-map canvas').getBoundingClientRect();
+    let best = null;
+    for (const way of editor.intersects()) {
+      if (way.type !== 'way' || !way.tags.highway) continue;
+      for (const nodeID of way.nodes) {
+        const node = graph.hasEntity(nodeID);
+        if (!node || graph.parentWays(node).length !== 1) continue;   // not a junction: one road moves
+        const [x, y] = rapidContext.viewport.project(node.loc);
+        const distance = Math.hypot(rect.left + x - target.x, rect.top + y - target.y);
+        if (distance > 60 && (!best || distance < best.distance)) {
+          best = { id: node.id, wayID: way.id, loc: node.loc, distance: distance };
+        }
+      }
+    }
+    return best;
+  }, target);
+
+  // Hover it first: a plain vertex is only shown, and can only be grabbed, while its road is hovered
+  const start = await locToPage(page, vertex.loc);
+  await page.mouse.move(start.x - 20, start.y - 20);
+  await page.mouse.move(start.x, start.y, { steps: 5 });
+  await mapSettled(page);
+
+  // Count the passes from here on
+  await page.evaluate(() => {
+    const gfx = rapidContext.systems.gfx;
+    globalThis.__frames = [];
+    gfx.on('draw', () => globalThis.__frames.push(gfx.lastRenderFrame.layers.get('osm').kept));
+  });
+
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) {
+    await page.mouse.move(start.x + ((target.x - start.x) * i / 10), start.y + ((target.y - start.y) * i / 10));
+    await page.waitForTimeout(20);   // (a pointer event each, as a hand would make them)
+  }
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => rapidContext.systems.editor.hasChanges())).toBe(true);
+  await mapSettled(page);
+
+  // The node moved, and frames were drawn for it, none of them a pass
+  const moved = await page.evaluate(nodeID => rapidContext.systems.editor.staging.graph.entity(nodeID).loc, vertex.id);
+  expect(moved).not.toEqual(vertex.loc);
+  const kept = await page.evaluate(() => globalThis.__frames.splice(0));
+  expect(kept.length).toBeGreaterThan(5);
+  expect(kept.filter(wasKept => !wasKept)).toEqual([]);
+
+  // What's shown is what a full pass shows, with the road in it
+  const after = await expectSameAsFullPass(page);
+  expect(after.some(feature => feature.startsWith(`osm-${vertex.wayID}-0 `))).toBe(true);
+
+  // Undo puts it back, and that's drawn the same way
+  await page.evaluate(() => {
+    rapidContext.enter('browse');
+    rapidContext.systems.editor.undo();
+  });
+  expect(await page.evaluate(() => rapidContext.systems.editor.hasChanges())).toBe(false);
+  await expectSameAsFullPass(page);
 
   expect(consoleErrors).toEqual([]);
 });

@@ -456,7 +456,7 @@ export class StreetsideService extends AbstractSystem {
       photos.selectPhoto('streetside', selectBubbleID);  // reselect
     }
 
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('streetside');
   }
 
 

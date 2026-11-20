@@ -36,6 +36,49 @@ describe('KeyboardSystem', () => {
   });
 
 
+  // The bubble handler ignores keys typed into form fields. Undo and redo ask to be let through
+  // while the field is empty: the sidebar's search fields take the focus by themselves.
+  describe('form fields', () => {
+    const key = (target, extra = {}) => ({ type: 'keydown', key: 'z', ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, target: target, ...extra });
+
+    it('ignores a key pressed in a text field', () => {
+      const callback = mock();
+      const keyboard = makeKeyboard();
+      keyboard.global.on('Z', callback);
+      keyboard._keydownBubble(key({ tagName: 'INPUT', value: '' }));
+      keyboard._keydownBubble(key({ tagName: 'TEXTAREA', value: 'abc' }));
+      assert.lengthOf(callback.mock.calls, 0);
+
+      keyboard._keydownBubble(key({ tagName: 'DIV' }));
+      assert.lengthOf(callback.mock.calls, 1);
+    });
+
+    it('lets a binding through from an empty text field when it asks for that', () => {
+      const undo = mock();
+      const other = mock();
+      const keyboard = makeKeyboard();
+      keyboard.global.on('Z', undo, { inEmptyFields: true });
+      keyboard.global.on('X', other);
+
+      keyboard._keydownBubble(key({ tagName: 'INPUT', value: '' }));
+      keyboard._keydownBubble(key({ tagName: 'TEXTAREA', value: '' }));
+      assert.lengthOf(undo.mock.calls, 2);
+
+      keyboard._keydownBubble(key({ tagName: 'INPUT', value: '' }, { key: 'x' }));
+      assert.lengthOf(other.mock.calls, 0);     // the others stay out of fields
+    });
+
+    it('..but not once something is typed in the field, and never from a select', () => {
+      const undo = mock();
+      const keyboard = makeKeyboard();
+      keyboard.global.on('Z', undo, { inEmptyFields: true });
+      keyboard._keydownBubble(key({ tagName: 'INPUT', value: 'caf' }));    // the field's own undo
+      keyboard._keydownBubble(key({ tagName: 'SELECT', value: '' }));
+      assert.lengthOf(undo.mock.calls, 0);
+    });
+  });
+
+
   describe('binding + matching', () => {
     it('triggers the callback when a key is pressed', () => {
       const callback = mock();

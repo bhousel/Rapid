@@ -627,7 +627,10 @@ export class Context extends EventEmitter {
     }
     this.$container.classed(`mode-${this._currMode.id}`, true);
 
-    gfx?.immediateRedraw();
+    // A frame, not a redraw of everything. What a mode changes on the map, it tells the scene:
+    // classes (`scene.setClass`), edits (`stagingchange`), entities kept visible (`forceVisible`).
+    // The scene tells the layers about the mode itself (on `modechange`, below).
+    gfx?.requestFrame();
     this.emit('modechange', this._currMode);
     return this._currMode;
   }

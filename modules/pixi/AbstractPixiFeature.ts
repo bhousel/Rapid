@@ -75,6 +75,10 @@ export class AbstractPixiFeature {
   protected _style: MinimalStyleProps;
   /** Whether the style needs to be reapplied */
   protected _styleDirty: boolean;
+  /** Whether the layer should work out the style again from the data (see `needsStyle`) */
+  protected _needsStyle: boolean;
+  /** Whether the Feature is dirty only because the view's zoom or rotation changed (see `onlyTransformDirty`) */
+  protected _transformOnly: boolean;
   /** Label string for this feature */
   protected _label: string | null;
   /** Whether the label needs to be reapplied */
@@ -115,8 +119,10 @@ export class AbstractPixiFeature {
 
     this._geom = null;
     this._geomDirty = true;
-    this._style = utilDeepMerge({}, styleDefaults) as MinimalStyleProps;
+    this._style = styleDefaults;   // shared until a style is assigned (nothing changes a style in place)
     this._styleDirty = true;
+    this._needsStyle = true;
+    this._transformOnly = false;
     this._label = null;
     this._labelDirty = true;
     this._data = null;
@@ -171,6 +177,7 @@ export class AbstractPixiFeature {
    */
   public update(viewport: Viewport): void {
     if (!this.dirty) return;   // nothing to do
+    this.layer.work.updated++;
     this._geomDirty = false;
     this._styleDirty = false;
   }
@@ -240,6 +247,7 @@ export class AbstractPixiFeature {
   public set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
+    this.layer.visibilityChanged(this, val);
     if (this.halo) this.halo.visible = val;
     this._labelDirty = true;
   }
@@ -261,6 +269,59 @@ export class AbstractPixiFeature {
     this._geomDirty = val;
     this._styleDirty = val;
     this._labelDirty = val;
+    if (val) {
+      this._needsStyle = true;
+      this._transformOnly = false;
+    }
+  }
+
+
+  /**
+   * Whether the layer should work out the Feature's style and label again from its data.
+   * That's so for a new Feature, and after anything that may have changed what the Feature is:
+   * its data was bound again, or it was marked dirty (`dirty = true`, as the layer and the scene
+   * do when the data, the styles, the language or the filters change). Assigning a `style` clears it.
+   *
+   * A change of zoom or rotation doesn't set it (see `dirtyTransform`), and neither does a class
+   * (hover, select): the Feature is drawn again with the style it has. Matching a style to tags
+   * costs several times what drawing does, so a layer should only do it when this says so:
+   * ```ts
+   * if (feature.needsStyle) {
+   *   feature.style = styles.styleMatch(entity.tags, geometry, 'osm');
+   *   feature.label = l10n.displayName(entity.tags);
+   * }
+   * feature.update(viewport);
+   * ```
+   * @return `true` if the style should be assigned again
+   */
+  public get needsStyle(): boolean {
+    return this._needsStyle;
+  }
+
+
+  /**
+   * Marks the Feature as needing to be drawn again because the view's zoom or rotation changed.
+   * What the Feature is hasn't changed, so its style stays as it is (see `needsStyle`).
+   */
+  public dirtyTransform(): void {
+    if (!this.dirty) {
+      this._transformOnly = true;   // (if it was dirty already, it's for another reason too)
+    }
+    this._geomDirty = true;
+    this._styleDirty = true;
+    this._labelDirty = true;
+  }
+
+
+  /**
+   * Whether the Feature is dirty only because the view's zoom or rotation changed, and not because
+   * of anything about the Feature itself (its data, its style, a class like hover or select).
+   * Such a Feature can be drawn as it was for a few frames, so its redraw can wait even in a
+   * frame that the user asked for (see `AbstractPixiLayer.updateFeature`).
+   * @return `true` if nothing but the view changed since the Feature was last drawn
+   */
+  public get onlyTransformDirty(): boolean {
+    return this._transformOnly && this.dirty;
   }
 
 
@@ -300,6 +361,8 @@ export class AbstractPixiFeature {
     // result: defaults ← props
     this._style = utilDeepMerge({}, styleDefaults, props) as MinimalStyleProps;
     this._styleDirty = true;
+    this._needsStyle = false;
+    this._transformOnly = false;
   }
 
   /**
@@ -323,6 +386,7 @@ export class AbstractPixiFeature {
   public set geometry(val: GeometryPart) {
     this._geom = val;
     this._geomDirty = true;
+    this._transformOnly = false;
   }
 
 
@@ -376,6 +440,7 @@ export class AbstractPixiFeature {
     this._classes.add(classID);
     this._styleDirty = true;
     this._labelDirty = true;
+    this._transformOnly = false;
   }
 
 
@@ -393,6 +458,7 @@ export class AbstractPixiFeature {
     this._classes.delete(classID);
     this._styleDirty = true;
     this._labelDirty = true;
+    this._transformOnly = false;
   }
 
 

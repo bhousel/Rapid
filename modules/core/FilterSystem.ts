@@ -21,8 +21,14 @@ type FilterStats = Record<string, FilterStat>;
 
 /** Cached data for an entity */
 interface EntityCache {
+  /** Parent ways (of a vertex) or parent relations (of anything else) */
   parents: OsmEntity[] | null;
-  matches: Set<string> | null;
+  /** The filters that the entity matched */
+  matches: Set<FilterID> | null;
+  /** The filter that hides the entity, or `null` if it's shown. Only valid for `hiddenVersion`. */
+  hidden: FilterID | null;
+  /** The `_hiddenVersion` that `hidden` was worked out for (-1 if not yet) */
+  hiddenVersion: number;
 }
 
 /** A preset-like object for isHiddenPreset */
@@ -57,6 +63,7 @@ class Filter {
  * `FilterSystem` maintains matching and filtering rules.
  * Each `Filter` is basically a filter function that returns true if an entity matches.
  * The code in here is relatively "hot", as it gets run against every entity.
+ * See `design/filter-system.md` for how it works, what it costs, and where it's heading.
  *
  * Events available:
  * - `filterchange`   Fires whenever user changes the enabled/disabled filters
@@ -69,8 +76,13 @@ export class FilterSystem extends AbstractSystem {
   protected _hidden: Set<FilterID>;
   /** Set of entityIDs to force visible */
   protected _forceVisible: Set<EntityID>;
-  /** Cache of entity.key to matched filterIDs */
-  protected _cache: Record<string, EntityCache>;
+  /**
+   * What's known about each entity: its parents, the filters it matched, and whether it's hidden.
+   * Keyed by the entity itself (an edited entity is a new object), so entries go away with their entity.
+   */
+  protected _cache: WeakMap<OsmEntity, EntityCache>;
+  /** Counts the changes to `_hidden`, so a cached "is it hidden" answer is only used for the same hidden filters */
+  protected _hiddenVersion: number;
   /** The saved disabled filters, as this system last read or saved them (to tell a sync from its own save) */
   protected _knownSaved: string;
 
@@ -87,7 +99,8 @@ export class FilterSystem extends AbstractSystem {
     this._filters = new Map<FilterID, Filter>();
     this._hidden = new Set<FilterID>();
     this._forceVisible = new Set<EntityID>();
-    this._cache = {};
+    this._cache = new WeakMap<OsmEntity, EntityCache>();
+    this._hiddenVersion = 0;
     this._knownSaved = '';
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -177,7 +190,7 @@ export class FilterSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
-    this._cache = {};
+    this._cache = new WeakMap<OsmEntity, EntityCache>();
     this._forceVisible.clear();
     return Promise.resolve();
   }
@@ -356,8 +369,7 @@ export class FilterSystem extends AbstractSystem {
    * @param entity - Entity to clear
    */
   public clearEntity(entity: OsmEntity): void {
-    const ekey = entity.key;
-    delete this._cache[ekey];
+    this._cache.delete(entity);
   }
 
 
@@ -375,11 +387,7 @@ export class FilterSystem extends AbstractSystem {
     // (note that multipolygons are considered 'area' geometry not 'relation')
     if (geometry === 'relation' && entity.tags.type !== 'boundary') return new Set();
 
-    const ekey = entity.key;
-    let cached = this._cache[ekey];
-    if (!cached) {
-      this._cache[ekey] = cached = { parents: null, matches: null };
-    }
+    const cached = this._cached(entity);
     if (cached.matches) {    // done already
       return cached.matches;
     }
@@ -389,8 +397,7 @@ export class FilterSystem extends AbstractSystem {
     const parents = cached.parents || this.getParents(entity, graph, geometry);
     if (parents.length) {
       for (const parent of parents) {
-        const pkey = parent.key;
-        const pmatches = this._cache[pkey]?.matches;
+        const pmatches = this._cache.get(parent)?.matches;
         if (pmatches) continue;  // parent matching was done already
         this.getMatches(parent, graph, parent.geometry(graph) as GeometryType);  // recurse up
       }
@@ -410,8 +417,7 @@ export class FilterSystem extends AbstractSystem {
           (parents.length === 1 && (parents[0] as OsmRelation).isMultipolygon?.()) ||
           (parents.length > 0 && parents.every(parent => parent.tags.type === 'boundary'))
         )) {
-          const pkey = parents[0].key;
-          const pmatches = this._cache[pkey]?.matches;
+          const pmatches = this._cache.get(parents[0])?.matches;
           if (pmatches) {
             matches = new Set(pmatches);  // copy
             continue;
@@ -439,12 +445,7 @@ export class FilterSystem extends AbstractSystem {
   public getParents(entity: OsmEntity, graph: Graph, geometry: GeometryType): OsmEntity[] {
     if (geometry === 'point') return [];
 
-    const ekey = entity.key;
-    let cached = this._cache[ekey];
-    if (!cached) {
-      this._cache[ekey] = cached = { parents: null, matches: null };
-    }
-
+    const cached = this._cached(entity);
     if (!cached.parents) {
       let parents: OsmEntity[];
       if (geometry === 'vertex') {
@@ -496,12 +497,29 @@ export class FilterSystem extends AbstractSystem {
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
 
-    const filterIDs = [...this.getMatches(entity, graph, geometry)];
-    if (filterIDs.length && filterIDs.every(filterID => this._hidden.has(filterID))) {
-      return filterIDs[0];
-    } else {
-      return null;
+    // skip - these match nothing (see `getMatches`)
+    if (geometry === 'vertex') return null;
+    if (geometry === 'relation' && entity.tags.type !== 'boundary') return null;
+
+    // The answer follows from what the entity matched and which filters are hidden, so it's kept
+    // with the matches until either changes. (Vertices ask this of each parent way, on every pass.)
+    const cached = this._cached(entity);
+    if (cached.hiddenVersion === this._hiddenVersion) {    // done already
+      return cached.hidden;
     }
+
+    let hidden: FilterID | null = null;
+    for (const filterID of this.getMatches(entity, graph, geometry)) {
+      if (!this._hidden.has(filterID)) {
+        hidden = null;
+        break;
+      }
+      hidden ??= filterID;   // keep the first one
+    }
+
+    cached.hidden = hidden;
+    cached.hiddenVersion = this._hiddenVersion;
+    return hidden;
   }
 
 
@@ -620,9 +638,13 @@ export class FilterSystem extends AbstractSystem {
    * @param entityIDs - Array of Entity ids
    */
   public forceVisible(entityIDs: EntityID[]): void {
+    const context = this.context;
+    const editor = context.systems.editor;
+    const gfx = context.systems.gfx;     // optional
+
+    const before = this._forceVisible;
     this._forceVisible = new Set<EntityID>();
 
-    const editor = this.context.systems.editor;
     if (!editor) return;
     const graph = editor.staging.graph!;
 
@@ -636,6 +658,44 @@ export class FilterSystem extends AbstractSystem {
         }
       }
     }
+
+    // Tell the map which entities this shows, or lets be hidden again, and their nodes with them.
+    // (Only if a filter hides anything: otherwise this changes nothing on the map.)
+    const scene = gfx?.scene;
+    if (!scene || !this._hidden.size) return;
+
+    const changedIDs = new Set<EntityID>();
+    for (const [ids, others] of [[before, this._forceVisible], [this._forceVisible, before]]) {
+      for (const entityID of ids) {
+        if (others.has(entityID)) continue;
+        changedIDs.add(entityID);
+        const entity = graph.hasEntity(entityID);
+        if (entity?.type === 'way') {
+          for (const nodeID of (entity as OsmWay).nodes) {
+            changedIDs.add(nodeID);
+          }
+        }
+      }
+    }
+    if (changedIDs.size) {
+      scene.dataChanged('osm', [...changedIDs]);
+      gfx.requestFrame();
+    }
+  }
+
+
+  /**
+   * Returns what's known about an entity, starting an empty record if there isn't one.
+   * @param entity - The Entity to look up
+   * @return The entity's cached data
+   */
+  protected _cached(entity: OsmEntity): EntityCache {
+    let cached = this._cache.get(entity);
+    if (!cached) {
+      cached = { parents: null, matches: null, hidden: null, hiddenVersion: -1 };
+      this._cache.set(entity, cached);
+    }
+    return cached;
   }
 
 
@@ -731,6 +791,7 @@ export class FilterSystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     // gather hidden
+    this._hiddenVersion++;
     this._hidden = new Set<FilterID>();
     for (const [filterID, filter] of this._filters) {
       if (!filter.enabled) {

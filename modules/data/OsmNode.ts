@@ -1,4 +1,4 @@
-import { RAD2DEG, vecAngle } from '@rapid-sdk/math';
+import { Extent, projWgs84ToWorld, RAD2DEG, vecAngle } from '@rapid-sdk/math';
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
@@ -15,6 +15,15 @@ export interface OsmNodeProps extends OsmEntityProps {
   /** Geographic location in WGS84 [lon, lat] */
   loc: Vec2;
 }
+
+
+/**
+ * What a node is to the ways it's on, see `OsmNode.vertexKind()`:
+ * - `'tagged'`: it has interesting tags of its own (a crossing, a gate)
+ * - `'structural'`: untagged, but its ways end or intersect there
+ * - `'shape'`: it only gives its way its shape
+ */
+export type VertexKind = 'tagged' | 'structural' | 'shape';
 
 
 /**
@@ -50,9 +59,42 @@ export class OsmNode extends OsmEntity {
     const otherLoc = (otherOrContext instanceof OsmNode) ? otherOrContext.loc : undefined;
     const loc = this.loc;
     const sameLoc = !!otherLoc && !!loc && otherLoc[0] === loc[0] && otherLoc[1] === loc[1];
-    if (!sameLoc) {
-      this.updateGeometry();
+    if (sameLoc) {
+      this._geoms = (otherOrContext as OsmNode).geoms;
+    } else {
+      this._geoms = null!;    // built when it's first asked for (see `OsmEntity.geoms`)
     }
+  }
+
+  /**
+   * The node's extent (in WGS84 lon/lat): its location.
+   * A node whose geometry hasn't been built gets a new `Extent` each time, and stays without one.
+   * @return  The Extent, or `undefined` if the node has no location
+   */
+  public override extent(): Extent | undefined {
+    if (this._geoms) return this._geoms.orig?.extent;
+    const loc = this.loc;
+    return (Array.isArray(loc) && loc.length >= 2) ? new Extent(loc) : undefined;
+  }
+
+  /**
+   * Whether the node's location is within the given Extent.
+   * @param other - the test extent
+   * @returns `true` if it is, `false` if not
+   */
+  public override intersects(other: Extent): boolean {
+    return this.extent()?.intersects(other) ?? false;
+  }
+
+  /**
+   * The node's location in world coordinates, worked out from `loc` each time.
+   * For code that looks at every node and needs only this: asking for `geoms` builds the node's
+   * whole `Geometry` and keeps it.
+   * @return  `[x, y]` in world coordinates, or `undefined` if the node has no location
+   */
+  public worldCoord(): Vec2 | undefined {
+    const loc = this.loc;
+    return (Array.isArray(loc) && loc.length >= 2) ? projWgs84ToWorld(loc) as Vec2 : undefined;
   }
 
 
@@ -357,6 +399,22 @@ export class OsmNode extends OsmEntity {
    */
   public isIntersection(graph: Graph): boolean {
     return this.parentIntersectionWays(graph).length > 1;
+  }
+
+  /**
+   * Says what this node is to the ways it's on, in one memoized answer.
+   * Most nodes only give a way its shape, and a map shows those only for what's selected. A map
+   * layer asks this of every node around the view, so it has to be cheap to ask again.
+   * @param graph - the Graph that holds the topology needed
+   * @returns the kind of vertex, or `null` if this node isn't on a way (it's a point)
+   */
+  public vertexKind(graph: Graph): VertexKind | null {
+    return this.memo(graph, 'vertexKind', () => {
+      if (this.geometry(graph) !== 'vertex') return null;
+      if (this.hasInterestingTags()) return 'tagged';
+      if (this.isEndpoint(graph) || this.isIntersection(graph)) return 'structural';
+      return 'shape';
+    });
   }
 
   /**

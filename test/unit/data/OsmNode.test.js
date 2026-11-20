@@ -54,6 +54,36 @@ describe('OsmNode', () => {
       assert.deepEqual(a.geoms.orig.extent.min, [1, 2]);
     });
 
+    // A node's `Geometry` is most of what the node takes, and most nodes only shape a way.
+    it('builds its geometry when it is first asked for', () => {
+      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
+      assert.isNotOk(a._geoms);
+      const geoms = a.geoms;
+      assert.instanceOf(geoms, Rapid.Geometry);
+      assert.deepEqual(geoms.parts[0].orig.coords, [1, 2]);
+      assert.strictEqual(a.geoms, geoms);     // once
+    });
+
+    it('answers extent, intersects and worldCoord without building its geometry', () => {
+      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
+      assert.deepEqual(a.extent().min, [1, 2]);
+      assert.deepEqual(a.extent().max, [1, 2]);
+      assert.isTrue(a.intersects(new Rapid.sdk.Extent([0, 0], [5, 5])));
+      assert.isFalse(a.intersects(new Rapid.sdk.Extent([3, 3], [5, 5])));
+      assert.deepEqual(a.worldCoord(), Rapid.sdk.projWgs84ToWorld([1, 2]));
+      assert.isNotOk(a._geoms);
+
+      assert.deepEqual(a.worldCoord(), a.geoms.parts[0].world.coords);    // the same answers as the geometry's
+      assert.strictEqual(a.extent(), a.geoms.orig.extent);
+    });
+
+    it('has no extent or world coordinate without a location', () => {
+      const a = new Rapid.OsmNode(context);
+      assert.isUndefined(a.extent());
+      assert.isUndefined(a.worldCoord());
+      assert.isFalse(a.intersects(new Rapid.sdk.Extent([0, 0], [5, 5])));
+    });
+
     it('constructs an OsmNode from another OsmNode', () => {
       const a = new Rapid.OsmNode(context);
       const b = new Rapid.OsmNode(a);
@@ -215,6 +245,86 @@ describe('OsmNode', () => {
       assert.isFalse(n1.isEndpoint(graph), 'circular way, connector node');
       assert.isFalse(n2.isEndpoint(graph), 'circular way, middle node');
       assert.isFalse(n3.isEndpoint(graph), 'circular way, ending node');
+    });
+  });
+
+
+  describe('vertexKind', () => {
+    it('returns null for a node that is not on a way', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' } });
+      const graph = new Rapid.Graph(context, [n1]);
+      assert.isNull(n1.vertexKind(graph));
+    });
+
+    it('sorts the nodes of a way into tagged, structural and shape', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', tags: { highway: 'crossing' } });
+      const n4 = new Rapid.OsmNode(context, { id: 'n4', tags: { source: 'survey' } });
+      const n5 = new Rapid.OsmNode(context, { id: 'n5', tags: { barrier: 'gate' } });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n4', 'n5'], tags: { highway: 'residential' } });
+      const graph = new Rapid.Graph(context, [n1, n2, n3, n4, n5, w1]);
+
+      assert.strictEqual(n1.vertexKind(graph), 'structural', 'untagged, the end of a way');
+      assert.strictEqual(n2.vertexKind(graph), 'shape', 'untagged, in the middle of a way');
+      assert.strictEqual(n3.vertexKind(graph), 'tagged', 'tagged, in the middle of a way');
+      assert.strictEqual(n4.vertexKind(graph), 'shape', 'only an uninteresting tag');
+      assert.strictEqual(n5.vertexKind(graph), 'tagged', 'tagged, and the end of a way');
+    });
+
+    it('returns structural where ways intersect', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3' });
+      const n4 = new Rapid.OsmNode(context, { id: 'n4' });
+      const n5 = new Rapid.OsmNode(context, { id: 'n5' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: { highway: 'residential' } });
+      const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n4', 'n2', 'n5'], tags: { highway: 'service' } });
+      const graph = new Rapid.Graph(context, [n1, n2, n3, n4, n5, w1, w2]);
+      assert.strictEqual(n2.vertexKind(graph), 'structural');
+    });
+
+    it('returns shape for the nodes of a closed way', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'], tags: { building: 'yes' } });
+      const graph = new Rapid.Graph(context, [n1, n2, n3, w1]);
+      assert.strictEqual(n1.vertexKind(graph), 'shape', 'where the way closes');
+      assert.strictEqual(n2.vertexKind(graph), 'shape');
+    });
+
+    it('gives a new answer after a way arrives that crosses at the node', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: { highway: 'residential' } });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1]);
+      assert.strictEqual(n2.vertexKind(base), 'shape');
+
+      const n4 = new Rapid.OsmNode(context, { id: 'n4' });
+      const n5 = new Rapid.OsmNode(context, { id: 'n5' });
+      const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n4', 'n2', 'n5'], tags: { highway: 'service' } });
+      base.rebase([n4, n5, w2], [base]);
+      assert.strictEqual(n2.vertexKind(base), 'structural');
+    });
+
+    it('answers for the graph it is asked about', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: { highway: 'residential' } });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1]);
+      assert.strictEqual(n3.vertexKind(base), 'structural');
+
+      // an edit that takes `n3` off the way: it's a point in that graph, and still a vertex in the base
+      const head = new Rapid.Graph(base);
+      head.replace(w1.update({ nodes: ['n1', 'n2'] }));
+      head.commit();
+      assert.isNull(n3.vertexKind(head));
+      assert.strictEqual(n2.vertexKind(head), 'structural');
+      assert.strictEqual(n3.vertexKind(base), 'structural');
+      assert.strictEqual(n2.vertexKind(base), 'shape');
     });
   });
 

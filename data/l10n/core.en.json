@@ -937,6 +937,28 @@
         "metric": "Metric",
         "imperial": "Imperial",
         "node_count": "Number of nodes"
+      },
+      "rendering": {
+        "title": "Rendering",
+        "frames": "Frames",
+        "frames_drawn": "{frames} in the last second",
+        "frames_held": "{frames} in the last second, {held} with a pass held back",
+        "app": "App",
+        "draw": "Draw",
+        "gpu": "GPU",
+        "milliseconds": "{ms} ms",
+        "features": "Features",
+        "features_shown": "{visible} of {total} shown",
+        "layers": "Slowest layers (ms)",
+        "kept": "Layers kept (frames)",
+        "waiting": "Waiting for a later frame",
+        "instructions": "Pixi instructions",
+        "groups": "Render groups",
+        "groups_rebuilt": "{rebuilt} of {total} rebuilt",
+        "webgl": "WebGL calls",
+        "scheduler": "Scheduler",
+        "show_details": "Show GPU Details",
+        "hide_details": "Hide GPU Details"
       }
     },
     "geometry": {
@@ -1141,6 +1163,10 @@
       "measurement_panel": {
         "title": "Show Measurement Panel",
         "tooltip": "Show geometry values for the selection."
+      },
+      "rendering_panel": {
+        "title": "Show Rendering Panel",
+        "tooltip": "Show how long the map takes to draw."
       },
       "style_options": "Style Options",
       "autohidden": "These features have been automatically hidden because too many would be shown on the screen.  You can zoom in to edit them.",
@@ -3616,6 +3642,10 @@
         "toggle_measurement_card": {
           "label": "Toggle measurement panel",
           "key": "M"
+        },
+        "toggle_rendering_card": {
+          "label": "Toggle rendering panel",
+          "key": "F"
         }
       }
     },

@@ -376,7 +376,7 @@ export class MapWithAIService extends AbstractSystem {
     graph.rebase(entities, [graph], true);   // true = force replace entities
 
     spatial.addData(ds.spatialID, entities, graph);
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('rapid');   // only the Rapid layer draws this data
   }
 
 

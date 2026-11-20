@@ -329,7 +329,7 @@ export class MapRouletteService extends AbstractSystem {
       this._challengeQueue.delete(challengeID);
       this.loadChallengeAsync(challengeID);
     }
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('maproulette');
   }
 
 

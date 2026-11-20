@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { BufferHitArea } from './lib/BufferHitArea.ts';
 import { geomLineSegments } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
@@ -23,19 +23,19 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  * This class renders a Line feature.
  *
  * Properties available:
- * - `casing`     - `PIXI.Graphic` for the casing (below)
+ * - `casing`     - `PIXI.Graphic` for the casing (below), or `null` while there's none to draw
  * - `stroke`     - `PIXI.Graphic` for the stroke (above)
  * -  (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
 
-  /** PIXI.Graphics for the casing (below) */
+  /** PIXI.Graphics for the casing (below), or null while there's none to draw (see `update`) */
   public casing: PIXI.Graphics | null;
   /** PIXI.Graphics for the stroke (above) */
   public stroke: PIXI.Graphics | null;
 
   /** Buffer polygon data for hit testing and halo */
-  protected _bufferdata: LineToPolyResult | null;
+  protected _hitBuffer: BufferHitArea | null;
 
 
   /**
@@ -45,13 +45,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
-    this._bufferdata = null;
+    this._hitBuffer = null;
 
-    const casing = new PIXI.Graphics();
-    casing.label = 'casing';
-    casing.eventMode = 'none';
-    casing.sortableChildren = false;
-    this.casing = casing;
+    this.casing = null;   // add later only if needed (see `update`)
 
     const stroke = new PIXI.Graphics();
     stroke.label = 'stroke';
@@ -59,7 +55,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     stroke.sortableChildren = false;
     this.stroke = stroke;
 
-    this.container.addChild(casing, stroke);
+    this.container.addChild(stroke);
   }
 
 
@@ -77,7 +73,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.stroke = null;
     }
 
-    this._bufferdata = null;
+    this._hitBuffer = null;
 
     super.destroy();
   }
@@ -91,6 +87,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    */
   public update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
+    this.layer.work.updated++;
 
     const map = this.context.systems.map;
     const viewZoom = viewport.transform.zoom;
@@ -126,12 +123,22 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this.visible = true;
     this.stroke!.renderable = true;
 
-    if (styleZoom < 16) {
-      this.lod = 1;
-      this.casing!.renderable = false;
-    } else {
-      this.lod = 2;
-      this.casing!.renderable = true;
+    // The casing is drawn from zoom 16, if the style has one that can be seen. Its `Graphics`
+    // exists only then: the lines of the photo and data layers have none, nor has any line
+    // below zoom 16.
+    const casingStyle = style.casing;
+    const showCasing = (styleZoom >= 16) && !!casingStyle && casingStyle.opacity !== 0;
+    this.lod = (styleZoom < 16) ? 1 : 2;
+    if (showCasing && !this.casing) {
+      const casing = new PIXI.Graphics();
+      casing.label = 'casing';
+      casing.eventMode = 'none';
+      casing.sortableChildren = false;
+      this.casing = casing;
+      container.addChildAt(casing, 0);   // below the stroke
+    } else if (!showCasing && this.casing) {
+      this.casing.destroy();
+      this.casing = null;
     }
 
     // Update line markers (oneway arrows, sided markers)
@@ -149,7 +156,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         lineMarkers.sortableChildren = false;
         container.addChild(lineMarkers);
       }
-      lineMarkers.removeChildren();
+      for (const sprite of lineMarkers.removeChildren()) {
+        sprite.destroy();
+      }
 
       // Show line markers (e.g. oneway arrows)
       if (lineMarkerTextureID) {
@@ -218,17 +227,16 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         cap: 'butt',
         join: 'bevel'
       };
-      this._bufferdata = lineToPoly(flat[0], bufferStyle);
-      container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
+      // (Worked out when the pointer comes near, or for a halo: see `BufferHitArea`)
+      this._hitBuffer = new BufferHitArea(flat[0], bufferStyle, local!.extent);
+      container.hitArea = this._hitBuffer;
     } else {
-      this._bufferdata = null;
+      this._hitBuffer = null;
       container.hitArea = null;
     }
 
-    if (this.casing!.renderable) {
-      this.updateGraphic('casing', this.casing!, points, styleZoom, viewZoom, isWireframe);
-    } else {
-      this.casing!.clear();
+    if (this.casing) {
+      this.updateGraphic('casing', this.casing, points, styleZoom, viewZoom, isWireframe);
     }
     if (this.stroke!.renderable) {
       this.updateGraphic('stroke', this.stroke!, points, styleZoom, viewZoom, isWireframe);
@@ -334,7 +342,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
+   * Show/Hide halo (expects `this._hitBuffer` to be already set up by `update()`)
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateHalo(viewport: Viewport): void {
@@ -362,7 +370,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     // Select
-    if (showSelect && this._bufferdata) {
+    if (showSelect && this._hitBuffer) {
       const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
       const haloParent = mapui.halo;
       if (!haloParent) return;
@@ -395,11 +403,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       (this.halo as PIXI.Graphics).clear();
 
       const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-      if (this._bufferdata.outer && this._bufferdata.inner) {   // closed line
-        dl.poly(this._bufferdata.outer);
-        dl.poly(this._bufferdata.inner);
+      const buffer = this._hitBuffer.buffer;
+      if (buffer.outer && buffer.inner) {   // closed line
+        dl.poly(buffer.outer);
+        dl.poly(buffer.inner);
       } else {   // unclosed line
-        dl.poly(this._bufferdata.perimeter);
+        dl.poly(buffer.perimeter);
       }
 
     } else {

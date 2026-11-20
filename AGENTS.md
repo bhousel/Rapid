@@ -144,6 +144,7 @@ Fetch the raw files with `curl -fsSL` (or `gh api`), so you get the exact text. 
 ### Data and Graphs
 - **Data elements are immutable.** Never change a data element's `props` in place. Make a new one with `d.update(props)`, and store it where the old one was (e.g. `spatial.replaceData(...)`, or the editor's datum). Renderers redraw a feature when its data is a different object, and selections find the newest version by data ID.
 - **A way's or relation's shape belongs to a graph.** Read it with `graph.geometry(entity)` / `graph.extent(entity)`; `entity.geoms` and `entity.extent()` throw for them. A node's shape is its own.
+- **A node's `Geometry` is built when it's first asked for, and then kept** (1.2 KB a node). Code that visits every node asks for `node.loc`, `node.extent()` / `graph.extent(node)` or `node.worldCoord()`, which don't build it. `node.geoms` and `graph.geometry(node)` are for the nodes you'll draw or measure.
 - **Search OSM data through `EditSystem`**, for the graph you mean: `editor.entitiesInBox(box, graph)`, `editor.waySegments(extent, graph)`, `editor.intersects(graph)`. They answer for any graph of the editor's lineage, including one inside an action.
 - See [`design/graph-geometry.md`](design/graph-geometry.md) for why, and `test/unit/lib/graph_model.test.js` (run it with `GRAPH_MODEL_SEEDS=3000`) after changing `Graph`.
 
@@ -612,6 +613,16 @@ what the developer is seeing when they report a problem.
      a value to get it back as JSON (the snippet is an async function body, so it can `await`)
    - `bun run cdp reload [setup.js]`: reload, wait for Rapid to start, then run an optional setup snippet
    - `bun run cdp press <key>`: press a key (e.g. `Escape` closes the welcome screen after a reload)
+4. To measure what a frame costs, `bun run measure` visits a set of difficult places in that Chrome and
+   prints each one's frame stats (`--fresh` for numbers you can compare between builds; see
+   `design/graphics-system.md`). It moves the developer's map.
+5. To compare with another build, an older Rapid or iD, `bun run compare <label> <url> <place>` pans
+   and zooms any of them with real input events, in a new tab, and reports how the page kept up.
+   Both scripts load places from the OSM API, which answers 429 after too many (for everyone at
+   your address, for a while): name the places you need, and don't run them in a loop.
+   **Use a tape for anything you'll measure more than once:** `--tape places.tape.json` on either
+   script keeps the API's answers in that file the first time, and answers from it after that
+   (`scripts/tape.ts`). `*.tape.json` is gitignored: tapes are large and hold OSM data.
 
 Tips:
 - **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`

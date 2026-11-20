@@ -336,7 +336,7 @@ export class KeepRightService extends AbstractSystem {
       spatial.addData(spatialID, new MarkerData(context, props));
     }
 
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('keepright');
   }
 
 

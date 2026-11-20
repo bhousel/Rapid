@@ -829,7 +829,13 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
         into a new issue that the layer and the sidebar both show, with no errors.
 
 Then, each measured on its own:
-- **Slim nodes.** World coordinates live on the node; a full `Geometry` is built only when asked for,
+- **Slim nodes.** *Partly done (Nov 19):* a node's `Geometry` is built only when asked for
+  (`OsmEntity.geoms`), and what visits every node asks for `node.extent()`, `node.worldCoord()` or
+  `node.loc` instead. In Užice 49,153 of 243,565 nodes have one after a load, and the heap is 200 MB
+  smaller. `GeometryPart`'s lazy products are getters on classes now, which halved a way's part (3.1
+  to 1.5 KB for five coordinates). Not done: coordinates on the node, and Pixi building point parts
+  from them. The plan was:
+  World coordinates live on the node; a full `Geometry` is built only when asked for,
   and Pixi builds its point parts from the coordinates. A node takes 182 B instead of 1,416 B. Node
   `Geometry` is 75-78% of a node's memory today (about 215 MB in central Paris). Against today's code,
   `update()` takes 1.6 instead of 3.2 µs, and way geometry built from nodes' world coordinates is 3-6×

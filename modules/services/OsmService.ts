@@ -248,6 +248,8 @@ export class OsmService extends AbstractSystem {
   protected _apiStatus: string | null;
   /** Current rate limiting info, or null if not rate-limited */
   protected _rateLimit: RateLimitInfo | null;
+  /** The timer that ends the rate limit when there's no scheduler to do it (see `setRateLimit`) */
+  protected _rateLimitTimeout: ReturnType<typeof setTimeout> | null;
   /** Cached list of the authenticated user's changesets, or null */
   protected _userChangesets: any[] | null;
   /** Cached details of the authenticated user, or null */
@@ -291,6 +293,7 @@ export class OsmService extends AbstractSystem {
     this._noteZoom = 12;
     this._apiStatus = null;
     this._rateLimit = null;
+    this._rateLimitTimeout = null;
 
     this._userChangesets = null;
     this._userDetails = null;
@@ -409,7 +412,15 @@ export class OsmService extends AbstractSystem {
 
     const context = this.context;
     const network = context.systems.network!;
+    const scheduler = context.systems.scheduler;   // optional
     const spatial = context.systems.spatial!;
+
+    // No rate limit, so nothing to do when its time is up
+    scheduler?.cancel('osm-rate-limit-ended');
+    if (this._rateLimitTimeout) {
+      globalThis.clearTimeout(this._rateLimitTimeout);
+      this._rateLimitTimeout = null;
+    }
 
     this._tileCache = { lastv: null };
     this._noteCache = { lastv: null, toLoad: new Set<string>(), closed: {} };
@@ -655,10 +666,9 @@ export class OsmService extends AbstractSystem {
         }
 
         // Success path — data was fetched and parsed on the worker
-        if (this._rateLimit) {               // if had rate limit before
-          this._rateLimit = null;            // clear rate limit
-          this.deferredReloadApiStatus();    // reload status / clear warning
-        }
+        // (A rate limit isn't over because a call succeeded: the API limits downloads of map data,
+        // and goes on answering its other calls, like the status check that a rate limit sets off.
+        // It's over when its time is up, see `_rateLimitEnded`.)
         if (this._apiStatus === 'error') {   // if had error before
           this.deferredReloadApiStatus();    // reload status / clear warning
         }
@@ -1307,8 +1317,8 @@ export class OsmService extends AbstractSystem {
           const api = results!.data.find(d => d.type === 'api') as ParsedApi | undefined;
           const policy = results!.data.find(d => d.type === 'policy') as ParsedPolicy | undefined;
 
-          // Set status - 'online', 'readonly', or 'offline'
-          this._apiStatus = this._rateLimit ? 'ratelimit' : ((api as any)?.status?.api || 'online');
+          // Set status - 'ratelimit' while one is on, otherwise 'online', 'readonly', or 'offline'
+          this._apiStatus = this.getRateLimit() ? 'ratelimit' : ((api as any)?.status?.api || 'online');
 
           // Update max nodes per way
           const maxWayNodes = (api as any)?.waynodes?.maximum || 2000;
@@ -1656,10 +1666,23 @@ export class OsmService extends AbstractSystem {
 
     const context = this.context;
     const network = context.systems.network!;
+    const scheduler = context.systems.scheduler;   // optional
 
     // Stop loading tiles, and cancel any inflight tile/note requests
     this._noteCache.toLoad.clear();
     network.abortMatching(id => id.startsWith('osm-data-tile') || id.startsWith('osm-note'));
+
+    // When the time is up, say so and load what's missing.
+    // (A little after, so that the limit has ended by then. A longer limit replaces the timer.)
+    const ms = (seconds * 1000) + 500;
+    if (scheduler) {
+      scheduler.setTimeout('osm-rate-limit-ended', () => this._rateLimitEnded(), { ms: ms });
+    } else {
+      if (this._rateLimitTimeout) {
+        globalThis.clearTimeout(this._rateLimitTimeout);
+      }
+      this._rateLimitTimeout = globalThis.setTimeout(() => this._rateLimitEnded(), ms);
+    }
 
     return this._rateLimit = {
       start: Math.floor(Date.now() / 1000),  // epoch seconds
@@ -1667,6 +1690,27 @@ export class OsmService extends AbstractSystem {
       remaining: seconds,
       elapsed: 0
     };
+  }
+
+
+  /**
+   * Called when a rate limit's time is up. Nothing else would notice: the tiles and notes that
+   * the API refused aren't asked for again while the view stays where it is, and the status
+   * would stay 'ratelimit' until the next periodic check.
+   * So this forgets which view was last loaded, checks the API's status again (which tells
+   * listeners that the rate limit is over), and asks for a redraw, which loads the view's data.
+   */
+  protected _rateLimitEnded(): void {
+    this._rateLimitTimeout = null;
+    if (this.getRateLimit()) return;   // a longer one replaced it meanwhile
+
+    const context = this.context;
+    const gfx = context.systems.gfx;   // optional
+
+    this._tileCache.lastv = null;
+    this._noteCache.lastv = null;
+    this.reloadApiStatus();
+    gfx?.requestFrame();   // (any frame makes the layers ask for the view's tiles)
   }
 
 
@@ -1779,7 +1823,8 @@ export class OsmService extends AbstractSystem {
         // Forget it so that errored tiles can be retried later.
         network.forget(requestID);
       } else {
-        gfx?.deferredRedraw();
+        // (The tile's entities reach the map when they're merged: `MapSystem` hears `merge`.)
+        gfx?.requestFrame();
       }
 
       if (callback) {
@@ -1949,7 +1994,7 @@ export class OsmService extends AbstractSystem {
         for (const props of (results.data ?? [])) {
           this._cacheNote(props);
         }
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('osm-notes');
       }
     };
 
@@ -1985,7 +2030,7 @@ export class OsmService extends AbstractSystem {
           reject(err);
         } else if (Array.isArray(results?.data)) {
           note = this._cacheNote(results!.data[0]);
-          gfx?.deferredRedraw();
+          gfx?.deferredRedraw('osm-notes');
           resolve(note!);
         } else {
           reject(new Error(`Note ${noteID} not found`));
@@ -2034,7 +2079,7 @@ export class OsmService extends AbstractSystem {
         // We get the updated note back, remove from caches and reparse..
         this.removeNote(note);
         note = this._cacheNote(results!.data[0]);
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('osm-notes');
         callback?.(null, note!);
         return;
       } else {
@@ -2120,7 +2165,7 @@ export class OsmService extends AbstractSystem {
         // We get the updated note back, remove from caches and reparse..
         this.removeNote(note);
         note = this._cacheNote(results!.data[0]);
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('osm-notes');
         callback?.(null, note!);
         return;
       } else {

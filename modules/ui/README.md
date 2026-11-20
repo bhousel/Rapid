@@ -110,7 +110,7 @@ The data, note, QA and detection editors are composed from smaller `…Header`, 
 
 | Folder | Description |
 |--------|-------------|
-| `cards/` | Info cards (background, history, location, measurement), extending `AbstractUiCard` |
+| `cards/` | Info cards (background, history, location, measurement, rendering), extending `AbstractUiCard` |
 | `controls/` | Map control buttons (bearing, zoom, zoom to selection, geolocate) |
 | `fields/` | Form field types (text, combo, address, etc.), extending `AbstractUiField`. `createUiField()` picks the class from the preset field's `type` |
 | `intro/` | Tutorial walkthrough: `UiIntro` orchestrator, `UiCurtain`, and chapters extending `AbstractIntroChapter` |

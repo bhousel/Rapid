@@ -18,6 +18,9 @@ describe('MapillaryService', () => {
     worker:  new Rapid.WorkerSystem(context)
   };
 
+  // A tile's photos, detections and signs are drawn by three layers, and each is asked to redraw.
+  const MAPILLARY_LAYERS = ['mapillary', 'mapillary-detections', 'mapillary-signs'];
+
   // Spy on redraws..
   const gfx = context.systems.gfx;
   const spyRedraw = mock();
@@ -169,7 +172,7 @@ describe('MapillaryService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.deepEqual(spyRedraw.mock.calls.map(args => args[0]), MAPILLARY_LAYERS, 'a redraw of its three layers, once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -187,7 +190,7 @@ describe('MapillaryService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.deepEqual(spyRedraw.mock.calls.map(args => args[0]), MAPILLARY_LAYERS, 'a redraw of its three layers, once');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
@@ -207,7 +210,7 @@ describe('MapillaryService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.deepEqual(spyRedraw.mock.calls.map(args => args[0]), MAPILLARY_LAYERS, 'a redraw of its three layers, once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -228,7 +231,7 @@ describe('MapillaryService', () => {
         assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
         assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.deepEqual(spyRedraw.mock.calls.map(args => args[0]), MAPILLARY_LAYERS, 'a redraw of its three layers, once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 

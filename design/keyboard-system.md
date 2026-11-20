@@ -221,6 +221,11 @@ The matching logic is faithfully carried over — it's correct and battle-tested
   (iD#4096).
 - **Input-field skip.** The bubble handler ignores events whose target is `INPUT`/`SELECT`/
   `TEXTAREA` (capture handlers still fire — that's how Esc-to-cancel works while typing).
+  - **Except in an empty text field, for bindings that ask** (`inEmptyFields`, Nov 2026; Bryan).
+    Undo and redo do. The sidebar puts the focus in a search field by itself (the preset list
+    after a feature is drawn, the feature list in browse mode). The preset list had a handler of
+    its own for undo from its empty field; the feature list had none, and neither had redo. While nothing is typed in the field there's
+    nothing of its own to undo; once something is, ⌘Z is the field's again.
 
 One deliberate refinement, **confirmed as desired**: today each registry iterates independently, so
 two registries *could* both fire for one event. Routing all scopes through one dispatcher keeps the

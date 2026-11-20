@@ -5,6 +5,7 @@ import { geoMetersToLon, projWgs84ToWorld, vecSubtract, WORLD_ZOOM } from '@rapi
 
 import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 
@@ -192,10 +193,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * Render any of the child containers for UI that should float over the map.
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public render(frame: number, viewport: Viewport): void {
+  public render(frame: RenderFrame, viewport: Viewport): void {
     // redraw if zoom changes - note: use true zoom here, not "effective" zoom.
     const z = viewport.transform.zoom;
     if (z !== this._oldz) {
@@ -216,10 +217,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * Render the lasso polygon
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderLasso(frame: number, viewport: Viewport): void {
+  public renderLasso(frame: RenderFrame, viewport: Viewport): void {
     if (!this._lassoDirty) return;
 
     const lasso = this.lasso;
@@ -284,10 +285,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * Render the geoloation data
-   * @param frame - Integer frame being rendered
+   * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderGeolocation(frame: number, viewport: Viewport): void {
+  public renderGeolocation(frame: RenderFrame, viewport: Viewport): void {
     if (!this._geolocationDirty) return;
 
     const container = this.geolocation;

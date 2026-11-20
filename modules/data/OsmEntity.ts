@@ -97,6 +97,13 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
     if (this.type === 'way' || this.type === 'relation') {
       throw new Error(`Read the geometry of ${this.type} ${this.id} through its graph: graph.geometry(entity)`);
     }
+    // A node's geometry is built when it's first asked for. Most nodes are never asked: they
+    // only give a way its shape, and a way builds that from its nodes' locations. (A node's
+    // `Geometry` is 1.2 KB, most of what the node takes. Code that looks at every node asks for
+    // `node.extent()`, `node.worldCoord()` or `node.loc`, which don't build it.)
+    if (!this._geoms && this.props) {
+      this._geoms = this.buildGeometry();
+    }
     return this._geoms;
   }
 
@@ -116,7 +123,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @return  The stored Geometry
    */
   public get baseGeometry(): Geometry {
-    return this._geoms;
+    return (this.type === 'node') ? this.geoms : this._geoms;
   }
 
   /**

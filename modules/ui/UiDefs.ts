@@ -117,7 +117,8 @@ export class UiDefs {
 
     // Notify Pixi about the icons so they can be used by WebGL/webGPU - see Rapid#925
     // Pixi's textureManager should be set up, throw if we're wrong about this.
-    const textureManager = this.context.systems.gfx!.textureManager;
+    const gfx = this.context.systems.gfx!;
+    const textureManager = gfx.textureManager;
     if (!textureManager) {
       throw new Error(`TextureManager not ready to pack icons for ${spritesheetID}`);
     }
@@ -128,6 +129,9 @@ export class UiDefs {
         const iconID = symbol.getAttribute('id') as string;
         textureManager.registerSvgIcon(iconID, symbol);
      });
+
+    // Features drawn before now are still waiting for these icons: have them ask again.
+    gfx.deferredRedraw();
   }
 
 }
