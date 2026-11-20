@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
 
@@ -54,6 +55,66 @@ describe('PixiFeaturePoint', () => {
     draw({ marker: { image: 'pin' } });
     assert.isTrue(icon.destroyed);
     assert.isNull(feature.icon);
+  });
+
+  // A point that labels avoid marks where it's drawn in the scene's avoid grid.
+  describe('updateAvoid', () => {
+    let grid, hits;
+
+    beforeEach(() => {
+      grid = new AvoidGrid(2);
+      hits = [];
+      const scene = feature.scene;
+      scene.avoidGrid = grid;
+      scene.labelOffset = new PIXI.Point(0, 0);
+      scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };    // where the point is on screen
+      scene.avoidHit = cells => hits.push(cells);
+      feature.labelAvoid = true;
+    });
+
+    it('marks its marker\'s box around where it is drawn', () => {
+      draw({ marker: { image: 'smallCircle' } });
+      const cells = feature.avoidCells;
+      assert.isOk(cells);
+      assert.isTrue(grid.isTaken('avoid', grid.cellsOf(499.5, 299.5, 500.5, 300.5)));    // a 1 px texture, in the middle
+      assert.isFalse(grid.isTaken('avoid', grid.cellsOf(520, 300, 522, 302)));
+    });
+
+    it('marks nothing for a point that labels do not avoid', () => {
+      feature.labelAvoid = false;
+      draw({ marker: { image: 'smallCircle' } });
+      assert.isNull(feature.avoidCells);
+      assert.strictEqual(grid.numBlocks, 0);
+    });
+
+    it('unmarks when it is hidden or destroyed, and marks again when shown', () => {
+      draw({ marker: { image: 'smallCircle' } });
+      const cells = feature.avoidCells;
+
+      feature.visible = false;
+      assert.isFalse(grid.isTaken('avoid', cells));
+      feature.visible = true;
+      assert.isTrue(grid.isTaken('avoid', cells));
+      feature.destroy();
+      assert.isFalse(grid.isTaken('avoid', cells));
+    });
+
+    it('forgets its cells when the grid was cleared, without unmarking what others marked since', () => {
+      draw({ marker: { image: 'smallCircle' } });
+      const cells = feature.avoidCells;
+      grid.clear();                               // a new zoom
+      grid.mark('avoid', cells);                  // ..and another feature is drawn there
+      assert.isNull(feature.avoidCells);
+
+      feature.visible = false;                    // must not take the other feature's mark away
+      assert.isTrue(grid.isTaken('avoid', cells));
+    });
+
+    it('tells the scene when it is drawn where a label is', () => {
+      grid.mark('label', grid.cellsOf(495, 295, 540, 305));
+      draw({ marker: { image: 'smallCircle' } });
+      assert.lengthOf(hits, 1);
+    });
   });
 
   it('shares the default style until one is assigned', () => {

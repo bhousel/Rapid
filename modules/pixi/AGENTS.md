@@ -63,6 +63,12 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
   hover or a click needs (`BufferHitArea`). Garbage is what brings the half-second collections
   (`design/graphics-system.md` section 13).
+- **A point that labels should keep clear of gets `feature.labelAvoid = true` from its layer**
+  (OSM, Rapid and custom data points do; photo and QA markers don't). It then marks where it's
+  drawn in `scene.avoidGrid` at the end of its `update()` (`updateAvoid()`), and unmarks when
+  it's hidden or destroyed. Nothing gathers avoids from containers anymore. A new kind of
+  feature that labels should avoid overrides `updateAvoid()` and calls `_setAvoid()` with its
+  box in label space (`scene.worldToLabel()`).
 - **Put an OSM feature in its tile's container with `_setTile()`**, not by setting
   `parentContainer`. After the view crosses a whole zoom level, features move to the new zoom's
   tiles a whole old tile at a time (`_retile()`), and a feature moved on its own in between

@@ -1522,6 +1522,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           let poiFeature = this.features.get(poiFeatureID) as PixiFeaturePoint | undefined;
           if (!poiFeature) {
             poiFeature = new PixiFeaturePoint(this, poiFeatureID);
+            poiFeature.labelAvoid = true;   // labels keep clear of it
             poiFeature.props.isVirtual = true;
           }
 
@@ -2036,6 +2037,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const extent = graph.geometry(node).parts[0]?.world?.extent;
         if (this._waitToMake('vertices', nodeID, extent, frame, node.isNew() || isRelated)) continue;
         feature = new PixiFeaturePoint(this, featureID);
+        feature.labelAvoid = true;   // labels keep clear of it
       }
 
       // If data has changed, replace it. (A node's geometry is its own, so a new shape is a new node.)
@@ -2137,6 +2139,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const extent = graph.geometry(node).parts[0]?.world?.extent;
         if (this._waitToMake('points', nodeID, extent, frame, node.isNew())) continue;
         feature = new PixiFeaturePoint(this, featureID);
+        feature.labelAvoid = true;   // labels keep clear of it
       }
 
       // If data has changed, replace it. (A node's geometry is its own, so a new shape is a new node.)
@@ -2300,6 +2303,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
+        feature.labelAvoid = true;   // labels keep clear of it
         feature.style = {
           marker: { color: 0xffffff, image: 'midpoint' }
         };

@@ -1,17 +1,17 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
+import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
 import { getDebugBBox, lineToPoly } from './helpers.ts';
 import { geomLineSegments } from '../geo/index.ts';
 
-import type { AbstractPixiFeature, FeatureContainer } from './AbstractPixiFeature.ts';
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { CellRect } from './lib/AvoidGrid.ts';
 import type { PixiFeatureLabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { SpatialItem } from '../core/SpatialSystem.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
@@ -62,6 +62,8 @@ interface LabelContents {
   labelID?: LabelID | null;
   objectID?: string | null;
   tint?: number;
+  /** For a label's box: the cells of the avoid grid that it marked */
+  cells?: CellRect | null;
 }
 
 /**
@@ -101,8 +103,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /** Container that holds all visible label features */
   public labelContainer: PIXI.Container | null;
 
-  /** FeatureIDs that we are avoiding (e.g. map pins, vertices, junctions) */
-  protected _avoided: Set<FeatureID>;
   /** FeatureIDs that have been labeled (points, roads, etc) - note that point features can be both avoided and labeled */
   protected _labeled: Set<FeatureID>;
 
@@ -126,8 +126,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /** Whether placing labels was put off because a frame was out of time (it waits one frame for that, not more) */
   protected _waitedForTime: boolean;
 
-  /** Tracks the difference between the top left corner of the screen and the parent "origin" container */
-  protected _labelOffset: PIXI.Point;
   /** Pixi TextStyle for normal-weight label text */
   protected _textStyleNormal: PIXI.TextStyle;
   /** Pixi TextStyle for italic label text */
@@ -147,7 +145,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelContainer = null;
 
     // Keep track of the labelable features we have processed
-    this._avoided = new Set<FeatureID>();
     this._labeled = new Set<FeatureID>();
 
     // Label placeholders — store the placement props for every possible label.
@@ -175,9 +172,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._placementWaiting = false;
     this._waitedForTime = false;
 
-    // Tracks the difference between the top left corner of the screen and the parent "origin" container
-    this._labelOffset = new PIXI.Point();
-
     // For ASCII-only labels, we can use PIXI.BitmapText to avoid generating label textures
     PIXI.BitmapFont.install({ name: 'label-normal', style: TEXTSTYLE_NORMAL });
     // PIXI.BitmapFont.install({ name: 'label-italic', style: TEXTSTYLE_ITALIC });  // not currently used
@@ -202,7 +196,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     spatial.clearCache(SPATIAL_LABELS);
     spatial.clearCache(SPATIAL_DEBUG);
-    this._avoided.clear();
+    this.scene.avoidGrid?.clearLabels();
     this._labeled.clear();
     this._placeholders.clear();
     this._debugSprites.clear();
@@ -257,7 +251,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   public resetFeature(featureID: FeatureID): void {
     const spatial = this.context.systems.spatial!;
-    this._avoided.delete(featureID);
     this._labeled.delete(featureID);
 
     const labelIDs = new Set<LabelID>();
@@ -273,6 +266,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (contents) {
         if (contents.type === 'label' || contents.type === 'avoid') {
           spatial.removeItems(SPATIAL_LABELS, boxID);
+          if (contents.cells) {
+            this.scene.avoidGrid.unmark('label', contents.cells);
+            contents.cells = null;
+          }
         }
         if (contents.type === 'debug') {
           spatial.removeItems(SPATIAL_DEBUG, boxID);
@@ -313,17 +310,20 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * The labels layer has no features of its own to draw again later. It reports 1 while placing
-   * labels is waiting for a later frame, so that the frame comes (see `render`).
+   * labels is waiting for a later frame, so that the frame comes (see `render`): placement was
+   * put off, or something was drawn over a label after this frame's placement.
    * @return 1 if placement is waiting, otherwise 0
    */
   public override get numWaiting(): number {
-    return this._placementWaiting ? 1 : 0;
+    return (this._placementWaiting || this.scene.numAvoidHits > 0) ? 1 : 0;
   }
 
 
   /**
    * Render all the labels. This is a multi-step process:
-   * - gather avoids - these are places in the scene that we don't want a label
+   * - avoids - the places where we don't want a label. The features that labels avoid mark
+   *   themselves in the scene's avoid grid as they're drawn; here we take back the labels that
+   *   one of them landed on
    * - label placement - do the math of figuring out where labels should be
    * - label rendering - show or hide labels based on their visibility
    *
@@ -385,26 +385,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const bearing = viewport.transform.rotation;
     const worldScale = origin.scale.x;
 
-    // Compute `labelOffset` — the screen-space anchor we subtract from feature positions
-    // before caching them in the rbush. The key invariant is that `labelOffset` must change
-    // by exactly the pan delta on each frame, so `featureScreen − labelOffset` is invariant
-    // under panning (and the cached rbush coords stay valid as the user pans around).
-    //
-    // `origin.toGlobal(P_local)` gives us that invariance automatically for any constant P_local
-    // (since only `origin.position` changes during pan, and it adds the same delta regardless
-    // of P_local). The naive choice P_local = (0, 0) is world-coord [0,0] — far from the
-    // viewport at high zooms, producing huge labelOffset values that cause GPU float32
-    // precision loss in MeshRope vertex math (visible as distorted rope label text).
-    //
-    // Instead, pick P_local so it maps near the viewport: subtract off the constant
-    // `(pixiT - WORLD_HALF*ws)` term that origin.position carries for world→screen scaling.
-    // The `viewport` passed in here is the pixi viewport (see GraphicsSystem._app).
-    const labelOffset = this._labelOffset;
-    const pixiT = viewport.transform.translation;
-    origin.toGlobal({
-      x: WORLD_HALF - pixiT[0] / worldScale,
-      y: WORLD_HALF - pixiT[1] / worldScale
-    }, labelOffset);
+    // Label space (the screen minus `labelOffset`) is the scene's, worked out before the layers
+    // render: see `PixiScene.updateLabelSpace`.
+    const labelOffset = this.scene.labelOffset;
 
     // Position the labels group to render in screen space.
     // `origin` now carries both the pan offset and world-scale transforms,
@@ -419,8 +402,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     labelOriginContainer.position.set(-stage.position.x + labelOffset.x, -stage.position.y + labelOffset.y);
 
     if (placeNow) {
-      // Collect features to avoid.
-      this.gatherAvoids();
+      // Take back the labels that something was drawn over.
+      this.resolveAvoidHits();
 
       // Collect features to place labels on.
       const points: PixiFeaturePoint[] = [];
@@ -601,121 +584,24 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * Gather the avoidable features, create boxes for them,
-   *  and insert them into the placement Rbush.
-   * If a new avoidance collides with an already placed label,
-   *  destroy the label and flag the feature as labeldirty for relabeling
+   * Takes back the labels that something has been drawn over since the last placement.
+   * The points and vertices that labels avoid mark themselves in the scene's avoid grid as
+   * they're drawn, and the scene notes where one landed on a label (a tile arrives, a way is
+   * selected and gets vertices). Those labels are placed again, somewhere else; no other
+   * label moves.
    */
-  public gatherAvoids(): void {
+  public resolveAvoidHits(): void {
     const spatial = this.context.systems.spatial!;
-    const showDebug = this.context.getDebug('label');
+    const size = this.scene.avoidGrid.cellSize;
 
-    // Gather the containers that have avoidable stuff on them.
-    const avoidContainers: PIXI.Container[] = [];
-
-    const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
-    const selectedContainer = mapUiLayer.selected;
-    if (selectedContainer) {
-      avoidContainers.push(selectedContainer);
-    }
-    // The points of every spatial ID (`points/osm`, `points/<dataset>`, …), see `design/scene.md`
-    const pointsContainer = this.scene.groups.get('points')!;
-    if (pointsContainer) {
-      avoidContainers.push(...this.scene.worldContainersIn(pointsContainer));
-    }
-
-    // For each container, gather the things to avoid.
-    const labelItems: LabelItem[] = [];
-    const debugItems: LabelItem[] = [];
-
-    const avoidObject = (sourceObject: FeatureContainer): void => {
-      if (!sourceObject.visible || !sourceObject.renderable) return;
-      // Not one that's still waiting to be drawn: it isn't where it will be, or as big. It's
-      // looked at again on a later placement, once it has been (it isn't remembered as avoided).
-      if (sourceObject.__feature__?.dirty) return;
-      const featureID = sourceObject.label;
-
-      if (this._avoided.has(featureID)) return;  // we've processed this avoidance already
-      this._avoided.add(featureID);
-
-      // The rectangle is in global/screen coordinates (where [0,0] is top left).
-      // To work in a coordinate system that is consistent, remove the label offset.
-      // If we didn't do this, as the user pans or rotates the map, the objects that leave
-      // and re-enter the scene would end up with different coordinates each time!
-      const fRect = sourceObject.getBounds().rectangle;
-      fRect.x -= this._labelOffset.x;
-      fRect.y -= this._labelOffset.y;
-
-      const EPSILON = 0.01;
-
-      const avoidItem: LabelItem = {
-        id: `${featureID}-avoid`,
-        contents: {
-          type: 'avoid',
-          featureID: featureID,
-          labelID: null
-        },
-        minX: fRect.x + EPSILON,
-        minY: fRect.y + EPSILON,
-        maxX: fRect.x + fRect.width - EPSILON,
-        maxY: fRect.y + fRect.height - EPSILON
-      };
-
-      this._cacheBox(avoidItem);
-      labelItems.push(avoidItem);
-
-      if (showDebug) {
-        const debugItem: LabelItem = {
-          id: avoidItem.id + '-debug',
-          contents: {
-            type: 'debug',
-            featureID: featureID,
-            tint: 0xff0000,   // red (avoid)
-            objectID: null
-          },
-          minX: avoidItem.minX,
-          minY: avoidItem.minY,
-          maxX: avoidItem.maxX,
-          maxY: avoidItem.maxY
-        };
-
-        this._cacheBox(debugItem);
-        debugItems.push(debugItem);
-      }
-
-      // If there is already a label where this avoid box is, we will need to redo that label.
-      // This is somewhat common that a label will be placed somewhere, then as more map loads,
-      // we learn that some of those junctions become important and we need to avoid them.
-      for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, avoidItem)) {
+    for (const cells of this.scene.takeAvoidHits()) {
+      const box = { minX: cells[0] * size, minY: cells[1] * size, maxX: (cells[2] + 1) * size, maxY: (cells[3] + 1) * size };
+      for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, box)) {
         const hit = item.contents as LabelContents;
-        if (hit.type === 'label' && hit.featureID) {
+        if (hit.type === 'label' && hit.labelID && hit.featureID) {
           this.resetFeature(hit.featureID);
         }
       }
-    };
-
-    // The features can be any number of containers down: a layer may sort its points into
-    // containers of its own (the OSM layer has one per map tile, each in a render group).
-    // A feature's container is the one that links back to its feature.
-    const avoidFeaturesIn = (container: PIXI.Container): void => {
-      for (const child of container.children as FeatureContainer[]) {
-        if (child.__feature__) {
-          avoidObject(child);
-        } else if (child.visible) {
-          avoidFeaturesIn(child);
-        }
-      }
-    };
-    for (const container of avoidContainers) {
-      avoidFeaturesIn(container);
-    }
-
-    // Bulk insert any items we collected..
-    if (labelItems.length) {
-      spatial.addItems(SPATIAL_LABELS, labelItems);
-    }
-    if (showDebug && debugItems.length) {
-      spatial.addItems(SPATIAL_DEBUG, debugItems);
     }
   }
 
@@ -782,7 +668,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     features.sort((a, b) => level(b) - level(a));
 
     const temp = new PIXI.Point();
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -820,7 +706,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   public labelPolygons(features: PixiFeaturePolygon[]): void {
     const temp = new PIXI.Point();
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -880,6 +766,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature) return;
 
     const spatial = this.context.systems.spatial!;
+    const grid = this.scene.avoidGrid;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
@@ -891,8 +778,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // If we didn't do this, as the user pans or rotates the map, the objects that leave
     // and re-enter the scene would end up with different coordinates each time!
     const fRect = container.getBounds().clone().pad(1, 0);
-    fRect.x -= this._labelOffset.x;
-    fRect.y -= this._labelOffset.y;
+    fRect.x -= this.scene.labelOffset.x;
+    fRect.y -= this.scene.labelOffset.y;
 
     const fLeft = fRect.x;
     const fTop = fRect.y;
@@ -967,6 +854,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       ];
     }
 
+    // A point's label goes right next to the point, and the point is something to avoid: its
+    // own cells would be in the way of every place tried. So they're set aside while its label
+    // is placed. (The points around it stay in the way.)
+    const ownCells = feature.avoidCells;
+    if (ownCells) {
+      grid.unmark('avoid', ownCells);
+    }
+
 //    let picked = null;
     for (const placementID of attempts) {
       const [x, y] = placements[placementID];
@@ -991,7 +886,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // Store the placeholder props, and insert the box into the rbush so
       // nothing else gets placed there.  The PixiFeatureLabel itself is
       // created lazily in renderObjects() the first time this label is in view.
-      if (!spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
+      // (Against the other labels, the boxes themselves are compared: there are few of them, and
+      // the grid's cells would keep two labels further apart than they need to be.)
+      const cells = grid.cellsOf(labelItem.minX, labelItem.minY, labelItem.maxX, labelItem.maxY);
+      if (cells && !grid.isTaken('avoid', cells) && !spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
 //        picked = placementID;
         const style = feature.style as any;
         const props: TextLabelProps = {
@@ -1008,6 +906,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
         this._cacheBox(labelItem);
         spatial.addItems(SPATIAL_LABELS, labelItem);
+        labelItem.contents.cells = cells;
+        grid.mark('label', cells);
 
         if (showDebug) {
           const debugItem: LabelItem = {
@@ -1031,6 +931,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
     }
 
+    if (ownCells) {
+      grid.mark('avoid', ownCells);
+    }
+
 //    if (!picked) {
 //      labelObj.destroy();  // didn't place it
 //    }
@@ -1050,6 +954,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const spatial = this.context.systems.spatial!;
+    const grid = this.scene.avoidGrid;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
 
@@ -1098,6 +1003,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       currChain = [];   // reset chain
     };
 
+
+    // Whether a box is clear of everything labels avoid (by the grid), and of the other labels
+    // (by their boxes: there are few of them, and cells would keep labels further apart).
+    const isFree = (item: LabelItem): boolean => {
+      const cells = grid.cellsOf(item.minX, item.minY, item.maxX, item.maxY);
+      return !!cells && !grid.isTaken('avoid', cells) && !spatial.hasItemsAtBox(SPATIAL_LABELS, item);
+    };
 
     // Walk the line, creating chains of bounding boxes,
     // and testing for candidate chains where labels can go.
@@ -1148,7 +1060,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           finishChain();
           debugItem.contents.tint = 0xff33ff;  // magenta (too bendy)
 
-        } else if (spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
+        } else if (!isFree(labelItem)) {
           finishChain();
           debugItem.contents.tint = 0xff0000;  // red (collision)
 
@@ -1188,6 +1100,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         ropeCoords.push(chain[i].coord);
         const labelItem = chain[i].labelItem;
         labelItem.contents.labelID = labelID;
+        const cells = grid.cellsOf(labelItem.minX, labelItem.minY, labelItem.maxX, labelItem.maxY);
+        if (cells) {
+          labelItem.contents.cells = cells;
+          grid.mark('label', cells);
+        }
         this._cacheBox(labelItem);
         labelItems.push(labelItem);
       }
@@ -1253,7 +1170,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
       minY: screen.y - labelOffset.y,
@@ -1312,7 +1229,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const spatial = this.context.systems.spatial!;
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
       minY: screen.y - labelOffset.y,

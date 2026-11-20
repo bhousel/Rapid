@@ -304,39 +304,46 @@ test('follows a zoom without a pass, and ends up with what a full pass shows', a
 });
 
 
-// Labels are placed around the points and vertices: each of those gets a box that labels avoid.
-// (The boxes were made for whole map tiles of points for a while, wherever those were at the time.)
-test('gives every point in view a box for labels to avoid, and puts no label over a point', async ({ page, consoleErrors }) => {
+// Labels are placed around the points and vertices: each of those marks where it's drawn in the
+// scene's avoid grid, and no label goes there (see `design/graphics-system.md`, section 14).
+// (For a while the avoids were made for whole map tiles of points, wherever those were at the time.)
+test('marks every point in view for labels to avoid, and puts no label over a point', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
 
   const check = () => page.evaluate(() => {
     const { gfx, spatial } = rapidContext.systems;
-    const labels = gfx.scene.layers.get('labels');
-    const offset = labels._labelOffset;
+    const scene = gfx.scene;
+    const grid = scene.avoidGrid;
+    const offset = scene.labelOffset;
     const screen = gfx.pixi.screen;
 
-    const avoided = new Set();
-    let placed = 0;
-    for (const item of spatial.getCache('labels').rbush.all()) {
-      if (item.contents.type === 'avoid') avoided.add(item.contents.featureID);
-      else if (item.contents.labelID) placed++;
-    }
-
-    const result = { points: 0, withoutBox: [], underALabel: [], labelBoxes: placed };
-    for (const feature of gfx.scene.layers.get('osm').features.values()) {
+    const labelBoxes = spatial.getCache('labels').rbush.all().filter(item => item.contents.labelID).length;
+    const result = { points: 0, notMarked: [], markedElsewhere: [], underALabel: [], labelBoxes: labelBoxes };
+    for (const feature of scene.layers.get('osm').features.values()) {
       if (feature.type !== 'Point' || !feature.visible || feature.dirty) continue;
       const rect = feature.container.getBounds().rectangle;
       if (rect.x + rect.width < 0 || rect.y + rect.height < 0 || rect.x > screen.width || rect.y > screen.height) continue;
       result.points++;
-      if (!avoided.has(feature.id)) result.withoutBox.push(feature.id);
 
+      // where it's drawn, a pixel in from each edge
       const x = rect.x - offset.x;
       const y = rect.y - offset.y;
-      const inside = { minX: x + 2, minY: y + 2, maxX: x + rect.width - 2, maxY: y + rect.height - 2 };
-      const over = spatial.getItemsAtBox('labels', inside).some(item => item.contents.labelID && item.contents.featureID !== feature.id);
-      if (over) result.underALabel.push(feature.id);
+      const drawn = grid.cellsOf(x + 1, y + 1, x + rect.width - 1, y + rect.height - 1);
+      const marked = feature.avoidCells;
+      if (!marked) {
+        result.notMarked.push(feature.id);
+      } else if (!feature.viewfields && (marked[0] > drawn[0] || marked[1] > drawn[1] || marked[2] < drawn[2] || marked[3] < drawn[3])) {
+        result.markedElsewhere.push(feature.id);     // (hidden viewfields count in `getBounds`, and aren't marked)
+      }
+      if (marked && grid.isTaken('label', marked)) {
+        // a point's own label may touch it; another feature's may not cover it
+        const box = { minX: x + 2, minY: y + 2, maxX: x + rect.width - 2, maxY: y + rect.height - 2 };
+        if (spatial.getItemsAtBox('labels', box).some(item => item.contents.labelID && item.contents.featureID !== feature.id)) {
+          result.underALabel.push(feature.id);
+        }
+      }
     }
     return result;
   });
@@ -344,7 +351,8 @@ test('gives every point in view a box for labels to avoid, and puts no label ove
   const loaded = await check();
   expect(loaded.points).toBeGreaterThan(20);
   expect(loaded.labelBoxes).toBeGreaterThan(0);
-  expect(loaded.withoutBox).toEqual([]);
+  expect(loaded.notMarked).toEqual([]);
+  expect(loaded.markedElsewhere).toEqual([]);
   expect(loaded.underALabel).toEqual([]);
 
   // ..and after a pan, with the points that came into view
@@ -358,8 +366,24 @@ test('gives every point in view a box for labels to avoid, and puts no label ove
   await waitForIdle(page);
   const panned = await check();
   expect(panned.points).toBeGreaterThan(5);
-  expect(panned.withoutBox).toEqual([]);
+  expect(panned.notMarked).toEqual([]);
+  expect(panned.markedElsewhere).toEqual([]);
   expect(panned.underALabel).toEqual([]);
+
+  // ..and in a view that's zoomed in and turned: label space is another one, and everything is marked again
+  await page.evaluate(() => {
+    const { gfx } = rapidContext.systems;
+    const viewport = rapidContext.viewport;
+    const t = viewport.transform.props;
+    const c = viewport.center();
+    return gfx.setTransformAsync({ x: c[0] + (t.x - c[0]) * 2, y: c[1] + (t.y - c[1]) * 2, z: t.z + 1, r: 0.6 }, 0);
+  });
+  await waitForIdle(page);
+  const turned = await check();
+  expect(turned.points).toBeGreaterThan(5);
+  expect(turned.notMarked).toEqual([]);
+  expect(turned.markedElsewhere).toEqual([]);
+  expect(turned.underALabel).toEqual([]);
 
   expect(consoleErrors).toEqual([]);
 });

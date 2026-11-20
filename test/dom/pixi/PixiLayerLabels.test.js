@@ -1,21 +1,26 @@
 import * as PIXI from 'pixi.js';
+import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
 import { PixiLayerLabels } from '../../../modules/pixi/PixiLayerLabels.ts';
 
 
+// Labels are placed around the points and vertices. Those mark themselves in the scene's avoid
+// grid as they're drawn (see `AbstractPixiFeature.updateAvoid`), and the labels layer places
+// against the grid.
 describe('PixiLayerLabels', () => {
-  let layer, spatial, points;
+  let layer, spatial, grid, hits;
 
-  // A stand-in for a point feature's container, 10 px wide at [x, y], linked back to its feature
-  function addPoint(parent, id, x, y, dirty = false) {
-    const container = new PIXI.Container();
-    container.label = id;
-    container.__feature__ = { id: id, dirty: dirty };
-    container.getBounds = () => ({ rectangle: new PIXI.Rectangle(x, y, 10, 10) });
-    parent.addChild(container);
-    return container;
+  // A stand-in for a point feature drawn 10 px wide at [x, y] of label space
+  function pointAt(id, x, y, avoided = true) {
+    const cells = avoided ? grid.cellsOf(x, y, x + 10, y + 10) : null;
+    if (cells) grid.mark('avoid', cells);
+    return {
+      id: id, type: 'Point', style: {}, avoidCells: cells,
+      container: { visible: true, renderable: true, getBounds: () => new PIXI.Bounds(x, y, x + 10, y + 10) }
+    };
   }
 
-  const avoidIDs = () => spatial.getCache('labels').rbush.all().filter(item => item.contents.type === 'avoid').map(item => item.contents.featureID).sort();
+  const labelBoxes = () => spatial.getCache('labels').rbush.all().filter(item => item.contents.labelID);
+  const MEASURE = { str: 'Cafe', style: 'normal', width: 40, height: 14 };
 
   beforeEach(() => {
     const context = new Rapid.MockContext();
@@ -23,14 +28,17 @@ describe('PixiLayerLabels', () => {
     context.systems.spatial = spatial;
     context.getDebug = () => false;
 
-    points = new PIXI.Container();     // `points/osm`: what a layer puts its points in
+    grid = new AvoidGrid(2);
+    hits = [];
     const scene = {
       context: context,
       gfx: {},
-      layers: new Map([['map-ui', { selected: new PIXI.Container() }]]),
-      groups: new Map([['points', new PIXI.Container()]]),
-      worldContainersIn: () => [points]
+      avoidGrid: grid,
+      labelOffset: new PIXI.Point(0, 0),
+      takeAvoidHits: () => hits.splice(0),
+      numAvoidHits: 0
     };
+
     // (The constructor installs a bitmap font, which needs a canvas that draws text.)
     const install = PIXI.BitmapFont.install;
     PIXI.BitmapFont.install = () => {};
@@ -41,63 +49,76 @@ describe('PixiLayerLabels', () => {
     }
   });
 
-  // Labels are placed around the points and vertices, so each of those gets a box to avoid.
-  describe('gatherAvoids', () => {
-    it('makes a box for each point, where the point is', () => {
-      addPoint(points, 'osm-n1', 100, 50);
-      layer.gatherAvoids();
-      assert.deepEqual(avoidIDs(), ['osm-n1']);
-      assert.lengthOf(spatial.getItemsAtBox('labels', { minX: 102, minY: 52, maxX: 104, maxY: 54 }), 1);
-      assert.lengthOf(spatial.getItemsAtBox('labels', { minX: 200, minY: 52, maxX: 204, maxY: 54 }), 0);
+  describe('placeTextLabel', () => {
+    it('places a point\'s label next to the point, though the point itself is something to avoid', () => {
+      const point = pointAt('osm-n1', 100, 100);
+      layer.placeTextLabel(point, MEASURE);
+
+      const [box] = labelBoxes();
+      assert.isOk(box);
+      assert.closeTo(box.minX, 111, 1.5);                 // to the right of it
+      assert.isTrue(grid.isTaken('label', box.contents.cells));
+      assert.isTrue(grid.isTaken('avoid', point.avoidCells));    // and the point is marked again
     });
 
-    it('finds the points in a layer\'s own containers, however deep', () => {
-      // The OSM layer has a container per map tile, each inside a render group
-      const group = new PIXI.Container({ isRenderGroup: true });
-      const tile = new PIXI.Container();
-      group.label = tile.label = '0,0,16';
-      group.addChild(tile);
-      points.addChild(group);
-      addPoint(tile, 'osm-n1', 100, 50);
-      addPoint(tile, 'osm-n2', 300, 50);
-      addPoint(points, 'osm-n3', 500, 50);
+    it('keeps the label off the other points around it', () => {
+      const point = pointAt('osm-n1', 100, 100);
+      pointAt('osm-n2', 120, 95);                         // where the label would go: to the right
+      layer.placeTextLabel(point, MEASURE);
 
-      layer.gatherAvoids();
-      assert.deepEqual(avoidIDs(), ['osm-n1', 'osm-n2', 'osm-n3']);     // not one box for the tile
+      const [box] = labelBoxes();
+      assert.isOk(box);
+      assert.isFalse(grid.isTaken('avoid', box.contents.cells));
+      assert.isFalse(box.minX > 110 && box.minY < 106 && box.maxY > 94 && box.minX < 131);   // not over n2
     });
 
-    it('leaves a point that is waiting to be drawn for later, and takes it once it is drawn', () => {
-      const waiting = addPoint(points, 'osm-n1', 0, 0, true);    // not where it will be yet
-      addPoint(points, 'osm-n2', 300, 50);
-      layer.gatherAvoids();
-      assert.deepEqual(avoidIDs(), ['osm-n2']);
-
-      waiting.__feature__.dirty = false;
-      waiting.getBounds = () => ({ rectangle: new PIXI.Rectangle(100, 50, 10, 10) });
-      layer.gatherAvoids();
-      assert.deepEqual(avoidIDs(), ['osm-n1', 'osm-n2']);
-      assert.lengthOf(spatial.getItemsAtBox('labels', { minX: 102, minY: 52, maxX: 104, maxY: 54 }), 1);
+    it('places no label where every place around the point is taken', () => {
+      const point = pointAt('osm-n1', 100, 100);
+      grid.mark('avoid', grid.cellsOf(0, 0, 300, 98));
+      grid.mark('avoid', grid.cellsOf(0, 112, 300, 300));
+      grid.mark('avoid', grid.cellsOf(0, 0, 98, 300));
+      grid.mark('avoid', grid.cellsOf(112, 0, 300, 300));
+      layer.placeTextLabel(point, MEASURE);
+      assert.lengthOf(labelBoxes(), 0);
     });
 
-    it('skips what is hidden, and everything in a hidden container', () => {
-      const hidden = new PIXI.Container();
-      hidden.visible = false;
-      points.addChild(hidden);
-      addPoint(hidden, 'osm-n1', 100, 50);
-      addPoint(points, 'osm-n2', 300, 50).visible = false;
-      layer.gatherAvoids();
-      assert.deepEqual(avoidIDs(), []);
+    it('keeps two labels off each other', () => {
+      layer.placeTextLabel(pointAt('osm-n1', 100, 100, false), MEASURE);
+      layer.placeTextLabel(pointAt('osm-n2', 100, 104, false), MEASURE);
+      const [a, b] = labelBoxes();
+      assert.isOk(b);
+      const overlap = a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+      assert.isFalse(overlap);
     });
+  });
 
-    it('takes back a label that a new point lands on', () => {
-      spatial.addItems('labels', { id: 'osm-w1-0-0', contents: { type: 'label', featureID: 'osm-w1', labelID: 'osm-w1-rope-0' }, minX: 95, minY: 45, maxX: 115, maxY: 65 });
-      layer._labeled.add('osm-w1');
-      layer._featureBoxes.set('osm-w1', new Set(['osm-w1-0-0']));
-      addPoint(points, 'osm-n1', 100, 50);
+  describe('resetFeature', () => {
+    it('frees the cells that the feature\'s label had marked', () => {
+      const point = pointAt('osm-n1', 100, 100, false);
+      layer._labeled.add('osm-n1');
+      layer.placeTextLabel(point, MEASURE);
+      const cells = labelBoxes()[0].contents.cells;
 
-      layer.gatherAvoids();
-      assert.isFalse(layer._labeled.has('osm-w1'));     // to be labeled again, somewhere else
-      assert.isFalse(spatial.hasItem('labels', 'osm-w1-0-0'));
+      layer.resetFeature('osm-n1');
+      assert.lengthOf(labelBoxes(), 0);
+      assert.isFalse(grid.isTaken('label', cells));
+      assert.isFalse(layer._labeled.has('osm-n1'));       // to be labeled again
+    });
+  });
+
+  // A tile arrives, or a way is selected and gets vertices: something is drawn where a label is.
+  describe('resolveAvoidHits', () => {
+    it('takes back the label that something was drawn over, and no other', () => {
+      layer.placeTextLabel(pointAt('osm-n1', 100, 100, false), MEASURE);
+      layer.placeTextLabel(pointAt('osm-n2', 100, 300, false), MEASURE);
+      layer._labeled.add('osm-n1').add('osm-n2');
+      const [first] = labelBoxes().filter(item => item.contents.featureID === 'osm-n1');
+
+      hits.push(grid.cellsOf(first.minX + 4, first.minY + 2, first.minX + 12, first.maxY - 2));   // a pin lands on it
+      layer.resolveAvoidHits();
+      assert.deepEqual(labelBoxes().map(item => item.contents.featureID), ['osm-n2']);
+      assert.isFalse(layer._labeled.has('osm-n1'));
+      assert.isTrue(layer._labeled.has('osm-n2'));
     });
   });
 });

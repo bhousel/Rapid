@@ -3,6 +3,7 @@ import { PixiLayerKeepRight } from '../../../modules/pixi/PixiLayerKeepRight.ts'
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
 import { PixiLayerRapid } from '../../../modules/pixi/PixiLayerRapid.ts';
+import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
 
@@ -237,6 +238,72 @@ describe('PixiScene', () => {
   });
 
 
+  // Label space is the screen minus an offset that moves with the map, so a pan changes nothing
+  // in it. The scene works it out once a frame, and owns the grid of what labels avoid.
+  describe('label space', () => {
+    function makeScene() {
+      const stage = new PIXI.Container();
+      const origin = new PIXI.Container();
+      stage.addChild(origin);
+      const scene = Object.create(PixiScene.prototype);
+      scene.gfx = { origin: origin };
+      scene.layers = new Map();
+      scene.labelOffset = new PIXI.Point();
+      scene._toScreen = new PIXI.Matrix();
+      scene._avoidHits = [];
+      scene.avoidGrid = new AvoidGrid(2);
+      return { scene, stage, origin };
+    }
+    const viewportAt = (x, y) => ({ transform: { translation: [x, y] } });
+
+    it('gives a world coordinate the same label coordinates however the map is panned', () => {
+      const { scene, origin } = makeScene();
+      origin.scale.set(2, 2);
+      origin.position.set(-1000, -500);
+      scene.updateLabelSpace(viewportAt(300, 200));
+      const before = scene.worldToLabel(600, 400, [0, 0]).slice();
+
+      origin.position.set(-1000 + 37, -500 - 12);       // a pan moves `origin`, and nothing else
+      scene.updateLabelSpace(viewportAt(300, 200));
+      const after = scene.worldToLabel(600, 400, [0, 0]);
+      assert.closeTo(after[0], before[0], 1e-6);
+      assert.closeTo(after[1], before[1], 1e-6);
+    });
+
+    it('puts two world coordinates as far apart as they are on screen, also when the map is turned', () => {
+      const { scene, stage, origin } = makeScene();
+      origin.scale.set(2, 2);
+      stage.rotation = Math.PI / 2;
+      scene.updateLabelSpace(viewportAt(0, 0));
+      const a = scene.worldToLabel(100, 100, [0, 0]).slice();
+      const b = scene.worldToLabel(110, 100, [0, 0]);     // 10 world units east, 20 px on screen
+      assert.closeTo(b[0] - a[0], 0, 1e-6);               // which is down, a quarter turn on
+      assert.closeTo(b[1] - a[1], 20, 1e-6);
+    });
+
+    it('empties the avoid grid for a new zoom or rotation', () => {
+      const { scene } = makeScene();
+      const cells = scene.avoidGrid.cellsOf(0, 0, 10, 10);
+      scene.avoidGrid.mark('avoid', cells);
+      scene.avoidHit(cells);
+      const generation = scene.avoidGrid.generation;
+
+      scene.dirtyTransform();
+      assert.isFalse(scene.avoidGrid.isTaken('avoid', cells));
+      assert.isAbove(scene.avoidGrid.generation, generation);
+      assert.strictEqual(scene.numAvoidHits, 0);
+    });
+
+    it('hands over where something was drawn over a label, once', () => {
+      const { scene } = makeScene();
+      scene.avoidHit([1, 2, 3, 4]);
+      assert.strictEqual(scene.numAvoidHits, 1);
+      assert.deepEqual(scene.takeAvoidHits(), [[1, 2, 3, 4]]);
+      assert.deepEqual(scene.takeAvoidHits(), []);
+    });
+  });
+
+
   describe('render', () => {
     it('renders and culls each layer with the frame, and records its stats on the frame', () => {
       const calls = [];
@@ -253,6 +320,7 @@ describe('PixiScene', () => {
         takeWork: () => ({ created: 1, destroyed: 0, updated: 2, shown: 0, hidden: 0, steps: { gather: 0.5 } })
       });
       const scene = {
+        updateLabelSpace: () => {},
         layers: new Map([
           ['osm', makeLayer('osm', true, [true, true, false], true)],
           ['keepright', makeLayer('keepright', false, [false], false)]
@@ -297,6 +365,7 @@ describe('PixiScene', () => {
       };
 
       const scene = {
+        updateLabelSpace: () => {},
         layers: new Map([
           ['osm', makeLayer('osm', 40, 100, 60)],
           ['rapid', makeLayer('rapid', 0, 0, 0)],

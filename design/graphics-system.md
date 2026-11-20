@@ -1756,8 +1756,8 @@ no more than two loads of one build differ from each other (dashes start at anot
 
 ## 14. Label placement (a plan)
 
-Written Nov 20, after `pixi-8.23` merged. Nothing here is built yet, except the fix in "What
-happened". The order of the steps is at the end.
+Written Nov 20, after `pixi-8.23` merged. Steps 1 to 4 and 7 are built (see "Order of work",
+at the end, and "What was built"); 5 and 6 aren't.
 
 ### Words used here
 
@@ -1874,23 +1874,61 @@ does it ask the index which label is there, and put that feature back on the lis
 
 The last row is the price: labels come in over a few frames, where they came all at once.
 
+### What was built (Nov 20: steps 2, 3, 4 and 7)
+
+`AvoidGrid` (`modules/pixi/lib`), `PixiScene.avoidGrid`, `updateLabelSpace()`, `worldToLabel()`
+and `avoidHit()`, `AbstractPixiFeature.labelAvoid` and `updateAvoid()`, and
+`PixiLayerLabels.resolveAvoidHits()`. `gatherAvoids()` and its boxes are gone. What turned out
+differently from the plan above:
+
+- **Cells are 2 px.** Labels placed after a load in downtown Seattle, where a box for each pin
+  gave 232: 208 with cells of 2 px, 219 with 1 px (four times the blocks and the writes).
+  Užice: 117 against 119.
+- **A point's own cells are set aside while its label is placed.** Its label goes right next
+  to it, and with cells every place tried touched the point's own mark: 104 labels in Seattle
+  before this.
+- **Labels are compared with each other by their boxes, as before,** in the spatial index,
+  which holds only labels now (435 boxes in Užice, where it held 53,723). Cells kept two
+  labels further apart than they need to be. Labels mark the grid too, but only so that a
+  point can tell cheaply that it's being drawn over one.
+- **The transform has to be this frame's.** `origin.getGlobalTransform(m, true)` returns the
+  one cached at the last render: marks were off by one step of a pan.
+- **A frame is asked for when a point lands on a label** after the frame's placement
+  (`numWaiting`), or the label would stay there until something else drew a frame.
+- **The label debug view (`context.setDebug('label')`) no longer shows the avoids in red.**
+  There are no boxes to show. Drawing the grid's taken cells would bring it back.
+
+| Užice, z16 | Boxes | Grid |
+|---|---|---|
+| The frame that places everything after a zoom | 104 to 132 ms | 28 to 30 ms |
+| The longest labels frame of a load | 122 to 130 ms | 39 to 44 ms |
+| A frame of a pan (median) | 4.9 to 6.3 ms | 1.1 to 1.4 ms |
+| Boxes in the labels' index | 53,723 | 435 |
+
+Checked in Užice after a load, a zoom in to where viewfields are drawn, two rotations, a zoom
+back out and pans: every drawn point in view is marked where it's drawn, and none is under
+another feature's label. The e2e test does the same on the small map, turned and zoomed too.
+
+What's left of the cost is steps 5 and 6: the two walks over every feature (the 1.1 to 1.4 ms),
+and placing everything in one frame (the 28 to 44 ms).
+
 ### Order of work
 
 Each step is measured with the label check (every point in view avoided, no point under a
 label) and against the table above, and can ship on its own.
 
 1. **The fix** (done on this branch): `gatherAvoids()` finds features, skips undrawn ones.
-2. **The avoid grid, by itself:** a class with `mark`, `unmark`, `isFree` and `clear`, and unit
+2. **(Done.) The avoid grid, by itself:** a class with `mark`, `unmark`, `isFree` and `clear`, and unit
    tests. No Pixi in it.
-3. **The scene owns the label space and the grid.** The offset that `PixiLayerLabels` works out
+3. **(Done.) The scene owns the label space and the grid.** The offset that `PixiLayerLabels` works out
    each frame moves to the scene, with the transform from world coordinates.
-4. **Points mark themselves; `gatherAvoids()` and its boxes go.** Placement asks the grid.
+4. **(Done.) Points mark themselves; `gatherAvoids()` and its boxes go.** Placement asks the grid.
    Compare the labels placed before and after at the test places: they'll differ a little
    (cells are coarser than boxes), and that needs a look, not just a count.
 5. **`scene.featureChanged()` replaces the walks.** A class change reaches the label as a
    new tint and doesn't place it again.
 6. **Placement in parts,** with the gate.
-7. **Labels mark their cells; a pin on a label takes it away** (rule 3). Until this step the
+7. **(Done, with step 4.) Labels mark their cells; a pin on a label takes it away** (rule 3). Until this step the
    index is asked for every new pin, as today. Only the label that's hit moves.
 
 ### Decided (Bryan, Nov 20)
@@ -1921,8 +1959,9 @@ label) and against the table above, and can ship on its own.
   fit around point labels. Across batches a line's label can be there first. Today has the
   same thing between tiles that arrive. If it shows, a point's label could take a line's
   label away, as a pin does.
-- **Cell size.** 4 px costs more cells and wastes less room around a pin than 8 px. To be
-  measured in step 4, by how many labels are placed.
+- **Cell size.** Measured: 2 px (see "What was built"). Seattle still places a tenth fewer
+  labels than with boxes, and 1 px only gets half of that back, so part of it isn't the cells.
+  Not found what.
 - **Between frames?** Placement touches no GL, so it could be a scheduler task and not the
   tail of APP. The tail of APP is simpler and has the frame's deadline; revisit if labels
   hold frames back.
