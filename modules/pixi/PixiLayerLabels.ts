@@ -366,9 +366,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (placeNow) {
       this._waitedForTime = false;
       if (!didReset) {
-        for (const [featureID, feature] of this.scene.features) {
+        // (Over the values: `for (const [id, feature] of map)` makes an array for every entry,
+        // and this walks every feature in the scene on every frame.)
+        for (const feature of this.scene.features.values()) {
           if ((feature as any)._labelDirty) {       // reset only the changed labels
-            this.resetFeature(featureID);
+            this.resetFeature(feature.id);
             (feature as any)._labelDirty = false;
           }
         }
@@ -424,10 +426,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const points: PixiFeaturePoint[] = [];
       const lines: PixiFeatureLine[] = [];
       const polygons: PixiFeaturePolygon[] = [];
-      for (const [featureID, feature] of this.scene.features) {
+      for (const feature of this.scene.features.values()) {
         // If the feature can be labeled, and hasn't yet been, add it to the list for placement.
         // (Not one that's still waiting to be drawn: it's labeled once it has its shape.)
-        if (feature.label && feature.visible && !feature.dirty && !this._labeled.has(featureID)) {
+        if (feature.label && feature.visible && !feature.dirty && !this._labeled.has(feature.id)) {
           if (feature.type === 'Point') {
             points.push(feature as PixiFeaturePoint);
           } else if (feature.type === 'LineString') {

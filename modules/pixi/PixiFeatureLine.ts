@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { BufferHitArea } from './lib/BufferHitArea.ts';
 import { geomLineSegments } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
@@ -35,7 +35,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   public stroke: PIXI.Graphics | null;
 
   /** Buffer polygon data for hit testing and halo */
-  protected _bufferdata: LineToPolyResult | null;
+  protected _hitBuffer: BufferHitArea | null;
 
 
   /**
@@ -45,7 +45,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
-    this._bufferdata = null;
+    this._hitBuffer = null;
 
     const casing = new PIXI.Graphics();
     casing.label = 'casing';
@@ -77,7 +77,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.stroke = null;
     }
 
-    this._bufferdata = null;
+    this._hitBuffer = null;
 
     super.destroy();
   }
@@ -150,7 +150,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         lineMarkers.sortableChildren = false;
         container.addChild(lineMarkers);
       }
-      lineMarkers.removeChildren();
+      for (const sprite of lineMarkers.removeChildren()) {
+        sprite.destroy();
+      }
 
       // Show line markers (e.g. oneway arrows)
       if (lineMarkerTextureID) {
@@ -219,10 +221,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         cap: 'butt',
         join: 'bevel'
       };
-      this._bufferdata = lineToPoly(flat[0], bufferStyle);
-      container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
+      // (Worked out when the pointer comes near, or for a halo: see `BufferHitArea`)
+      this._hitBuffer = new BufferHitArea(flat[0], bufferStyle, local!.extent);
+      container.hitArea = this._hitBuffer;
     } else {
-      this._bufferdata = null;
+      this._hitBuffer = null;
       container.hitArea = null;
     }
 
@@ -335,7 +338,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
+   * Show/Hide halo (expects `this._hitBuffer` to be already set up by `update()`)
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateHalo(viewport: Viewport): void {
@@ -363,7 +366,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     // Select
-    if (showSelect && this._bufferdata) {
+    if (showSelect && this._hitBuffer) {
       const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
       const haloParent = mapui.halo;
       if (!haloParent) return;
@@ -396,11 +399,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       (this.halo as PIXI.Graphics).clear();
 
       const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-      if (this._bufferdata.outer && this._bufferdata.inner) {   // closed line
-        dl.poly(this._bufferdata.outer);
-        dl.poly(this._bufferdata.inner);
+      const buffer = this._hitBuffer.buffer;
+      if (buffer.outer && buffer.inner) {   // closed line
+        dl.poly(buffer.outer);
+        dl.poly(buffer.inner);
       } else {   // unclosed line
-        dl.poly(this._bufferdata.perimeter);
+        dl.poly(buffer.perimeter);
       }
 
     } else {

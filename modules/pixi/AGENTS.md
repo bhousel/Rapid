@@ -48,6 +48,19 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **For data that arrived, `scene.dataArrived('osm', ids)` and `gfx.requestFrame()`.**
   `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
   A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
+- **Destroy the Pixi objects you replace.** `removeChildren()` and assigning a new
+  `mesh.geometry` leave the old ones alive: Pixi keeps what it built for them until they're
+  destroyed, or until its own collector finds them unused a minute later. After a zoom that
+  was 550 MB. (`for (const child of parent.removeChildren()) child.destroy();`, and
+  `geometry.destroy(true)`: a `Mesh` doesn't destroy its geometry either.)
+- **In a loop over every feature, don't make an object per feature.** Iterate
+  `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
+  hover or a click needs (`BufferHitArea`). Garbage is what brings the half-second collections
+  (`design/graphics-system.md` section 13).
+- **Put an OSM feature in its tile's container with `_setTile()`**, not by setting
+  `parentContainer`. After the view crosses a whole zoom level, features move to the new zoom's
+  tiles a whole old tile at a time (`_retile()`), and a feature moved on its own in between
+  makes Pixi rebuild both tiles.
 - **The OSM layer's pass doesn't see every vertex.** It leaves out the ones that only shape
   their way (`OsmNode.vertexKind()`), and adds the ones related to what's selected or hovered
   afterwards (`_addRelatedVertices()`). Something new that should draw such a vertex has to say

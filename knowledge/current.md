@@ -120,8 +120,23 @@ Still to do, in about this order:
   zoom level it moves every feature to its new tile container at once (`_placeAgain()`). The
   frame of a zoom in Užice went from 210 to 230 ms of APP to 66 to 83, and the longest animation
   frame of a jump from 200 to 50 to 67. Everything is drawn again 0.1 to 0.3 s later.
-  Next: the frame that crosses a whole zoom level (250 to 420 ms, a rebuild of every tile
-  container), following the box itself (45 to 80 ms in Užice), what's left of the pass for a filter or a
+  **Crossing a whole zoom level, a tile at a time** (Nov 19, same section):
+  the features move to the new zoom's tile containers a whole old tile at a time, over the
+  frames after the zoom (`_findOldTiles()`, `_retile()`, `_setTile()`). The frame that crosses a
+  level costs 80 to 140 ms where it cost 250 to 420. Following the box skips the lookups for
+  features that are still in it (10 ms of a zoom frame, was 30). Traced: the frames of 250 to
+  710 ms that are left during zooms are major garbage collections, half a second each.
+  **Garbage** (Nov 19, `graphics-system.md` section 13): a major collection
+  is 400 to 650 ms of marking on the main thread, and a page can't schedule it, only make less
+  garbage and keep less alive. Pixi kept everything a polygon had drawn in the last minute
+  (strokes removed but not destroyed, mask geometries replaced), and polygons kept geometry
+  they didn't show: the heap went from 2.27 GB to 3 after some zooms, and stays at 2.35 now.
+  `BufferHitArea` works out a line's hit buffer only when the pointer is near (19% of what a
+  zoom allocated). Sixteen zooms: 3 major collections where there were 6.
+  Next: what's left of the garbage (Pixi's line builder with round joins is a quarter of it;
+  `syncShader`), the 2.2 GB alive (a node is 1.3 KB), labels placed in one
+  frame (50 ms, half of it `getBounds()` for every point), following the box by the spatial
+  index, what's left of the pass for a filter or a
   change of style (71 ms of looking at each feature), the other layers, merging a tile (80 to 134 ms on the main thread, the
   longest stall of a pan), and the heap (2.1 GB live in Užice: the rare long frames come with a
   major garbage collection).

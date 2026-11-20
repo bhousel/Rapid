@@ -261,7 +261,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       // if # of viewfields has changed, or if the texture name has changed, recreate them
       const vfImage = style.viewfield.image;
       if (this._viewfieldCount !== vfAngles.length || this._viewfieldName !== vfImage) {
-        this.viewfields.removeChildren();
+        for (const sprite of this.viewfields.removeChildren()) {
+          sprite.destroy();
+        }
 
         for (const _a of vfAngles) {
           const vfSprite = new PIXI.Sprite(vfTexture);

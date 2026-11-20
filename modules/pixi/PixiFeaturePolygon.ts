@@ -2,12 +2,11 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { lineToPoly } from './helpers.ts';
+import { BufferHitArea } from './lib/BufferHitArea.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
-import type { LineToPolyResult } from './helpers.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -43,7 +42,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public debugSurround?: PIXI.Graphics | null;
 
   /** Buffer polygon data for hit testing and halo */
-  protected _bufferdata: LineToPolyResult | null;
+  protected _hitBuffer: BufferHitArea | null;
+  /** Whether `fill` and `mask` hold geometry from the last time they were drawn */
+  protected _hasFill: boolean;
 
 
   /**
@@ -53,7 +54,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
-    this._bufferdata = null;
+    this._hitBuffer = null;
+    this._hasFill = false;
 
     const lowRes = new PIXI.Sprite();
     lowRes.label = 'lowRes';
@@ -116,6 +118,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.fill = null;
     }
     if (this.mask) {
+      this.mask.geometry?.destroy(true);   // (the mesh doesn't destroy its geometry)
       this.mask.destroy();
       this.mask = null;
     }
@@ -132,7 +135,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.debugSurround = null;
     }
 
-    this._bufferdata = null;
+    this._hitBuffer = null;
 
     super.destroy();
   }
@@ -285,8 +288,21 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     // Redraw the shapes
 
+    // What isn't shown at this level of detail holds no geometry. (A polygon that was drawn in
+    // full at a higher zoom kept all of it while it showed a `lowRes` sprite, or nothing.)
+    if (!fill.visible && this._hasFill) {
+      fill.clear();
+      fill.mask = null;
+      this._setMaskGeometry(new PIXI.MeshGeometry({}));
+      this._hasFill = false;
+    }
+
     // STROKES
-    strokes.removeChildren();
+    // (Destroyed, not only removed: Pixi keeps what it built for a `Graphics` until it's
+    // destroyed, or until its own collector finds it unused a minute later.)
+    for (const stroke of strokes.removeChildren()) {
+      stroke.destroy();
+    }
     if (strokes.visible) {
       strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
@@ -325,12 +341,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
           stroke.poly(ring).stroke(strokeStyle);
         }
 
-        const buffer = lineToPoly(ring, bufferStyle);
+        // (Worked out when the pointer comes near, or for a halo: see `BufferHitArea`)
+        const hitBuffer = new BufferHitArea(ring, bufferStyle, local.extent);
         if (i === 0) {
-          this._bufferdata = buffer;  // save outer buffer for the hover halo.
+          this._hitBuffer = hitBuffer;  // save outer buffer for the hover halo.
         }
 
-        stroke.hitArea = new PIXI.Polygon(buffer.perimeter);
+        stroke.hitArea = hitBuffer;
         stroke.label = `stroke${i}`;
         stroke.sortableChildren = false;
         strokes.addChild(stroke);
@@ -349,6 +366,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         textureSpace: 'global'
       };
 
+      this._hasFill = true;
       fill.clear();
       for (let i = 0; i < flat.length; i++) {
         fill.poly(flat[i]);
@@ -401,11 +419,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
         PIXI.buildContextBatches(graphicsContext, gpuContext);
 
-        mask.geometry = new PIXI.MeshGeometry({
+        this._setMaskGeometry(new PIXI.MeshGeometry({
           indices: new Uint32Array(gpuContext.geometryData.indices),
           positions: new Float32Array(gpuContext.geometryData.vertices),
           uvs: new Float32Array(gpuContext.geometryData.uvs)
-        });
+        }));
+        maskSource.clear();   // it was only the source of that geometry
 
         mask.visible = true;
         fill.mask = mask;
@@ -426,6 +445,19 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._geomDirty = false;
     this._styleDirty = false;
     this.updateHalo(viewport);
+  }
+
+
+  /**
+   * Gives the mask a new geometry, and destroys the one it had.
+   * (Pixi keeps a replaced geometry's buffers until its own collector finds them unused.)
+   * @param geometry - The new geometry
+   */
+  protected _setMaskGeometry(geometry: PIXI.MeshGeometry): void {
+    const mask = this.mask!;
+    const old = mask.geometry;
+    mask.geometry = geometry;
+    old?.destroy(true);
   }
 
 
@@ -461,7 +493,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // Select
-    if (showSelect && this._bufferdata) {
+    if (showSelect && this._hitBuffer) {
       const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
       const haloParent = mapui.halo;
       if (!haloParent) return;
@@ -494,11 +526,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       (this.halo as PIXI.Graphics).clear();
 
       const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-      if (this._bufferdata.outer) {
-        dl.poly(this._bufferdata.outer);
+      const buffer = this._hitBuffer.buffer;
+      if (buffer.outer) {
+        dl.poly(buffer.outer);
       }
-      if (wireframeMode && this._bufferdata.inner) {
-        dl.poly(this._bufferdata.inner);
+      if (wireframeMode && buffer.inner) {
+        dl.poly(buffer.inner);
       }
 
     } else {

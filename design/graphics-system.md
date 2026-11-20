@@ -1494,26 +1494,52 @@ feature was put in line to be drawn again and placed in its tile's container.
   the pass's work for a zoom (a place in line to be drawn, a line's details for the new zoom),
   spread over the frames that draw the features again anyway. The features that hid themselves
   for being too small at the old zoom are included.
-- **Crossing a whole zoom level moves every feature to another tile's container.** Done a
-  batch at a time, Pixi rebuilt the containers on both ends on every frame (40 to 100 ms of
-  DRAW each, for 30 frames). So on that frame `_placeAgain()` moves all of them at once, which
-  is one rebuild, as the pass did it.
+- **Crossing a whole zoom level moves every feature to another tile's container**, a whole old
+  tile at a time (`_retile()`). Three ways were tried in Užice:
+  - *As each feature is drawn again:* Pixi rebuilds the containers at both ends on every frame,
+    40 to 100 ms of DRAW each, for 30 frames.
+  - *All at once on the frame of the zoom:* 100 ms of APP to move them and 150 ms of DRAW for
+    one rebuild of everything. That frame was 250 to 420 ms.
+  - *A whole old tile at a time:* the old container is emptied in one go and removed, and the
+    new ones are rebuilt once, or a few times. `_findOldTiles()` lists the containers of the
+    other zoom on the frame of the zoom, in view first, and each frame takes at least four, and
+    more when it has time left after drawing. Meanwhile a feature that's drawn again stays in
+    its old tile (`_setTile()`), and old and new tiles are drawn side by side. The features that
+    are bigger than a tile at one of the two zooms only move at once (`_placeLarge()`), so that
+    the `large` containers are rebuilt once. That frame is 80 to 140 ms.
+- **Following the box looks nothing up for a feature whose own shape is still in the box**
+  (most of them). That took the `box` step of a zoom frame from 30 to 35 ms to about 10 at
+  z16, and it's the step that decides how often a zoom gets a real frame (below).
 - **What's related is worked out again** on that frame: which vertices and midpoints are
   shown depends on the zoom.
 
 | Užice, from the tape (two runs each) | Before | After |
 |---|---|---|
-| Jump of half a level: the zoom frame, APP + DRAW | 210 + 16, 227 + 21 | 66 to 83 + 9 to 26 |
-| ..longest animation frame | 200, 217 ms | 50 to 67 ms |
-| ..until everything is drawn again | 1.3, 1.4 s | 1.5 s |
-| Eased zoom of a whole level, in: longest animation frame | 450 ms | 250, 300 ms |
-| ..out | 283 ms | 150, 167 ms |
-| Wheel-like zoom (60 steps of 0.02): zoom frames, median APP | 226, 231 ms | 46 to 75 ms |
-| ..frames drawn while it zooms | 5 | 6, 7 |
+| Jump of half a level: the zoom frame, APP + DRAW | 210 + 16, 227 + 21 | 56 to 65 + 9 to 21 |
+| ..longest animation frame | 200, 217 ms | 50 ms (one run: 483, a garbage collection) |
+| ..until everything is drawn again | 1.3, 1.4 s | 1.5 s (one run: 1.9) |
+| Eased zoom of a whole level, in: the costliest zoom frame, APP + DRAW | 499 ms | 118, 142 ms |
+| ..out | 445 ms | 80, 82 ms |
+| ..until everything is drawn again, in / out | 2.1 / 1.6 s | 2.5 / 2.1 to 2.2 s |
+| Wheel-like zoom (60 steps of 0.02): zoom frames, median APP | 226, 231 ms | 34 to 50 ms |
+| ..the costliest zoom frame | 466 to 492 ms | 79 to 114 ms |
+| ..frames drawn while it zooms | 5 | 7, 8 |
 
-Everything is drawn again 0.1 to 0.3 s later than before: the pass's work is still done, in
-smaller pieces between the drawing. The frame that crosses a whole level is still the long
-one (250 to 420 ms with its DRAW), for the rebuild of every tile's container.
+Everything is drawn again 0.1 to 0.5 s later than before: the pass's work and the move
+between tiles are still done, in smaller pieces between and after the drawing.
+
+**What's still long during a zoom isn't the zoom.** Across sixteen zooms, the frames that cost
+more than 150 ms were not zoom frames. They were six frames of 250 to 710 ms, and a trace
+shows 230 to 650 ms of garbage collection on the main thread inside each (see "Seen on the
+way"). That's where the animation frames of 450 ms in some runs come from.
+
+**A zoom gets a real frame every 110 to 250 ms**, and the CSS transform scales the last one in
+between. `FramePacer` waits twice what a zoom frame cost before the next, as for any frame
+with layer work, and a zoom frame costs 55 to 100 ms. Before, it was every 450 ms or more.
+
+**Labels are still placed in one frame**, after the features in view are drawn: 37 to 55 ms
+in Užice. About half is `gatherAvoids()` asking Pixi for the bounds of every point
+(`getBounds()`), a quarter placing the points' labels. They're gone from the zoom until then.
 
 **Checked against a full pass**, in Užice: after jumps and eased zooms in and out across a
 whole level, rotations, a wheel-like zoom with a road selected, and a pan followed by a zoom,
@@ -1539,9 +1565,10 @@ And the pass itself, for when it's needed. In Užice it's 134 ms with nothing to
   their ways.
 - **`entity.geometry(graph)` twice** for what's left (once to filter, once to classify), and a
   `Map` entry per entity to sort them: 30 ms.
-- **Following the box costs 45 to 80 ms in Užice** (the `box` step), most of it a walk over
-  every feature to see whether its entity is still in the box. That's the frame of a zoom or of
-  a pan that leaves the box now.
+- **Following the box is a walk over every feature** (the `box` step: about 10 ms at z16 in
+  Užice when nothing has left, 40 to 60 with what a zoom adds to it: every entity that stays is
+  remembered as having arrived). Asking the spatial index for what the box left behind would
+  make it cost what moved, not what's there.
 
 ### Seen on the way
 
@@ -1552,6 +1579,14 @@ And the pass itself, for when it's needed. In Užice it's 134 ms with nothing to
   134 ms for each of the dense tiles (10,000 to 15,000 entities), on the main thread and outside
   any frame: 0.9 s of a 5 s pan, and its longest gaps (159 ms twice). The gaps of 400 to 700 ms
   that some runs still show aren't frames or merges; garbage collection is the guess.
+- **A major garbage collection stops the page for half a second** (Nov 19, traced during
+  zooms; section 13 has what was done about it). In 55 s of zooming in Užice there were six, and each long frame that wasn't a zoom
+  frame had one inside it: 230 to 650 ms of collection work on the main thread, in frames of
+  250 to 710 ms. (The trace's `MajorGC` event is only the last 35 to 50 ms of it; the rest is
+  in the `V8.GC_…` events around it, which the first look below didn't count.) Minor
+  collections took another 2.5 s of the 55, a few ms at a time. Drawing every feature again
+  makes a lot of garbage, and the live heap is 2.1 GB. Both are worth going after: fewer
+  objects made per feature drawn, and a smaller heap.
 - **The rare long frame of a selection or a hover comes with a major garbage collection**
   (Bryan's guess, then traced). Now and then one takes 140 to 430 ms without a pass, one to
   three in 64 changes of mode. It isn't the selection: the same one takes 8 to 40 ms the next
@@ -1567,3 +1602,88 @@ And the pass itself, for when it's needed. In Užice it's 134 ms with nothing to
   (`Graph._markTopologyChanged()`). After loading Užice that's 1,438 entities nobody edited,
   whose memoized answers (`geometry()`, `vertexKind()`) are worked out on every call. Small
   today; it grows with the data that's loaded.
+
+## 13. Garbage collection
+
+Looked at Nov 19, in Užice. Once a zoom no longer did a pass, the long frames left were
+collections: every frame over 150 ms in sixteen zooms that wasn't a zoom frame had one inside it.
+
+### What a collection costs, and when it comes
+
+- **A major collection takes 400 to 650 ms of the main thread**, nearly all of it marking
+  (`V8.GC_MC_INCREMENTAL`): 390 ms with 2.2 GB alive, 540 to 610 with 3.2 GB. V8 does the
+  marking in steps of up to 5 ms, between other work when it can. But it starts when the heap
+  has grown by about a gigabyte, and while a zoom is being drawn the page allocates so fast
+  that the steps have to run back to back to finish in time. Then they land in one or two
+  frames, which take half a second.
+- **A page can't ask for a collection, or put one off.** There's no API for it. V8 collects
+  in idle time by itself when the page lets the main thread rest. What a page decides is how
+  much garbage it makes (how often a collection comes, and how hurried it is) and how much is
+  alive (how long the marking takes).
+- **Minor collections** take 4% of the time while zooming (1.8 to 2.5 s in 46 to 55 s), a few
+  ms each.
+
+### What was alive: 2.27 GB after a load, and 3 GB after some zooms
+
+Sampled from the start of a load (`HeapProfiler.startSampling`), then asked what's still alive:
+
+| After the load | MB | |
+|---|---|---|
+| OSM data, as merged | 764 | 301,243 entities, 2.5 KB each. A node is 1.3 KB: its `GeometryPart` keeps the location three times (original, world, local), each with an `Extent` |
+| The OSM layer's features | 800 | 106,762 features, 7.5 KB each. Pixi's `Container` objects alone are 285 MB: a point is three of them (container, marker, icon) |
+| What Pixi built to draw them | 230 | instructions, batches, buffers |
+| The rest | 470 | presets, the spatial indexes, imagery, strings |
+
+**After sixteen zooms it was 2.96 GB, and 3.06 after sixteen more.** Two things:
+
+- **Pixi keeps what it built for an object until the object is destroyed**, or until its own
+  collector finds it unused a minute later (`gcMaxUnusedTime`). `PixiFeaturePolygon` made new
+  stroke `Graphics` on every redraw and only removed the old ones (`removeChildren()`), and
+  replaced its mask's geometry without destroying the old one. Line markers and viewfields were
+  removed the same way. So everything drawn in the last minute stayed alive: 550 MB after
+  those zooms (the heap fell to 2.5 GB after 100 idle seconds). Now each is destroyed where
+  it's replaced.
+- **A polygon kept its full geometry while it showed a `lowRes` sprite, or nothing.** Zoom in
+  and out once, and every building had a fill, a mask and strokes it didn't show: 240 MB.
+  Now `update()` clears what the level of detail doesn't show.
+
+After the same zooms the heap is now 2.34 GB, and 2.37 after sixteen more. That's also the
+distance from the limit (4.4 GB), where the tab crashed once.
+
+### What was allocated: 350 MB a second while zooming
+
+Sampled with what was collected included (18.1 GB in 51 s). The biggest, and what was done:
+
+| | Share | |
+|---|---|---|
+| Pixi building lines and polygons in DRAW (`buildContextBatches`) | 34% | Left. `buildLine` and its `round` joins and caps are most of it: a quarter of everything allocated is line vertices |
+| `lineToPoly()`: the buffer around every line and ring, for its hit area and halo | 19% | **Gone.** `BufferHitArea` keeps what's needed to work it out, and does so when the pointer is inside the line's box, or for a halo |
+| The labels layer's two walks over every feature, on every frame | 6 to 8% | **Gone.** `for (const [id, feature] of map)` made an array per entry |
+| Pixi's `syncShader` (the `unsafe-eval` polyfill Rapid needs for its CSP) | 5% | Left. A `for…in` over the shader's groups on every draw call; it's Pixi's code |
+| Tile containers: a label string and a tile for every feature drawn | 4% | Left |
+
+| Sixteen zooms in Užice | Before | After |
+|---|---|---|
+| Allocated | 18.1 GB | 13.7 GB |
+| Major collections | 6 in 55 s | 3 in 46 s |
+| ..main thread in each | 530 to 650 ms | 420 to 480 ms |
+| Minor collections | 2.5 s | 1.8 s |
+| Heap after them, collected | 2.96 GB | 2.34 GB |
+
+So the half-second stalls are half as frequent and a quarter shorter. They're still there.
+
+### What's left
+
+- **A major collection every 12 s of zooming.** Each zoom replaces what Pixi built for every
+  feature, and what's replaced has lived long enough to be in the old generation: a gigabyte
+  of it every two or three zooms. Less per feature would mean fewer collections (the line
+  builder of section 4 would say how many vertices a line needs; round joins on a line 2 px
+  wide make most of them).
+- **2.2 GB alive.** Marking takes the time it takes because of it. The data is the place to
+  look first: a node that's only a vertex doesn't need three copies of its location. Then the
+  features: an icon sprite for the points that have no icon.
+- **V8 marks in idle time when there is any.** After a load the scheduler's queues keep every
+  tick busy for another 25 s (`backlog.md`). Whether that keeps collections from happening at
+  the quiet moments wasn't measured.
+- `design/profiling.md` has the plan for a profile of the heap by kind of object, which this
+  section didn't do (a snapshot of 2 GB is a risk to the tab).
