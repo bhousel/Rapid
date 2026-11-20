@@ -315,7 +315,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     // (note: in pixi v8 they now do, but they don't yet respect the `alignment` property)
     // So we'll create the mask graphic and then copy its attributes into a mesh
     // which _does_ hit test properly.
-    const mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({}) });
+    const maskGeometry = new PIXI.MeshGeometry({});
+    maskGeometry.batchMode = 'batch';   // see `_setMaskGeometry()`
+    const mask = new PIXI.Mesh({ geometry: maskGeometry });
     mask.label = 'mask';
     mask.eventMode = 'static';
     mask.visible = false;
@@ -381,6 +383,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const maskSource = this.maskSource!;
     const strokes = this.strokes!;
 
+    // The mask is visible only while it masks a visible fill. Pixi still updates a visible mask
+    // that nothing draws, at its place in an old batch, over other features (pixijs#12388).
     fill.visible = !isWireframe;
     mask.visible = !isWireframe;
     strokes.visible = true;
@@ -533,11 +537,17 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   /**
    * Gives the mask a new geometry, and destroys the one it had.
    * (Pixi keeps a replaced geometry's buffers until its own collector finds them unused.)
+   * The mask is always batched, whatever its size (Rapid#1636, pixijs#12437). In Pixi's `'auto'`
+   * mode a mesh is batched only up to 100 vertices, and one that crosses that line in a frame where
+   * its render group is rebuilt throws in `MeshPipe.updateRenderable` on a later frame, or stops
+   * following its parent. (Measured: always batching costs no more than `'auto'`; never batching
+   * costs ~1 ms of DRAW a frame in Seattle.)
    * @param geometry - The new geometry
    */
   protected _setMaskGeometry(geometry: PIXI.MeshGeometry): void {
     const mask = this.mask!;
     const old = mask.geometry;
+    geometry.batchMode = 'batch';
     mask.geometry = geometry;
     old?.destroy(true);
   }

@@ -661,6 +661,122 @@ test('draws a point again when its icon arrives, without another pass', async ({
 });
 
 
+// Rapid#1636, pixijs#12437: in Pixi's 'auto' batch mode, a mesh of 100 vertices or fewer is
+// batched. A partial fill's mask that crosses that line in a frame where its tile's render group is
+// rebuilt made Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`),
+// until something rebuilt it. The masks are always batched now, so crossing the line changes nothing.
+test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx } = rapidContext.systems;
+    const scene = gfx.scene;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const drawFrame = async () => {
+      gfx.requestFrame();
+      await nextFrame();
+      await nextFrame();
+    };
+    // A mask geometry of n vertices, as `_drawShapes()` makes one (with uvs)
+    const strip = n => {
+      const positions = new Float32Array(n * 2);
+      const indices = [];
+      for (let i = 0; i < n; i++) {
+        positions[i * 2] = (i >> 1) * 4;
+        positions[i * 2 + 1] = (i & 1) * 4;
+      }
+      for (let i = 0; i + 2 < n; i++) indices.push(i, i + 1, i + 2);
+      return new PIXI.MeshGeometry({ positions, uvs: new Float32Array(n * 2), indices: new Uint32Array(indices) });
+    };
+
+    const layer = scene.layers.get('osm');
+    const feature = [...layer.features.values()].find(feature => feature.visible && feature.mask?.visible);
+    if (!feature) return { found: false };
+
+    const mask = feature.mask;
+    const tile = feature.container.parent;
+    const batched = [];
+
+    // A mask of 200 vertices (more than Pixi batches in 'auto' mode), that Pixi has never batched,
+    // like one first drawn zoomed in. (A mask that was batched once keeps its old place in a batch,
+    // and Pixi writes it there instead of throwing.)
+    mask.unload();
+    feature._setMaskGeometry(strip(200));
+    await drawFrame();
+    batched.push(mask.batched);
+
+    // In one frame: the tile's render group is rebuilt (a child added), and the mask gets 50 vertices
+    const child = new PIXI.Container();
+    tile.addChild(child);
+    feature._setMaskGeometry(strip(50));
+    await drawFrame();
+    batched.push(mask.batched);
+
+    // Then frames that move the tile, without a rebuild: the anchor moves its container
+    const [x, y] = scene.anchor;
+    scene.setAnchor([x + 256, y]);
+    await drawFrame();
+    scene.setAnchor([x, y]);
+    await drawFrame();
+
+    tile.removeChild(child);
+    child.destroy();
+    feature.dirty = true;   // draw its real mask again
+    gfx.immediateRedraw();
+    return { found: true, batched: batched };
+  });
+
+  expect(result.found).toBe(true);
+  expect(result.batched).toEqual([true, true]);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
+// pixijs#12295, #12388: a stencil mask that's still visible when nothing draws it (its fill hidden,
+// or no longer masked) keeps its place from an earlier batch, and Pixi writes it there when an
+// ancestor moves, over other features' vertices. So a mask is visible only while its fill is.
+test('shows a partial fill\'s mask only with its fill, in every area fill mode', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+
+    const counts = {};
+    for (const mode of ['partial', 'full', 'wireframe', 'partial']) {
+      map.areaFillMode = mode;
+      await nextFrame();
+      while (gfx.pending) {
+        await nextFrame();
+      }
+      const polygons = [...layer.features.values()].filter(feature => feature.visible && feature.mask);
+      counts[mode] = {
+        masks: polygons.filter(feature => feature.mask.visible).length,
+        alone: polygons.filter(feature => feature.mask.visible && !(feature.fill.visible && feature.fill.mask === feature.mask)).length
+      };
+    }
+    return counts;
+  });
+
+  expect(result.partial.masks).toBeGreaterThan(0);
+  expect(result.full.masks).toBe(0);
+  expect(result.wireframe.masks).toBe(0);
+  for (const mode of ['partial', 'full', 'wireframe']) {
+    expect(result[mode].alone).toBe(0);
+  }
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
 test('counts WebGL calls while detailed stats are on', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);

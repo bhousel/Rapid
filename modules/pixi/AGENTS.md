@@ -96,6 +96,11 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **Check work done without a pass against a pass.** After it, `gfx.immediateRedraw()` should
   change nothing that's shown: `osmSceneState()` in `test/e2e/fixtures.js` describes what's
   shown, for comparing before and after.
+- **A `Mesh` whose geometry you replace needs a fixed `geometry.batchMode`** (`'batch'` or
+  `'no-batch'`). In `'auto'` mode Pixi batches a mesh up to 100 vertices, and a mesh that crosses
+  that line in a frame where its render group is rebuilt crashes Pixi on a later frame (Rapid#1636,
+  pixijs#12437).
+  The polygon masks are always batched (`PixiFeaturePolygon._setMaskGeometry()`).
 - **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
 - **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
   minimap, `autoStart: false`, the renderer choice from the url).
