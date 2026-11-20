@@ -175,7 +175,9 @@ One `polygons` group can be huge (11,763 at Staten Island), so `PixiLayerOsm` sp
 into a container per map tile (`_polygonTileContainer()`), each with its own render group. The tiles
 are one zoom level past the view's zoom, rounded down, so a tile is 128 to 256 pixels wide on screen
 and about 110 are in view. A polygon goes in the tile its extent's center is in, and moves to
-another when the zoom changes. A tile's container is removed when it empties.
+another when the view crosses a whole zoom level: a whole old tile at a time, over the frames
+after the zoom (`_retile()`; "A zoom without a pass" in `graphics-system.md`). A tile's container
+is removed when it empties.
 
 **Draw order between tiles isn't kept.** Polygons used to be sorted by area across the whole view,
 small over big. Now:

@@ -219,6 +219,111 @@ describe('PixiLayerOsm', () => {
       assert.isBelow(west.parent.zIndex, north.parent.zIndex);    // side by side: the same order on every load
     });
 
+    // When the view crosses a whole zoom level, every feature belongs in another tile's container.
+    // They move a whole old tile at a time, over several frames.
+    describe('after a whole zoom level', () => {
+      let frame;
+
+      // A stand-in feature in a tile's container (tiles of 256 at zoom 16, of 128 at 17)
+      function addFeature(id, container, min, max = min) {
+        const feature = { id: id, geometry: part(min, max), container: new PIXI.Container(), visible: true, style: {} };
+        feature.container.label = id;
+        Object.defineProperty(feature, 'parentContainer', {
+          get: () => feature.container.parent,
+          set: parent => { parent.addChild(feature.container); }
+        });
+        container.addChild(feature.container);
+        layer.features.set(id, feature);
+        return feature;
+      }
+
+      beforeEach(() => {
+        frame = new RenderFrame(1, 17.2);
+        frame.viewBox = new Rapid.sdk.Extent([0, 0], [200, 200]);
+        frame.deadline = Infinity;
+        layer._tileFloor = 16;
+      });
+
+      it('lists the tiles of another zoom, the ones in view first', () => {
+        const far = layer._lineTileContainer(level, -9, part([900, 900], [910, 910]), 16);
+        const near = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+        const points = layer._pointTileContainer(pointAt(10, 10), false, 16);
+        layer._lineTileContainer(level, -9, part([0, 0], [600, 20]), 16);   // large: not a tile
+        layer._pointTileContainer(pointAt(10, 10), true, 16);               // viewfields: not a tile
+
+        layer._tileFloor = 17;
+        layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 17);   // of the new zoom already
+        layer._findOldTiles(frame);
+        assert.sameMembers([...layer._oldTiles], [near, points, far]);
+        assert.strictEqual([...layer._oldTiles].at(-1), far);
+        assert.strictEqual(layer.numWaiting, 3);     // so more frames follow
+      });
+
+      it('moves a whole tile at a time to the new zoom\'s tiles, and removes the old one', () => {
+        const old = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+        const a = addFeature('a', old, [10, 10], [20, 20]);
+        const b = addFeature('b', old, [200, 200], [210, 210]);
+        const c = addFeature('c', old, [0, 100], [250, 110]);    // bigger than a tile of the new zoom
+
+        layer._tileFloor = 17;
+        layer._findOldTiles(frame);
+        layer._retile(frame);
+        assert.strictEqual(a.container.parent.label, '-9/0,0,17');
+        assert.strictEqual(b.container.parent.label, '-9/1,1,17');
+        assert.strictEqual(c.container.parent.label, '-9/large');
+        assert.strictEqual(a.container.parent.parent.parent, level);
+        assert.isTrue(old.destroyed);
+        assert.strictEqual(layer._oldTiles.size, 0);
+        assert.isAbove(frame.drawDebt, 0);           // Pixi rebuilds what changed, and that counts
+      });
+
+      it('takes a few tiles in a frame with no time, and the rest in later frames', () => {
+        for (let i = 0; i < 10; i++) {
+          const old = layer._pointTileContainer(pointAt(i * 256 + 10, 10), false, 16);
+          addFeature(`n${i}`, old, [i * 256 + 10, 10]);
+        }
+        layer._tileFloor = 17;
+        layer._findOldTiles(frame);
+
+        frame.deadline = -Infinity;
+        layer._retile(frame);
+        assert.strictEqual(layer._oldTiles.size, 6);
+        layer._retile(frame);
+        layer._retile(frame);
+        assert.strictEqual(layer._oldTiles.size, 0);
+        assert.strictEqual(layer.features.get('n9').container.parent.label, '18,0,17');
+      });
+
+      it('leaves a feature in a tile that is about to move, when it is drawn again', () => {
+        const old = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+        const a = addFeature('a', old, [10, 10], [20, 20]);
+        layer._tileFloor = 17;
+        layer._findOldTiles(frame);
+
+        layer._setTile(a, layer._lineTileContainer(level, -9, a.geometry, 17));
+        assert.strictEqual(a.container.parent, old);         // its whole tile moves soon
+
+        layer._setTile(a, layer._lineTileContainer(level, -8, a.geometry, 17));
+        assert.strictEqual(a.container.parent.label, '-8/0,0,17');   // another road class: that can't wait
+      });
+
+      it('moves a feature at once when it is bigger than a tile at one zoom only', () => {
+        const old = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16);
+        const small = addFeature('small', old, [10, 10], [20, 20]);
+        const big = addFeature('big', old, [0, 100], [250, 110]);
+
+        layer._tileFloor = 17;
+        layer._placeLarge(small);
+        layer._placeLarge(big);
+        assert.strictEqual(small.container.parent, old);
+        assert.strictEqual(big.container.parent.label, '-9/large');
+
+        layer._tileFloor = 16;
+        layer._placeLarge(big);
+        assert.strictEqual(big.container.parent.label, '-9/0,0,16');
+      });
+    });
+
     it('puts a point with viewfields above every tile', () => {
       const south = layer._pointTileContainer(pointAt(10, 100000), false, 16);
       const withViewfields = layer._pointTileContainer(pointAt(10, 10), true, 16);
@@ -990,22 +1095,17 @@ describe('PixiLayerOsm', () => {
           assert.isFalse(layer.keptFeatures(frame));
         });
 
-        it('moves every feature to its new tile at once when the view crosses a whole zoom level', () => {
+        it('lists the tiles of the old zoom when the view crosses a whole zoom level', () => {
           addEntity('n70', 'point', BOTH);
-          addEntity('n71', 'point', BOTH);
-          const a = addFeature('n70');
-          const b = addFeature('n71');
-          b.visible = false;
-          for (const feature of [a, b]) feature.dirtyTransform = () => {};
-          const placed = [];
-          layer._placeAgain = (feature, zoomFloor) => placed.push(`${feature.id} ${zoomFloor}`);
+          addFeature('n70').dirtyTransform = () => {};
+          let listed = 0;
+          layer._findOldTiles = () => listed++;
           layer._tileFloor = 17;
 
           layer.dirtyTransform();
           layer.render(frame, viewport);          // still zoom 17
-          assert.deepEqual(placed, []);
+          assert.strictEqual(listed, 0);
 
-          b.visible = false;
           const next = new RenderFrame(2, 18.2);
           next.cullBox = new Rapid.sdk.Extent([65, 5], [150, 95]);
           next.viewBox = next.cullBox;
@@ -1013,7 +1113,8 @@ describe('PixiLayerOsm', () => {
           next.deadline = -Infinity;
           layer.dirtyTransform();
           layer.render(next, { transform: { zoom: 18.2 } });
-          assert.deepEqual(placed, ['osm-n70 18']);   // (a hidden one is placed when it's drawn again)
+          assert.strictEqual(listed, 1);
+          assert.strictEqual(layer._tileFloor, 18);
         });
       });
 

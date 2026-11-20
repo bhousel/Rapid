@@ -87,6 +87,29 @@ const KIND_GEOMETRY: Record<OsmDataKind, GeometryType> = {
   vertices: 'vertex'
 };
 
+/** What's known about a tile container (see `PixiLayerOsm._tileContainer`, `_retile`) */
+interface TilePlace {
+  /** The container it was made under: the polygons, the points, or a level of lines */
+  parent: PIXI.Container;
+  /** Its label there */
+  label: string;
+  /** For lines, the road class (z-index) */
+  lineClass?: number;
+  /** The tile `[x, y]` and its zoom, or nothing for a container that isn't one tile (`large`, `viewfields`) */
+  tile?: Vec2;
+  tileZoom?: number;
+}
+
+/**
+ * After the view crosses a whole zoom level, the layer moves its features to the new zoom's tile
+ * containers a few tiles at a time (see `_retile`). At least this many old containers are emptied
+ * on every frame, and more while the frame has time.
+ */
+const MIN_RETILE = 4;
+
+/** What moving a feature to another tile container costs the DRAW pass, which rebuilds both (ms) */
+const RETILE_DRAW_MS = 0.002;
+
 /**
  * The zoom (the map's effective zoom) from which the vertices worth showing by themselves are drawn:
  * the tagged ones, and where ways end or intersect (see `OsmNode.vertexKind`).
@@ -264,10 +287,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _showsVertices: boolean;
   /** Whether the features were marked to be drawn again for a new zoom or rotation (see `dirtyTransform`) */
   protected _zoomed: boolean;
-  /** The whole zoom level that the features' tile containers are for (see `_placeAgain`) */
+  /** The whole zoom level that the features' tile containers are for (see `_retile`) */
   protected _tileFloor: number;
-  /** What each tile container was made under, and for lines their road class (see `_placeAgain`) */
-  protected _tilePlace: WeakMap<PIXI.Container, { parent: PIXI.Container, lineClass?: number }>;
+  /** What each tile container is */
+  protected _tilePlace: WeakMap<PIXI.Container, TilePlace>;
+  /** The tile containers of another zoom whose features are still to move, in the order to take them */
+  protected _oldTiles: Set<PIXI.Container>;
 
 
   /**
@@ -298,7 +323,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._showsVertices = false;
     this._zoomed = false;
     this._tileFloor = 0;
-    this._tilePlace = new WeakMap<PIXI.Container, { parent: PIXI.Container, lineClass?: number }>();
+    this._tilePlace = new WeakMap<PIXI.Container, TilePlace>();
+    this._oldTiles = new Set<PIXI.Container>();
   }
 
 
@@ -346,6 +372,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     super.reset();
 
     this._tileContainers.clear();
+    this._oldTiles.clear();
     this._midpoints.clear();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
@@ -431,7 +458,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     }
 
     // A pass sees every entity again, and says which ones wait this time.
-    this._tileFloor = Math.floor(viewZoom);
+    // (After a whole zoom level, the features move to other tiles over the next frames: `_retile`.)
+    if (this._tileFloor !== Math.floor(viewZoom)) {
+      this._tileFloor = Math.floor(viewZoom);
+      this._findOldTiles(frame);
+    }
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
     this._arrivedIDs.clear();
@@ -588,19 +619,27 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     super.continueWaiting(frame, viewport, outside);
 
-    if (!this._countUnmade(this._unmadeOutside) && !this._countUnmade(this._unmadeInView)) return;
+    if (this._countUnmade(this._unmadeOutside) || this._countUnmade(this._unmadeInView)) {
+      this._catchingUp = true;
+      this._madeCount = 0;
+      this._makeWaiting(frame, viewport, false);
 
-    this._catchingUp = true;
-    this._madeCount = 0;
-    this._makeWaiting(frame, viewport, false);
-
-    // ..and with time to spare (or nothing else to do), the ones outside the view
-    if (outside && (frame.hasTime() || !this._countUnmade(this._unmadeInView))) {
-      this._makingOutside = true;
-      this._makeWaiting(frame, viewport, true);
-      this._makingOutside = false;
+      // ..and with time to spare (or nothing else to do), the ones outside the view
+      if (outside && (frame.hasTime() || !this._countUnmade(this._unmadeInView))) {
+        this._makingOutside = true;
+        this._makeWaiting(frame, viewport, true);
+        this._makingOutside = false;
+      }
+      this._catchingUp = false;
     }
-    this._catchingUp = false;
+
+    // Last, the tiles of another zoom: nobody sees which container a feature is in.
+    // (A few on every frame, and the rest once the drawing is done.)
+    if (this._oldTiles.size) {
+      const t0 = performance.now();
+      this._retile(frame);
+      this._endStep('retile', t0);
+    }
   }
 
 
@@ -1093,7 +1132,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // Left behind: the features of entities that the new box doesn't reach.
     // (By the entity's whole shape, as a pass gathers it, not by the feature's own part of it.)
     const zoomFloor = Math.floor(frame.zoom);
-    const placeAgain = (zoomFloor !== this._tileFloor);
+    const crossed = (zoomFloor !== this._tileFloor);
     this._tileFloor = zoomFloor;
 
     const left = new Map<DataID, boolean>();
@@ -1103,6 +1142,24 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // (After a zoom the hidden ones count too: a feature hides itself at a zoom where it's
       // too small to see, and may be big enough now.)
       if (!feature.visible && !zoomed) continue;
+
+      // Most features are still in the box, and their own shape says so: then their entity's is
+      // too, and there's nothing to look up. (Not a midpoint: those go with their ways.)
+      const own = feature.geometry?.world?.extent;
+      if (own?.intersects(box)) {
+        if (zoomed) {
+          const data = feature.data;
+          const type = data?.type;
+          if (type === 'node' || type === 'way' || type === 'relation') {
+            (own.intersects(frame.viewBox) ? inView : outside).push(data!.dataID);
+          }
+        }
+        if (crossed) {
+          this._placeLarge(feature);
+        }
+        continue;
+      }
+
       const dataID = this._featureHasData.get(feature.id);
       if (!dataID) continue;
 
@@ -1120,8 +1177,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.visible = false;
         this._waitingInView.delete(feature);   // (drawing it again could show it)
         this._waitingOutside.delete(feature);
-      } else if (placeAgain && feature.visible) {
-        this._placeAgain(feature, zoomFloor);
+      } else if (crossed) {
+        this._placeLarge(feature);
       }
     }
 
@@ -1139,6 +1196,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     }
     for (const entityID of outside) {
       this._arrivedIDs.add(entityID);
+    }
+
+    if (crossed) {
+      this._findOldTiles(frame);
     }
 
     this._moves++;
@@ -1260,7 +1321,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   public override get numWaiting(): number {
     return super.numWaiting + this._countUnmade(this._unmadeInView) + this._countUnmade(this._unmadeOutside) +
-      this._arrivedIDs.size;
+      this._arrivedIDs.size + this._oldTiles.size;
   }
 
 
@@ -1379,7 +1440,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (feature.dirty) {
           // A new shape, or a new zoom (and its tiles), may put it in another container
-          feature.parentContainer = this._polygonTileContainer(part, tileZoom);
+          this._setTile(feature, this._polygonTileContainer(part, tileZoom));
         }
 
         // (Not after a change of zoom alone: what it is hasn't changed, see `needsStyle`)
@@ -1494,7 +1555,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (!tile) {
       return this._tileContainer(polygonContainer, 'large', -1);
     }
-    return this._tileContainer(polygonContainer, `${tile[0]},${tile[1]},${tileZoom}`, tileOrder(tile));
+    return this._tileContainer(polygonContainer, `${tile[0]},${tile[1]},${tileZoom}`, tileOrder(tile), tile, tileZoom);
   }
 
 
@@ -1522,7 +1583,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _lineTileContainer(levelContainer: PIXI.Container, zIndex: number, part: GeometryPart, tileZoom: number): PIXI.Container {
     const tile = this._tileOf(part.world!.extent, tileZoom);
     const container = tile ?
-      this._tileContainer(levelContainer, `${zIndex}/${tile[0]},${tile[1]},${tileZoom}`, zIndex + tileOrder(tile)) :
+      this._tileContainer(levelContainer, `${zIndex}/${tile[0]},${tile[1]},${tileZoom}`, zIndex + tileOrder(tile), tile, tileZoom) :
       this._tileContainer(levelContainer, `${zIndex}/large`, zIndex);
     this._tilePlace.get(container)!.lineClass = zIndex;
     return container;
@@ -1530,26 +1591,143 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Puts a feature in the tile container it belongs in at another zoom, next to the one it's in.
-   * The `render…()` functions do this for a feature they draw again, but after a zoom that's
-   * spread over many frames, and features moving between containers a few at a time would have
-   * Pixi rebuild those containers' instructions on every one of them. So when the view crosses
-   * a whole zoom level, `_moveBox()` moves them all at once.
+   * Returns the tile container a feature belongs in at the current zoom, given the kind of
+   * container it's in now (polygons, points, or a level and road class of lines).
    * @param feature - The feature
-   * @param zoomFloor - The whole zoom level of the view
+   * @param place - What its container is
+   * @return The container, or `null` if the feature has no shape
    */
-  protected _placeAgain(feature: AbstractPixiFeature, zoomFloor: number): void {
+  protected _tileFor(feature: AbstractPixiFeature, place: TilePlace): PIXI.Container | null {
     const part = feature.geometry;
-    const tileContainer = feature.container.parent;
-    const place = tileContainer && this._tilePlace.get(tileContainer);
-    if (!part?.world || !place) return;    // (not in a tile container: it stays where it is)
+    if (!part?.world) return null;
 
     if (place.parent === this.polygonContainer) {
-      feature.parentContainer = this._polygonTileContainer(part, zoomFloor + POLYGON_TILE_ZOOM);
+      return this._polygonTileContainer(part, this._tileFloor + POLYGON_TILE_ZOOM);
     } else if (place.parent === this.pointContainer) {
-      this._placePoint(feature as PixiFeaturePoint, zoomFloor + POINT_TILE_ZOOM);
+      const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;
+      return this._pointTileContainer(part, hasViewfields, this._tileFloor + POINT_TILE_ZOOM);
     } else if (place.lineClass !== undefined) {
-      feature.parentContainer = this._lineTileContainer(place.parent, place.lineClass, part, zoomFloor + LINE_TILE_ZOOM);
+      return this._lineTileContainer(place.parent, place.lineClass, part, this._tileFloor + LINE_TILE_ZOOM);
+    }
+    return null;
+  }
+
+
+  /**
+   * Puts a feature in a tile container, as the `render…()` functions do for a feature they
+   * draw again. While the feature's old tile is waiting to be moved as a whole (`_retile`), it
+   * stays there, unless it belongs somewhere else altogether (another level or road class).
+   * @param feature - The feature
+   * @param container - The tile container it belongs in
+   */
+  protected _setTile(feature: AbstractPixiFeature, container: PIXI.Container): void {
+    const current = feature.container.parent;
+    if (current && this._oldTiles.has(current)) {
+      const from = this._tilePlace.get(current);
+      const to = this._tilePlace.get(container);
+      if (from && to && from.parent === to.parent && from.lineClass === to.lineClass) return;
+    }
+    feature.parentContainer = container;
+  }
+
+
+  /**
+   * After the view crossed a whole zoom level: moves a feature at once if it's bigger than a
+   * tile at one of the two zooms and not at the other. Those go between a tile and the `large`
+   * container, which is too big to rebuild every time a tile's worth of features joins it.
+   * @param feature - The feature
+   */
+  protected _placeLarge(feature: AbstractPixiFeature): void {
+    const extent = feature.geometry?.world?.extent;
+    const current = feature.container.parent;
+    const place = current && this._tilePlace.get(current);
+    if (!extent || !place || place.parent === this.pointContainer) return;
+
+    const tileZoom = this._tileFloor + ((place.parent === this.polygonContainer) ? POLYGON_TILE_ZOOM : LINE_TILE_ZOOM);
+    const isLarge = !place.tile;
+    const willBeLarge = !this._tileOf(extent, tileZoom);
+    if (isLarge !== willBeLarge) {
+      const container = this._tileFor(feature, place);
+      if (container) {
+        feature.parentContainer = container;
+      }
+    }
+  }
+
+
+  /**
+   * After the view crossed a whole zoom level: lists the tile containers that are for another
+   * zoom, the ones in view first. `_retile()` moves their features over the next frames.
+   * @param frame - The frame being rendered
+   */
+  protected _findOldTiles(frame: RenderFrame): void {
+    const inView: PIXI.Container[] = [];
+    const outside: PIXI.Container[] = [];
+
+    for (const [parent, byLabel] of this._tileContainers) {
+      const kindZoom = (parent === this.polygonContainer) ? POLYGON_TILE_ZOOM : (parent === this.pointContainer) ? POINT_TILE_ZOOM : LINE_TILE_ZOOM;
+      const tileZoom = this._tileFloor + kindZoom;
+      for (const container of byLabel.values()) {
+        const place = this._tilePlace.get(container);
+        if (!place?.tile || place.tileZoom === undefined || place.tileZoom === tileZoom) continue;
+
+        const tileSize = 256 * (2 ** (WORLD_ZOOM - place.tileZoom));
+        const [x, y] = place.tile;
+        const extent = new Extent([x * tileSize, y * tileSize], [(x + 1) * tileSize, (y + 1) * tileSize]);
+        (extent.intersects(frame.viewBox) ? inView : outside).push(container);
+      }
+    }
+
+    // Tiles that share a parent tile go one after the other: after a zoom out they all move
+    // into that one, and it's rebuilt once if they arrive on the same frame.
+    const byParentTile = (a: PIXI.Container, b: PIXI.Container): number => {
+      const [ax, ay] = this._tilePlace.get(a)!.tile!;
+      const [bx, by] = this._tilePlace.get(b)!.tile!;
+      return ((ay >> 1) - (by >> 1)) || ((ax >> 1) - (bx >> 1));
+    };
+    this._oldTiles = new Set<PIXI.Container>([...inView.sort(byParentTile), ...outside.sort(byParentTile)]);
+  }
+
+
+  /**
+   * Moves features to the tile containers of the current zoom, a few old tiles at a time.
+   *
+   * When the view crosses a whole zoom level, every feature belongs in another tile's container.
+   * Moving them all on one frame costs 100 ms, and then Pixi rebuilds every container's
+   * instructions (150 ms in Užice). Moving them as they're drawn again takes 30 frames, and
+   * Pixi rebuilds the containers at both ends on each of them. So a whole old tile moves at a
+   * time: its container is rebuilt never again, and the new ones once, or a few times.
+   * Meanwhile the old and the new tiles are drawn side by side.
+   * @param frame - The frame being rendered
+   */
+  protected _retile(frame: RenderFrame): void {
+    const oldTiles = this._oldTiles;
+    let count = 0;
+
+    for (const container of oldTiles) {
+      if (count >= MIN_RETILE && !frame.hasTime()) return;
+      oldTiles.delete(container);   // (deleting from a Set while iterating over it is safe)
+      count++;
+
+      const place = this._tilePlace.get(container);
+      if (!place || container.destroyed) continue;
+
+      const children = container.removeChildren();
+      for (const child of children) {
+        const feature = this.features.get(child.label);
+        const tile = feature && this._tileFor(feature, place);
+        if (tile) {
+          tile.addChild(child);
+        } else {
+          container.addChild(child);    // (nothing we know: it stays)
+        }
+      }
+      frame.drawDebt += children.length * RETILE_DRAW_MS;
+
+      if (!container.children.length) {
+        this._tileContainers.get(place.parent)?.delete(place.label);
+        this.scene.destroyWorldContainer(container);
+      }
     }
   }
 
@@ -1579,7 +1757,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (hasViewfields || !tile) {
       return this._tileContainer(pointContainer, 'viewfields', Number.MAX_SAFE_INTEGER);
     }
-    return this._tileContainer(pointContainer, `${tile[0]},${tile[1]},${tileZoom}`, tile[1] + tileOrder(tile));
+    return this._tileContainer(pointContainer, `${tile[0]},${tile[1]},${tileZoom}`, tile[1] + tileOrder(tile), tile, tileZoom);
   }
 
 
@@ -1607,9 +1785,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param parent - The container to look in
    * @param label - The container's label
    * @param zIndex - The container's `zIndex` among its siblings, if it's made
+   * @param tile - The tile `[x, y]`, for a container that's one tile
+   * @param tileZoom - That tile's zoom
    * @return The container
    */
-  protected _tileContainer(parent: PIXI.Container, label: string, zIndex: number): PIXI.Container {
+  protected _tileContainer(parent: PIXI.Container, label: string, zIndex: number, tile?: Vec2, tileZoom?: number): PIXI.Container {
     let byLabel = this._tileContainers.get(parent);
     if (!byLabel) {
       byLabel = new Map<string, PIXI.Container>();
@@ -1619,7 +1799,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (!container) {
       container = this._childContainer(parent, label, zIndex);
       byLabel.set(label, container);
-      this._tilePlace.set(container, { parent: parent });
+      this._tilePlace.set(container, { parent: parent, label: label, tile: tile, tileZoom: tileZoom });
     }
     return container;
   }
@@ -1704,7 +1884,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (feature.dirty) {
           // A new shape, level or road class, or a new zoom (and its tiles), may put it in another container
-          feature.parentContainer = this._lineTileContainer(levelContainer, zindex, part, tileZoom);
+          this._setTile(feature, this._lineTileContainer(levelContainer, zindex, part, tileZoom));
         }
 
         if (feature.needsStyle) {
@@ -1879,7 +2059,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (!part) return;
 
     const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;
-    feature.parentContainer = this._pointTileContainer(part, hasViewfields, tileZoom);
+    this._setTile(feature, this._pointTileContainer(part, hasViewfields, tileZoom));
   }
 
 
