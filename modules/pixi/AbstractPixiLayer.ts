@@ -467,11 +467,25 @@ export class AbstractPixiLayer {
 
 
   /**
+   * More of the layer's data arrived (a tile loaded), and nothing else changed. The caller names
+   * what arrived and whatever it changes the look of.
+   * Here that marks the data's features dirty, which makes the layer do its next pass
+   * (`dirtyData`). A layer that keeps its features overrides this to make and draw just that
+   * data, when its frames have time.
+   * @param dataIDs - The data that arrived
+   */
+  public dataArrived(dataIDs: OneOrMore<DataID>): void {
+    this.dirtyData(dataIDs);
+  }
+
+
+  /**
    * Counts a feature of this layer being shown or hidden. `AbstractPixiFeature` calls this when
    * its `visible` changes, so the layer knows how many are visible without walking them all.
+   * @param _feature - The feature
    * @param visible - Whether the feature is visible now
    */
-  public visibilityChanged(visible: boolean): void {
+  public visibilityChanged(_feature: AbstractPixiFeature, visible: boolean): void {
     if (visible) {
       this._numVisible++;
       this.work.shown++;

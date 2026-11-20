@@ -75,7 +75,7 @@ Still to do, in about this order:
   scheduler, whose queues the frames' own `draw` listeners kept full; now it goes by the view,
   and `SchedulerSystem` gives normal tasks 4 ms of every tick), and bookkeeping that grew with
   the waiting work. What's left is in `backlog.md`.
-  **OSM lines and points are split by map tile** (Nov 19; not committed yet, `scene.md` section
+  **OSM lines and points are split by map tile** (Nov 19, `scene.md` section
   3), each tile's container with its own render group, as polygons were: lines by level, road
   class and tile (the order between classes is kept), points by tile (from north to south between
   rows; side by side, the eastern tile is on top). In Užice a changed line or a new point costs 8
@@ -95,15 +95,23 @@ Still to do, in about this order:
   (`gfx.requestFrame()`). Also found: Pixi's `globalMove` and `wheel` events were never off (the
   option was passed as `events`, Pixi reads `eventFeatures`), so every pointer move walked the
   scene (50 ms in Užice). Moving the pointer across Užice for 4 seconds took 37 s, and takes 5.
-  **An edit and a change of mode without a pass** (Nov 19; not committed yet, same section):
+  **An edit and a change of mode without a pass** (Nov 19, same section):
   `MapSystem` passes what an edit affects to `scene.dataChanged('osm', …)`, `Context.enter()`
   asks for a frame, and `FilterSystem.forceVisible()` and `PhotoSystem` tell the scene what
   they change. Dragging a vertex in Užice for one second took 14 s (61 passes) and takes 1.5.
   Checked against a full pass after 110 edits, 64 changes of mode and 74 hovers: nothing shown
   differs.
-  Next (section 12, "What still asks for a pass"): each tile that arrives, and leaving the
-  cull box. Then the pass itself: half of it is vertices. Also a frame between passes during a
-  zoom, and the other layers.
+  **A tile that arrives and a cull box that moves, without a pass** (Nov 19, same section): `MapSystem` passes what a `merge` lists to `scene.dataArrived('osm', …)`, and
+  the OSM layer draws it in batches while its frames have time. When the view leaves the cull
+  box, the layer hides what the new box doesn't reach and asks the spatial index for the strips
+  it moved over (`_moveBox()`). `FramePacer` lets a pass for arriving data wait up to a second,
+  and the photo, QA and vector tile services name their layer. The first pan in Užice had 8 to
+  11 passes of 205 to 250 ms and has none (36 to 39 frames a second, was 28 to 34); the frame
+  where the box moves costs 29 ms of APP there, was 195. Checked against a full pass after the
+  load and eight pans: nothing shown differs.
+  Next (section 12, "What still asks for a pass"): a zoom, a filter, the styles. Then the pass
+  itself: half of it is vertices. Also a frame between passes during a zoom, the other layers,
+  and merging a tile (80 to 134 ms on the main thread in Užice: the longest stall of a pan now).
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

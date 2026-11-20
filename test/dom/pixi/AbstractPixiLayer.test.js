@@ -452,7 +452,7 @@ describe('AbstractPixiLayer', () => {
       assert.strictEqual(layer.numVisible, 2);
 
       b.visible = false;
-      layer.visibilityChanged(false);   // (a real feature's `visible` setter calls this)
+      layer.visibilityChanged(b, false);   // (a real feature's `visible` setter calls this)
       assert.strictEqual(layer.numVisible, 1);
       b.destroy();                      // it wasn't visible: no change
       assert.strictEqual(layer.numVisible, 1);

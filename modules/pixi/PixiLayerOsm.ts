@@ -5,7 +5,7 @@ import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
+import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
@@ -16,7 +16,7 @@ import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Preset } from '../lib/Preset.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Extent, Vec2, Viewport } from '@rapid-sdk/math';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /** Minimum zoom level where OSM data is rendered */
@@ -100,6 +100,19 @@ const MAKE_BATCH = 64;
  */
 const MAX_CHANGED = 5000;
 
+/**
+ * Entities that arrived (a tile loaded, or the cull box moved over them) are sorted and looked at
+ * this many at a time, with a check of the frame's time between (see `_renderArrived`). Most are
+ * vertices that aren't drawn, so a batch takes about a millisecond.
+ */
+const ARRIVED_BATCH = 1000;
+
+/**
+ * How many moves of the cull box (or passes) a hidden feature is kept for before it's destroyed.
+ * Panning back within that many finds it still made.
+ */
+const KEEP_HIDDEN_MOVES = 20;
+
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
   type: 'midpoint';
@@ -152,6 +165,34 @@ function entityOrder(entityID: EntityID): number {
 
 
 /**
+ * Returns the parts of one box that another doesn't cover, as up to four boxes: left and right of
+ * the other at full height, and above and below it in between.
+ * @param a - The box
+ * @param b - The box to take away from it
+ * @returns The parts of `a` outside `b` (`a` itself if they don't overlap)
+ */
+function extentMinus(a: Extent, b: Extent): Extent[] {
+  if (!a.intersects(b)) return [a];
+
+  const [ax0, ay0] = a.min;
+  const [ax1, ay1] = a.max;
+  const [bx0, by0] = b.min;
+  const [bx1, by1] = b.max;
+  const parts: Extent[] = [];
+
+  if (bx0 > ax0)  parts.push(new Extent([ax0, ay0], [bx0, ay1]));
+  if (bx1 < ax1)  parts.push(new Extent([bx1, ay0], [ax1, ay1]));
+
+  const x0 = Math.max(ax0, bx0);
+  const x1 = Math.min(ax1, bx1);
+  if (by0 > ay0)  parts.push(new Extent([x0, ay0], [x1, by0]));
+  if (by1 < ay1)  parts.push(new Extent([x0, by1], [x1, ay1]));
+
+  return parts;
+}
+
+
+/**
  * Checks if entity has any wikidata tags (deserves special styling)
  * @param entity - OSM entity to check
  * @returns true if entity has wikidata tags
@@ -200,6 +241,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _seenFeatureIDs: Set<FeatureID> | null;
   /** Whether the mode changed since the midpoints were last drawn (they're shown in select mode only) */
   protected _modeDirty: boolean;
+  /** Entities that arrived since the last pass, to sort and draw when frames have time (see `dataArrived`, `_moveBox`) */
+  protected _arrivedIDs: Set<EntityID>;
+  /** How many times the cull box moved, or a pass was done: hidden features age by this */
+  protected _moves: number;
+  /** The features that are hidden, and the value of `_moves` when each was (see `_forgetHidden`) */
+  protected _hiddenAt: Map<FeatureID, number>;
 
 
   /**
@@ -224,6 +271,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._changedIDs = new Set<DataID>();
     this._seenFeatureIDs = null;
     this._modeDirty = false;
+    this._arrivedIDs = new Set<EntityID>();
+    this._moves = 0;
+    this._hiddenAt = new Map<FeatureID, number>();
   }
 
 
@@ -275,6 +325,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
     this._changedIDs.clear();
+    this._arrivedIDs.clear();
+    this._hiddenAt.clear();
 
     // Add containers (`super.reset()` released the old ones), see `design/scene.md`
     const basemap = this._spatialContainer('basemap', 'osm');
@@ -300,6 +352,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._unmadeInView = this._newUnmade();    // nothing is drawn, so nothing is waiting to be made
       this._unmadeOutside = this._newUnmade();
       this._changedIDs.clear();
+      this._arrivedIDs.clear();
       return;
     }
 
@@ -311,7 +364,22 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     // Only the view moved, and the last pass saw everything there is.
     // (Go on with what an earlier frame had no time for: features to make, and to draw again.)
+    const prevBox = this._currentBox;
+    const prevSortedBox = this._sortedBox;
     if (this.keepFeatures(frame)) {
+      this.continueWaiting(frame, viewport);
+      return;
+    }
+
+    // Only the view moved, and it left the cull box: the frame has a new one that overlaps it.
+    // Then the features in both boxes stay as they are too, and the layer looks at what the box
+    // moved over and what it left behind. (Not after anything else changed: `changedFor`.)
+    if (prevBox && !frame.changedFor(this.id) && prevBox.intersects(frame.cullBox)) {
+      const t0 = performance.now();
+      this._keptFrame = frame.id;          // no pass, so `cull()` leaves the features alone
+      this._sortedBox = prevSortedBox;     // ..and what's waiting is still sorted by the old view
+      this._moveBox(frame, prevBox);
+      this._endStep('box', t0);
       this.continueWaiting(frame, viewport);
       return;
     }
@@ -319,6 +387,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // A pass sees every entity again, and says which ones wait this time.
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
+    this._arrivedIDs.clear();
 
     let t = performance.now();   // each step's time goes in the frame's stats
     let entities = editor.entitiesInBox(frame.cullBox.bbox(), graph);   // Gather data in and around the view
@@ -379,6 +448,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     t = this._endStep('midpoints', t);
 
     // Features may have moved to other tiles' containers, or been destroyed since the last pass.
+    this._moves++;
+    this._forgetHidden();
     this._removeEmptyContainers();
     this._endStep('containers', t);
   }
@@ -439,7 +510,15 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // First what the user is looking at: the data that changed (an edit), or whose classes did
     // (a hover, a selection). Unless a pass is due anyway: it sees everything.
     if ((this._changedIDs.size || this._modeDirty) && this._currentBox) {
-      this._renderChanged(frame, viewport);
+      const changedIDs = new Set<DataID>(this._changedIDs);
+      this._changedIDs.clear();
+      this._modeDirty = false;
+      this._renderChanged(frame, viewport, changedIDs, true);
+    }
+
+    // ..then what arrived, while there's time
+    if (this._arrivedIDs.size && this._currentBox) {
+      this._renderArrived(frame, viewport);
     }
 
     super.continueWaiting(frame, viewport, outside);
@@ -504,6 +583,63 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Remembers the entities that arrived (a tile loaded), to sort them and make their features
+   * over the next frames, without a pass (see `_renderArrived`). The ones that have features
+   * already get their styles worked out again: what arrived may change how they connect, or
+   * what they're a member of.
+   * @param dataIDs - The entities on the tile, and the ones whose shape it changed (what
+   *   `EditSystem` lists with its `merge` event)
+   */
+  public override dataArrived(dataIDs: OneOrMore<DataID>): void {
+    for (const dataID of utilIterable(dataIDs)) {
+      this._arrivedIDs.add(dataID);
+      for (const featureID of (this._dataHasFeature.get(dataID) ?? [])) {
+        const feature = this.features.get(featureID);
+        if (feature) {
+          feature.dirty = true;
+        }
+      }
+    }
+  }
+
+
+  /**
+   * Notes which features are hidden, and since when (see `_forgetHidden`).
+   * @param feature - The feature
+   * @param visible - Whether it's visible now
+   */
+  public override visibilityChanged(feature: AbstractPixiFeature, visible: boolean): void {
+    super.visibilityChanged(feature, visible);
+    if (visible) {
+      this._hiddenAt.delete(feature.id);
+    } else {
+      this._hiddenAt.set(feature.id, this._moves);
+    }
+  }
+
+
+  /**
+   * Adds a feature to the layer (see `AbstractPixiLayer.addFeature`). A new feature is visible,
+   * whatever became of an earlier one with its ID.
+   * @param feature - The feature
+   */
+  public override addFeature(feature: AbstractPixiFeature): void {
+    super.addFeature(feature);
+    this._hiddenAt.delete(feature.id);
+  }
+
+
+  /**
+   * Removes a feature from the layer (see `AbstractPixiLayer.removeFeature`).
+   * @param feature - The feature
+   */
+  public override removeFeature(feature: AbstractPixiFeature): void {
+    super.removeFeature(feature);
+    this._hiddenAt.delete(feature.id);
+  }
+
+
+  /**
    * Retains a feature (see `AbstractPixiLayer.retainFeature`), and notes that it was seen, while
    * `_renderChanged()` is watching for the features that aren't.
    * @param feature - The feature
@@ -512,6 +648,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   public override retainFeature(feature: AbstractPixiFeature, frame: RenderFrame): void {
     super.retainFeature(feature, frame);
     this._seenFeatureIDs?.add(feature.id);
+    if (this._hiddenAt.size) {
+      this._hiddenAt.delete(feature.id);   // wanted, even if it isn't shown at this zoom
+    }
   }
 
 
@@ -577,29 +716,32 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Draws again the features of the data whose classes changed since the last pass (a hover, a
-   * selection), without the pass: in a dense place a pass takes 200 ms, and a hover changes two
-   * features and a few vertices.
+   * Draws the features of some data again without the pass: in a dense place a pass takes 200 ms,
+   * and a hover changes two features and a few vertices.
    *
-   * What a class changes: the data's own features (a halo, a highlight), and which vertices and
-   * midpoints are shown above everything (`_gatherRelated`). So this runs the changed data, and
-   * everything that was or is now related to it, through the same `render…()` functions as a
-   * pass. Then it hides whichever of their features those functions didn't want anymore (the
-   * vertices of a line that's no longer hovered), as `cull()` does after a pass.
+   * It runs the data through the same `render…()` functions as a pass does, leaving out what a
+   * pass wouldn't have gathered (hidden, or outside the cull box). Then it hides whichever of the
+   * data's features those functions didn't want anymore, as `cull()` does after a pass.
    *
-   * These are drawn at once, whatever time the frame has: the user is looking at them.
+   * There are two ways to call it:
+   * - **Urgent,** for what the user just did: an edit, a hover, a selection, a change of mode.
+   *   A class changes the data's own features (a halo, a highlight) and which vertices and
+   *   midpoints are shown above everything (`_gatherRelated`), so this also draws again
+   *   everything that was or is now related, and the midpoints. All of it is drawn in this
+   *   frame, whatever time the frame has.
+   * - **Not urgent,** for data that arrived. New features are made and drawn as the frame's time
+   *   allows, and wait otherwise (`_waitToMake`, `updateFeature`). What's related isn't worked
+   *   out again, unless some of what arrived is related: then the next frame does that.
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
+   * @param changedIDs - The data to draw again
+   * @param urgent - Whether the user is waiting for it (see above)
    */
-  protected _renderChanged(frame: RenderFrame, viewport: Viewport): void {
+  protected _renderChanged(frame: RenderFrame, viewport: Viewport, changedIDs: Set<DataID>, urgent: boolean): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
-
-    const changedIDs = new Set<DataID>(this._changedIDs);
-    this._changedIDs.clear();
-    this._modeDirty = false;
 
     // Sorts data as a pass does, leaving out what a pass wouldn't have gathered: what's outside
     // the cull box, or hidden. (Some of it isn't entities: midpoints, and other layers' data.)
@@ -633,10 +775,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     };
 
     // What was a midpoint before may not be one after
-    const midpointsBefore = [...this._midpoints.keys()];
+    const midpointsBefore = urgent ? [...this._midpoints.keys()] : [];
 
     const wasUrgent = frame.urgent;
-    frame.urgent = true;                // draw them in this frame
+    if (urgent) {
+      frame.urgent = true;              // draw them in this frame
+    }
     this._catchingUp = true;            // (their features belong to the last pass: see `retainFeature`)
     this._madeCount = 0;
     this._seenFeatureIDs = new Set<FeatureID>();
@@ -649,39 +793,53 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (data.lines.size)     this.renderLines(frame, viewport, data);
     if (data.points.size)    this.renderPoints(frame, viewport, data);
 
-    const before = this._lastRelated;
-    const related = this._gatherRelated(viewport.transform.zoom);
-    this._lastRelated = related;
-
-    // ..then whatever was or is now related to what's selected or hovered, and wasn't drawn above
+    let related = this._lastRelated;
     const relatedIDs = new Set<DataID>();
-    for (const ids of [before.descendantIDs, before.siblingIDs, related.descendantIDs, related.siblingIDs]) {
-      for (const dataID of ids) {
-        if (!changedIDs.has(dataID)) {
-          relatedIDs.add(dataID);
+
+    if (urgent) {
+      const before = this._lastRelated;
+      related = this._gatherRelated(viewport.transform.zoom);
+      this._lastRelated = related;
+
+      // ..then whatever was or is now related to what's selected or hovered, and wasn't drawn above
+      for (const ids of [before.descendantIDs, before.siblingIDs, related.descendantIDs, related.siblingIDs]) {
+        for (const dataID of ids) {
+          if (!changedIDs.has(dataID)) {
+            relatedIDs.add(dataID);
+          }
+        }
+      }
+      const more = sort(relatedIDs);
+      if (more.polygons.size)  this.renderPolygons(frame, viewport, more);
+      if (more.lines.size)     this.renderLines(frame, viewport, more);
+      if (more.points.size)    this.renderPoints(frame, viewport, more);
+
+      // ..then the vertices and midpoints of all of it
+      for (const kind of Object.keys(more) as OsmDataKind[]) {
+        for (const [entityID, entity] of more[kind]) {
+          (data[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
         }
       }
     }
-    const more = sort(relatedIDs);
-    if (more.polygons.size)  this.renderPolygons(frame, viewport, more);
-    if (more.lines.size)     this.renderLines(frame, viewport, more);
-    if (more.points.size)    this.renderPoints(frame, viewport, more);
 
-    // ..then the vertices and midpoints of all of it
-    for (const kind of Object.keys(more) as OsmDataKind[]) {
-      for (const [entityID, entity] of more[kind]) {
-        (data[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
-      }
-    }
     if (data.vertices.size)  this.renderVertices(frame, viewport, data, related);
 
-    if (context.mode?.id === 'select') {
-      this.renderMidpoints(frame, viewport, data, related);
+    if (urgent) {
+      if (context.mode?.id === 'select') {
+        this.renderMidpoints(frame, viewport, data, related);
+      } else {
+        this._midpoints.clear();
+      }
     } else {
-      this._midpoints.clear();
+      // Did something arrive that's related to what's selected or hovered? Its vertices and
+      // midpoints may be different now: work that out on the next frame.
+      for (const dataID of changedIDs) {
+        if (related.descendantIDs.has(dataID) || related.siblingIDs.has(dataID)) {
+          this._modeDirty = true;
+          break;
+        }
+      }
     }
-
-    const dataIDs = new Set<DataID>([...changedIDs, ...relatedIDs]);
 
     const seen = this._seenFeatureIDs;
     this._seenFeatureIDs = null;
@@ -694,11 +852,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
     const selectedContainer = mapUiLayer.selected;
     const unwanted: AbstractPixiFeature[] = [];
-    for (const dataID of dataIDs) {
-      for (const featureID of (this._dataHasFeature.get(dataID) ?? [])) {
-        const feature = this.features.get(featureID);
-        if (feature && !seen.has(featureID)) {
-          unwanted.push(feature);
+    for (const dataIDs of [changedIDs, relatedIDs]) {
+      for (const dataID of dataIDs) {
+        for (const featureID of (this._dataHasFeature.get(dataID) ?? [])) {
+          const feature = this.features.get(featureID);
+          if (feature && !seen.has(featureID)) {
+            unwanted.push(feature);
+          }
         }
       }
     }
@@ -716,6 +876,104 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       } else {
         feature.visible = false;
       }
+    }
+  }
+
+
+  /**
+   * Sorts and draws the entities that arrived (a tile loaded, or the cull box moved over them),
+   * a batch at a time while the frame has time, and at least one batch.
+   * A new entity gets its feature now or in a later frame, like any other (`_waitToMake`).
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  protected _renderArrived(frame: RenderFrame, viewport: Viewport): void {
+    const arrivedIDs = this._arrivedIDs;
+    do {
+      const batch = new Set<DataID>();
+      for (const entityID of arrivedIDs) {
+        arrivedIDs.delete(entityID);   // (deleting from a Set while iterating over it is safe)
+        batch.add(entityID);
+        if (batch.size >= ARRIVED_BATCH) break;
+      }
+      this._renderChanged(frame, viewport, batch, false);
+    } while (arrivedIDs.size && frame.hasTime());
+  }
+
+
+  /**
+   * Follows the cull box to a new place without a pass: the view left the box that the layer
+   * has features for, and the frame has a new one that overlaps it. Whatever is in both stays
+   * as it is.
+   * - What the box left behind is hidden, as `cull()` would hide it. (It's kept for a while,
+   *   in case the view comes back: see `_forgetHidden`.)
+   * - What the box moved over is remembered as having arrived, the entities in view first, and
+   *   made over the next frames (`_renderArrived`).
+   * @param frame - The frame being rendered
+   * @param prevBox - The cull box that the layer's features were current for
+   */
+  protected _moveBox(frame: RenderFrame, prevBox: Extent): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
+    const box = frame.cullBox;
+
+    // Left behind: the features of entities that the new box doesn't reach.
+    // (By the entity's whole shape, as a pass gathers it, not by the feature's own part of it.)
+    const left = new Map<DataID, boolean>();
+    for (const feature of this.features.values()) {
+      if (!feature.visible) continue;
+      const dataID = this._featureHasData.get(feature.id);
+      if (!dataID) continue;
+
+      let hasLeft = left.get(dataID);
+      if (hasLeft === undefined) {
+        const entity = graph.hasEntity(dataID);     // (not a midpoint: those go with their ways)
+        const extent = entity && graph.geometry(entity).world?.extent;
+        hasLeft = !!extent && !extent.intersects(box);
+        left.set(dataID, hasLeft);
+      }
+      if (hasLeft) {
+        feature.visible = false;
+        this._waitingInView.delete(feature);
+        this._waitingOutside.delete(feature);
+      }
+    }
+
+    // Moved over: the entities in the parts of the new box that the old one didn't cover.
+    // (An entity that reaches into the old box was there already.)
+    const inView: EntityID[] = [];
+    const outside: EntityID[] = [];
+    for (const part of extentMinus(box, prevBox)) {
+      for (const entity of editor.entitiesInBox(part.bbox(), graph)) {
+        const extent = graph.geometry(entity).world?.extent;
+        if (!extent || extent.intersects(prevBox)) continue;
+        (extent.intersects(frame.viewBox) ? inView : outside).push(entity.id);
+      }
+    }
+    for (const entityID of inView) {
+      this._arrivedIDs.add(entityID);
+    }
+    for (const entityID of outside) {
+      this._arrivedIDs.add(entityID);
+    }
+
+    this._moves++;
+    this._forgetHidden();
+    this._removeEmptyContainers();
+  }
+
+
+  /**
+   * Destroys the features that have been hidden for more than `KEEP_HIDDEN_MOVES` moves of the
+   * cull box (or passes). A pass does this for what it hasn't seen in a while (`cull()`), but
+   * while the view only moves there are no passes, and what the box leaves behind would pile up.
+   */
+  protected _forgetHidden(): void {
+    for (const [featureID, hiddenAt] of this._hiddenAt) {
+      if (this._moves - hiddenAt <= KEEP_HIDDEN_MOVES) continue;
+      this._hiddenAt.delete(featureID);    // (deleting from a Map while iterating over it is safe)
+      this.features.get(featureID)?.destroy();
     }
   }
 
@@ -768,6 +1026,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const entity = graph.hasEntity(entityID);
         if (!entity || entity.geometry(graph) !== KIND_GEOMETRY[kind]) continue;
 
+        // ..and still in the cull box? (It may have moved on since: see `_moveBox`.)
+        const extent = graph.geometry(entity).world?.extent;
+        if (extent && !extent.intersects(frame.cullBox)) continue;
+
         (batch[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
         if (++batchSize >= MAKE_BATCH) {
           makeBatch();
@@ -814,7 +1076,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @return The number waiting
    */
   public override get numWaiting(): number {
-    return super.numWaiting + this._countUnmade(this._unmadeInView) + this._countUnmade(this._unmadeOutside);
+    return super.numWaiting + this._countUnmade(this._unmadeInView) + this._countUnmade(this._unmadeOutside) +
+      this._arrivedIDs.size;
   }
 
 

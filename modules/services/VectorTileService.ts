@@ -501,7 +501,9 @@ export class VectorTileService extends AbstractSystem {
 
     if (newFeatures.length) {
       spatial.addData(cache.spatialID, newFeatures);
-      gfx?.deferredRedraw();
+      // (Vector tiles are custom data, or an Overture dataset on the Rapid layer.)
+      gfx?.deferredRedraw('custom-data');
+      gfx?.deferredRedraw('rapid');
     }
   }
 
@@ -607,7 +609,8 @@ export class VectorTileService extends AbstractSystem {
     }
 
     const gfx = this.context.systems.gfx;
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('custom-data');
+    gfx?.deferredRedraw('rapid');
   }
 
 

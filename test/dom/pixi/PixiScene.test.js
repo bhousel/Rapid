@@ -395,6 +395,22 @@ describe('PixiScene', () => {
   });
 
 
+  describe('dataArrived', () => {
+    it('tells the one layer which data arrived', () => {
+      const told = [];
+      const scene = {
+        layers: new Map([
+          ['osm', { dataArrived: dataIDs => told.push(['osm', ...dataIDs]) }],
+          ['rapid', { dataArrived: dataIDs => told.push(['rapid', ...dataIDs]) }]
+        ])
+      };
+      PixiScene.prototype.dataArrived.call(scene, 'osm', new Set(['w1', 'n1']));
+      PixiScene.prototype.dataArrived.call(scene, 'no-such-layer', ['w1']);
+      assert.deepEqual(told, [['osm', 'w1', 'n1']]);
+    });
+  });
+
+
   describe('texturesLoaded', () => {
     it('tells every layer, and asks for a frame that goes on with waiting work, not for a redraw', () => {
       const calls = [];

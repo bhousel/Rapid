@@ -1,4 +1,4 @@
-import { test, expect, startRapid, waitForIdle, waitForOsmData, TEST_MAP } from './fixtures.js';
+import { test, expect, osmSceneState, startRapid, waitForIdle, waitForOsmData, TEST_MAP } from './fixtures.js';
 
 
 // Frame stats read Pixi's internals (its instruction lists and GPU contexts), which can change in any
@@ -85,12 +85,30 @@ test('keeps the OSM features as they are while only the view moves, and does the
   expect(redrawn.layers.osm.visible).toBe(panned.layers.osm.visible);
   expect(redrawn.layers.osm.shown + redrawn.layers.osm.hidden).toBe(0);
 
-  // A pan out of the cull box: the layer does its pass for a new box
+  // A pan out of the cull box: the frame has a new box, and the layer follows it there without a
+  // pass. It hides what the box left behind and looks at what it moved over (`_moveBox`).
   const far = await frameAfter({ pan: [400, 0] });
-  expect(far.layers.osm.kept).toBe(false);
   expect(far.cullBox).not.toEqual(panned.cullBox);
+  expect(far.layers.osm.kept).toBe(true);
+  expect(far.layers.osm.steps.box).toBeGreaterThanOrEqual(0);
+  expect(far.layers.osm.hidden).toBeGreaterThan(0);
 
+  // Once it has caught up with the new box, it shows what a full pass shows there
   await waitForIdle(page);
+  const followed = await osmSceneState(page);
+  expect(followed.length).toBeGreaterThan(50);
+  await frameAfter({ redraw: true });
+  await waitForIdle(page);
+  expect(await osmSceneState(page)).toEqual(followed);
+
+  // ..and the same after going back, where its features were only hidden
+  await frameAfter({ pan: [-400, 0] });
+  await waitForIdle(page);
+  const back = await osmSceneState(page);
+  await frameAfter({ redraw: true });
+  await waitForIdle(page);
+  expect(await osmSceneState(page)).toEqual(back);
+
   expect(consoleErrors).toEqual([]);
 });
 
@@ -129,7 +147,8 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
   expect(panned.moves).toBeGreaterThanOrEqual(panned.ticks / 3);
 
   // Then, right after an expensive pass, move the view out of the cull box. The frames until the
-  // gap is over move the view with the features as they are, and then the pass happens.
+  // gap is over move the view with the features as they are, and then a frame gets the new box.
+  // (The OSM layer follows the box there without a pass of its own: see `_moveBox`.)
   const held = await page.evaluate(async () => {
     const { gfx, map } = rapidContext.systems;
     const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
@@ -159,7 +178,7 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
         return { kept: frame.layers.get('osm').kept, sameBox: boxOf(frame) === boxBefore };
       }),
       waitedMs: pass.time - since,
-      pass: { kept: pass.layers.get('osm').kept, sameBox: boxOf(pass) === boxBefore }
+      pass: { movedBox: pass.layers.get('osm').steps.box !== undefined, sameBox: boxOf(pass) === boxBefore }
     };
   });
   expect(held.heldFrames.length).toBeGreaterThan(0);
@@ -167,7 +186,7 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
     expect(frame).toEqual({ kept: true, sameBox: true });
   }
   expect(held.waitedMs).toBeGreaterThan(200);
-  expect(held.pass).toEqual({ kept: false, sameBox: false });
+  expect(held.pass).toEqual({ movedBox: true, sameBox: false });
 
   await waitForIdle(page);
   expect(consoleErrors).toEqual([]);

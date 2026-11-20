@@ -22,6 +22,7 @@ describe('OsmService', () => {
   const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
+  gfx.requestFrame = spyRedraw;   // (a frame without a pass: what a loaded tile asks for)
 
   // Setup fetchMock..
   beforeAll(() => {

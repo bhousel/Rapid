@@ -536,7 +536,7 @@ export class RapidDataset {
 
     if (newFeatures.length) {
       spatial.addData(this.spatialID, newFeatures);
-      gfx?.deferredRedraw();
+      gfx?.deferredRedraw('rapid');
     }
 
 

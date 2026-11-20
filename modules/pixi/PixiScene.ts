@@ -819,6 +819,19 @@ export class PixiScene extends EventEmitter {
 
 
   /**
+   * Says that more of a layer's data arrived (a tile loaded), and nothing else in it changed. The
+   * layer makes and draws that data over the next frames, without doing its whole pass if it can
+   * (see `AbstractPixiLayer.dataArrived`). Follow it with `gfx.requestFrame()`.
+   * @param layerID - layerID that is rendering the data
+   * @param dataIDs - What arrived, and whatever it changes the look of (for OSM, what the `merge`
+   *   event lists)
+   */
+  public dataArrived(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
+    this.layers.get(layerID)?.dataArrived(dataIDs);
+  }
+
+
+  /**
    * Called whenever the enabled layers change.
    * This will trigger a redraw and emit a 'layerchange' event.
    */

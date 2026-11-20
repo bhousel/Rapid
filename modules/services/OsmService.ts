@@ -1710,7 +1710,7 @@ export class OsmService extends AbstractSystem {
     this._tileCache.lastv = null;
     this._noteCache.lastv = null;
     this.reloadApiStatus();
-    gfx?.deferredRedraw();
+    gfx?.requestFrame();   // (any frame makes the layers ask for the view's tiles)
   }
 
 
@@ -1823,7 +1823,8 @@ export class OsmService extends AbstractSystem {
         // Forget it so that errored tiles can be retried later.
         network.forget(requestID);
       } else {
-        gfx?.deferredRedraw();
+        // (The tile's entities reach the map when they're merged: `MapSystem` hears `merge`.)
+        gfx?.requestFrame();
       }
 
       if (callback) {
@@ -1993,7 +1994,7 @@ export class OsmService extends AbstractSystem {
         for (const props of (results.data ?? [])) {
           this._cacheNote(props);
         }
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('osm-notes');
       }
     };
 
@@ -2029,7 +2030,7 @@ export class OsmService extends AbstractSystem {
           reject(err);
         } else if (Array.isArray(results?.data)) {
           note = this._cacheNote(results!.data[0]);
-          gfx?.deferredRedraw();
+          gfx?.deferredRedraw('osm-notes');
           resolve(note!);
         } else {
           reject(new Error(`Note ${noteID} not found`));
@@ -2078,7 +2079,7 @@ export class OsmService extends AbstractSystem {
         // We get the updated note back, remove from caches and reparse..
         this.removeNote(note);
         note = this._cacheNote(results!.data[0]);
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('osm-notes');
         callback?.(null, note!);
         return;
       } else {
@@ -2164,7 +2165,7 @@ export class OsmService extends AbstractSystem {
         // We get the updated note back, remove from caches and reparse..
         this.removeNote(note);
         note = this._cacheNote(results!.data[0]);
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('osm-notes');
         callback?.(null, note!);
         return;
       } else {

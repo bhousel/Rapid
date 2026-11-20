@@ -247,7 +247,7 @@ export class AbstractPixiFeature {
   public set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
-    this.layer.visibilityChanged(val);
+    this.layer.visibilityChanged(this, val);
     if (this.halo) this.halo.visible = val;
     this._labelDirty = true;
   }

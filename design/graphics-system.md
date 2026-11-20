@@ -29,9 +29,11 @@ Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the poi
   map draws has changed. Moving the view isn't one.
 - **Cull box:** the part of the world a frame wants features ready for: the view, and padding around it.
 - **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view had
-  moved, inside the cull box it already had everything for (section 8).
+  moved, inside the cull box it already had everything for (section 8). The OSM layer also keeps
+  them when it's told which data changed, or follows the cull box when that moves (section 12).
 - **Pass frame:** a frame in which layers had a pass to do: a redraw was requested, or the view needed
-  a new cull box. A frame that only moves the view isn't one.
+  a new cull box. A frame that only moves the view isn't one. (The OSM layer follows a cull box
+  that moves without a pass since section 12; a new zoom or rotation still needs one.)
 - **Gap:** how long a pass frame waits after the one before it. It grows with what that one cost
   (section 9).
 - **Held frame:** a frame drawn while a pass frame waits for its gap. It moves the view, and every
@@ -701,7 +703,8 @@ Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull fra
   work.
 - **Make the pass cheaper.** The filter's quick fixes are done (above). Next, the vertices: don't
   gather, filter, sort and test each one when few are drawn (`design/filter-system.md` section 4).
-- **More requests could name their layer:** the photo and QA services, `VectorTileService`.
+- ~~More requests could name their layer.~~ Done (Nov 19): the photo and QA services, the notes,
+  `VectorTileService` and `RapidDataset` name the layers that draw their data.
 
 ## 9. Frame pacing
 
@@ -724,10 +727,16 @@ its turn, and how long depends on why it's wanted:
 | `immediateRedraw()`: the user did something | Not at all |
 | `immediateRedraw(layerID)`: one layer has something to show now (a label texture) | That layer is drawn on the next tick. Anything else that's waiting keeps waiting. |
 | The view needs it: it left the cull box, or the zoom or rotation changed | The gap: twice what the last pass frame cost (APP and DRAW together), at most 250 ms |
-| `deferredRedraw()`: data arrived | The gap, and at least 250 ms after the last pass frame, so that arrivals batch up |
+| `deferredRedraw()`: data arrived | Twice what the last pass frame cost, at least 250 ms (so that arrivals batch up) and at most 1 s |
 
 So passes take at most a third of the time, nothing waits longer than it did before, and data
 arriving is drawn as often as before.
+
+(The view's 250 ms limit breaks the "third" where a pass costs more than 125 ms: the view can't
+wait longer for what it's missing. At first a pass for arriving data stopped at the same limit,
+so in Užice, where a pass costs 250 ms, those passes took half of the time. Since Nov 19 it waits
+the whole gap, up to a second. Since then, too, the OSM layer no longer needs a pass for either
+reason: section 12.)
 
 **While a pass frame waits**, the view doesn't have to: a held frame is drawn on every tick that the
 view moved. It tells the layers that nothing changed and gives them the cull box they had, so the
@@ -823,7 +832,8 @@ the old box covers.
 ### What it doesn't fix
 
 - **A pass frame is one block of work.** When the view leaves the cull box at Staten Island, that's
-  45 to 80 ms in two ticks, three to five animation frames missed. The first pass after a load is
+  45 to 80 ms in two ticks, three to five animation frames missed (21 ms since section 12, where
+  the OSM layer follows the box without a pass). The first pass after a load is
   790 ms. Pacing decides how often that happens, not how long it takes: a cheaper pass, or a pass
   spread over frames (section 8, "What's left"), does.
 - **Užice's pass frame is 240 ms.** With the longest gap after it, that's about two a second, as
@@ -1370,14 +1380,58 @@ of drawing a line.
 **What this doesn't update:** the count of hidden features in the footer comes from the pass
 (`FilterSystem.filterScene()`), so after an edit it's the last pass's count until the next one.
 
+### A tile that arrives, and a cull box that moves, without a pass
+
+The first pan in Užice still did 8 to 11 passes of 205 to 250 ms: 2.3 of its 4.2 s of frames.
+Most were for tiles that arrived, the rest for the view leaving the cull box.
+
+- **A tile that arrives.** `EditSystem` lists everything on the tile with its `merge` event (also
+  what was there already, and what the new data reshaped: the list was made for redrawing).
+  `MapSystem` passes that to `scene.dataArrived('osm', …)` and asks for a frame. The OSM layer
+  remembers the IDs, and on each frame sorts and draws a batch of 1,000 at a time while the frame
+  has time (`_renderArrived()`). New entities go through `_waitToMake()` like any others, so
+  their features are made in view first, as the budget allows.
+- **A cull box that moves** (`_moveBox()`). When the view leaves the box and nothing else
+  changed, the frame's new box overlaps the old one, and what's in both stays as it is.
+  - What the box left behind is hidden: the features of entities that the new box doesn't reach
+    (by the entity's whole shape, as a pass gathers it).
+  - What it moved over is asked of the spatial index, for the up to four strips of the new box
+    that the old one didn't cover, and remembered as having arrived, what's in view first.
+- **Hidden features age by moves of the box.** A pass destroys a feature it hasn't seen for 20
+  passes. With no passes, the layer counts the moves of the cull box, notes when each feature
+  was hidden (`visibilityChanged()`), and destroys the ones hidden for more than 20 moves
+  (`_forgetHidden()`).
+- **Other services name their layer.** A photo tile or a QA marker that arrived asked for a
+  redraw of everything, which was a pass of the OSM layer for another layer's data.
+- **The pacer** lets a pass for arriving data wait the whole gap its cost asks for (section 9).
+  On its own that took the first pan from 8 to 11 passes to 8; with the rest there are none.
+
+| Užice, from the tape | Before | After |
+|---|---|---|
+| First pan, dev build: time its events took | 5.5 to 6.5 s | 4.7, 5.5 s |
+| First pan: passes | 8 to 11 | 0 |
+| First pan: frames a second | 28 to 34 | 39, 36 |
+| First pan: a frame's cost, 90th percentile / longest | 60 to 100 / 250 ms | 42 / 77 ms (one run had a frame of 520) |
+| A frame where the cull box moves, APP (`bun run measure`) | 195 ms | 29 ms |
+| Pan back over loaded data: frames a second, longest gap | 47 to 50, 205 to 260 ms | 54, under 100 ms |
+| Load, while tiles arrive: longest frame | 265 to 400 ms | 63 to 70 ms |
+| Load: from the last tile until every feature is made | 7.4 to 8.0 s | 6.2 to 6.8 s |
+| `bun run compare`, first pan: frames a second | 24.9, 27.4, 26.3 | 32.5, 35.5, 39.1 |
+| `bun run compare`, first pan: time its events took | 6.1, 5.6, 5.6 s | 4.4, 4.1, 3.9 s |
+| `bun run compare`, pan back: frames a second, longest gap | 43 to 49, 222 to 339 ms | 50 to 56, 59 to 139 ms |
+
+At Staten Island a frame where the cull box moves went from 63 to 9 ms of APP, and in Seattle from
+15 to 9. (Rapid 2.5.7's first pan in Užice, live: 25 frames a second, 5.2 s; `main`'s: 12, 11.4 s.)
+
+**Checked against a full pass**, in Užice: after the load, and after each of eight pans in all
+directions (12 moves of the cull box, with tiles arriving during the first ones), a full pass
+changed nothing that was shown. No frame of any of it was a pass.
+
 ### What still asks for a pass
 
-- **Each tile that arrives** (`merge`): 8 to 11 passes during the first pan in Užice, 2.3 of its
-  4.2 s of frames. The merged IDs are known. Entities they change without being among them need
-  care: a point becomes a vertex when its way arrives.
-- **Leaving the cull box.** What enters and leaves is the difference between two answers of the
-  spatial index.
 - **Anything that marks the whole layer dirty:** a filter, the styles, the language, a zoom.
+- **A redraw request without a layer.** A few are left: `Context.setDebug()`, the lasso, the
+  systems that change how everything looks.
 
 And the pass itself, for when it's needed (the filters, the styles, a zoom):
 
@@ -1391,5 +1445,9 @@ And the pass itself, for when it's needed (the filters, the styles, a zoom):
 - **Užice uses 2.4 GB of JavaScript heap** after one load (the limit is 4.4). The debug Chrome's
   tab crashed once during this work, after about twenty loads of it and several CPU profiles.
   Not looked into.
-- **`FramePacer` caps the gap between passes at 250 ms.** Where a pass costs that much, passes
-  for arriving data take half the time, not the third the pacer aims for.
+- **Merging a tile is the longest thing in a pan now.** `EditSystem._mergeEntities()` took 80 to
+  134 ms for each of the dense tiles (10,000 to 15,000 entities), on the main thread and outside
+  any frame: 0.9 s of a 5 s pan, and its longest gaps (159 ms twice). The gaps of 400 to 700 ms
+  that some runs still show aren't frames or merges; garbage collection is the guess.
+- **A selection or a hover now and then takes 240 to 430 ms** without a pass (one in 64 mode
+  changes, one in 74 hovers). Not looked into.

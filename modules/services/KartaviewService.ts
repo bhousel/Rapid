@@ -398,7 +398,7 @@ export class KartaviewService extends AbstractSystem {
       this._cacheSequence(images);
     }
 
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('kartaview');
 
     if (data.length === MAXRESULTS) {
       this._nextPage.set(tile.id, page + 1);
@@ -645,7 +645,7 @@ export class KartaviewService extends AbstractSystem {
 
         // Update the sequence to include this image, create if needed..
         this._cacheSequence([image]);
-        gfx?.deferredRedraw();
+        gfx?.deferredRedraw('kartaview');
         return image;
       })
       .catch(err => {

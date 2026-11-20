@@ -6,7 +6,11 @@
  */
 export const PASS_GAP_FACTOR = 2;
 
-/** The longest that a pass waits for the one before it, in milliseconds, however much that one cost */
+/**
+ * The longest that a pass which the view needs waits for the one before it, in milliseconds,
+ * however much that one cost. The view is showing something it has no features for, so it can't
+ * wait long, even where passes then take more than a third of the time.
+ */
 export const MAX_PASS_GAP = 250;
 
 /**
@@ -14,6 +18,14 @@ export const MAX_PASS_GAP = 250;
  * request asks for it. Data streams in, and this lets the changes batch up.
  */
 export const DEFERRED_WAIT = 250;
+
+/**
+ * The longest that a pass for a deferred redraw request waits, in milliseconds. Such a pass waits
+ * the whole gap that the last pass's cost asks for: nothing is missing from the view meanwhile.
+ * (Until Nov 2026 it stopped at `MAX_PASS_GAP` too. In a place where a pass costs 250 ms, passes
+ * for arriving data then took half of the time.)
+ */
+export const MAX_DEFERRED_GAP = 1000;
 
 
 /**
@@ -23,15 +35,16 @@ export const DEFERRED_WAIT = 250;
  *
  * - A pass that was asked for now (`hurry()`, from `immediateRedraw()`) doesn't wait.
  * - A pass that the view needs (it left the cull box, or the zoom changed) waits until the gap
- *   after the last pass is over. The gap grows with what that pass cost.
- * - A pass for a deferred redraw request alone waits for the gap, and at least `DEFERRED_WAIT`.
+ *   after the last pass is over. The gap grows with what that pass cost, up to `MAX_PASS_GAP`.
+ * - A pass for a deferred redraw request alone waits for the gap too, up to `MAX_DEFERRED_GAP`,
+ *   and at least `DEFERRED_WAIT`.
  *
  * It owns no clock: callers pass the time in (`performance.now()`).
  * See "Frame pacing" in `design/graphics-system.md`.
  */
 export class FramePacer {
-  /** Milliseconds that a pass waits after the last one */
-  protected _gap: number;
+  /** What the last pass cost, in milliseconds (its APP and DRAW passes together) */
+  protected _cost: number;
   /** When the last pass finished (`-Infinity` before the first) */
   protected _lastPass: number;
   /** Whether a pass was asked for now */
@@ -42,18 +55,28 @@ export class FramePacer {
    * @constructor
    */
   public constructor() {
-    this._gap = 0;
+    this._cost = 0;
     this._lastPass = -Infinity;
     this._hurried = false;
   }
 
 
   /**
-   * Milliseconds that a pass waits after the last one, from what that one cost.
+   * Milliseconds that a pass which the view needs waits after the last one, from what that one cost.
    * @return The gap in milliseconds
    */
   public get gap(): number {
-    return this._gap;
+    return Math.min(MAX_PASS_GAP, this._cost * PASS_GAP_FACTOR);
+  }
+
+
+  /**
+   * Milliseconds that a pass for a deferred redraw request waits after the last one: the gap
+   * that the last pass's cost asks for, between `DEFERRED_WAIT` and `MAX_DEFERRED_GAP`.
+   * @return The gap in milliseconds
+   */
+  public get deferredGap(): number {
+    return Math.max(DEFERRED_WAIT, Math.min(MAX_DEFERRED_GAP, this._cost * PASS_GAP_FACTOR));
   }
 
 
@@ -92,7 +115,7 @@ export class FramePacer {
   public wait(now: number, forView: boolean): number {
     if (this._hurried) return 0;
 
-    const needed = forView ? this._gap : Math.max(this._gap, DEFERRED_WAIT);
+    const needed = forView ? this.gap : this.deferredGap;
     return Math.max(0, needed - (now - this._lastPass));
   }
 
@@ -103,7 +126,7 @@ export class FramePacer {
    * @param costMs - What the pass cost in milliseconds (its APP and DRAW passes together)
    */
   public passed(now: number, costMs: number): void {
-    this._gap = Math.min(MAX_PASS_GAP, Math.max(0, costMs) * PASS_GAP_FACTOR);
+    this._cost = Math.max(0, costMs);
     this._lastPass = now;
   }
 
@@ -112,7 +135,7 @@ export class FramePacer {
    * Forgets the last pass, so the next one doesn't wait.
    */
   public reset(): void {
-    this._gap = 0;
+    this._cost = 0;
     this._lastPass = -Infinity;
     this._hurried = false;
   }

@@ -45,6 +45,13 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **For an edit, `scene.dataChanged('osm', ids)` and `gfx.requestFrame()`,** with everything the
   edit affects (`Difference.complete()`). `MapSystem` does this for `stagingchange`. The layer
   draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
+- **For data that arrived, `scene.dataArrived('osm', ids)` and `gfx.requestFrame()`.**
+  `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
+  A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
+- **The OSM layer rarely does its whole pass now**, so don't count on one to pick something up.
+  It does one when it's marked dirty (`dirtyLayer()`, `dirtyTransform()`, `dirtyData()`: a
+  filter, the styles, a zoom) or when a redraw is asked for without a layer. A view that leaves
+  the cull box isn't one: the layer follows the box (`_moveBox()`).
 - **A change of mode asks for a frame, not a redraw** (`Context.enter()`). If a mode changes
   what the map shows, it has to reach the layers: through a class, an edit, a redraw request of
   its own, or (for something a layer draws in one mode only, like the OSM layer's midpoints)

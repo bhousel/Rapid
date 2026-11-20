@@ -321,6 +321,42 @@ describe('MapSystem', () => {
   });
 
 
+  describe('merge', () => {
+    it('tells the scene what arrived, and asks for a frame, not for a redraw of everything', async () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      const filters = new Rapid.FilterSystem(ctx);
+      const gfx = new Rapid.MockGfxSystem(ctx);
+      const arrived = [];
+      const asked = [];
+      gfx.scene.dataArrived = (layerID, dataIDs) => arrived.push(layerID, ...dataIDs);
+      gfx.requestFrame = () => asked.push('frame');
+      gfx.deferredRedraw = () => asked.push('redraw');
+      gfx.immediateRedraw = () => asked.push('redraw');
+      ctx.systems = {
+        editor:  editor,
+        filters: filters,
+        gfx:     gfx
+      };
+
+      const n1 = new Rapid.OsmNode(ctx, { id: 'n1', loc: [0, 0], tags: { amenity: 'bench' } });
+      const graph = new Rapid.Graph(ctx, [n1]);
+      editor.staging = { graph: graph };
+
+      const map = new Rapid.MapSystem(ctx);
+      await map.initAsync();
+
+      filters.getMatches(n1, graph, 'point');
+      assert.isTrue(filters._cache.has(n1));
+
+      editor.emit('merge', new Set(['n1', 'n2']));   // (`n2` isn't in this graph: a deleted node, say)
+      assert.isFalse(filters._cache.has(n1));        // what was matched for it may be different now
+      assert.deepEqual(arrived, ['osm', 'n1', 'n2']);
+      assert.deepEqual(asked, ['frame']);
+    });
+  });
+
+
   describe('historyjump', () => {
     it('undo while dragging goes back to what was selected before the drag, not the newest edit\'s selection', () => {
       const ctx = new Rapid.MockContext();

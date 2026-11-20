@@ -1,4 +1,4 @@
-import { DEFERRED_WAIT, FramePacer, MAX_PASS_GAP, PASS_GAP_FACTOR } from '../../../modules/pixi/lib/FramePacer.ts';
+import { DEFERRED_WAIT, FramePacer, MAX_DEFERRED_GAP, MAX_PASS_GAP, PASS_GAP_FACTOR } from '../../../modules/pixi/lib/FramePacer.ts';
 
 
 describe('FramePacer', () => {
@@ -39,10 +39,22 @@ describe('FramePacer', () => {
     assert.strictEqual(pacer.wait(1020, false), DEFERRED_WAIT - 20);     // data that arrived waits
     assert.strictEqual(pacer.wait(1000 + DEFERRED_WAIT, false), 0);
 
-    // ..and for the gap too, when that's longer
-    assert.isAbove(MAX_PASS_GAP + 1, DEFERRED_WAIT);
+  });
+
+  it('makes a pass for a deferred redraw wait the whole gap its cost asks for, where the view\'s pass stops at its limit', () => {
+    // A pass of 250 ms, as in a very dense place: twice that for arriving data, so that such
+    // passes take a third of the time. The view can't wait that long for what it's missing.
+    pacer.passed(1000, 250);
+    assert.strictEqual(pacer.deferredGap, 250 * PASS_GAP_FACTOR);
+    assert.strictEqual(pacer.wait(1000, false), 250 * PASS_GAP_FACTOR);
+    assert.strictEqual(pacer.wait(1000, true), MAX_PASS_GAP);
+    assert.strictEqual(pacer.wait(1000 + MAX_PASS_GAP, true), 0);
+    assert.isAbove(pacer.wait(1000 + MAX_PASS_GAP, false), 0);
+
+    // ..up to a limit of its own
     pacer.passed(2000, 1600);
-    assert.strictEqual(pacer.wait(2000, false), Math.max(MAX_PASS_GAP, DEFERRED_WAIT));
+    assert.strictEqual(pacer.wait(2000, false), MAX_DEFERRED_GAP);
+    assert.strictEqual(pacer.wait(2000 + MAX_DEFERRED_GAP, false), 0);
   });
 
   it('lets a pass that was asked for now start at once, until that pass begins', () => {

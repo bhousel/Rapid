@@ -28,7 +28,8 @@ import { parseArgs, styleText } from 'node:util';
 // - pan:     the view moved 100 px since the last frame, over an area it has shown before
 //            (so it measures moving the view, not making new features or loading data).
 //            Most pan frames only move the view; about one in three leaves the cull box, and the
-//            OSM layer does its whole pass ("cull" in the table). No redraw is requested for these:
+//            OSM layer follows it to a new one ("cull" in the table: it looks at what the box
+//            moved over and left behind, where it used to do its whole pass). No redraw is requested:
 //            a frame that only moves the view is drawn on the next tick, and a pass waits for the
 //            gap after the last one (`FramePacer`), with held frames in between, as in a real drag.
 // - glide:   the view moves a little on every animation frame, along the same path. It reports how
@@ -224,7 +225,8 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
     }
 
     // The frames where the OSM layer kept its features as they were (only the view had moved, inside
-    // its cull box), and the ones where it did its whole pass. See "A CULL pass" in the design doc.
+    // its cull box), and the ones where the view left the box: the layer followed it to a new one
+    // (`steps.box`), or did its whole pass. See "A CULL pass" in the design doc.
     const times = (subset: any[]) => ({
       frames: subset.length,
       appMs: median(subset.map((f: any) => f.appMs)),
@@ -232,7 +234,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
       gpuMs: median(subset.map((f: any) => f.draw.gpuMs)),
       rebuiltGroups: median(subset.map((f: any) => f.draw.rebuiltGroups))
     });
-    const isKept = (f: any) => !!f.layers.get('osm')?.kept;
+    const isKept = (f: any) => !!f.layers.get('osm')?.kept && f.layers.get('osm')?.steps?.box === undefined;
 
     return {
       ...times(frames),
@@ -268,7 +270,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
     }
     const ms = performance.now() - start;
     const drawn = gfx.renderFrames.filter((f: any) => f.id > startID);   // the most recent of them
-    const passes = drawn.filter((f: any) => !f.layers.get('osm')?.kept);
+    const passes = drawn.filter((f: any) => !f.layers.get('osm')?.kept || f.layers.get('osm')?.steps?.box !== undefined);
     const frames = (gfx.lastRenderFrame?.id ?? -1) - startID;
     return {
       ticks: GLIDE_TICKS,
@@ -349,10 +351,10 @@ console.log('\nTimes in ms. The first group is a frame where nothing changed. lo
 console.log('still loading after a minute. visible = features shown, also those in the padding around the view.');
 console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch.');
 console.log('pan = pan frames where the OSM layer kept its features as they were (also while a pass was held');
-console.log('back). cull = pan frames where it did its whole pass, because the view left the cull box (or');
-console.log('something else changed); of = how many. glide = the view moving on every animation frame for');
+console.log('back). cull = pan frames where the view left the cull box, and the layer followed it to a new one');
+console.log('(or did its whole pass); of = how many. glide = the view moving on every animation frame for');
 console.log('240 of them: frames drawn a second, animation frames longer than 25 ms, and what a frame with');
-console.log('a pass cost (APP + DRAW) in the middle of that. restyle = every feature drawn again, as after');
+console.log('a new cull box cost (APP + DRAW) in the middle of that. restyle = every feature drawn again, as after');
 console.log('a zoom: the first frame, then how many frames and how many ms until all of them were done.');
 
 if (values.out) {

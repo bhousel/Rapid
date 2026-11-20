@@ -618,7 +618,10 @@ export class MapillaryService extends AbstractSystem {
       }
     }
 
-    gfx?.deferredRedraw();
+    // (A tile has photos, sequences, detections and signs: three layers draw them.)
+    for (const mapLayerID of ['mapillary', 'mapillary-detections', 'mapillary-signs']) {
+      gfx?.deferredRedraw(mapLayerID);
+    }
   }
 
 

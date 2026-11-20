@@ -249,7 +249,7 @@ export class OsmoseService extends AbstractSystem {
       spatial.addData(spatialID, new MarkerData(context, props));
     }
 
-    gfx?.deferredRedraw();
+    gfx?.deferredRedraw('osmose');
   }
 
 

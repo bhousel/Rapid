@@ -254,9 +254,10 @@ describe('PixiLayerOsm', () => {
     const IN_VIEW = new Rapid.sdk.Extent([10, 10], [11, 11]);
     const OUTSIDE = new Rapid.sdk.Extent([80, 10], [81, 11]);
 
-    // A frame whose view is `VIEW`, with or without time left
+    // A frame whose view is `VIEW` (the left half of its cull box), with or without time left
     function makeFrame(hasTime, props = {}) {
       const frame = new RenderFrame(1, 17);
+      frame.cullBox = new Rapid.sdk.Extent([0, 0], [100, 100]);
       frame.viewBox = VIEW;
       frame.deadline = hasTime ? Infinity : -Infinity;
       return Object.assign(frame, props);
@@ -396,7 +397,7 @@ describe('PixiLayerOsm', () => {
         const geometry = graph.geometry;
         let lookups = 0;
         graph.geometry = entity => {
-          lookups++;
+          if (entity.id.startsWith('far')) lookups++;   // (the ones outside the view)
           return geometry(entity);
         };
 
@@ -409,7 +410,7 @@ describe('PixiLayerOsm', () => {
 
         const moved = makeFrame(false, { time: 4000, viewBox: new Rapid.sdk.Extent([60, 0], [100, 50]) });
         layer.continueWaiting(moved, {});
-        assert.strictEqual(lookups, 60);
+        assert.isAtLeast(lookups, 60);   // looked at again (and once more each as they're made)
         assert.isAbove(made.filter(id => id.startsWith('far')).length, 0);
       });
 
@@ -666,6 +667,148 @@ describe('PixiLayerOsm', () => {
       assert.deepEqual(calls, []);
       assert.strictEqual(layer._changedIDs.size, 6000);   // the pass clears them
     });
+
+    // A tile that loads brings thousands of entities. They're sorted and drawn like the ones
+    // above, but when the frames have time: nobody is waiting for any one of them.
+    describe('data that arrived', () => {
+      it('remembers what arrived, and marks its features to be styled again', () => {
+        const line1 = addFeature('w1');
+        layer.dataArrived(new Set(['w1', 'n9']));
+        assert.isTrue(line1.dirty);
+        assert.strictEqual(layer._currentBox, BOX);   // no pass asked for
+        assert.strictEqual(layer.numWaiting, 2);      // ..but more frames, until it's looked at
+      });
+
+      it('draws it when a frame comes, not urgently, and without working out what is related again', () => {
+        addFeature('w1');
+        addEntity('n9', 'point');
+        const related = layer._lastRelated;
+        layer.dataArrived(['w2', 'n9']);              // (not `w1`, which is hovered)
+
+        layer.continueWaiting(frame, viewport);
+        assert.sameMembers(calls, ['lines w2 (not urgent)', 'points n9 (not urgent)']);
+        assert.strictEqual(layer._lastRelated, related);
+        assert.isFalse(layer._modeDirty);
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
+      it('works out what is related again on the next frame, when some of what arrived is', () => {
+        layer.dataArrived(['n1']);                    // a vertex of the hovered way
+        layer.continueWaiting(frame, viewport);
+        assert.isTrue(layer._modeDirty);
+      });
+
+      it('takes a batch at a time when frames have no time, and all of it when they do', () => {
+        const ids = [];
+        for (let i = 0; i < 2500; i++) {
+          addEntity(`n${1000 + i}`, 'point');
+          ids.push(`n${1000 + i}`);
+        }
+        layer.dataArrived(ids);
+
+        frame.deadline = -Infinity;
+        layer.continueWaiting(frame, viewport);
+        assert.strictEqual(calls.length, 1000);
+        assert.strictEqual(layer.numWaiting, 1500);
+
+        frame.deadline = Infinity;
+        layer.continueWaiting(frame, viewport);
+        assert.strictEqual(calls.length, 2500);
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
+      it('hides the features of what arrived and is hidden by a filter, or gone', () => {
+        const line2 = addFeature('w2');
+        hidden.add('w2');
+        layer.dataArrived(['w2']);
+        layer.continueWaiting(frame, viewport);
+        assert.isFalse(line2.visible);
+      });
+    });
+
+
+    // When the view leaves the cull box, the frame has a new one. The layer follows it there
+    // without a pass: what's in both boxes stays as it is.
+    describe('a cull box that moved', () => {
+      const NEW_BOX = new Rapid.sdk.Extent([60, 0], [160, 100]);    // 60 to the east
+      const BOTH = new Rapid.sdk.Extent([70, 10], [71, 11]);
+      const LEFT_BEHIND = new Rapid.sdk.Extent([20, 10], [21, 11]);
+      const MOVED_OVER = new Rapid.sdk.Extent([130, 10], [131, 11]);
+
+      beforeEach(() => {
+        // The spatial index: what touches a box
+        layer.context.systems.editor.entitiesInBox = bbox => {
+          const box = new Rapid.sdk.Extent([bbox.minX, bbox.minY], [bbox.maxX, bbox.maxY]);
+          return [...entities.values()].filter(entity => entity.extent.intersects(box));
+        };
+        frame.cullBox = NEW_BOX;
+        frame.viewBox = new Rapid.sdk.Extent([110, 0], [160, 100]);
+      });
+
+      it('hides what the box left behind, and leaves alone what is in both boxes', () => {
+        addEntity('n20', 'point', LEFT_BEHIND);
+        addEntity('n70', 'point', BOTH);
+        addEntity('w50', 'line', new Rapid.sdk.Extent([20, 10], [70, 11]));   // reaches into the new box
+        const gone = addFeature('n20');
+        const stays = addFeature('n70');
+        const reaches = addFeature('w50');
+
+        layer._moveBox(frame, BOX);
+        assert.isFalse(gone.visible);
+        assert.isFalse(gone.destroyed);     // kept for a while, in case the view comes back
+        assert.isTrue(stays.visible);
+        assert.isTrue(reaches.visible);
+        assert.deepEqual(calls, []);        // nothing was drawn again for it
+      });
+
+      it('remembers what the box moved over as having arrived, what is in view first', () => {
+        addEntity('n140', 'point', new Rapid.sdk.Extent([105, 10], [106, 11]));   // new, not in view yet
+        addEntity('n130', 'point', MOVED_OVER);                                   // new, and in view
+        addEntity('n70', 'point', BOTH);                                          // was there already
+        addEntity('w90', 'line', new Rapid.sdk.Extent([90, 10], [130, 11]));      // reached into the old box
+
+        layer._moveBox(frame, BOX);
+        assert.deepEqual([...layer._arrivedIDs], ['n130', 'n140']);
+      });
+
+      it('destroys what has been hidden for more than 20 moves, unless it was shown again', () => {
+        addEntity('n20', 'point', LEFT_BEHIND);
+        addEntity('n21', 'point', LEFT_BEHIND);
+        const gone = addFeature('n20');
+        const back = addFeature('n21');
+        // (a real feature tells its layer when it's hidden or shown)
+        const hide = feature => { feature.visible = false; layer.visibilityChanged(feature, false); };
+        const show = feature => { feature.visible = true; layer.visibilityChanged(feature, true); };
+        hide(gone);
+        hide(back);
+
+        for (let i = 0; i < 20; i++) {
+          layer._moves++;
+          layer._forgetHidden();
+        }
+        assert.isFalse(gone.destroyed);
+        show(back);
+
+        layer._moves++;
+        layer._forgetHidden();
+        assert.isTrue(gone.destroyed);
+        assert.isFalse(back.destroyed);
+        assert.isFalse(layer.features.has('osm-n20'));
+      });
+
+      it('does not make a feature for an entity that waited and is outside the box now', () => {
+        addEntity('w20', 'line', LEFT_BEHIND);
+        addEntity('w70', 'line', BOTH);
+        layer._unmadeInView.lines.add('w20');
+        layer._unmadeInView.lines.add('w70');
+
+        frame.deadline = Infinity;
+        layer.continueWaiting(frame, viewport);
+        assert.deepEqual(calls, ['lines w70 (not urgent)']);
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+    });
+
 
     it('draws the midpoints again after a change of mode, with nothing else changed', () => {
       let midpoints = 0;
