@@ -8,10 +8,14 @@ import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 /* Intersection type that includes both Pixi Stroke and DashLineOptions  */
 type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
+
+
+/** Scratch space for `PixiFeaturePoint.updateAvoid` */
+const TEMP: Vec2 = [0, 0];
 
 
 /** Additional properties for a point */
@@ -47,6 +51,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   protected _viewfieldCount: number;
   /** Name of viewfield texture (to detect changes) */
   protected _viewfieldName: string | null;
+  /** How big the point is drawn on screen, compared with its textures (see `updateStyle`) */
+  protected _screenScale: number;
 
 
   /**
@@ -58,6 +64,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     this._viewfieldCount = 0;         // to watch for change in # of viewfield sprites
     this._viewfieldName = null;       // to watch for change in viewfield texture
+    this._screenScale = 1;
     this.props.isCircular = false;    // set true to use a circular halo and hit area
 
     const marker = new PIXI.Sprite();
@@ -108,6 +115,42 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.updateStyle(viewport);
     this.updateHitArea();
     this.updateHalo();
+    this.updateAvoid();
+    this.scene.featureChanged(this);
+  }
+
+
+  /**
+   * Marks where this point is drawn, for labels to keep clear of (see `AbstractPixiFeature.updateAvoid`).
+   *
+   * A point is drawn at a size on screen, upright, whatever the zoom and rotation: so its box
+   * is its marker's size around its place in label space, from arithmetic. A point with
+   * viewfields is different: they keep their direction on the ground, so what they cover
+   * changes as the map turns. Few points have them, and for those Pixi is asked what's drawn.
+   */
+  public override updateAvoid(): void {
+    const scene = this.scene;
+    const marker = this.marker;
+    const origin = this._geom?.world?.origin;
+    if (!this.labelAvoid || !this.container?.visible || !marker || !origin || !scene?.avoidGrid) {
+      this._setAvoid(null);
+      return;
+    }
+
+    const hasViewfields = !!this.viewfields && this.viewfields.renderable;
+    if (hasViewfields || !marker.visible || marker.rotation !== 0) {
+      const rect = this.container.getBounds().rectangle;
+      const offset = scene.labelOffset;
+      this._setAvoid([rect.x - offset.x, rect.y - offset.y, rect.x + rect.width - offset.x, rect.y + rect.height - offset.y]);
+      return;
+    }
+
+    const [x, y] = scene.worldToLabel(origin[0], origin[1], TEMP);
+    const w = marker.texture.orig.width * Math.abs(marker.scale.x) * this._screenScale;
+    const h = marker.texture.orig.height * Math.abs(marker.scale.y) * this._screenScale;
+    const minX = x - (marker.anchor.x * w);
+    const minY = y - (marker.anchor.y * h);
+    this._setAvoid([minX, minY, minX + w, minY + h]);
   }
 
 
@@ -171,6 +214,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // If we are rendering world coordinates, apply counter-scale to get children back to screen coords.
     // Scale down even more at lower zooms.
     const baseScale = (styleZoom < 17 || wireframeMode) ? 0.8 : 1.0;
+    this._screenScale = baseScale;
     if (this._geom) {   // GeometryPart path
       const worldScale = 2 ** (viewZoom - WORLD_ZOOM) || 1;
       container.scale.set(baseScale / worldScale, baseScale / worldScale);

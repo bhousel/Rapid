@@ -688,6 +688,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
+        feature.labelAvoid = true;   // labels keep clear of it
         feature.parentContainer = parentContainer;
       }
 
@@ -725,6 +726,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
+        feature.labelAvoid = true;   // labels keep clear of it
         feature.parentContainer = parentContainer;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
       }

@@ -18,12 +18,14 @@ import { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
-import { Extent, WORLD_ZOOM } from '@rapid-sdk/math';
+import { AvoidGrid } from './lib/AvoidGrid.ts';
+import { Extent, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractMode } from '../modes/AbstractMode.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { RenderFrame } from './RenderFrame.ts';
@@ -38,6 +40,17 @@ const EMPTY_CLASSES: ReadonlySet<ClassID> = new Set<ClassID>();
  * made and drawn outside the view (at 256, about twice what a 1300×1100 view holds).
  */
 const CULL_PADDING = 256;
+
+
+/**
+ * The size of the avoid grid's cells, in pixels of label space (see `PixiScene.avoidGrid`).
+ * A pin is marked in every cell it touches, so it takes up to a cell more room on each side
+ * than it's drawn with, and fewer labels fit between pins. Measured Nov 2026 by the labels placed
+ * after a load in downtown Seattle, where a box for each pin gave 232: cells of 4 px 104 (before
+ * a point's own cells were set aside for its label), then 2 px 208 and 1 px 219. At 1 px the
+ * grid is four times the blocks and the marking four times the writes.
+ */
+const AVOID_CELL_PX = 2;
 
 
 /**
@@ -78,6 +91,10 @@ export class PixiScene extends EventEmitter {
   public layers: Map<LayerID, AbstractPixiLayer>;
   /** All registered features, keyed by FeatureID */
   public features: Map<FeatureID, AbstractPixiFeature>;
+  /** Where labels can't go: what's drawn that they avoid, and the labels placed so far, in label space */
+  public avoidGrid: AvoidGrid;
+  /** The offset between the screen and label space, as of this frame (see `updateLabelSpace`) */
+  public labelOffset: PIXI.Point;
 
   /** Map of dataID to Set of classIDs */
   protected _dataHasClass: Map<DataID, Set<ClassID>>;
@@ -91,6 +108,14 @@ export class PixiScene extends EventEmitter {
   protected _worldContainers: Set<PIXI.Container>;
   /** The part of the world layers have features ready for, or `null` before the first frame (see `updateCullBox`) */
   protected _cullBox: Extent | null;
+  /** The transform from world coordinates to the screen, as of this frame (see `updateLabelSpace`) */
+  protected _toScreen: PIXI.Matrix;
+  /** Cells where something to avoid was drawn over a placed label (see `avoidHit`) */
+  protected _avoidHits: CellRect[];
+  /** Cells that something to avoid has left (see `avoidFreed`) */
+  protected _avoidFrees: CellRect[];
+  /** The features that were drawn, shown, hidden or destroyed since the labels layer last asked (see `featureChanged`) */
+  protected _changedFeatureIDs: Set<FeatureID>;
   /** The zoom the cull box was made at */
   protected _cullZoom: number;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
@@ -122,6 +147,12 @@ export class PixiScene extends EventEmitter {
     this._worldContainers = new Set<PIXI.Container>();
     this._cullBox = null;
     this._cullZoom = 0;
+    this.avoidGrid = new AvoidGrid(AVOID_CELL_PX);
+    this.labelOffset = new PIXI.Point();
+    this._toScreen = new PIXI.Matrix();
+    this._avoidHits = [];
+    this._avoidFrees = [];
+    this._changedFeatureIDs = new Set<FeatureID>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -486,6 +517,8 @@ export class PixiScene extends EventEmitter {
     // the `origin` container (set up in `GraphicsSystem._app`) provides the position
     // and scale that maps world coords → screen coords. Group containers themselves
     // need no extra transform (except the `labels` group which renders in screen space).
+    this.updateLabelSpace(viewport);   // (the features mark what labels avoid as they're drawn)
+
     const times = new Map<LayerID, { renderMs: number, cullMs: number }>();
     for (const layer of this.layers.values()) {
       const t0 = performance.now();
@@ -751,9 +784,141 @@ export class PixiScene extends EventEmitter {
    * styles they worked out before.
    */
   public dirtyTransform(): void {
+    // Label space is a new one. Every feature is drawn again, and marks what it covers again.
+    this.avoidGrid.clear();
+    this._avoidHits = [];
+    this._avoidFrees = [];
+
     for (const layer of this.layers.values()) {
       layer.dirtyTransform();
     }
+  }
+
+
+  /**
+   * Works out this frame's label space: the coordinates that labels are placed in, and that the
+   * avoid grid covers (see "Label placement" in `design/graphics-system.md`).
+   *
+   * Label space is the screen minus `labelOffset`, an offset that changes by exactly the pan
+   * on each frame. So a feature has the same label coordinates however the map is panned, and
+   * what's been placed and marked stays valid until the zoom or the rotation changes.
+   *
+   * `origin.toGlobal(P)` gives that for any constant P in `origin`'s coordinates, since a pan
+   * only changes `origin.position`. The naive choice P = (0, 0) is world coordinate [0,0], far
+   * from the viewport at high zooms: a huge offset, and GPU float32 precision loss in the rope
+   * labels' vertex math (distorted text). So P is picked to map near the viewport: it takes off
+   * the constant `(pixiT - WORLD_HALF * worldScale)` term that `origin.position` carries.
+   * @param viewport - The Pixi viewport of the frame (see `GraphicsSystem._app`)
+   */
+  public updateLabelSpace(viewport: Viewport): void {
+    const origin = this.gfx.origin;
+    if (!origin) return;
+
+    const worldScale = origin.scale.x;
+    const pixiT = viewport.transform.translation;
+    origin.toGlobal({
+      x: WORLD_HALF - pixiT[0] / worldScale,
+      y: WORLD_HALF - pixiT[1] / worldScale
+    }, this.labelOffset);
+    origin.getGlobalTransform(this._toScreen, false);   // (worked out now: the cached one is the last frame's)
+  }
+
+
+  /**
+   * Converts a world coordinate to label space (see `updateLabelSpace`).
+   * @param x - World x
+   * @param y - World y
+   * @param out - Where to put the result
+   * @return `out`, as `[x, y]` in label space
+   */
+  public worldToLabel(x: number, y: number, out: Vec2): Vec2 {
+    const m = this._toScreen;
+    out[0] = (m.a * x) + (m.c * y) + m.tx - this.labelOffset.x;
+    out[1] = (m.b * x) + (m.d * y) + m.ty - this.labelOffset.y;
+    return out;
+  }
+
+
+  /**
+   * A feature tells the scene that it has been drawn again, shown, hidden or destroyed, or has
+   * another label. The labels layer takes these (`takeChangedFeatures`) and looks at the labels
+   * of those features only: it used to walk every feature in the scene on every frame to find
+   * the ones that had changed.
+   * @param feature - The feature
+   */
+  public featureChanged(feature: AbstractPixiFeature): void {
+    this._changedFeatureIDs.add(feature.id);
+  }
+
+
+  /**
+   * Returns the features that changed since the last call (see `featureChanged`), and forgets them.
+   * @return Their IDs. A feature may be gone by now.
+   */
+  public takeChangedFeatures(): Set<FeatureID> {
+    const changed = this._changedFeatureIDs;
+    this._changedFeatureIDs = new Set<FeatureID>();
+    return changed;
+  }
+
+
+  /**
+   * A feature that labels avoid was drawn where a label is. The labels layer takes these and
+   * places the labels it finds there again, somewhere else (`takeAvoidHits`).
+   * @param cells - The cells of the avoid grid that the feature covers
+   */
+  public avoidHit(cells: CellRect): void {
+    this._avoidHits.push(cells);
+  }
+
+
+  /**
+   * How many times something was drawn over a label since the labels layer last looked.
+   * @return The number of hits waiting
+   */
+  public get numAvoidHits(): number {
+    return this._avoidHits.length;
+  }
+
+
+  /**
+   * Returns the cells where something was drawn over a label since the last call, and forgets them.
+   * @return The cells, one rectangle for each feature
+   */
+  public takeAvoidHits(): CellRect[] {
+    const hits = this._avoidHits;
+    this._avoidHits = [];
+    return hits;
+  }
+
+
+  /**
+   * A feature that labels avoid isn't where it was: it was hidden, moved or destroyed. The
+   * labels layer tries the labels again that had no room there (`takeAvoidFrees`).
+   * @param cells - The cells of the avoid grid that the feature covered
+   */
+  public avoidFreed(cells: CellRect): void {
+    this._avoidFrees.push(cells);
+  }
+
+
+  /**
+   * How many features that labels avoid have left their place since the labels layer last looked.
+   * @return The number waiting
+   */
+  public get numAvoidFrees(): number {
+    return this._avoidFrees.length;
+  }
+
+
+  /**
+   * Returns the cells that something to avoid has left since the last call, and forgets them.
+   * @return The cells, one rectangle for each feature
+   */
+  public takeAvoidFrees(): CellRect[] {
+    const frees = this._avoidFrees;
+    this._avoidFrees = [];
+    return frees;
   }
 
 

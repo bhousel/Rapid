@@ -23,7 +23,7 @@ describe('PixiFeatureLine', () => {
     effectiveZoom = 17;
     context.systems.map = { effectiveZoom: () => effectiveZoom, wireframeMode: false };
     const gfx = { textureManager: { getTexture: () => null } };
-    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {} };
+    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
     const layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);

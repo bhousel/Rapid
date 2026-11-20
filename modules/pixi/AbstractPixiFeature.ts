@@ -4,6 +4,7 @@ import { styleDefaults } from '../lib/Style.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
@@ -64,7 +65,16 @@ export class AbstractPixiFeature {
   public lod: number;
   /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
   public halo: PIXI.Container | null;
+  /**
+   * Whether labels keep clear of this Feature. Its layer sets this: pins and vertices are
+   * avoided, photo and QA markers aren't. (See `updateAvoid`.)
+   */
+  public labelAvoid: boolean;
 
+  /** The cells of the scene's avoid grid that this Feature has marked, if any */
+  protected _avoidCells: CellRect | null;
+  /** The generation of the avoid grid that `_avoidCells` is for */
+  protected _avoidGeneration: number;
   /** Whether the Feature is allowed to be interactive */
   protected _allowInteraction: boolean;
   /** GeometryPart containing all the information about the geometry */
@@ -116,6 +126,9 @@ export class AbstractPixiFeature {
 
     this.lod = 2;   // full detail
     this.halo = null;
+    this.labelAvoid = false;
+    this._avoidCells = null;
+    this._avoidGeneration = 0;
 
     this._geom = null;
     this._geomDirty = true;
@@ -140,6 +153,8 @@ export class AbstractPixiFeature {
    * Do not use the Feature after calling `destroy()`.
    */
   public destroy(): void {
+    this._setAvoid(null);
+    this.scene.featureChanged(this);    // (its label goes with it)
     this.layer.removeFeature(this);
     this.scene.removeFeature(this);
 
@@ -180,6 +195,7 @@ export class AbstractPixiFeature {
     this.layer.work.updated++;
     this._geomDirty = false;
     this._styleDirty = false;
+    this.scene.featureChanged(this);
   }
 
 
@@ -250,6 +266,64 @@ export class AbstractPixiFeature {
     this.layer.visibilityChanged(this, val);
     if (this.halo) this.halo.visible = val;
     this._labelDirty = true;
+    // What's hidden isn't in a label's way. What's shown is, where it was drawn. (If it's
+    // waiting to be drawn again, it marks its place when it is.)
+    if (!val) {
+      this._setAvoid(null);
+    } else if (!this.dirty) {
+      this.updateAvoid();
+    }
+    this.scene.featureChanged(this);
+  }
+
+
+  /**
+   * Marks, in the scene's avoid grid, the part of label space that this Feature covers, so that
+   * no label is placed over it (see "Label placement" in `design/graphics-system.md`).
+   * A Feature that labels avoid calls this at the end of its `update()`, once it's where it
+   * will be drawn. Override in a subclass that can be avoided; this one covers nothing.
+   */
+  public updateAvoid(): void {
+  }
+
+
+  /**
+   * The cells of the scene's avoid grid that this Feature has marked, if it has marked any that
+   * still count (see `updateAvoid`).
+   * @return The cells, or `null`
+   */
+  public get avoidCells(): CellRect | null {
+    const grid = this.scene?.avoidGrid;
+    return (grid && this._avoidGeneration === grid.generation) ? this._avoidCells : null;
+  }
+
+
+  /**
+   * Replaces what this Feature has marked in the avoid grid.
+   * If a label is where the Feature now is, the scene is told, and the label moves.
+   * @param box - What the Feature covers, `[minX, minY, maxX, maxY]` in label space, or `null` for nothing
+   */
+  protected _setAvoid(box: [number, number, number, number] | null): void {
+    const scene = this.scene;
+    const grid = scene?.avoidGrid;
+    if (!grid) return;
+
+    const old = (this._avoidGeneration === grid.generation) ? this._avoidCells : null;   // (else: cleared since)
+    const cells = box && grid.cellsOf(box[0], box[1], box[2], box[3]);
+    if (old && cells && old[0] === cells[0] && old[1] === cells[1] && old[2] === cells[2] && old[3] === cells[3]) return;
+
+    if (old) {
+      grid.unmark('avoid', old);
+      scene.avoidFreed(old);
+    }
+    if (cells) {
+      grid.mark('avoid', cells);
+      if (grid.isTaken('label', cells)) {
+        scene.avoidHit(cells);
+      }
+    }
+    this._avoidCells = cells;
+    this._avoidGeneration = grid.generation;
   }
 
 
@@ -273,6 +347,26 @@ export class AbstractPixiFeature {
       this._needsStyle = true;
       this._transformOnly = false;
     }
+  }
+
+
+  /**
+   * Whether the Feature's label has to be placed again: its shape, its label or its visibility
+   * changed since the label was placed. (Not for a hover or a selection: see `setClass`.)
+   * The labels layer reads this when the Feature tells the scene it changed
+   * (`PixiScene.featureChanged`), and clears it with `labelPlaced()`.
+   * @return `true` if the label is out of date
+   */
+  public get labelDirty(): boolean {
+    return this._labelDirty;
+  }
+
+
+  /**
+   * The labels layer has looked at this Feature's label, as it is now.
+   */
+  public labelPlaced(): void {
+    this._labelDirty = false;
   }
 
 
@@ -405,6 +499,7 @@ export class AbstractPixiFeature {
     if (str === this._label) return;  // no change
     this._label = str;
     this._labelDirty = true;
+    this.scene.featureChanged(this);
   }
 
 
@@ -438,9 +533,8 @@ export class AbstractPixiFeature {
     if (hasClass) return;  // nothing to do
 
     this._classes.add(classID);
-    this._styleDirty = true;
-    this._labelDirty = true;
-    this._transformOnly = false;
+    this._styleDirty = true;      // (not the label: a class changes how a feature looks, not where
+    this._transformOnly = false;  //  its label goes. A label that's placed again can land elsewhere.)
   }
 
 
@@ -457,7 +551,6 @@ export class AbstractPixiFeature {
 
     this._classes.delete(classID);
     this._styleDirty = true;
-    this._labelDirty = true;
     this._transformOnly = false;
   }
 

@@ -1,17 +1,17 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
+import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
 import { getDebugBBox, lineToPoly } from './helpers.ts';
 import { geomLineSegments } from '../geo/index.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { CellRect } from './lib/AvoidGrid.ts';
 import type { PixiFeatureLabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { SpatialItem } from '../core/SpatialSystem.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
@@ -41,6 +41,22 @@ const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
 };
 
 /** Measurements for a label, including its expected width and height */
+/** A box in label space: `[minX, minY, maxX, maxY]` */
+type LabelRoom = [number, number, number, number];
+
+/** Past this many freed boxes in a frame, they're treated as one box around them all */
+const MAX_FREED = 64;
+
+/**
+ * Milliseconds that the zoom and rotation have to stay as they are before labels are placed.
+ * Every label is taken away when either changes, so during a pinch or a turn of the map,
+ * labels placed between two steps would only flash.
+ */
+const SETTLE_MS = 150;
+
+/** Features that a frame places labels for whatever the time, so that placement always moves on */
+const MIN_PLACED = 25;
+
 interface LabelMeasurement {
   /** Label text, e.g. "Main Street" */
   str: string;
@@ -62,6 +78,8 @@ interface LabelContents {
   labelID?: LabelID | null;
   objectID?: string | null;
   tint?: number;
+  /** For a label's box: the cells of the avoid grid that it marked */
+  cells?: CellRect | null;
 }
 
 /**
@@ -101,8 +119,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /** Container that holds all visible label features */
   public labelContainer: PIXI.Container | null;
 
-  /** FeatureIDs that we are avoiding (e.g. map pins, vertices, junctions) */
-  protected _avoided: Set<FeatureID>;
   /** FeatureIDs that have been labeled (points, roads, etc) - note that point features can be both avoided and labeled */
   protected _labeled: Set<FeatureID>;
 
@@ -121,13 +137,33 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   protected _rasterDrainScheduled: boolean;
   /** Map transform at the last labeling pass; used to detect zoom/rotation changes that need a full relabel */
   protected _tPrev: { x: number; y: number; z: number; r: number };
+  /** The features whose labels are to be looked at: they changed, or their label was taken away (see `render`) */
+  protected _pending: Set<FeatureID>;
+  /** Whether every feature in the scene is to be looked at, as after a zoom (see `reset`) */
+  protected _placeAll: boolean;
+  /**
+   * The features that have a label and got no place for it, with the box in label space where
+   * the label would have gone. They're tried again when room is made there (see `_retryUnplaced`).
+   */
+  protected _unplaced: Map<FeatureID, LabelRoom>;
+  /** Boxes in label space where a label was taken away since the last placement */
+  protected _freed: LabelRoom[];
+  /** Whether the last call to `placeTextLabel` or `placeRopeLabel` placed a label */
+  protected _didPlace: boolean;
+  /** The red boxes that show what labels avoid, in the label debug view, by feature (see `renderDebugAvoids`) */
+  protected _debugAvoids: Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>;
   /** Whether the last frame put off placing labels (so that another frame should follow it) */
   protected _placementWaiting: boolean;
-  /** Whether placing labels was put off because a frame was out of time (it waits one frame for that, not more) */
-  protected _waitedForTime: boolean;
+  /**
+   * The features that are ready for a label and haven't been tried yet. A frame places as many
+   * as it has time for, the ones in view first (see `_placeQueued`).
+   */
+  protected _queue: Set<FeatureID>;
+  /** When the zoom and rotation will have stayed the same for long enough to place labels (`RenderFrame.time`) */
+  protected _settleAt: number;
+  /** How many features this frame has placed labels for (see `MIN_PLACED`) */
+  protected _numTried: number;
 
-  /** Tracks the difference between the top left corner of the screen and the parent "origin" container */
-  protected _labelOffset: PIXI.Point;
   /** Pixi TextStyle for normal-weight label text */
   protected _textStyleNormal: PIXI.TextStyle;
   /** Pixi TextStyle for italic label text */
@@ -147,7 +183,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelContainer = null;
 
     // Keep track of the labelable features we have processed
-    this._avoided = new Set<FeatureID>();
     this._labeled = new Set<FeatureID>();
 
     // Label placeholders — store the placement props for every possible label.
@@ -173,10 +208,15 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // We reset the labeling when scale or rotation change
     this._tPrev = { x: 0, y: 0, z: 1, r: 0 };
     this._placementWaiting = false;
-    this._waitedForTime = false;
-
-    // Tracks the difference between the top left corner of the screen and the parent "origin" container
-    this._labelOffset = new PIXI.Point();
+    this._queue = new Set<FeatureID>();
+    this._settleAt = 0;
+    this._numTried = 0;
+    this._pending = new Set<FeatureID>();
+    this._placeAll = true;
+    this._unplaced = new Map<FeatureID, LabelRoom>();
+    this._freed = [];
+    this._didPlace = false;
+    this._debugAvoids = new Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>();
 
     // For ASCII-only labels, we can use PIXI.BitmapText to avoid generating label textures
     PIXI.BitmapFont.install({ name: 'label-normal', style: TEXTSTYLE_NORMAL });
@@ -202,10 +242,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     spatial.clearCache(SPATIAL_LABELS);
     spatial.clearCache(SPATIAL_DEBUG);
-    this._avoided.clear();
+    this.scene.avoidGrid?.clearLabels();
     this._labeled.clear();
     this._placeholders.clear();
     this._debugSprites.clear();
+    this._debugAvoids?.clear();      // (their sprites go with the containers, below)
+    this._pending?.clear();
+    this._placeAll = true;           // nothing is labeled now: look at every feature once
+    this._unplaced?.clear();
+    this._queue?.clear();
+    if (this._freed) this._freed.length = 0;
     this._featureBoxes.clear();
     this._pendingRasters.clear();
     if (this._rasterDrainScheduled) {
@@ -245,7 +291,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     labelOriginContainer.addChild(debugContainer, labelContainer);
 
     for (const feature of this.scene.features.values()) {
-      (feature as any)._labelDirty = false;
+      feature.labelPlaced();
     }
   }
 
@@ -257,8 +303,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   public resetFeature(featureID: FeatureID): void {
     const spatial = this.context.systems.spatial!;
-    this._avoided.delete(featureID);
     this._labeled.delete(featureID);
+    this._unplaced.delete(featureID);
+    this._queue.delete(featureID);
+    this._pending.add(featureID);     // to be placed again, if it's still there
 
     const labelIDs = new Set<LabelID>();
     const debugObjectIDs = new Set<string>();
@@ -273,6 +321,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (contents) {
         if (contents.type === 'label' || contents.type === 'avoid') {
           spatial.removeItems(SPATIAL_LABELS, boxID);
+          if (contents.cells) {
+            const size = this.scene.avoidGrid.cellSize;
+            const c = contents.cells;
+            this._freed.push([c[0] * size, c[1] * size, (c[2] + 1) * size, (c[3] + 1) * size]);
+            this.scene.avoidGrid.unmark('label', contents.cells);
+            contents.cells = null;
+          }
         }
         if (contents.type === 'debug') {
           spatial.removeItems(SPATIAL_DEBUG, boxID);
@@ -313,18 +368,26 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * The labels layer has no features of its own to draw again later. It reports 1 while placing
-   * labels is waiting for a later frame, so that the frame comes (see `render`).
+   * labels is waiting for a later frame, so that the frame comes (see `render`): placement was
+   * put off, or something was drawn over a label after this frame's placement.
    * @return 1 if placement is waiting, otherwise 0
    */
   public override get numWaiting(): number {
-    return this._placementWaiting ? 1 : 0;
+    if (this._placementWaiting || this.scene.numAvoidHits > 0) return 1;
+    // Room was made, and something is waiting for room
+    if (this._unplaced.size > 0 && (this._freed.length > 0 || this.scene.numAvoidFrees > 0)) return 1;
+    return 0;
   }
 
 
   /**
    * Render all the labels. This is a multi-step process:
-   * - gather avoids - these are places in the scene that we don't want a label
-   * - label placement - do the math of figuring out where labels should be
+   * - avoids - the places where we don't want a label. The features that labels avoid mark
+   *   themselves in the scene's avoid grid as they're drawn; here we take back the labels that
+   *   one of them landed on
+   * - label placement - do the math of figuring out where labels should be. The features that
+   *   are ready for a label wait on a queue, and each frame places what it has time for. Nothing
+   *   is placed while the zoom or rotation is changing (see `SETTLE_MS`)
    * - label rendering - show or hide labels based on their visibility
    *
    * @param frame - The frame being rendered
@@ -345,36 +408,19 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const didReset = (tCurr.z !== tPrev.z || tCurr.r !== tPrev.r);  // zoom or rotation changed
     if (didReset) {
       this.reset();                                    // reset all labels
+      this._settleAt = frame.time + SETTLE_MS;         // ..and wait for the view to hold still
     }
     this._tPrev = tCurr;
 
-    // Placing labels can wait. They go by the shapes of the features, so they wait until the
-    // features in view have been drawn again. And if this frame is out of time, they wait for the
-    // next one. Unless the user asked for the frame: then they're placed now.
-    // (The labels that exist are still drawn, where they belong.)
-    let placeNow = true;
-    if (!frame.urgent) {
-      if (frame.waitingInView > 0) {
-        placeNow = false;
-      } else if (!frame.hasTime() && !this._waitedForTime) {
-        placeNow = false;
-        this._waitedForTime = true;
-      }
-    }
-    this._placementWaiting = !placeNow;
+    // Placing labels waits for the view: while the zoom or rotation is changing, every label
+    // placed is taken away at the next step, and would only flash. (A pan moves the labels along.)
+    const settled = frame.time >= this._settleAt;
 
-    if (placeNow) {
-      this._waitedForTime = false;
-      if (!didReset) {
-        // (Over the values: `for (const [id, feature] of map)` makes an array for every entry,
-        // and this walks every feature in the scene on every frame.)
-        for (const feature of this.scene.features.values()) {
-          if ((feature as any)._labelDirty) {       // reset only the changed labels
-            this.resetFeature(feature.id);
-            (feature as any)._labelDirty = false;
-          }
-        }
-      }
+    // The features that were drawn, shown, hidden or destroyed since the last frame said so
+    // to the scene. Those are the only ones whose labels can need anything.
+    const changedIDs = this.scene.takeChangedFeatures();
+    for (const featureID of changedIDs) {
+      this._pending.add(featureID);
     }
 
 
@@ -385,26 +431,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const bearing = viewport.transform.rotation;
     const worldScale = origin.scale.x;
 
-    // Compute `labelOffset` — the screen-space anchor we subtract from feature positions
-    // before caching them in the rbush. The key invariant is that `labelOffset` must change
-    // by exactly the pan delta on each frame, so `featureScreen − labelOffset` is invariant
-    // under panning (and the cached rbush coords stay valid as the user pans around).
-    //
-    // `origin.toGlobal(P_local)` gives us that invariance automatically for any constant P_local
-    // (since only `origin.position` changes during pan, and it adds the same delta regardless
-    // of P_local). The naive choice P_local = (0, 0) is world-coord [0,0] — far from the
-    // viewport at high zooms, producing huge labelOffset values that cause GPU float32
-    // precision loss in MeshRope vertex math (visible as distorted rope label text).
-    //
-    // Instead, pick P_local so it maps near the viewport: subtract off the constant
-    // `(pixiT - WORLD_HALF*ws)` term that origin.position carries for world→screen scaling.
-    // The `viewport` passed in here is the pixi viewport (see GraphicsSystem._app).
-    const labelOffset = this._labelOffset;
-    const pixiT = viewport.transform.translation;
-    origin.toGlobal({
-      x: WORLD_HALF - pixiT[0] / worldScale,
-      y: WORLD_HALF - pixiT[1] / worldScale
-    }, labelOffset);
+    // Label space (the screen minus `labelOffset`) is the scene's, worked out before the layers
+    // render: see `PixiScene.updateLabelSpace`.
+    const labelOffset = this.scene.labelOffset;
 
     // Position the labels group to render in screen space.
     // `origin` now carries both the pan offset and world-scale transforms,
@@ -418,33 +447,72 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const labelOriginContainer = this.labelOriginContainer!;
     labelOriginContainer.position.set(-stage.position.x + labelOffset.x, -stage.position.y + labelOffset.y);
 
-    if (placeNow) {
-      // Collect features to avoid.
-      this.gatherAvoids();
+    if (settled) {
+      // Take back the labels that something was drawn over.
+      this.resolveAvoidHits();
+      // ..and try the features again that had no room, where room was made.
+      this._retryUnplaced();
 
-      // Collect features to place labels on.
-      const points: PixiFeaturePoint[] = [];
-      const lines: PixiFeatureLine[] = [];
-      const polygons: PixiFeaturePolygon[] = [];
-      for (const feature of this.scene.features.values()) {
-        // If the feature can be labeled, and hasn't yet been, add it to the list for placement.
-        // (Not one that's still waiting to be drawn: it's labeled once it has its shape.)
+      // Look at the features that changed, or after a zoom, at all of them. The ones that are
+      // ready for a label go on the queue.
+      const consider = (feature: AbstractPixiFeature): void => {
+        if (feature.layer === this) return;     // (a label is a feature too)
+        if (feature.labelDirty) {               // its shape, label or visibility changed: place it again
+          if (this._labeled.has(feature.id)) {
+            this.resetFeature(feature.id);
+          }
+          feature.labelPlaced();
+        }
+        // If the feature can be labeled, and hasn't yet been, add it to the queue for placement.
+        // (Not one that's still waiting to be drawn: it's labeled once it has its shape, and it
+        // says so then.)
         if (feature.label && feature.visible && !feature.dirty && !this._labeled.has(feature.id)) {
-          if (feature.type === 'Point') {
-            points.push(feature as PixiFeaturePoint);
-          } else if (feature.type === 'LineString') {
-            lines.push(feature as PixiFeatureLine);
-          } else if (feature.type === 'Polygon') {
-            polygons.push(feature as PixiFeaturePolygon);
+          this._queue.add(feature.id);
+        } else {
+          this._queue.delete(feature.id);
+        }
+      };
+
+      if (this._placeAll) {
+        this._placeAll = false;
+        for (const feature of this.scene.features.values()) {
+          consider(feature);
+        }
+      } else {
+        for (const featureID of [...this._pending]) {
+          const feature = this.scene.features.get(featureID);
+          if (feature) {
+            consider(feature);
+          } else {                              // it's gone, and its label with it
+            this._labeled.delete(featureID);
+            this._unplaced.delete(featureID);
+            this._queue.delete(featureID);
+            if (this._featureBoxes.has(featureID)) {
+              this.resetFeature(featureID);
+            }
           }
         }
       }
+      this._pending.clear();
 
-      // Points first, then lines (so line labels can avoid point labels)
-      this.labelPoints(points);
-      this.labelLines(lines);
-      this.labelPolygons(polygons);
+      // Place what's on the queue, as far as this frame's time goes.
+      // - What the user just changed is placed now, whatever the time.
+      // - The rest goes by the shapes of the features around it, so it waits until the features
+      //   in view have been drawn again. (A label placed before a point is drawn there would
+      //   be taken away again: right in the end, but it would flash.)
+      this._numTried = 0;
+      if (frame.urgent) {
+        const urgentIDs: FeatureID[] = [];
+        for (const featureID of changedIDs) {
+          if (this._queue.has(featureID)) urgentIDs.push(featureID);
+        }
+        this._placeQueued(urgentIDs, frame, true);
+      }
+      if (this._queue.size && frame.waitingInView === 0) {
+        this._placeQueued(this._queue, frame, false);
+      }
     }
+    this._placementWaiting = !settled || this._queue.size > 0;
 
     this.labelContainer!.visible = true;
     this.renderLabels(frame, viewport);
@@ -453,6 +521,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (showDebug) {
       this.debugContainer!.visible = true;
       this.renderDebug();
+      this.renderDebugAvoids();
     } else {
       this.debugContainer!.visible = false;
     }
@@ -601,108 +670,24 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * Gather the avoidable features, create boxes for them,
-   *  and insert them into the placement Rbush.
-   * If a new avoidance collides with an already placed label,
-   *  destroy the label and flag the feature as labeldirty for relabeling
+   * Takes back the labels that something has been drawn over since the last placement.
+   * The points and vertices that labels avoid mark themselves in the scene's avoid grid as
+   * they're drawn, and the scene notes where one landed on a label (a tile arrives, a way is
+   * selected and gets vertices). Those labels are placed again, somewhere else; no other
+   * label moves.
    */
-  public gatherAvoids(): void {
+  public resolveAvoidHits(): void {
     const spatial = this.context.systems.spatial!;
-    const showDebug = this.context.getDebug('label');
+    const size = this.scene.avoidGrid.cellSize;
 
-    // Gather the containers that have avoidable stuff on them.
-    const avoidContainers: PIXI.Container[] = [];
-
-    const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
-    const selectedContainer = mapUiLayer.selected;
-    if (selectedContainer) {
-      avoidContainers.push(selectedContainer);
-    }
-    // The points of every spatial ID (`points/osm`, `points/<dataset>`, …), see `design/scene.md`
-    const pointsContainer = this.scene.groups.get('points')!;
-    if (pointsContainer) {
-      avoidContainers.push(...this.scene.worldContainersIn(pointsContainer));
-    }
-
-    // For each container, gather the things to avoid.
-    const labelItems: LabelItem[] = [];
-    const debugItems: LabelItem[] = [];
-
-    const avoidObject = (sourceObject: PIXI.Container): void => {
-      if (!sourceObject.visible || !sourceObject.renderable) return;
-      const featureID = sourceObject.label;
-
-      if (this._avoided.has(featureID)) return;  // we've processed this avoidance already
-      this._avoided.add(featureID);
-
-      // The rectangle is in global/screen coordinates (where [0,0] is top left).
-      // To work in a coordinate system that is consistent, remove the label offset.
-      // If we didn't do this, as the user pans or rotates the map, the objects that leave
-      // and re-enter the scene would end up with different coordinates each time!
-      const fRect = sourceObject.getBounds().rectangle;
-      fRect.x -= this._labelOffset.x;
-      fRect.y -= this._labelOffset.y;
-
-      const EPSILON = 0.01;
-
-      const avoidItem: LabelItem = {
-        id: `${featureID}-avoid`,
-        contents: {
-          type: 'avoid',
-          featureID: featureID,
-          labelID: null
-        },
-        minX: fRect.x + EPSILON,
-        minY: fRect.y + EPSILON,
-        maxX: fRect.x + fRect.width - EPSILON,
-        maxY: fRect.y + fRect.height - EPSILON
-      };
-
-      this._cacheBox(avoidItem);
-      labelItems.push(avoidItem);
-
-      if (showDebug) {
-        const debugItem: LabelItem = {
-          id: avoidItem.id + '-debug',
-          contents: {
-            type: 'debug',
-            featureID: featureID,
-            tint: 0xff0000,   // red (avoid)
-            objectID: null
-          },
-          minX: avoidItem.minX,
-          minY: avoidItem.minY,
-          maxX: avoidItem.maxX,
-          maxY: avoidItem.maxY
-        };
-
-        this._cacheBox(debugItem);
-        debugItems.push(debugItem);
-      }
-
-      // If there is already a label where this avoid box is, we will need to redo that label.
-      // This is somewhat common that a label will be placed somewhere, then as more map loads,
-      // we learn that some of those junctions become important and we need to avoid them.
-      for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, avoidItem)) {
+    for (const cells of this.scene.takeAvoidHits()) {
+      const box = { minX: cells[0] * size, minY: cells[1] * size, maxX: (cells[2] + 1) * size, maxY: (cells[3] + 1) * size };
+      for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, box)) {
         const hit = item.contents as LabelContents;
-        if (hit.type === 'label' && hit.featureID) {
+        if (hit.type === 'label' && hit.labelID && hit.featureID) {
           this.resetFeature(hit.featureID);
         }
       }
-    };
-
-    for (const container of avoidContainers) {
-      for (const child of container.children) {
-        avoidObject(child as PIXI.Container);
-      }
-    }
-
-    // Bulk insert any items we collected..
-    if (labelItems.length) {
-      spatial.addItems(SPATIAL_LABELS, labelItems);
-    }
-    if (showDebug && debugItems.length) {
-      spatial.addItems(SPATIAL_DEBUG, debugItems);
     }
   }
 
@@ -727,32 +712,51 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * This calculates the placement, but does not actually add the label to the scene.
-   * @param features - The features to place point labels on
+   * @param features - The features to place labels on
+   * @param stop - Asked before each feature whether to stop there (the frame is out of time)
+   * @return `false` if it stopped before the end of the list
    */
-  public labelPoints(features: PixiFeaturePoint[]): void {
+  public labelPoints(features: PixiFeaturePoint[], stop?: () => boolean): boolean {
     // Sort by container y-position (north-to-south in world coords) for stable placement priority.
     features.sort((a, b) => a.container.position.y - b.container.position.y);
+    const tempVec: Vec2 = [0, 0];
 
     for (const feature of features) {
       const featureID = feature.id;
 
+      if (stop?.()) return false;                  // (what's left stays on the queue)
+      this._queue.delete(featureID);
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
       if (!feature.label) continue;  // no label needed
 
       const measurement = this.measureLabel(feature.label, 'normal');
+      this._didPlace = false;
       this.placeTextLabel(feature, measurement);
+
+      if (!this._didPlace) {   // no room: remember where it would have gone (anywhere around the point)
+        const origin = feature.geometry?.world?.origin;
+        if (origin) {
+          const [x, y] = this.scene.worldToLabel(origin[0], origin[1], tempVec);
+          const dx = measurement.width + 50;
+          const dy = measurement.height + 50;
+          this._unplaced.set(featureID, [x - dx, y - dy, x + dx, y + dy]);
+        }
+      }
     }
+    return true;
   }
 
 
   /**
    * Lines are labeled with `PIXI.SimpleRope` that run along the line.
    * This calculates the placement, but does not actually add the rope label to the scene.
-   * @param features - The features to place point labels on
+   * @param features - The features to place labels on
+   * @param stop - Asked before each feature whether to stop there (the frame is out of time)
+   * @return `false` if it stopped before the end of the list
    */
-  public labelLines(features: PixiFeatureLine[]): void {
+  public labelLines(features: PixiFeatureLine[], stop?: () => boolean): boolean {
     /**
      * Priority sort the labels according to what level their feature has been rendered on.
      * This is hacky, but we can sort the line labels by their parent container label (name).
@@ -769,12 +773,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     features.sort((a, b) => level(b) - level(a));
 
     const temp = new PIXI.Point();
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
       const featureID = feature.id;
       const localCoords = feature.geometry?.local?.coords as Vec2[] | undefined;
 
+      if (stop?.()) return false;                  // (what's left stays on the queue)
+      this._queue.delete(featureID);
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
@@ -795,24 +801,31 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
 
       const measurement = this.measureLabel(feature.label, 'normal');
+      this._didPlace = false;
       this.placeRopeLabel(feature, measurement, labelCoords);
+      if (!this._didPlace) this._noteUnplaced(featureID, labelCoords);
     }
+    return true;
   }
 
 
   /**
    * Polygons are labeled with `PIXI.SimpleRope` that run along the inside of the perimeter.
    * This calculates the placement, but does not actually add the rope label to the scene.
-   * @param features - The features to place point labels on
+   * @param features - The features to place labels on
+   * @param stop - Asked before each feature whether to stop there (the frame is out of time)
+   * @return `false` if it stopped before the end of the list
    */
-  public labelPolygons(features: PixiFeaturePolygon[]): void {
+  public labelPolygons(features: PixiFeaturePolygon[], stop?: () => boolean): boolean {
     const temp = new PIXI.Point();
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
       const featureID = feature.id;
       const outer = feature.geometry?.local?.outer;
 
+      if (stop?.()) return false;                  // (what's left stays on the queue)
+      this._queue.delete(featureID);
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
@@ -851,7 +864,118 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
       }
 
+      this._didPlace = false;
       this.placeRopeLabel(feature, measurement, coords);
+      if (!this._didPlace) this._noteUnplaced(featureID, coords);
+    }
+    return true;
+  }
+
+
+  /**
+   * Places labels for features on the queue: the ones in view first, and of those the points,
+   * then the lines, then the polygons (so that a line's label fits around the points' labels).
+   * It stops when the frame is out of time, after a minimum (`MIN_PLACED`). What's left stays
+   * on the queue for the next frame.
+   * @param featureIDs - The features to place labels for, all of them on the queue
+   * @param frame - The frame being rendered
+   * @param force - `true` to place them all, whatever the time
+   * @return `false` if it stopped before the end
+   */
+  protected _placeQueued(featureIDs: Iterable<FeatureID>, frame: RenderFrame, force: boolean): boolean {
+    const viewBox = frame.viewBox;
+
+    // [in view, outside]
+    const points: PixiFeaturePoint[][] = [[], []];
+    const lines: PixiFeatureLine[][] = [[], []];
+    const polygons: PixiFeaturePolygon[][] = [[], []];
+
+    for (const featureID of [...featureIDs]) {
+      const feature = this.scene.features.get(featureID);
+      // (One that isn't ready anymore says so when it is again.)
+      if (!feature || !feature.label || !feature.visible || feature.dirty) {
+        this._queue.delete(featureID);
+        continue;
+      }
+      const extent = feature.geometry?.world?.extent;
+      const i = (!viewBox || !extent || extent.intersects(viewBox)) ? 0 : 1;
+      if (feature.type === 'Point') {
+        points[i].push(feature as PixiFeaturePoint);
+      } else if (feature.type === 'LineString') {
+        lines[i].push(feature as PixiFeatureLine);
+      } else if (feature.type === 'Polygon') {
+        polygons[i].push(feature as PixiFeaturePolygon);
+      } else {
+        this._queue.delete(featureID);
+      }
+    }
+
+    const stop = force ? undefined : () => (this._numTried++ >= MIN_PLACED && !frame.hasTime());
+    for (const i of [0, 1]) {
+      if (!this.labelPoints(points[i], stop)) return false;
+      if (!this.labelLines(lines[i], stop)) return false;
+      if (!this.labelPolygons(polygons[i], stop)) return false;
+    }
+    return true;
+  }
+
+
+  /**
+   * Remembers a line or polygon that had a label and no room for it, so that it's tried again
+   * when room is made along it (see `_retryUnplaced`).
+   * @param featureID - The feature
+   * @param coords - The coordinates its label would have run along, in label space
+   */
+  protected _noteUnplaced(featureID: FeatureID, coords: Vec2[]): void {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of coords) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (minX <= maxX) {
+      this._unplaced.set(featureID, [minX, minY, maxX, maxY]);
+    }
+  }
+
+
+  /**
+   * Puts the features that had no room for their label back on the list to be placed, where
+   * room has been made since: a label was taken away, or something that labels avoid was
+   * hidden, moved or destroyed (the vertices of a way that isn't selected anymore).
+   * Nothing else would try them again: a feature is only looked at when it changes.
+   */
+  protected _retryUnplaced(): void {
+    const size = this.scene.avoidGrid.cellSize;
+
+    let freed = this._freed;
+    this._freed = [];
+    for (const c of this.scene.takeAvoidFrees()) {
+      freed.push([c[0] * size, c[1] * size, (c[2] + 1) * size, (c[3] + 1) * size]);
+    }
+    if (!freed.length || !this._unplaced.size) return;
+
+    if (freed.length > MAX_FREED) {   // too many to compare one by one
+      const all: LabelRoom = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const box of freed) {
+        if (box[0] < all[0]) all[0] = box[0];
+        if (box[1] < all[1]) all[1] = box[1];
+        if (box[2] > all[2]) all[2] = box[2];
+        if (box[3] > all[3]) all[3] = box[3];
+      }
+      freed = [all];
+    }
+
+    for (const [featureID, room] of this._unplaced) {
+      for (const box of freed) {
+        if (box[0] <= room[2] && box[2] >= room[0] && box[1] <= room[3] && box[3] >= room[1]) {
+          this._unplaced.delete(featureID);
+          this._labeled.delete(featureID);
+          this._pending.add(featureID);
+          break;
+        }
+      }
     }
   }
 
@@ -867,6 +991,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature) return;
 
     const spatial = this.context.systems.spatial!;
+    const grid = this.scene.avoidGrid;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
@@ -878,8 +1003,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // If we didn't do this, as the user pans or rotates the map, the objects that leave
     // and re-enter the scene would end up with different coordinates each time!
     const fRect = container.getBounds().clone().pad(1, 0);
-    fRect.x -= this._labelOffset.x;
-    fRect.y -= this._labelOffset.y;
+    fRect.x -= this.scene.labelOffset.x;
+    fRect.y -= this.scene.labelOffset.y;
 
     const fLeft = fRect.x;
     const fTop = fRect.y;
@@ -954,6 +1079,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       ];
     }
 
+    // A point's label goes right next to the point, and the point is something to avoid: its
+    // own cells would be in the way of every place tried. So they're set aside while its label
+    // is placed. (The points around it stay in the way.)
+    const ownCells = feature.avoidCells;
+    if (ownCells) {
+      grid.unmark('avoid', ownCells);
+    }
+
 //    let picked = null;
     for (const placementID of attempts) {
       const [x, y] = placements[placementID];
@@ -978,7 +1111,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // Store the placeholder props, and insert the box into the rbush so
       // nothing else gets placed there.  The PixiFeatureLabel itself is
       // created lazily in renderObjects() the first time this label is in view.
-      if (!spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
+      // (Against the other labels, the boxes themselves are compared: there are few of them, and
+      // the grid's cells would keep two labels further apart than they need to be.)
+      const cells = grid.cellsOf(labelItem.minX, labelItem.minY, labelItem.maxX, labelItem.maxY);
+      if (cells && !grid.isTaken('avoid', cells) && !spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
 //        picked = placementID;
         const style = feature.style as any;
         const props: TextLabelProps = {
@@ -992,9 +1128,12 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           tint: style?.label?.color ?? 0xeeeeee
         };
         this._placeholders.set(labelID, props);
+        this._didPlace = true;
 
         this._cacheBox(labelItem);
         spatial.addItems(SPATIAL_LABELS, labelItem);
+        labelItem.contents.cells = cells;
+        grid.mark('label', cells);
 
         if (showDebug) {
           const debugItem: LabelItem = {
@@ -1018,6 +1157,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
     }
 
+    if (ownCells) {
+      grid.mark('avoid', ownCells);
+    }
+
 //    if (!picked) {
 //      labelObj.destroy();  // didn't place it
 //    }
@@ -1037,6 +1180,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const spatial = this.context.systems.spatial!;
+    const grid = this.scene.avoidGrid;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
 
@@ -1085,6 +1229,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       currChain = [];   // reset chain
     };
 
+
+    // Whether a box is clear of everything labels avoid (by the grid), and of the other labels
+    // (by their boxes: there are few of them, and cells would keep labels further apart).
+    const isFree = (item: LabelItem): boolean => {
+      const cells = grid.cellsOf(item.minX, item.minY, item.maxX, item.maxY);
+      return !!cells && !grid.isTaken('avoid', cells) && !spatial.hasItemsAtBox(SPATIAL_LABELS, item);
+    };
 
     // Walk the line, creating chains of bounding boxes,
     // and testing for candidate chains where labels can go.
@@ -1135,7 +1286,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           finishChain();
           debugItem.contents.tint = 0xff33ff;  // magenta (too bendy)
 
-        } else if (spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
+        } else if (!isFree(labelItem)) {
           finishChain();
           debugItem.contents.tint = 0xff0000;  // red (collision)
 
@@ -1175,6 +1326,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         ropeCoords.push(chain[i].coord);
         const labelItem = chain[i].labelItem;
         labelItem.contents.labelID = labelID;
+        const cells = grid.cellsOf(labelItem.minX, labelItem.minY, labelItem.maxX, labelItem.maxY);
+        if (cells) {
+          labelItem.contents.cells = cells;
+          grid.mark('label', cells);
+        }
         this._cacheBox(labelItem);
         labelItems.push(labelItem);
       }
@@ -1210,6 +1366,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         tint: style?.label?.color ?? 0xeeeeee
       };
       this._placeholders.set(labelID, props);
+      this._didPlace = true;
     });
 
     // Bulk insert any items we collected..
@@ -1240,7 +1397,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
       minY: screen.y - labelOffset.y,
@@ -1293,13 +1450,51 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
+   * Shows what labels avoid, as red boxes, in the label debug view (`context.setDebug('label')`).
+   * The avoids are marks in the scene's avoid grid, made by the features themselves, so this
+   * asks every feature for the cells it marked. (A walk over the whole scene, on every frame:
+   * for the debug view only.)
+   */
+  public renderDebugAvoids(): void {
+    const size = this.scene.avoidGrid.cellSize;
+    const debugAvoids = this._debugAvoids;
+    const seen = new Set<FeatureID>();
+
+    for (const feature of this.scene.features.values()) {
+      const cells = feature.avoidCells;
+      if (!cells) continue;
+      seen.add(feature.id);
+
+      const existing = debugAvoids.get(feature.id);
+      if (existing?.cells === cells) continue;      // (a feature gets a new array when its cells change)
+      existing?.sprite.destroy();
+
+      const x = cells[0] * size;
+      const y = cells[1] * size;
+      const w = (cells[2] - cells[0] + 1) * size;
+      const h = (cells[3] - cells[1] + 1) * size;
+      const sprite = getDebugBBox(x, y, w, h, 0xff0000, 0.65, `${feature.id}-avoid-debug`);   // red (avoid)
+      this.debugContainer!.addChild(sprite);
+      debugAvoids.set(feature.id, { sprite: sprite, cells: cells });
+    }
+
+    for (const [featureID, { sprite }] of debugAvoids) {
+      if (!seen.has(featureID)) {
+        sprite.destroy();
+        debugAvoids.delete(featureID);    // (deleting from a Map while iterating over it is safe)
+      }
+    }
+  }
+
+
+  /**
    * This renders any of the debug sprites in the view
    */
   public renderDebug(): void {
     const spatial = this.context.systems.spatial!;
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
-    const labelOffset = this._labelOffset;
+    const labelOffset = this.scene.labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
       minY: screen.y - labelOffset.y,

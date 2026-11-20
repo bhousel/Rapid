@@ -410,6 +410,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
         if (!feature) {
           feature = new PixiFeaturePoint(this, featureID);
+          feature.labelAvoid = true;   // labels keep clear of it
           feature.style = pointStyle;
           feature.parentContainer = parentContainer;
         }

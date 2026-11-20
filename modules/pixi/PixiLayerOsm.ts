@@ -72,6 +72,12 @@ interface OsmData {
 interface RelatedIDs {
   descendantIDs: Set<EntityID>;
   siblingIDs: Set<EntityID>;
+  /**
+   * The related IDs that are there to be grabbed: those of what's selected or being drawn, and
+   * not of what's only hovered. Labels keep clear of these vertices and midpoints. They don't
+   * for a hover, which would push labels around under the pointer.
+   */
+  handleIDs: Set<EntityID>;
 }
 
 /** The kinds of OSM data the layer draws, as it sorts them in `OsmData` */
@@ -331,7 +337,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._midpoints = new Map<DataID, Midpoint>();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
-    this._lastRelated = { descendantIDs: new Set<EntityID>(), siblingIDs: new Set<EntityID>() };
+    this._lastRelated = { descendantIDs: new Set<EntityID>(), siblingIDs: new Set<EntityID>(), handleIDs: new Set<EntityID>() };
     this._madeCount = 0;
     this._makingOutside = false;
     this._changedIDs = new Set<DataID>();
@@ -809,6 +815,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const hoveredIDs = this.scene.getDataWithClass('hover');
     const drawingIDs = this.scene.getDataWithClass('drawing');
     const dataIDs = new Set<EntityID>([...selectedIDs, ...hoveredIDs, ...drawingIDs]);
+    const hoverOnlyIDs = new Set<EntityID>();   // hovered, and neither selected nor being drawn
+    for (const hoveredID of hoveredIDs) {
+      if (!selectedIDs.has(hoveredID) && !drawingIDs.has(hoveredID)) {
+        hoverOnlyIDs.add(hoveredID);
+      }
+    }
 
     // Experiment: avoid showing child vertices/midpoints for too small parents
     for (const dataID of dataIDs) {
@@ -834,6 +846,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const entity = graph.hasEntity(dataID);
       if (entity?.type !== 'node') continue;   // nodes only
       for (const parent of graph.parentWays(entity)) {
+        if (hoverOnlyIDs.has(dataID) && !interestingIDs.has(parent.id)) {
+          hoverOnlyIDs.add(parent.id);
+        } else if (!hoverOnlyIDs.has(dataID)) {
+          hoverOnlyIDs.delete(parent.id);
+        }
         interestingIDs.add(parent.id);
       }
     }
@@ -842,11 +859,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // These will determine which vertices and midpoints get drawn.
     const related: RelatedIDs = {
       descendantIDs: new Set<EntityID>(),
-      siblingIDs: new Set<EntityID>()
+      siblingIDs: new Set<EntityID>(),
+      handleIDs: new Set<EntityID>()
     };
     for (const interestingID of interestingIDs) {
       this.getSelfAndDescendants(interestingID, related.descendantIDs);
       this.getSelfAndSiblings(interestingID, related.siblingIDs);
+      if (!hoverOnlyIDs.has(interestingID)) {
+        this.getSelfAndDescendants(interestingID, related.handleIDs);
+        this.getSelfAndSiblings(interestingID, related.handleIDs);
+      }
     }
 
     return related;
@@ -1522,6 +1544,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           let poiFeature = this.features.get(poiFeatureID) as PixiFeaturePoint | undefined;
           if (!poiFeature) {
             poiFeature = new PixiFeaturePoint(this, poiFeatureID);
+            poiFeature.labelAvoid = true;   // labels keep clear of it
             poiFeature.props.isVirtual = true;
           }
 
@@ -2080,6 +2103,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       // Change layer stacking if necessary: above everything, or among the points in its tile.
       // (A new shape or a new zoom may put it in another tile.)
+      // Labels keep clear of a vertex, unless it's only drawn because its way is hovered.
+      // (A hover that pushed labels aside would make them jump around under the pointer.)
+      const labelAvoid = isInteresting || related.handleIDs.has(nodeID);
+      if (feature.labelAvoid !== labelAvoid) {
+        feature.labelAvoid = labelAvoid;
+        if (!feature.dirty) feature.updateAvoid();   // (a dirty one marks its place when it's drawn)
+      }
+
       if (isRelated) {
         feature.parentContainer = selectedContainer;
       } else if (feature.dirty || feature.container.parent === selectedContainer) {
@@ -2137,6 +2168,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const extent = graph.geometry(node).parts[0]?.world?.extent;
         if (this._waitToMake('points', nodeID, extent, frame, node.isNew())) continue;
         feature = new PixiFeaturePoint(this, featureID);
+        feature.labelAvoid = true;   // labels keep clear of it
       }
 
       // If data has changed, replace it. (A node's geometry is its own, so a new shape is a new node.)
@@ -2317,6 +2349,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
       // (Every frame: the way's own redraw replaces its links to children)
       feature.addChildData(midpoint.props.wayID, midpoint.id);
+
+      // Labels keep clear of a midpoint, unless its way is only hovered (as for vertices).
+      const labelAvoid = related.handleIDs.has(midpoint.props.wayID);
+      if (feature.labelAvoid !== labelAvoid) {
+        feature.labelAvoid = labelAvoid;
+        if (!feature.dirty) feature.updateAvoid();
+      }
 
       this.syncFeatureClasses(feature);
       if (feature.dirty) {

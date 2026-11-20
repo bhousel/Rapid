@@ -110,7 +110,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.visible = false;
       this._geomDirty = false;
       this._styleDirty = false;
-      return;
+      return;   // (hiding it told the scene that it changed)
     }
 
     // The container lives under the `world` Pixi container (in GraphicsSystem),
@@ -248,6 +248,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._styleDirty = false;
 
     this.updateHalo(viewport);
+    this.scene.featureChanged(this);
   }
 
 

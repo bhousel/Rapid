@@ -304,7 +304,185 @@ test('follows a zoom without a pass, and ends up with what a full pass shows', a
 });
 
 
+// Labels are placed around the points and vertices: each of those marks where it's drawn in the
+// scene's avoid grid, and no label goes there (see `design/graphics-system.md`, section 14).
+// (For a while the avoids were made for whole map tiles of points, wherever those were at the time.)
+test('marks every point in view for labels to avoid, and puts no label over a point', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const check = () => page.evaluate(() => {
+    const { gfx, spatial } = rapidContext.systems;
+    const scene = gfx.scene;
+    const grid = scene.avoidGrid;
+    const offset = scene.labelOffset;
+    const screen = gfx.pixi.screen;
+
+    const labelBoxes = spatial.getCache('labels').rbush.all().filter(item => item.contents.labelID).length;
+    const result = { points: 0, notMarked: [], markedElsewhere: [], underALabel: [], labelBoxes: labelBoxes };
+    for (const feature of scene.layers.get('osm').features.values()) {
+      if (feature.type !== 'Point' || !feature.visible || feature.dirty) continue;
+      const rect = feature.container.getBounds().rectangle;
+      if (rect.x + rect.width < 0 || rect.y + rect.height < 0 || rect.x > screen.width || rect.y > screen.height) continue;
+      result.points++;
+
+      // where it's drawn, a pixel in from each edge
+      const x = rect.x - offset.x;
+      const y = rect.y - offset.y;
+      const drawn = grid.cellsOf(x + 1, y + 1, x + rect.width - 1, y + rect.height - 1);
+      const marked = feature.avoidCells;
+      if (!marked) {
+        result.notMarked.push(feature.id);
+      } else if (!feature.viewfields && (marked[0] > drawn[0] || marked[1] > drawn[1] || marked[2] < drawn[2] || marked[3] < drawn[3])) {
+        result.markedElsewhere.push(feature.id);     // (hidden viewfields count in `getBounds`, and aren't marked)
+      }
+      if (marked && grid.isTaken('label', marked)) {
+        // a point's own label may touch it; another feature's may not cover it
+        const box = { minX: x + 2, minY: y + 2, maxX: x + rect.width - 2, maxY: y + rect.height - 2 };
+        if (spatial.getItemsAtBox('labels', box).some(item => item.contents.labelID && item.contents.featureID !== feature.id)) {
+          result.underALabel.push(feature.id);
+        }
+      }
+    }
+    return result;
+  });
+
+  const loaded = await check();
+  expect(loaded.points).toBeGreaterThan(20);
+  expect(loaded.labelBoxes).toBeGreaterThan(0);
+  expect(loaded.notMarked).toEqual([]);
+  expect(loaded.markedElsewhere).toEqual([]);
+  expect(loaded.underALabel).toEqual([]);
+
+  // ..and after a pan, with the points that came into view
+  await page.evaluate(async () => {
+    const { map } = rapidContext.systems;
+    for (let i = 0; i < 10; i++) {
+      map.pan([-12, -8]);
+      await new Promise(resolve => { requestAnimationFrame(resolve); });
+    }
+  });
+  await waitForIdle(page);
+  const panned = await check();
+  expect(panned.points).toBeGreaterThan(5);
+  expect(panned.notMarked).toEqual([]);
+  expect(panned.markedElsewhere).toEqual([]);
+  expect(panned.underALabel).toEqual([]);
+
+  // ..and in a view that's zoomed in and turned: label space is another one, and everything is marked again
+  await page.evaluate(() => {
+    const { gfx } = rapidContext.systems;
+    const viewport = rapidContext.viewport;
+    const t = viewport.transform.props;
+    const c = viewport.center();
+    return gfx.setTransformAsync({ x: c[0] + (t.x - c[0]) * 2, y: c[1] + (t.y - c[1]) * 2, z: t.z + 1, r: 0.6 }, 0);
+  });
+  await waitForIdle(page);
+  const turned = await check();
+  expect(turned.points).toBeGreaterThan(5);
+  expect(turned.notMarked).toEqual([]);
+  expect(turned.markedElsewhere).toEqual([]);
+  expect(turned.underALabel).toEqual([]);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
 // ..and when there are many features to make, as after a load, they're made over several frames too.
+
+test('leaves every label where it is while features are hovered', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // Where each label is, in label space
+  const placements = () => page.evaluate(() => {
+    const labels = rapidContext.systems.gfx.scene.layers.get('labels');
+    const result = {};
+    for (const [labelID, props] of labels._placeholders) {
+      result[labelID] = (props.kind === 'text') ? [props.x, props.y] : props.coords;
+    }
+    return result;
+  });
+
+  // The labeled lines: a hovered line gets its vertices drawn, along where its label runs
+  const wayIDs = await page.evaluate(() => {
+    const scene = rapidContext.systems.gfx.scene;
+    const labels = scene.layers.get('labels');
+    const ids = [];
+    for (const feature of scene.layers.get('osm').features.values()) {
+      if (feature.type === 'LineString' && feature.visible && labels._featureBoxes.has(feature.id)) {
+        ids.push(feature.data.id);
+      }
+    }
+    return ids.slice(0, 8);
+  });
+  expect(wayIDs.length).toBeGreaterThan(0);
+
+  const before = await placements();
+  expect(Object.keys(before).length).toBeGreaterThan(0);
+
+  for (const wayID of wayIDs) {
+    const vertices = await page.evaluate(id => {
+      const { gfx } = rapidContext.systems;
+      gfx.scene.setClass('hover', id);
+      gfx.requestFrame();
+      return rapidContext.systems.editor.staging.graph.entity(id).nodes.length;
+    }, wayID);
+    expect(vertices).toBeGreaterThan(1);
+    await waitForIdle(page);
+    expect(await placements()).toEqual(before);
+
+    await page.evaluate(id => {
+      const { gfx } = rapidContext.systems;
+      gfx.scene.unsetClass('hover', id);
+      gfx.requestFrame();
+    }, wayID);
+    await waitForIdle(page);
+    expect(await placements()).toEqual(before);
+  }
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
+
+test('places no labels while the zoom or rotation is changing, and places them once the view holds still', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const numLabels = () => page.evaluate(() => rapidContext.systems.gfx.scene.layers.get('labels')._placeholders.size);
+  expect(await numLabels()).toBeGreaterThan(0);
+
+  // A pinch, then a turn: a small step each frame. Every step takes all labels away, so any
+  // that were placed between two steps would only flash.
+  for (const [dz, dr] of [[0.01, 0], [0, 0.01]]) {
+    const shown = await page.evaluate(async ([dz, dr]) => {
+      const { gfx } = rapidContext.systems;
+      const viewport = rapidContext.viewport;
+      const labels = gfx.scene.layers.get('labels');
+      let most = 0;
+      for (let i = 0; i < 30; i++) {
+        const t = viewport.transform.props;
+        const c = viewport.center();
+        const k = 2 ** dz;
+        gfx.setTransformAsync({ x: c[0] + (t.x - c[0]) * k, y: c[1] + (t.y - c[1]) * k, z: t.z + dz, r: t.r + dr }, 0);
+        await new Promise(resolve => { requestAnimationFrame(resolve); });
+        most = Math.max(most, labels._placeholders.size);
+      }
+      return most;
+    }, [dz, dr]);
+    expect(shown).toBe(0);
+
+    await waitForIdle(page);
+    expect(await numLabels()).toBeGreaterThan(0);
+  }
+
+  expect(consoleErrors).toEqual([]);
+});
+
 test('makes features over several frames when there are many to make, and ends up with all of them', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
