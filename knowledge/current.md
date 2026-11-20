@@ -152,6 +152,9 @@ Still to do, in about this order:
   Bryan's calls on the list (Nov 20): 5, 7, 9, 18, 22 to the backlog (all there now, with the
   things found on the way); 13 (other layers keep their features) and 11 (styles) worth doing;
   20, 21, 23 not now.
+  **`pixi-8.23` is merged** (PR #10, Nov 20). On branch `label-avoids`: labels
+  avoid each point again, not each tile of points (`gatherAvoids()`; broken since the points
+  were split by tile), with a DOM test and an e2e test.
   Next: what's left of the garbage (Pixi's line builder with round joins is a quarter of it;
   `syncShader`), the 1.7 GB alive (a copy of the style per feature; ways' coordinates as
   arrays of pairs), labels placed in one

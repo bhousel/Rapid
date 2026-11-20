@@ -304,6 +304,67 @@ test('follows a zoom without a pass, and ends up with what a full pass shows', a
 });
 
 
+// Labels are placed around the points and vertices: each of those gets a box that labels avoid.
+// (The boxes were made for whole map tiles of points for a while, wherever those were at the time.)
+test('gives every point in view a box for labels to avoid, and puts no label over a point', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const check = () => page.evaluate(() => {
+    const { gfx, spatial } = rapidContext.systems;
+    const labels = gfx.scene.layers.get('labels');
+    const offset = labels._labelOffset;
+    const screen = gfx.pixi.screen;
+
+    const avoided = new Set();
+    let placed = 0;
+    for (const item of spatial.getCache('labels').rbush.all()) {
+      if (item.contents.type === 'avoid') avoided.add(item.contents.featureID);
+      else if (item.contents.labelID) placed++;
+    }
+
+    const result = { points: 0, withoutBox: [], underALabel: [], labelBoxes: placed };
+    for (const feature of gfx.scene.layers.get('osm').features.values()) {
+      if (feature.type !== 'Point' || !feature.visible || feature.dirty) continue;
+      const rect = feature.container.getBounds().rectangle;
+      if (rect.x + rect.width < 0 || rect.y + rect.height < 0 || rect.x > screen.width || rect.y > screen.height) continue;
+      result.points++;
+      if (!avoided.has(feature.id)) result.withoutBox.push(feature.id);
+
+      const x = rect.x - offset.x;
+      const y = rect.y - offset.y;
+      const inside = { minX: x + 2, minY: y + 2, maxX: x + rect.width - 2, maxY: y + rect.height - 2 };
+      const over = spatial.getItemsAtBox('labels', inside).some(item => item.contents.labelID && item.contents.featureID !== feature.id);
+      if (over) result.underALabel.push(feature.id);
+    }
+    return result;
+  });
+
+  const loaded = await check();
+  expect(loaded.points).toBeGreaterThan(20);
+  expect(loaded.labelBoxes).toBeGreaterThan(0);
+  expect(loaded.withoutBox).toEqual([]);
+  expect(loaded.underALabel).toEqual([]);
+
+  // ..and after a pan, with the points that came into view
+  await page.evaluate(async () => {
+    const { map } = rapidContext.systems;
+    for (let i = 0; i < 10; i++) {
+      map.pan([-12, -8]);
+      await new Promise(resolve => { requestAnimationFrame(resolve); });
+    }
+  });
+  await waitForIdle(page);
+  const panned = await check();
+  expect(panned.points).toBeGreaterThan(5);
+  expect(panned.withoutBox).toEqual([]);
+  expect(panned.underALabel).toEqual([]);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
 // ..and when there are many features to make, as after a load, they're made over several frames too.
 test('makes features over several frames when there are many to make, and ends up with all of them', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);

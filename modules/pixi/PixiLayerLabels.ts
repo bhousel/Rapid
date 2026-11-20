@@ -5,7 +5,7 @@ import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
 import { getDebugBBox, lineToPoly } from './helpers.ts';
 import { geomLineSegments } from '../geo/index.ts';
 
-import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { AbstractPixiFeature, FeatureContainer } from './AbstractPixiFeature.ts';
 import type { PixiFeatureLabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { SpatialItem } from '../core/SpatialSystem.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
@@ -628,8 +628,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const labelItems: LabelItem[] = [];
     const debugItems: LabelItem[] = [];
 
-    const avoidObject = (sourceObject: PIXI.Container): void => {
+    const avoidObject = (sourceObject: FeatureContainer): void => {
       if (!sourceObject.visible || !sourceObject.renderable) return;
+      // Not one that's still waiting to be drawn: it isn't where it will be, or as big. It's
+      // looked at again on a later placement, once it has been (it isn't remembered as avoided).
+      if (sourceObject.__feature__?.dirty) return;
       const featureID = sourceObject.label;
 
       if (this._avoided.has(featureID)) return;  // we've processed this avoidance already
@@ -691,10 +694,20 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
     };
 
-    for (const container of avoidContainers) {
-      for (const child of container.children) {
-        avoidObject(child as PIXI.Container);
+    // The features can be any number of containers down: a layer may sort its points into
+    // containers of its own (the OSM layer has one per map tile, each in a render group).
+    // A feature's container is the one that links back to its feature.
+    const avoidFeaturesIn = (container: PIXI.Container): void => {
+      for (const child of container.children as FeatureContainer[]) {
+        if (child.__feature__) {
+          avoidObject(child);
+        } else if (child.visible) {
+          avoidFeaturesIn(child);
+        }
       }
+    };
+    for (const container of avoidContainers) {
+      avoidFeaturesIn(container);
     }
 
     // Bulk insert any items we collected..

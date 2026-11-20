@@ -1554,6 +1554,9 @@ no feature to draw again, none to make, and nothing that arrived and hasn't been
 (`numWaitingInView`; the last was missing while arrivals and zooms were drawn without a pass,
 so labels could be placed before the vertices of a tile that had just arrived). A point that
 appears later still pushes a label out of its way on the next placement (`gatherAvoids()`).
+(Until Nov 20 that function made a box for each map tile of points, not for each point: it
+walked the children of the points' container, which are tiles since section 12. It finds the
+features wherever they are now, and leaves the ones that are waiting to be drawn for later.)
 
 **Labels are still placed in one frame**, after the features in view are drawn: 37 to 55 ms
 in Užice. About half is `gatherAvoids()` asking Pixi for the bounds of every point
@@ -1750,3 +1753,198 @@ no more than two loads of one build differ from each other (dashes start at anot
   the quiet moments wasn't measured.
 - `design/profiling.md` has the plan for a profile of the heap by kind of object, which this
   section didn't do (a snapshot of 2 GB is a risk to the tab).
+
+## 14. Label placement (a plan)
+
+Written Nov 20, after `pixi-8.23` merged. Nothing here is built yet, except the fix in "What
+happened". The order of the steps is at the end.
+
+### Words used here
+
+- **Avoid:** a place where no label may go, because something is drawn there that a label would
+  cover: a pin, a vertex.
+- **Label space:** the coordinates labels are placed in. It's the screen, minus an offset that
+  moves with the map, so a pan changes nothing in it. A new zoom or rotation makes a new label
+  space, and everything is placed again.
+- **Placement:** working out where a feature's label goes (`placeTextLabel()`,
+  `placeRopeLabel()`). It's arithmetic and lookups, with no drawing. Showing the labels that
+  are in view (`renderLabels()`) is a separate, cheap step, and stays as it is.
+
+### What happened
+
+Bryan loaded Manhattan and panned south: labels lay over the pins in some places, and other
+places had no labels at all. `gatherAvoids()` made its boxes from the children of the points'
+container, which were the features until section 12 split them into a container per map tile.
+After that it made one box per tile, wherever the tile's points were at that moment.
+
+Fixed on this branch: it walks down to the containers that belong to a feature, and skips a
+feature that's waiting to be drawn (it isn't where it will be yet). A DOM test and an e2e test
+check that every point in view has a box and that no label is over a point.
+
+**With that right, the cost shows.** Užice at z16:
+
+| | |
+|---|---|
+| Avoid boxes in the index | 53,298 |
+| Features tried for a label, labels placed | 3,338, 119 |
+| The frame that places everything, after a load or a zoom | 100 to 130 ms |
+| ..of which Pixi's `getBounds()` for each pin | about a quarter |
+| Every frame of a pan | 5 to 6 ms |
+
+The pan's 5 to 6 ms is three walks: twice over every feature in the scene (who has
+`_labelDirty`; who has no label yet), and once over every point (who has no box yet). They
+find nothing, on most frames.
+
+### What placement needs, and what it doesn't
+
+- **It needs the features to have been drawn in APP.** A point's position, its marker and its
+  scale are set in `update()`. That's what Bryan's rule protects: labels are placed around the
+  points and vertices, so those have to be there first.
+- **It doesn't need DRAW.** Nothing it reads comes from what Pixi put on the screen.
+  `getBounds()` works from the containers' transforms. So a third pass after DRAW would wait
+  for something placement doesn't use.
+- **So "LABEL" is work that follows APP's, with its own budget:** a list of features that
+  need placing, worked through at the end of APP while the frame has time, and on later
+  frames when it hasn't. Layers don't have to say which pass draws them. In Performer's
+  terms it's a stage of the application's own, fed by what APP produced, not a draw.
+
+### The design
+
+**1. A feature says when it has been drawn. Nobody walks the scene to find out.**
+
+`_labelDirty` is set when something about a feature changes, which is before it's drawn again
+(Bryan: "maybe we are setting this flag too early"). The labels layer then looks at every
+feature on every frame to find the flags. Turn it around:
+
+- When a feature's `update()` finishes, and when it's shown, hidden or destroyed, it tells the
+  scene: `scene.featureChanged(feature)`. The scene keeps the IDs in a set.
+- The labels layer takes that set and nothing else. A frame in which nothing was drawn has
+  nothing to place, and costs nothing.
+- `_labelDirty` stays as the feature's own note that its label is out of date. What changes is
+  when the labels layer hears of it: at the draw, not at the change.
+
+**2. Points mark themselves in a grid as they're drawn. No boxes in the index.**
+
+`PixiScene` owns the label space and an **avoid grid** over it (it already owns the world
+containers and the cull box, which are the same kind of thing: where things are, for every
+layer).
+
+- The grid is label space cut into cells of a few pixels. Each cell holds a count of the avoids
+  that cover it. Marking a pin adds one to the cells under it, a dozen array writes. Taking it
+  away subtracts. A label fits where every cell under it is zero.
+- The cells are kept in blocks (say 64 by 64 cells in a typed array), made when first written
+  to, in a map by block. The map can be panned any distance, and a cloud of points fills each
+  block once, however many points there are.
+- A point marks itself at the end of `update()`, from what it has just set: its position, its
+  marker's size, anchor and scale. The scene gives it the transform from world coordinates to
+  label space, worked out once a frame. No `getBounds()` (except for a point with viewfields,
+  see "Decided"), and no list of containers to look in: whatever draws a point that labels
+  should avoid marks it.
+- Each feature remembers the cells it marked (four numbers), so that it can unmark them when
+  it moves, is hidden or is destroyed.
+- A new zoom or rotation empties the grid (`scene.dirtyTransform()`). Every feature is drawn
+  again after that anyway, and marks itself again.
+
+Labels stay in the spatial index, with their boxes: there are a hundred of them, and a label
+has to be found again by its feature.
+
+**3. A pin that lands on a label takes the label away.** That's today's rule (a tile arrives,
+and a junction turns out to matter). To keep it cheap, placed labels mark a second count in the
+same cells. Marking a pin looks at that count, which is nearly always zero; only when it isn't
+does it ask the index which label is there, and put that feature back on the list.
+
+**4. Placement takes the list in parts.**
+
+- Each frame, after the layers have rendered: sort what's on the list (in view first; then
+  points, lines, polygons, as now), and place while `frame.hasTime()`, with a small minimum.
+  What's left waits, and the layer reports it (`numWaiting`), so another frame follows.
+- **The gate stays:** nothing in view is placed while features in view are waiting to be
+  drawn or made (`frame.waitingInView`). With marks made at the draw, a label placed too early
+  would be taken away again by rule 3, so the gate isn't needed to be right, only not to flicker.
+- A frame the user asked for (`frame.urgent`) places everything on its list, as now.
+
+### What it should cost
+
+| Užice, z16 | Now | Expected |
+|---|---|---|
+| A frame of a pan with nothing new | 5 to 6 ms | under 0.5 ms |
+| Avoids after a load or a zoom | 53,000 boxes made and indexed in one frame | marked as each point is drawn, a fraction of a microsecond each |
+| The longest frame of placement | 100 to 130 ms | the frame's budget (6 to 24 ms) |
+| Until every label in view is placed | one frame after the drawing | a few frames after the drawing |
+
+The last row is the price: labels come in over a few frames, where they came all at once.
+
+### Order of work
+
+Each step is measured with the label check (every point in view avoided, no point under a
+label) and against the table above, and can ship on its own.
+
+1. **The fix** (done on this branch): `gatherAvoids()` finds features, skips undrawn ones.
+2. **The avoid grid, by itself:** a class with `mark`, `unmark`, `isFree` and `clear`, and unit
+   tests. No Pixi in it.
+3. **The scene owns the label space and the grid.** The offset that `PixiLayerLabels` works out
+   each frame moves to the scene, with the transform from world coordinates.
+4. **Points mark themselves; `gatherAvoids()` and its boxes go.** Placement asks the grid.
+   Compare the labels placed before and after at the test places: they'll differ a little
+   (cells are coarser than boxes), and that needs a look, not just a count.
+5. **`scene.featureChanged()` replaces the walks.** A class change reaches the label as a
+   new tint and doesn't place it again.
+6. **Placement in parts,** with the gate.
+7. **Labels mark their cells; a pin on a label takes it away** (rule 3). Until this step the
+   index is asked for every new pin, as today. Only the label that's hit moves.
+
+### Decided (Bryan, Nov 20)
+
+- **Which points are avoids: as today.** Everything in the `points` group (OSM, the Rapid
+  datasets, custom data) and the selected vertices. Photo and QA markers aren't. With points
+  marking themselves it becomes a property of the feature, set by its layer.
+- **A point's viewfields are part of its avoid.** A label for a railway shouldn't cover the
+  viewfields of the signals along it. Viewfields keep their direction on the ground, so their
+  box in label space changes as the map rotates; that's why the first version used Pixi's
+  `getBounds()`, which gives what's drawn. So: a point without viewfields marks its marker's
+  box from arithmetic, and a point with viewfields asks `getBounds()` at the end of its
+  `update()`. Few points have them, and the answer is right by construction.
+- **A label stays where it is unless something is drawn on top of it.**
+  - A hover or a selection changes a label's color, not its place. Today `setClass()` marks the
+    label out of date, the label is taken away and placed again, and it can land somewhere
+    else, which is what makes labels jump under the pointer. A class change is to reach the
+    label as a new tint, and nothing else.
+  - A selected way gets vertices and midpoints, which are avoids, and its label may be under
+    one. That label has to move (the handle has to be reachable), and Bryan wants a selected
+    way to keep a label. But only the labels that are hit move, each to the nearest place that
+    fits, and the others aren't touched. When the selection ends, a label that moved stays
+    where it went: moving back would be a second jump.
+
+### Open questions
+
+- **Order between frames.** Within a batch, points are placed before lines, so line labels
+  fit around point labels. Across batches a line's label can be there first. Today has the
+  same thing between tiles that arrive. If it shows, a point's label could take a line's
+  label away, as a pin does.
+- **Cell size.** 4 px costs more cells and wastes less room around a pin than 8 px. To be
+  measured in step 4, by how many labels are placed.
+- **Between frames?** Placement touches no GL, so it could be a scheduler task and not the
+  tail of APP. The tail of APP is simpler and has the frame's deadline; revisit if labels
+  hold frames back.
+
+### Notes for whoever builds it
+
+- **The check that matters** is `test/e2e/rendering.test.js`, "gives every point in view a box
+  for labels to avoid, and puts no label over a point". It reads the avoid boxes from the
+  spatial index, so step 4 has to change how it asks (the grid), not what it asserts. Add to
+  it: a rotated view, a point with viewfields, and a hover that leaves every label where it was.
+- **Label space under rotation.** The labels' group undoes the stage's rotation, so label
+  space is the unrotated screen, and a point's place in it is its world coordinate through
+  `origin`'s transform and then the offset (`_labelOffset` in `PixiLayerLabels.render()`, with
+  a long comment on why the offset is what it is: keep that). Work the transform out once a
+  frame, after `GraphicsSystem._app()` has positioned `origin` and before the layers render.
+- **A point is drawn at a size on screen, not in the world:** its container counter-scales
+  and counter-rotates (`PixiFeaturePoint.updateStyle()`), so its marker's box in label space
+  is the texture's size times the marker's scale and the 0.8 or 1.0 of the zoom, placed by the
+  anchor. Pins are anchored at the bottom, circles in the middle.
+- **Unmark before marking again.** A point that's drawn again has usually not moved. Compare
+  the cells first and do nothing if they're the same.
+- **Measure in Užice from the tape** (`bun run compare … --tape`, section 11), and look at the
+  labels at Seattle too, where there's room for them: the number placed should not drop.
+- **Rules that apply:** `modules/pixi/AGENTS.md` (find features by `container.__feature__`,
+  not by depth; destroy what's replaced; no object per feature in a loop over all of them).
