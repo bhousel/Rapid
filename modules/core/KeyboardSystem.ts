@@ -36,6 +36,8 @@ interface KeyBinding {
   test: KeyMatch;
   /** Optional remappable command this binding belongs to */
   commandID?: CommandID;
+  /** Whether it also fires while a text field with nothing in it has the focus */
+  inEmptyFields: boolean;
 }
 
 /** Options for registering a keybinding */
@@ -44,6 +46,12 @@ export interface KeyBindingOpts {
   capture?: boolean;
   /** Associate this binding with a remappable command (scaffolding for user remapping) */
   commandID?: CommandID;
+  /**
+   * Also fire while a text field has the focus, as long as the field is empty (default `false`).
+   * For undo and redo: the sidebar puts the focus in its search field by itself, and there's
+   * nothing of the field's own to undo until something is typed in it.
+   */
+  inEmptyFields?: boolean;
 }
 
 /** A remappable command — a stable identity whose combo can be changed and persisted */
@@ -134,7 +142,8 @@ export class KeyBindingScope {
         capture: capture,
         callback: callback,
         test: _parseCombo(code),
-        commandID: opts.commandID
+        commandID: opts.commandID,
+        inEmptyFields: opts.inEmptyFields ?? false
       });
       combos.push(code);
     }
@@ -410,11 +419,19 @@ export class KeyboardSystem extends AbstractSystem {
 
   /**
    * Bubble-phase `keydown` handler — tests bubble bindings, ignoring events from form fields.
+   * A text field with nothing in it lets through the bindings that ask for that (`inEmptyFields`).
    * @param evt - The keyboard event
    */
   protected _keydownBubble(evt: KeyboardEvent): void {
-    const tagName = (evt.target as Element | null)?.tagName;
-    if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA') return;
+    const target = evt.target as Partial<HTMLInputElement> | null;
+    const tagName = target?.tagName;
+    if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA') {
+      const isEmptyField = (tagName !== 'SELECT') && target!.value === '';
+      if (isEmptyField) {
+        this._testBindings(evt, false, true);
+      }
+      return;
+    }
     this._testBindings(evt, false);
   }
 
@@ -424,15 +441,17 @@ export class KeyboardSystem extends AbstractSystem {
    * If one matches, its callback is invoked (at most one binding fires per event).
    * @param  evt         - The event to test
    * @param  isCapturing - `true` for the capturing phase, `false` for bubbling
+   * @param  inEmptyField - `true` if an empty text field has the focus: only the bindings for that are tested
    * @return `true` if something matched
    */
-  protected _testBindings(evt: KeyboardEvent, isCapturing: boolean): boolean {
+  protected _testBindings(evt: KeyboardEvent, isCapturing: boolean, inEmptyField: boolean = false): boolean {
     // Gather all bindings from enabled scopes.
     const bindings: KeyBinding[] = [];
     for (const scope of this._scopes.values()) {
       if (!scope.enabled) continue;
       for (const binding of scope.bindings.values()) {
         if (binding.capture !== isCapturing) continue;
+        if (inEmptyField && !binding.inEmptyFields) continue;
         bindings.push(binding);
       }
     }

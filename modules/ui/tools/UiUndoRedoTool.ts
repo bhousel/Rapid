@@ -79,7 +79,8 @@ export class UiUndoRedoTool {
 
     // Event listeners
     for (const d of this.commands) {
-      context.systems.keyboard!.global.on(d.key, e => this.choose(e, d));
+      // (Also from an empty text field: the sidebar's search fields take the focus by themselves.)
+      context.systems.keyboard!.global.on(d.key, e => this.choose(e, d), { inEmptyFields: true });
     }
     gfx.on('draw', this.debouncedRender);
     editor.on('stablechange', this.rerender);

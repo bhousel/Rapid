@@ -105,10 +105,16 @@ test('draws a line, and undo takes it away', async ({ page, consoleErrors }) => 
   expect(line).toEqual({ id: line.id, nodes: 3, isNew: true });
 
   // Each click was an edit: the first undo takes away the last node, the second takes away the line
+  // (Finishing a feature, and each undo, puts the focus in a search field of the sidebar a moment
+  // later. ⌘Z undoes from there too, while nothing has been typed in the field: wait for the
+  // focus, so that this is what's tested.)
   const nodeCount = id => page.evaluate(id => rapidContext.systems.editor.staging.graph.hasEntity(id)?.nodes.length ?? 0, id);
+  const focusInSearchField = () => page.evaluate(() => document.activeElement?.tagName === 'INPUT' && document.activeElement.value === '');
+  await expect.poll(focusInSearchField).toBe(true);
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(() => nodeCount(line.id)).toBe(2);
 
+  await expect.poll(focusInSearchField).toBe(true);
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(() => nodeCount(line.id)).toBe(0);
   expect(await page.evaluate(() => rapidContext.systems.editor.hasChanges())).toBe(false);
