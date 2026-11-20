@@ -48,6 +48,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **For data that arrived, `scene.dataArrived('osm', ids)` and `gfx.requestFrame()`.**
   `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
   A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
+- **The OSM layer's pass doesn't see every vertex.** It leaves out the ones that only shape
+  their way (`OsmNode.vertexKind()`), and adds the ones related to what's selected or hovered
+  afterwards (`_addRelatedVertices()`). Something new that should draw such a vertex has to say
+  so there, and in `_isIdleVertex()` for the ones that arrive.
 - **The OSM layer rarely does its whole pass now**, so don't count on one to pick something up.
   It does one when it's marked dirty (`dirtyLayer()`, `dirtyTransform()`, `dirtyData()`: a
   filter, the styles, a zoom) or when a redraw is asked for without a layer. A view that leaves

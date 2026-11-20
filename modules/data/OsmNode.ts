@@ -18,6 +18,15 @@ export interface OsmNodeProps extends OsmEntityProps {
 
 
 /**
+ * What a node is to the ways it's on, see `OsmNode.vertexKind()`:
+ * - `'tagged'`: it has interesting tags of its own (a crossing, a gate)
+ * - `'structural'`: untagged, but its ways end or intersect there
+ * - `'shape'`: it only gives its way its shape
+ */
+export type VertexKind = 'tagged' | 'structural' | 'shape';
+
+
+/**
  * This class contains the data for an OSM Node.
  * @see https://wiki.openstreetmap.org/wiki/Node
  *
@@ -357,6 +366,22 @@ export class OsmNode extends OsmEntity {
    */
   public isIntersection(graph: Graph): boolean {
     return this.parentIntersectionWays(graph).length > 1;
+  }
+
+  /**
+   * Says what this node is to the ways it's on, in one memoized answer.
+   * Most nodes only give a way its shape, and a map shows those only for what's selected. A map
+   * layer asks this of every node around the view, so it has to be cheap to ask again.
+   * @param graph - the Graph that holds the topology needed
+   * @returns the kind of vertex, or `null` if this node isn't on a way (it's a point)
+   */
+  public vertexKind(graph: Graph): VertexKind | null {
+    return this.memo(graph, 'vertexKind', () => {
+      if (this.geometry(graph) !== 'vertex') return null;
+      if (this.hasInterestingTags()) return 'tagged';
+      if (this.isEndpoint(graph) || this.isIntersection(graph)) return 'structural';
+      return 'shape';
+    });
   }
 
   /**

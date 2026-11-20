@@ -484,6 +484,11 @@ describe('PixiLayerOsm', () => {
       entities.set(id, { id: id, extent: extent, geometry: () => geometry });
     }
 
+    // A node on a way, of one of the kinds that `OsmNode.vertexKind()` returns
+    function addVertex(id, kind, extent = INSIDE) {
+      entities.set(id, { id: id, type: 'node', extent: extent, geometry: () => 'vertex', vertexKind: () => kind });
+    }
+
     // A stand-in feature for some data, in one of the two containers
     function addFeature(dataID, parent = tile) {
       const feature = {
@@ -723,6 +728,143 @@ describe('PixiLayerOsm', () => {
         layer.dataArrived(['w2']);
         layer.continueWaiting(frame, viewport);
         assert.isFalse(line2.visible);
+      });
+
+      // Most of what arrives in a dense place is vertices that only shape their way.
+      it('passes by the vertices that only shape their way', () => {
+        addVertex('n10', 'shape');
+        addVertex('n11', 'structural');
+        addVertex('n12', 'tagged');
+        layer.dataArrived(['n10', 'n11', 'n12']);
+
+        layer.continueWaiting(frame, viewport);
+        assert.sameMembers(calls, ['vertices n11 (not urgent)', 'vertices n12 (not urgent)']);
+        assert.strictEqual(layer.numWaiting, 0);
+      });
+
+      it('..unless one is related to what is hovered, or has a feature from before', () => {
+        addVertex('n1', 'shape');                     // a vertex of the hovered way
+        addVertex('n10', 'shape');                    // it was a point before its way arrived
+        const point = addFeature('n10');
+        layer.dataArrived(['n1', 'n10']);
+
+        layer.continueWaiting(frame, viewport);
+        assert.sameMembers(calls, ['vertices n1 (not urgent)', 'vertices n10 (not urgent)']);
+        assert.isFalse(point.visible);                // nothing wanted it anymore
+      });
+
+      it('looks at a limited number of them in a frame with no time', () => {
+        const ids = [];
+        for (let i = 0; i < 20000; i++) {
+          addVertex(`n${1000 + i}`, 'shape');
+          ids.push(`n${1000 + i}`);
+        }
+        layer.dataArrived(ids);
+
+        frame.deadline = -Infinity;
+        layer.continueWaiting(frame, viewport);
+        assert.strictEqual(layer.numWaiting, 12000);
+        assert.deepEqual(calls, []);
+
+        frame.deadline = Infinity;
+        layer.continueWaiting(frame, viewport);
+        assert.strictEqual(layer.numWaiting, 0);
+        assert.deepEqual(calls, []);
+      });
+    });
+
+
+    // The whole pass: everything in the cull box, through the filter and the `render…()` functions.
+    describe('the pass', () => {
+      let asked, effectiveZoom;
+
+      beforeEach(() => {
+        const context = layer.context;
+        asked = [];
+        effectiveZoom = 17;
+        context.services.osm = { started: true };
+        context.loadTiles = () => {};
+        context.systems.map = { effectiveZoom: () => effectiveZoom };
+        context.systems.editor.entitiesInBox = () => [...entities.values()];
+        context.systems.filters.filterScene = list => {
+          asked = list.map(entity => entity.id);
+          return list.filter(entity => !hidden.has(entity.id));
+        };
+        layer.renderMidpoints = () => {};
+        layer._currentBox = null;   // nothing is current, so the layer does its pass
+        layer._lastRelated = { descendantIDs: new Set(), siblingIDs: new Set() };
+
+        // (replaces the vertices of the ways above, which had no kind)
+        addVertex('n1', 'shape');
+        addVertex('n2', 'shape');
+        addVertex('n3', 'structural');
+        addVertex('n4', 'tagged');
+        addEntity('n5', 'point');
+        entities.get('n5').type = 'node';
+        entities.get('n5').vertexKind = () => null;
+      });
+
+      it('leaves out the vertices that only shape their way, before asking the filter', () => {
+        layer.render(frame, viewport);
+        assert.sameMembers(asked, ['w1', 'w2', 'n3', 'n4', 'n5']);
+        assert.sameMembers(calls, ['lines w1 (not urgent)', 'lines w2 (not urgent)', 'points n5 (not urgent)',
+          'vertices n3 (not urgent)', 'vertices n4 (not urgent)']);
+        assert.isTrue(layer._showsVertices);
+      });
+
+      it('below the zoom for vertices, keeps only the tagged ones (the filter counts them)', () => {
+        effectiveZoom = 15.9;
+        layer.render(frame, viewport);
+        assert.sameMembers(asked, ['w1', 'w2', 'n4', 'n5']);
+        assert.isFalse(layer._showsVertices);
+      });
+
+      it('adds the vertices of what is hovered, whatever kind they are', () => {
+        classes.hover = ['w1'];
+        layer.render(frame, viewport);
+        assert.sameMembers(asked, ['w1', 'w2', 'n3', 'n4', 'n5']);
+        assert.includeMembers(calls, ['vertices n1 (not urgent)', 'vertices n2 (not urgent)']);
+      });
+
+      it('..but not the ones a filter hides, or outside the cull box', () => {
+        classes.hover = ['w1'];
+        hidden.add('n1');
+        addVertex('n2', 'shape', OUTSIDE);
+        layer.render(frame, viewport);
+        assert.notInclude(calls, 'vertices n1 (not urgent)');
+        assert.notInclude(calls, 'vertices n2 (not urgent)');
+      });
+
+      // The zoom for vertices is the map's effective zoom, which grows with the latitude.
+      it('remembers the vertices as arrived when the view crosses the zoom for them without a pass', () => {
+        effectiveZoom = 15.9;
+        layer.render(frame, viewport);
+        calls.length = 0;
+
+        effectiveZoom = 16.1;
+        const next = new RenderFrame(2, 17);
+        next.cullBox = BOX;                     // only the view moved, inside the cull box
+        next.contentChanged = false;
+        next.deadline = -Infinity;
+        layer._changedIDs.clear();
+        layer.render(next, viewport);
+        assert.isTrue(layer.keptFeatures(next));
+        assert.isTrue(layer._showsVertices);
+        assert.sameMembers(calls, ['vertices n3 (not urgent)', 'vertices n4 (not urgent)']);
+      });
+
+      it('leaves that for the pass in a held frame', () => {
+        effectiveZoom = 15.9;
+        layer.render(frame, viewport);
+
+        effectiveZoom = 16.1;
+        const next = new RenderFrame(2, 17);
+        next.cullBox = BOX;
+        next.contentChanged = false;
+        next.held = true;
+        layer.render(next, viewport);
+        assert.isFalse(layer._showsVertices);
+        assert.strictEqual(layer.numWaiting, 0);
       });
     });
 

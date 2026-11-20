@@ -147,14 +147,16 @@ the pass 100 → 72 ms.)
   parents' answers, and the rest the checks before them (`version`, forced visible).
 - 2.0 ms is `entity.geometry(graph)` for every entity.
 
-**Options that don't need the rethink**, none done:
+**Options that don't need the rethink:**
 
-- **Don't ask about vertices the layer won't draw.** The layer draws a vertex when it's
-  "interesting" (tagged, an endpoint or an intersection) at effective zoom 16 and up, or when it
-  belongs to a selected or hovered way. Today all 65,695 go through `filterScene()`, then
-  `classify` (4.2 ms), then the `vertices` step (5.4 ms), which tests each one. The layer could
-  keep the vertices apart and ask the filter only about the ones it's about to draw. This changes
-  the counts: a tagged vertex on a hidden way wouldn't be counted below zoom 16.
+- **Don't ask about vertices the layer won't draw.** Done (Nov 19; `graphics-system.md` section
+  12, "The vertices that aren't drawn"). The layer draws a vertex when it's "interesting"
+  (tagged, an endpoint or an intersection) at effective zoom 16 and up, or when it belongs to a
+  selected or hovered way. All 65,695 went through `filterScene()`, then `classify` (4.2 ms),
+  then the `vertices` step (5.4 ms), which tested each one. Now the layer leaves out the ones it
+  won't draw before it calls `filterScene()` (`OsmNode.vertexKind()`), and asks about the related
+  ones by themselves. It still passes every tagged vertex, whatever the zoom, so the counts are
+  what they were. The filter step went from 9.2 to 2.6 ms here, and from 48 to 15 in Užice.
 - **Remember a vertex's answer too.** It depends on its parents' answers and on the forced-visible
   set, so it needs a version number that both of those bump.
 - **Count the hidden features apart from the pass**, when `UiFilterStatus` needs them.

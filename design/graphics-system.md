@@ -284,8 +284,9 @@ into as they go, and the scene moves it onto the frame after the layer's pass (`
   lists, and `draw.rebuiltGroups` says how many it rebuilt.
 - `steps` is for a layer that wants to say where its time went. It calls `_endStep(name, since)`
   after each step of `render()`. Only the OSM layer does so far: `gather` (the spatial index),
-  `filter` (hidden features), `classify` (sorting by geometry), `polygons`, `lines`, `points`,
-  `related`, `vertices`, `midpoints`.
+  `vertexkinds` (leaving out the vertices that won't be drawn), `filter` (hidden features),
+  `classify` (sorting by geometry), `polygons`, `lines`, `points`, `related`, `vertices`,
+  `midpoints`. A frame where the layer followed the cull box without a pass has `box`.
 
 **Decisions so far**
 
@@ -1427,18 +1428,76 @@ At Staten Island a frame where the cull box moves went from 63 to 9 ms of APP, a
 directions (12 moves of the cull box, with tiles arriving during the first ones), a full pass
 changed nothing that was shown. No frame of any of it was a pass.
 
+### The vertices that aren't drawn
+
+A zoom, a filter and a change of style still need the pass, so its own cost matters. Half of it
+was the vertices: 223,044 of the 296,274 entities in Užice's cull box, of which 33,324 are drawn.
+Each one was asked about by the filter (which asks its ways), put in a `Map`, and tested for
+being worth drawing, on every pass.
+
+- **`OsmNode.vertexKind(graph)`** says what a node is to its ways, in one memoized answer:
+  `'tagged'` (it has interesting tags), `'structural'` (untagged, but its ways end or intersect
+  there), `'shape'` (it only gives its way its shape), or `null` for a point. The first two are
+  what the layer called an interesting vertex: they're drawn from effective zoom 16. A shape
+  vertex is drawn only while it's related to what's selected, hovered or being drawn.
+- **The pass leaves the shape vertices out** right after the spatial index returns them (the
+  `vertexkinds` step), before the filter or anything else is asked about them. Below zoom 16 it
+  leaves the structural ones out too. The tagged ones stay whatever the zoom, because
+  `FilterSystem.filterScene()` counts the ones it hides for the footer: the counts are the same
+  as before.
+- **The related vertices are added back** once the pass knows what's related
+  (`_addRelatedVertices()`): the nodes of what's selected or hovered, if they're in the cull box
+  and not hidden.
+- **Arrivals pass them by too.** Three quarters of a tile that arrives is shape vertices, and
+  each was sorted and asked about. `_renderArrived()` skips a shape vertex that isn't related and
+  has no feature (`_isIdleVertex()`), looking at up to 8,000 for each batch of 1,000 it draws.
+- **The zoom for vertices is the map's effective zoom**, which grows with the latitude, so a
+  view that only moves north or south can cross it. That used to be noticed at the next pass, and
+  a pan has no passes now. The layer notices it on a kept frame, and remembers the tagged and
+  structural vertices in the cull box as having arrived (`_checkVertexZoom()`).
+
+| The OSM layer's pass, ms | Before | After |
+|---|---|---|
+| Seattle | 11.5 | 9.5 |
+| Staten Island | 37.2 | 24.5 |
+| Užice | 181 | 134 |
+| Užice: the frame of a jump in zoom (APP) | 262, 286 | 210, 227 |
+| Užice: every feature drawn again as after a zoom, first frame (APP) | 246 | 187 |
+
+(Medians from `bun run measure --fresh` and a zoom of half a level, one build after the other,
+from tapes.) In Užice the steps went from gather 12, filter 48, classify 30, vertices 41 to
+gather 13, vertexkinds 19, filter 15, classify 15, vertices 21; polygons, lines and points are
+as they were (26, 17, 8).
+
+**Checked against the build before:** in Užice, after a pass in eleven situations (nothing
+selected; a road of 358 nodes, a building of 151, a shape vertex selected; three filters hidden,
+and a hidden road selected; all of those below zoom 16), the two builds show exactly the same
+features, in the same containers, with the same classes, and the filter counts the same hidden
+features. The checks of work done without a pass still find no differences (after a load and
+eight pans, 64 changes of mode, 110 edits, 74 hovers).
+
 ### What still asks for a pass
 
 - **Anything that marks the whole layer dirty:** a filter, the styles, the language, a zoom.
 - **A redraw request without a layer.** A few are left: `Context.setDebug()`, the lasso, the
   systems that change how everything looks.
 
-And the pass itself, for when it's needed (the filters, the styles, a zoom):
+And the pass itself, for when it's needed. In Užice it's 134 ms with nothing to do:
 
-- **The vertices.** One in seven is drawn in Užice, one in twenty at Staten Island. Reaching
-  them through the ways that are drawn, not through the spatial index, would take about half of
-  the pass away (`design/filter-system.md` section 4).
-- **`entity.geometry(graph)` twice**, and a `Map` entry per entity to sort them.
+- **The features, 71 ms:** for each of the 84,606 that are shown, finding it by an ID made from
+  a string, checking its data and its classes, and noting that it was seen (`polygons`, `lines`,
+  `points`, `vertices`). On the frame of a zoom these steps take 130 ms: every feature is put in
+  line to be drawn again, and the points are placed in their tiles again.
+- **The vertices that aren't drawn, still about 30 ms:** the spatial index returns them (most
+  of `gather`), and each is asked for its kind (`vertexkinds`: 80 ns each, for the entity's type,
+  the check that graphs agree about it, and the memo). To get under that, the index would have
+  to keep vertices apart from the features, and the layer reach the ones worth drawing through
+  their ways.
+- **`entity.geometry(graph)` twice** for what's left (once to filter, once to classify), and a
+  `Map` entry per entity to sort them: 30 ms.
+- **A zoom doesn't need most of this.** After a zoom in, the new cull box is inside the old
+  one, and after a zoom out the layer could look at what the box grew over, as `_moveBox()`
+  does. What a zoom changes is how everything is drawn, which already waits for later frames.
 
 ### Seen on the way
 
@@ -1449,5 +1508,18 @@ And the pass itself, for when it's needed (the filters, the styles, a zoom):
   134 ms for each of the dense tiles (10,000 to 15,000 entities), on the main thread and outside
   any frame: 0.9 s of a 5 s pan, and its longest gaps (159 ms twice). The gaps of 400 to 700 ms
   that some runs still show aren't frames or merges; garbage collection is the guess.
-- **A selection or a hover now and then takes 240 to 430 ms** without a pass (one in 64 mode
-  changes, one in 74 hovers). Not looked into.
+- **The rare long frame of a selection or a hover comes with a major garbage collection**
+  (Bryan's guess, then traced). Now and then one takes 140 to 430 ms without a pass, one to
+  three in 64 changes of mode. It isn't the selection: the same one takes 8 to 40 ms the next
+  time, and the first time after a load. In a trace of 64 changes of mode, the three slowest
+  frames (141, 176 and 218 ms) each had a major collection end inside them. The pause itself is
+  21 to 27 ms, so the rest of those frames isn't accounted for yet. The live
+  heap is 2.1 GB after each collection, and marking it runs all the time: 2.5 s of 5 ms steps
+  on the main thread in 27 s, and another 1.8 s of minor collections (the check itself makes a
+  lot of garbage, so real use has less of both). A smaller heap is what would help.
+- **Loading a place marks entities as edited.** `ValidationSystem` tries fixes on a scratch
+  graph and commits it (`crossing_ways`, `outdated_tags`), and a commit tells every graph of the
+  lineage that answers about those entities can't be shared anymore
+  (`Graph._markTopologyChanged()`). After loading Užice that's 1,438 entities nobody edited,
+  whose memoized answers (`geometry()`, `vertexKind()`) are worked out on every call. Small
+  today; it grows with the data that's loaded.

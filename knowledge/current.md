@@ -109,9 +109,16 @@ Still to do, in about this order:
   11 passes of 205 to 250 ms and has none (36 to 39 frames a second, was 28 to 34); the frame
   where the box moves costs 29 ms of APP there, was 195. Checked against a full pass after the
   load and eight pans: nothing shown differs.
-  Next (section 12, "What still asks for a pass"): a zoom, a filter, the styles. Then the pass
-  itself: half of it is vertices. Also a frame between passes during a zoom, the other layers,
-  and merging a tile (80 to 134 ms on the main thread in Užice: the longest stall of a pan now).
+  **The vertices that aren't drawn are left out of the pass** (Nov 19, same section): `OsmNode.vertexKind()` says in one memoized answer whether a node is tagged, where
+  ways end or intersect, or only shapes its way. The pass drops the last kind before the filter
+  sees them and adds the ones related to the selection afterwards; arrivals skip them too. The
+  pass went from 181 to 134 ms in Užice, and the frame of a zoom from 262 to 210. Eleven
+  situations checked against the build before: the same features and the same filter counts.
+  Next (section 12, "What still asks for a pass"): a zoom could follow the cull box as a pan
+  does. Then what's left of the pass (71 ms of looking at each feature in Užice), a frame between
+  passes during a zoom, the other layers, merging a tile (80 to 134 ms on the main thread, the
+  longest stall of a pan), and the heap (2.1 GB live in Užice: the rare long frames come with a
+  major garbage collection).
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type

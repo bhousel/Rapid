@@ -88,6 +88,19 @@ const KIND_GEOMETRY: Record<OsmDataKind, GeometryType> = {
 };
 
 /**
+ * The zoom (the map's effective zoom) from which the vertices worth showing by themselves are drawn:
+ * the tagged ones, and where ways end or intersect (see `OsmNode.vertexKind`).
+ */
+const MIN_VERTEX_ZOOM = 16;
+
+/**
+ * While the layer goes through the entities that arrived (see `_renderArrived`), most of them
+ * need nothing done (vertices that only shape their way). It looks at up to this many for each
+ * batch, so that a frame can't spend all of its time passing them by.
+ */
+const ARRIVED_LOOK = 8000;
+
+/**
  * When the layer makes features after its pass (see `_makeWaiting`), it takes this many entities
  * at a time, and checks the frame's time between them. At least one batch is made on every call.
  */
@@ -247,6 +260,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _moves: number;
   /** The features that are hidden, and the value of `_moves` when each was (see `_forgetHidden`) */
   protected _hiddenAt: Map<FeatureID, number>;
+  /** Whether the zoom was high enough for vertices the last time the layer looked (see `MIN_VERTEX_ZOOM`) */
+  protected _showsVertices: boolean;
 
 
   /**
@@ -274,6 +289,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._arrivedIDs = new Set<EntityID>();
     this._moves = 0;
     this._hiddenAt = new Map<FeatureID, number>();
+    this._showsVertices = false;
   }
 
 
@@ -358,15 +374,19 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
+    const map = context.systems.map;
     const graph = editor.staging.graph;
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
+
+    const showsVertices = (map?.effectiveZoom() ?? viewZoom) >= MIN_VERTEX_ZOOM;
 
     // Only the view moved, and the last pass saw everything there is.
     // (Go on with what an earlier frame had no time for: features to make, and to draw again.)
     const prevBox = this._currentBox;
     const prevSortedBox = this._sortedBox;
     if (this.keepFeatures(frame)) {
+      if (!frame.held) this._checkVertexZoom(frame, showsVertices);
       this.continueWaiting(frame, viewport);
       return;
     }
@@ -379,6 +399,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._keptFrame = frame.id;          // no pass, so `cull()` leaves the features alone
       this._sortedBox = prevSortedBox;     // ..and what's waiting is still sorted by the old view
       this._moveBox(frame, prevBox);
+      this._checkVertexZoom(frame, showsVertices);
       this._endStep('box', t0);
       this.continueWaiting(frame, viewport);
       return;
@@ -390,8 +411,25 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._arrivedIDs.clear();
 
     let t = performance.now();   // each step's time goes in the frame's stats
-    let entities = editor.entitiesInBox(frame.cullBox.bbox(), graph);   // Gather data in and around the view
+    const gathered = editor.entitiesInBox(frame.cullBox.bbox(), graph);   // Gather data in and around the view
     t = this._endStep('gather', t);
+
+    // Leave out the vertices that won't be drawn, before anything is asked about them: in a
+    // dense place they're three quarters of what's there. A vertex that only shapes its way is
+    // drawn only for what's selected or hovered (`_addRelatedVertices`, below), and below the
+    // zoom for vertices that goes for the ones where ways end or intersect too.
+    // (The tagged ones stay whatever the zoom: `filterScene` counts the ones it hides.)
+    this._showsVertices = showsVertices;
+    let entities: OsmEntity[] = [];
+    for (const entity of gathered) {
+      if (entity.type === 'node') {
+        const kind = (entity as OsmNode).vertexKind(graph);
+        if (kind === 'shape' || (kind === 'structural' && !showsVertices)) continue;
+      }
+      entities.push(entity);
+    }
+    t = this._endStep('vertexkinds', t);
+
     entities = filters.filterScene(entities, graph);   // Apply feature filters
     t = this._endStep('filter', t);
 
@@ -435,6 +473,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._lastRelated = related;
     this._changedIDs.clear();   // the pass has seen every feature, whatever changed
     this._modeDirty = false;
+    this._addRelatedVertices(frame, data, related);
     t = this._endStep('related', t);
 
     this.renderVertices(frame, viewport, data, related);
@@ -716,6 +755,85 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Adds the vertices related to what's selected, hovered or being drawn to the data of a pass.
+   * These are drawn whatever kind of vertex they are, and the pass left out the ones that only
+   * shape their way. Like everything else in a pass, they have to be in the frame's cull box,
+   * and not hidden.
+   * @param frame - The frame being rendered
+   * @param data - The data of the pass, sorted by type
+   * @param related - Collections of related OSM IDs
+   */
+  protected _addRelatedVertices(frame: RenderFrame, data: OsmData, related: RelatedIDs): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const filters = context.systems.filters!;
+    const graph = editor.staging.graph;
+
+    for (const relatedIDs of [related.descendantIDs, related.siblingIDs]) {
+      for (const entityID of relatedIDs) {
+        if (data.vertices.has(entityID)) continue;
+
+        const entity = graph.hasEntity(entityID);
+        if (entity?.type !== 'node') continue;
+
+        const node = entity as OsmNode;
+        if (node.geometry(graph) !== 'vertex') continue;
+        if (!graph.geometry(node).world?.extent?.intersects(frame.cullBox)) continue;
+        if (filters.isHidden(node, graph, 'vertex')) continue;
+
+        data.vertices.set(entityID, node);
+      }
+    }
+  }
+
+
+  /**
+   * Whether there's nothing to do for an entity that arrived, because it's a vertex that only
+   * shapes its way. Such a vertex has a feature only while it's related to what's selected or
+   * hovered, and most of what arrives in a dense place is one of these.
+   * @param entity - The entity, if it still exists
+   * @return `true` if the layer can pass it by
+   */
+  protected _isIdleVertex(entity: OsmEntity | undefined): boolean {
+    if (entity?.type !== 'node') return false;
+
+    const graph = this.context.systems.editor!.staging.graph;
+    const related = this._lastRelated;
+    const nodeID = entity.id;
+
+    if ((entity as OsmNode).vertexKind(graph) !== 'shape') return false;
+    if (this._dataHasFeature.get(nodeID)?.size) return false;    // (it was something else before)
+    return !related.descendantIDs.has(nodeID) && !related.siblingIDs.has(nodeID);
+  }
+
+
+  /**
+   * Looks at whether the zoom for vertices was crossed without a pass. The map's effective zoom
+   * depends on the latitude, so a view that only moves north or south can cross it.
+   * The vertices that appear or disappear then are remembered as having arrived, to be drawn or
+   * hidden over the next frames (`_renderArrived`).
+   * @param frame - The frame being rendered
+   * @param showsVertices - Whether the zoom is high enough for vertices now
+   */
+  protected _checkVertexZoom(frame: RenderFrame, showsVertices: boolean): void {
+    if (showsVertices === this._showsVertices) return;
+    this._showsVertices = showsVertices;
+
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
+
+    for (const entity of editor.entitiesInBox(frame.cullBox.bbox(), graph)) {
+      if (entity.type !== 'node') continue;
+      const kind = (entity as OsmNode).vertexKind(graph);
+      if (kind && kind !== 'shape') {
+        this._arrivedIDs.add(entity.id);
+      }
+    }
+  }
+
+
+  /**
    * Draws the features of some data again without the pass: in a dense place a pass takes 200 ms,
    * and a hover changes two features and a few vertices.
    *
@@ -884,19 +1002,28 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * Sorts and draws the entities that arrived (a tile loaded, or the cull box moved over them),
    * a batch at a time while the frame has time, and at least one batch.
    * A new entity gets its feature now or in a later frame, like any other (`_waitToMake`).
+   * The vertices that need nothing done aren't part of a batch (see `_isIdleVertex`).
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
   protected _renderArrived(frame: RenderFrame, viewport: Viewport): void {
+    const graph = this.context.systems.editor!.staging.graph;
+
     const arrivedIDs = this._arrivedIDs;
     do {
       const batch = new Set<DataID>();
+      let looked = 0;
       for (const entityID of arrivedIDs) {
         arrivedIDs.delete(entityID);   // (deleting from a Set while iterating over it is safe)
-        batch.add(entityID);
-        if (batch.size >= ARRIVED_BATCH) break;
+        if (!this._isIdleVertex(graph.hasEntity(entityID))) {
+          batch.add(entityID);
+          if (batch.size >= ARRIVED_BATCH) break;
+        }
+        if (++looked >= ARRIVED_LOOK) break;
       }
-      this._renderChanged(frame, viewport, batch, false);
+      if (batch.size) {
+        this._renderChanged(frame, viewport, batch, false);
+      }
     } while (arrivedIDs.size && frame.hasTime());
   }
 
@@ -1571,7 +1698,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const selectedContainer = mapUiLayer.selected;
 
     const isInterestingVertex = (node: OsmNode): boolean => {
-      return node.hasInterestingTags() || node.isEndpoint(graph) || node.isIntersection(graph);
+      return node.vertexKind(graph) !== 'shape';   // tagged, or where ways end or intersect
     };
 
     const isRelatedVertex = (entityID: EntityID): boolean => {
@@ -1584,7 +1711,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const nodes = data.vertices;
     for (const [nodeID, node] of nodes) {
       const isRelated = isRelatedVertex(nodeID);   // major importance: drawn above everything
-      const isInteresting = (styleZoom >= 16 && isInterestingVertex(node));   // minor importance: drawn with the points
+      const isInteresting = (styleZoom >= MIN_VERTEX_ZOOM && isInterestingVertex(node));   // minor importance: drawn with the points
 
       if (!isRelated && !isInteresting) continue;   // this vertex isn't important enough to render
 
