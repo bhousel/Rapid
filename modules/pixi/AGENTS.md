@@ -53,9 +53,11 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   afterwards (`_addRelatedVertices()`). Something new that should draw such a vertex has to say
   so there, and in `_isIdleVertex()` for the ones that arrive.
 - **The OSM layer rarely does its whole pass now**, so don't count on one to pick something up.
-  It does one when it's marked dirty (`dirtyLayer()`, `dirtyTransform()`, `dirtyData()`: a
-  filter, the styles, a zoom) or when a redraw is asked for without a layer. A view that leaves
-  the cull box isn't one: the layer follows the box (`_moveBox()`).
+  It does one when it's marked dirty (`dirtyLayer()`, `dirtyData()`: a filter, the styles) or
+  when a redraw is asked for without a layer. A view that leaves the cull box isn't one, and
+  neither is a zoom or a rotation: the layer follows the box (`_moveBox()`), and after a zoom
+  it runs its features through `render…()` again over the next frames. So what a `render…()`
+  function decides from the zoom is picked up there, a batch at a time, not all in one frame.
 - **A change of mode asks for a frame, not a redraw** (`Context.enter()`). If a mode changes
   what the map shows, it has to reach the layers: through a class, an edit, a redraw request of
   its own, or (for something a layer draws in one mode only, like the OSM layer's midpoints)

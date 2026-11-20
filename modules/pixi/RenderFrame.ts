@@ -117,6 +117,11 @@ export class RenderFrame {
    * Layers ask `changedFor()`.
    */
   public contentChanged: boolean;
+  /**
+   * Whether something asked for this frame without naming a layer. Unlike `contentChanged`, a
+   * new zoom or rotation alone doesn't count. Layers ask `requestedFor()`.
+   */
+  public requested: boolean;
   /** The layers that a redraw was requested for by name (e.g. the imagery, when a tile arrives) */
   public changedLayerIDs: Set<LayerID>;
   /**
@@ -173,6 +178,7 @@ export class RenderFrame {
     this.zoom = zoom;
     this.dirtyScene = false;
     this.contentChanged = true;
+    this.requested = true;
     this.changedLayerIDs = new Set<LayerID>();
     this.cullBox = new Extent();
     this.held = false;
@@ -196,6 +202,18 @@ export class RenderFrame {
    */
   public changedFor(layerID: LayerID): boolean {
     return this.contentChanged || this.changedLayerIDs.has(layerID);
+  }
+
+
+  /**
+   * Whether a redraw was requested for the given layer, or for everything. When `changedFor()` is
+   * `true` and this is `false`, the layer's data is what it was, and only how it's drawn changed:
+   * the view has a new zoom or rotation.
+   * @param layerID - The layer asking
+   * @return `true` if a redraw was requested for the whole scene or for this layer
+   */
+  public requestedFor(layerID: LayerID): boolean {
+    return this.requested || this.changedLayerIDs.has(layerID);
   }
 
 

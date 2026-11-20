@@ -262,6 +262,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _hiddenAt: Map<FeatureID, number>;
   /** Whether the zoom was high enough for vertices the last time the layer looked (see `MIN_VERTEX_ZOOM`) */
   protected _showsVertices: boolean;
+  /** Whether the features were marked to be drawn again for a new zoom or rotation (see `dirtyTransform`) */
+  protected _zoomed: boolean;
+  /** The whole zoom level that the features' tile containers are for (see `_placeAgain`) */
+  protected _tileFloor: number;
+  /** What each tile container was made under, and for lines their road class (see `_placeAgain`) */
+  protected _tilePlace: WeakMap<PIXI.Container, { parent: PIXI.Container, lineClass?: number }>;
 
 
   /**
@@ -290,6 +296,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._moves = 0;
     this._hiddenAt = new Map<FeatureID, number>();
     this._showsVertices = false;
+    this._zoomed = false;
+    this._tileFloor = 0;
+    this._tilePlace = new WeakMap<PIXI.Container, { parent: PIXI.Container, lineClass?: number }>();
   }
 
 
@@ -365,6 +374,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const osm = context.services.osm;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !osm?.started || viewZoom < MINZOOM) {
+      if (this._zoomed) {     // the features are for another zoom: the next thing to do is a pass
+        this._zoomed = false;
+        this._currentBox = null;
+      }
       this._unmadeInView = this._newUnmade();    // nothing is drawn, so nothing is waiting to be made
       this._unmadeOutside = this._newUnmade();
       this._changedIDs.clear();
@@ -386,19 +399,31 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const prevBox = this._currentBox;
     const prevSortedBox = this._sortedBox;
     if (this.keepFeatures(frame)) {
-      if (!frame.held) this._checkVertexZoom(frame, showsVertices);
+      if (!frame.held) {
+        if (this._zoomed && prevBox) {
+          this._zoomed = false;
+          this._moveBox(frame, prevBox, true);
+        }
+        this._checkVertexZoom(frame, showsVertices);
+      }
       this.continueWaiting(frame, viewport);
       return;
     }
 
-    // Only the view moved, and it left the cull box: the frame has a new one that overlaps it.
-    // Then the features in both boxes stay as they are too, and the layer looks at what the box
-    // moved over and what it left behind. (Not after anything else changed: `changedFor`.)
-    if (prevBox && !frame.changedFor(this.id) && prevBox.intersects(frame.cullBox)) {
+    // Only the view changed, and the frame has a new cull box that overlaps the old one: the view
+    // left the box, or has a new zoom or rotation. Then the features in both boxes are still
+    // the right ones, and the layer looks at what the box moved over and what it left behind.
+    // After a zoom it also runs what stays through `render…()` again, over the next frames.
+    // (Not after anything else changed: `requestedFor`. And whatever marks features dirty except
+    // `dirtyTransform()` forgets the box, so that there's a pass.)
+    const zoomed = this._zoomed;
+    this._zoomed = false;
+    if (prevBox && !frame.requestedFor(this.id) && prevBox.intersects(frame.cullBox)) {
       const t0 = performance.now();
       this._keptFrame = frame.id;          // no pass, so `cull()` leaves the features alone
       this._sortedBox = prevSortedBox;     // ..and what's waiting is still sorted by the old view
-      this._moveBox(frame, prevBox);
+      this._moveBox(frame, prevBox, zoomed);
+      if (zoomed) this._modeDirty = true;  // which vertices and midpoints are shown depends on the zoom
       this._checkVertexZoom(frame, showsVertices);
       this._endStep('box', t0);
       this.continueWaiting(frame, viewport);
@@ -406,6 +431,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     }
 
     // A pass sees every entity again, and says which ones wait this time.
+    this._tileFloor = Math.floor(viewZoom);
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
     this._arrivedIDs.clear();
@@ -575,6 +601,20 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._makingOutside = false;
     }
     this._catchingUp = false;
+  }
+
+
+  /**
+   * Marks the features to be drawn again for a new zoom or rotation, as every layer does.
+   * Unlike the others, this layer doesn't forget which cull box its features are for: a zoom
+   * changes how they're drawn, not which ones there are, so `render()` can follow the box to
+   * its new size without a pass (see `_moveBox`).
+   */
+  public override dirtyTransform(): void {
+    const box = this._currentBox;
+    super.dirtyTransform();
+    this._currentBox = box;
+    this._zoomed = true;
   }
 
 
@@ -1036,10 +1076,15 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    *   in case the view comes back: see `_forgetHidden`.)
    * - What the box moved over is remembered as having arrived, the entities in view first, and
    *   made over the next frames (`_renderArrived`).
+   * - After a zoom, what stays is remembered as having arrived too. Its features are drawn for
+   *   another zoom, and may belong in other tiles' containers and need other details (a line's
+   *   arrows). The `render…()` functions see to all of that, a batch at a time, where a pass
+   *   would do it for everything in one frame.
    * @param frame - The frame being rendered
    * @param prevBox - The cull box that the layer's features were current for
+   * @param zoomed - Whether the features are to be drawn again for a new zoom or rotation
    */
-  protected _moveBox(frame: RenderFrame, prevBox: Extent): void {
+  protected _moveBox(frame: RenderFrame, prevBox: Extent, zoomed: boolean = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -1047,9 +1092,17 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     // Left behind: the features of entities that the new box doesn't reach.
     // (By the entity's whole shape, as a pass gathers it, not by the feature's own part of it.)
+    const zoomFloor = Math.floor(frame.zoom);
+    const placeAgain = (zoomFloor !== this._tileFloor);
+    this._tileFloor = zoomFloor;
+
     const left = new Map<DataID, boolean>();
+    const inView: EntityID[] = [];
+    const outside: EntityID[] = [];
     for (const feature of this.features.values()) {
-      if (!feature.visible) continue;
+      // (After a zoom the hidden ones count too: a feature hides itself at a zoom where it's
+      // too small to see, and may be big enough now.)
+      if (!feature.visible && !zoomed) continue;
       const dataID = this._featureHasData.get(feature.id);
       if (!dataID) continue;
 
@@ -1059,18 +1112,21 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const extent = entity && graph.geometry(entity).world?.extent;
         hasLeft = !!extent && !extent.intersects(box);
         left.set(dataID, hasLeft);
+        if (zoomed && extent && !hasLeft) {
+          (extent.intersects(frame.viewBox) ? inView : outside).push(dataID);
+        }
       }
       if (hasLeft) {
         feature.visible = false;
-        this._waitingInView.delete(feature);
+        this._waitingInView.delete(feature);   // (drawing it again could show it)
         this._waitingOutside.delete(feature);
+      } else if (placeAgain && feature.visible) {
+        this._placeAgain(feature, zoomFloor);
       }
     }
 
     // Moved over: the entities in the parts of the new box that the old one didn't cover.
     // (An entity that reaches into the old box was there already.)
-    const inView: EntityID[] = [];
-    const outside: EntityID[] = [];
     for (const part of extentMinus(box, prevBox)) {
       for (const entity of editor.entitiesInBox(part.bbox(), graph)) {
         const extent = graph.geometry(entity).world?.extent;
@@ -1465,10 +1521,36 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   protected _lineTileContainer(levelContainer: PIXI.Container, zIndex: number, part: GeometryPart, tileZoom: number): PIXI.Container {
     const tile = this._tileOf(part.world!.extent, tileZoom);
-    if (!tile) {
-      return this._tileContainer(levelContainer, `${zIndex}/large`, zIndex);
+    const container = tile ?
+      this._tileContainer(levelContainer, `${zIndex}/${tile[0]},${tile[1]},${tileZoom}`, zIndex + tileOrder(tile)) :
+      this._tileContainer(levelContainer, `${zIndex}/large`, zIndex);
+    this._tilePlace.get(container)!.lineClass = zIndex;
+    return container;
+  }
+
+
+  /**
+   * Puts a feature in the tile container it belongs in at another zoom, next to the one it's in.
+   * The `render…()` functions do this for a feature they draw again, but after a zoom that's
+   * spread over many frames, and features moving between containers a few at a time would have
+   * Pixi rebuild those containers' instructions on every one of them. So when the view crosses
+   * a whole zoom level, `_moveBox()` moves them all at once.
+   * @param feature - The feature
+   * @param zoomFloor - The whole zoom level of the view
+   */
+  protected _placeAgain(feature: AbstractPixiFeature, zoomFloor: number): void {
+    const part = feature.geometry;
+    const tileContainer = feature.container.parent;
+    const place = tileContainer && this._tilePlace.get(tileContainer);
+    if (!part?.world || !place) return;    // (not in a tile container: it stays where it is)
+
+    if (place.parent === this.polygonContainer) {
+      feature.parentContainer = this._polygonTileContainer(part, zoomFloor + POLYGON_TILE_ZOOM);
+    } else if (place.parent === this.pointContainer) {
+      this._placePoint(feature as PixiFeaturePoint, zoomFloor + POINT_TILE_ZOOM);
+    } else if (place.lineClass !== undefined) {
+      feature.parentContainer = this._lineTileContainer(place.parent, place.lineClass, part, zoomFloor + LINE_TILE_ZOOM);
     }
-    return this._tileContainer(levelContainer, `${zIndex}/${tile[0]},${tile[1]},${tileZoom}`, zIndex + tileOrder(tile));
   }
 
 
@@ -1537,6 +1619,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     if (!container) {
       container = this._childContainer(parent, label, zIndex);
       byLabel.set(label, container);
+      this._tilePlace.set(container, { parent: parent });
     }
     return container;
   }

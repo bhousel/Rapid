@@ -938,6 +938,85 @@ describe('PixiLayerOsm', () => {
         assert.isFalse(layer.features.has('osm-n20'));
       });
 
+      // A zoom or a rotation changes how features are drawn, not which ones there are.
+      describe('after a zoom', () => {
+        beforeEach(() => {
+          const context = layer.context;
+          context.services.osm = { started: true };
+          context.loadTiles = () => {};
+          context.systems.filters.filterScene = list => list;
+          frame.contentChanged = true;      // as `GraphicsSystem` says for a new zoom..
+          frame.requested = false;          // ..when nothing asked for a redraw
+          frame.deadline = -Infinity;
+        });
+
+        it('keeps the cull box when the features are marked for a new zoom', () => {
+          const feature = addFeature('n70');
+          feature.dirtyTransform = () => { feature.dirty = true; };
+          layer.dirtyTransform();
+          assert.isTrue(feature.dirty);
+          assert.strictEqual(layer._currentBox, BOX);
+          layer.dirtyLayer();
+          assert.isNull(layer._currentBox);   // anything else still means a pass
+        });
+
+        it('follows the box, and remembers what stays as having arrived, also what hid itself', () => {
+          addEntity('n20', 'point', LEFT_BEHIND);
+          addEntity('n70', 'point', BOTH);
+          addEntity('n71', 'point', BOTH);
+          addEntity('n130', 'point', MOVED_OVER);
+          const gone = addFeature('n20');
+          const stays = addFeature('n70');
+          const tooSmall = addFeature('n71');
+          tooSmall.visible = false;
+          for (const feature of [gone, stays, tooSmall]) feature.dirtyTransform = () => {};
+
+          layer.dirtyTransform();
+          layer.render(frame, viewport);
+          assert.isTrue(layer.keptFeatures(frame));     // no pass
+          assert.isFalse(gone.visible);
+          assert.isTrue(stays.visible);
+          assert.strictEqual(layer._currentBox, NEW_BOX);
+          // one batch was looked at already, in this frame without time
+          // (and what's related to the hovered way is worked out again: it depends on the zoom)
+          assert.includeMembers(calls, ['points n130 (not urgent)', 'points n70 (not urgent)', 'points n71 (not urgent)']);
+        });
+
+        it('does its pass when a redraw was asked for too', () => {
+          addEntity('n70', 'point', BOTH);
+          layer.dirtyTransform();
+          frame.requested = true;
+          layer.render(frame, viewport);
+          assert.isFalse(layer.keptFeatures(frame));
+        });
+
+        it('moves every feature to its new tile at once when the view crosses a whole zoom level', () => {
+          addEntity('n70', 'point', BOTH);
+          addEntity('n71', 'point', BOTH);
+          const a = addFeature('n70');
+          const b = addFeature('n71');
+          b.visible = false;
+          for (const feature of [a, b]) feature.dirtyTransform = () => {};
+          const placed = [];
+          layer._placeAgain = (feature, zoomFloor) => placed.push(`${feature.id} ${zoomFloor}`);
+          layer._tileFloor = 17;
+
+          layer.dirtyTransform();
+          layer.render(frame, viewport);          // still zoom 17
+          assert.deepEqual(placed, []);
+
+          b.visible = false;
+          const next = new RenderFrame(2, 18.2);
+          next.cullBox = new Rapid.sdk.Extent([65, 5], [150, 95]);
+          next.viewBox = next.cullBox;
+          next.requested = false;
+          next.deadline = -Infinity;
+          layer.dirtyTransform();
+          layer.render(next, { transform: { zoom: 18.2 } });
+          assert.deepEqual(placed, ['osm-n70 18']);   // (a hidden one is placed when it's drawn again)
+        });
+      });
+
       it('does not make a feature for an entity that waited and is outside the box now', () => {
         addEntity('w20', 'line', LEFT_BEHIND);
         addEntity('w70', 'line', BOTH);

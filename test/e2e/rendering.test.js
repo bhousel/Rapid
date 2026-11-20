@@ -261,6 +261,49 @@ test('after a zoom, draws the features again over the following frames, with the
 });
 
 
+// A zoom changes how features are drawn, not which ones there are. So the OSM layer follows the
+// cull box to its new size without a pass, and runs its features through its `render…()`
+// functions again over the next frames (see `design/graphics-system.md`, section 12).
+test('follows a zoom without a pass, and ends up with what a full pass shows', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // In, across a whole zoom level (the features move to other tiles' containers), and back out
+  for (const dz of [0.25, 1, -1.25]) {
+    const frames = await page.evaluate(async (dz) => {
+      const { gfx, map } = rapidContext.systems;
+      const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+      const startID = gfx.lastRenderFrame.id;
+      map.zoom(map.zoom() + dz);
+      await nextFrame();
+      await nextFrame();
+      while (gfx.pending) {
+        await nextFrame();
+      }
+      return gfx.renderFrames.filter(frame => frame.id > startID).map(frame => {
+        const osm = frame.layers.get('osm');
+        return { zoomed: frame.dirtyScene, held: frame.held, kept: osm.kept, box: osm.steps.box !== undefined };
+      });
+    }, dz);
+
+    const zoomFrames = frames.filter(frame => frame.zoomed);
+    expect(zoomFrames.length).toBeGreaterThan(0);
+    expect(zoomFrames.filter(frame => !frame.kept || !frame.box)).toEqual([]);   // each followed the box
+    expect(frames.filter(frame => !frame.kept && !frame.held)).toEqual([]);      // and no frame was a pass
+
+    const shown = await osmSceneState(page);
+    expect(shown.length).toBeGreaterThan(50);
+    expect(shown.filter(feature => feature.includes('| dirty |'))).toEqual([]);
+    await page.evaluate(() => rapidContext.systems.gfx.immediateRedraw());
+    await waitForIdle(page);
+    expect(await osmSceneState(page)).toEqual(shown);
+  }
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
 // ..and when there are many features to make, as after a load, they're made over several frames too.
 test('makes features over several frames when there are many to make, and ends up with all of them', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);

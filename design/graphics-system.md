@@ -1476,9 +1476,53 @@ features, in the same containers, with the same classes, and the filter counts t
 features. The checks of work done without a pass still find no differences (after a load and
 eight pans, 64 changes of mode, 110 edits, 74 hovers).
 
+### A zoom without a pass
+
+A zoom or a rotation changes how every feature is drawn, not which features there are. But the
+frame of a zoom did the whole pass (210 to 330 ms of APP in Užice), because that's where each
+feature was put in line to be drawn again and placed in its tile's container.
+
+- **The frame says why it changed.** `frame.changedFor()` is true after a zoom, as before.
+  `frame.requestedFor()` is true only when a redraw was asked for. When the first is true and
+  the second isn't, the data is what it was.
+- **The OSM layer keeps its cull box through `dirtyTransform()`** (the other ways of marking
+  features dirty still forget it, so they still mean a pass). On the frame of the zoom it
+  follows the box to its new size as it does for a pan (`_moveBox()`): it hides what the new
+  box doesn't reach, and looks up what it grew over.
+- **What stays is remembered as having arrived.** Its features go through the `render…()`
+  functions again a batch at a time, in view first, on that frame and the next ones. That's
+  the pass's work for a zoom (a place in line to be drawn, a line's details for the new zoom),
+  spread over the frames that draw the features again anyway. The features that hid themselves
+  for being too small at the old zoom are included.
+- **Crossing a whole zoom level moves every feature to another tile's container.** Done a
+  batch at a time, Pixi rebuilt the containers on both ends on every frame (40 to 100 ms of
+  DRAW each, for 30 frames). So on that frame `_placeAgain()` moves all of them at once, which
+  is one rebuild, as the pass did it.
+- **What's related is worked out again** on that frame: which vertices and midpoints are
+  shown depends on the zoom.
+
+| Užice, from the tape (two runs each) | Before | After |
+|---|---|---|
+| Jump of half a level: the zoom frame, APP + DRAW | 210 + 16, 227 + 21 | 66 to 83 + 9 to 26 |
+| ..longest animation frame | 200, 217 ms | 50 to 67 ms |
+| ..until everything is drawn again | 1.3, 1.4 s | 1.5 s |
+| Eased zoom of a whole level, in: longest animation frame | 450 ms | 250, 300 ms |
+| ..out | 283 ms | 150, 167 ms |
+| Wheel-like zoom (60 steps of 0.02): zoom frames, median APP | 226, 231 ms | 46 to 75 ms |
+| ..frames drawn while it zooms | 5 | 6, 7 |
+
+Everything is drawn again 0.1 to 0.3 s later than before: the pass's work is still done, in
+smaller pieces between the drawing. The frame that crosses a whole level is still the long
+one (250 to 420 ms with its DRAW), for the rebuild of every tile's container.
+
+**Checked against a full pass**, in Užice: after jumps and eased zooms in and out across a
+whole level, rotations, a wheel-like zoom with a road selected, and a pan followed by a zoom,
+a full pass changed nothing that was shown, and no frame was a pass. An e2e test does the same
+on the small test map.
+
 ### What still asks for a pass
 
-- **Anything that marks the whole layer dirty:** a filter, the styles, the language, a zoom.
+- **Anything that marks the whole layer dirty:** a filter, the styles, the language.
 - **A redraw request without a layer.** A few are left: `Context.setDebug()`, the lasso, the
   systems that change how everything looks.
 
@@ -1495,9 +1539,9 @@ And the pass itself, for when it's needed. In Užice it's 134 ms with nothing to
   their ways.
 - **`entity.geometry(graph)` twice** for what's left (once to filter, once to classify), and a
   `Map` entry per entity to sort them: 30 ms.
-- **A zoom doesn't need most of this.** After a zoom in, the new cull box is inside the old
-  one, and after a zoom out the layer could look at what the box grew over, as `_moveBox()`
-  does. What a zoom changes is how everything is drawn, which already waits for later frames.
+- **Following the box costs 45 to 80 ms in Užice** (the `box` step), most of it a walk over
+  every feature to see whether its entity is still in the box. That's the frame of a zoom or of
+  a pan that leaves the box now.
 
 ### Seen on the way
 

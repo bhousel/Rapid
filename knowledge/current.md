@@ -114,9 +114,15 @@ Still to do, in about this order:
   sees them and adds the ones related to the selection afterwards; arrivals skip them too. The
   pass went from 181 to 134 ms in Užice, and the frame of a zoom from 262 to 210. Eleven
   situations checked against the build before: the same features and the same filter counts.
-  Next (section 12, "What still asks for a pass"): a zoom could follow the cull box as a pan
-  does. Then what's left of the pass (71 ms of looking at each feature in Užice), a frame between
-  passes during a zoom, the other layers, merging a tile (80 to 134 ms on the main thread, the
+  **A zoom without a pass** (Nov 19, same section): the OSM layer keeps its
+  cull box through `dirtyTransform()`, follows the box on the frame of a zoom or rotation, and
+  runs what stays through `render…()` again over the next frames. When the view crosses a whole
+  zoom level it moves every feature to its new tile container at once (`_placeAgain()`). The
+  frame of a zoom in Užice went from 210 to 230 ms of APP to 66 to 83, and the longest animation
+  frame of a jump from 200 to 50 to 67. Everything is drawn again 0.1 to 0.3 s later.
+  Next: the frame that crosses a whole zoom level (250 to 420 ms, a rebuild of every tile
+  container), following the box itself (45 to 80 ms in Užice), what's left of the pass for a filter or a
+  change of style (71 ms of looking at each feature), the other layers, merging a tile (80 to 134 ms on the main thread, the
   longest stall of a pan), and the heap (2.1 GB live in Užice: the rare long frames come with a
   major garbage collection).
   Fixes found along the way are in `backlog.md` ("Pixi rendering follow-ups").

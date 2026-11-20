@@ -1003,6 +1003,7 @@ export class GraphicsSystem extends AbstractSystem {
       // Tell the layers whether something changed, or only the view moved.
       // (Cleared before they render, so a request made while rendering counts for the next frame.)
       frame.contentChanged = this._redrawRequested || frame.dirtyScene;
+      frame.requested = this._redrawRequested;
       frame.changedLayerIDs = this._redrawLayerIDs;
       this._redrawRequested = false;
       this._redrawLayerIDs = new Set<LayerID>();
@@ -1024,6 +1025,7 @@ export class GraphicsSystem extends AbstractSystem {
       // No pass: the redraw requests and the view's new cull box wait for a frame that may do one.
       // Only the layers that asked to be drawn now are told that something changed.
       frame.contentChanged = false;
+      frame.requested = false;
       frame.changedLayerIDs = this._urgentLayerIDs;
       for (const layerID of this._urgentLayerIDs) {
         this._redrawLayerIDs.delete(layerID);
