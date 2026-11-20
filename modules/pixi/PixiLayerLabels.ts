@@ -41,6 +41,12 @@ const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
 };
 
 /** Measurements for a label, including its expected width and height */
+/** A box in label space: `[minX, minY, maxX, maxY]` */
+type LabelRoom = [number, number, number, number];
+
+/** Past this many freed boxes in a frame, they're treated as one box around them all */
+const MAX_FREED = 64;
+
 interface LabelMeasurement {
   /** Label text, e.g. "Main Street" */
   str: string;
@@ -121,6 +127,21 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   protected _rasterDrainScheduled: boolean;
   /** Map transform at the last labeling pass; used to detect zoom/rotation changes that need a full relabel */
   protected _tPrev: { x: number; y: number; z: number; r: number };
+  /** The features whose labels are to be looked at: they changed, or their label was taken away (see `render`) */
+  protected _pending: Set<FeatureID>;
+  /** Whether every feature in the scene is to be looked at, as after a zoom (see `reset`) */
+  protected _placeAll: boolean;
+  /**
+   * The features that have a label and got no place for it, with the box in label space where
+   * the label would have gone. They're tried again when room is made there (see `_retryUnplaced`).
+   */
+  protected _unplaced: Map<FeatureID, LabelRoom>;
+  /** Boxes in label space where a label was taken away since the last placement */
+  protected _freed: LabelRoom[];
+  /** Whether the last call to `placeTextLabel` or `placeRopeLabel` placed a label */
+  protected _didPlace: boolean;
+  /** The red boxes that show what labels avoid, in the label debug view, by feature (see `renderDebugAvoids`) */
+  protected _debugAvoids: Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>;
   /** Whether the last frame put off placing labels (so that another frame should follow it) */
   protected _placementWaiting: boolean;
   /** Whether placing labels was put off because a frame was out of time (it waits one frame for that, not more) */
@@ -171,6 +192,12 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._tPrev = { x: 0, y: 0, z: 1, r: 0 };
     this._placementWaiting = false;
     this._waitedForTime = false;
+    this._pending = new Set<FeatureID>();
+    this._placeAll = true;
+    this._unplaced = new Map<FeatureID, LabelRoom>();
+    this._freed = [];
+    this._didPlace = false;
+    this._debugAvoids = new Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>();
 
     // For ASCII-only labels, we can use PIXI.BitmapText to avoid generating label textures
     PIXI.BitmapFont.install({ name: 'label-normal', style: TEXTSTYLE_NORMAL });
@@ -200,6 +227,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._labeled.clear();
     this._placeholders.clear();
     this._debugSprites.clear();
+    this._debugAvoids?.clear();      // (their sprites go with the containers, below)
+    this._pending?.clear();
+    this._placeAll = true;           // nothing is labeled now: look at every feature once
+    this._unplaced?.clear();
+    if (this._freed) this._freed.length = 0;
     this._featureBoxes.clear();
     this._pendingRasters.clear();
     if (this._rasterDrainScheduled) {
@@ -239,7 +271,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     labelOriginContainer.addChild(debugContainer, labelContainer);
 
     for (const feature of this.scene.features.values()) {
-      (feature as any)._labelDirty = false;
+      feature.labelPlaced();
     }
   }
 
@@ -252,6 +284,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   public resetFeature(featureID: FeatureID): void {
     const spatial = this.context.systems.spatial!;
     this._labeled.delete(featureID);
+    this._unplaced.delete(featureID);
+    this._pending.add(featureID);     // to be placed again, if it's still there
 
     const labelIDs = new Set<LabelID>();
     const debugObjectIDs = new Set<string>();
@@ -267,6 +301,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         if (contents.type === 'label' || contents.type === 'avoid') {
           spatial.removeItems(SPATIAL_LABELS, boxID);
           if (contents.cells) {
+            const size = this.scene.avoidGrid.cellSize;
+            const c = contents.cells;
+            this._freed.push([c[0] * size, c[1] * size, (c[2] + 1) * size, (c[3] + 1) * size]);
             this.scene.avoidGrid.unmark('label', contents.cells);
             contents.cells = null;
           }
@@ -315,7 +352,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @return 1 if placement is waiting, otherwise 0
    */
   public override get numWaiting(): number {
-    return (this._placementWaiting || this.scene.numAvoidHits > 0) ? 1 : 0;
+    if (this._placementWaiting || this.scene.numAvoidHits > 0) return 1;
+    // Room was made, and something is waiting for room
+    if (this._unplaced.size > 0 && (this._freed.length > 0 || this.scene.numAvoidFrees > 0)) return 1;
+    return 0;
   }
 
 
@@ -363,18 +403,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     }
     this._placementWaiting = !placeNow;
 
+    // The features that were drawn, shown, hidden or destroyed since the last frame said so
+    // to the scene. Those are the only ones whose labels can need anything.
+    for (const featureID of this.scene.takeChangedFeatures()) {
+      this._pending.add(featureID);
+    }
     if (placeNow) {
       this._waitedForTime = false;
-      if (!didReset) {
-        // (Over the values: `for (const [id, feature] of map)` makes an array for every entry,
-        // and this walks every feature in the scene on every frame.)
-        for (const feature of this.scene.features.values()) {
-          if ((feature as any)._labelDirty) {       // reset only the changed labels
-            this.resetFeature(feature.id);
-            (feature as any)._labelDirty = false;
-          }
-        }
-      }
     }
 
 
@@ -404,14 +439,25 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (placeNow) {
       // Take back the labels that something was drawn over.
       this.resolveAvoidHits();
+      // ..and try the features again that had no room, where room was made.
+      this._retryUnplaced();
 
-      // Collect features to place labels on.
+      // Collect features to place labels on: the ones that changed, or after a zoom, all of them.
       const points: PixiFeaturePoint[] = [];
       const lines: PixiFeatureLine[] = [];
       const polygons: PixiFeaturePolygon[] = [];
-      for (const feature of this.scene.features.values()) {
+
+      const consider = (feature: AbstractPixiFeature): void => {
+        if (feature.layer === this) return;     // (a label is a feature too)
+        if (feature.labelDirty) {               // its shape, label or visibility changed: place it again
+          if (this._labeled.has(feature.id)) {
+            this.resetFeature(feature.id);
+          }
+          feature.labelPlaced();
+        }
         // If the feature can be labeled, and hasn't yet been, add it to the list for placement.
-        // (Not one that's still waiting to be drawn: it's labeled once it has its shape.)
+        // (Not one that's still waiting to be drawn: it's labeled once it has its shape, and it
+        // says so then.)
         if (feature.label && feature.visible && !feature.dirty && !this._labeled.has(feature.id)) {
           if (feature.type === 'Point') {
             points.push(feature as PixiFeaturePoint);
@@ -421,7 +467,28 @@ export class PixiLayerLabels extends AbstractPixiLayer {
             polygons.push(feature as PixiFeaturePolygon);
           }
         }
+      };
+
+      if (this._placeAll) {
+        this._placeAll = false;
+        for (const feature of this.scene.features.values()) {
+          consider(feature);
+        }
+      } else {
+        for (const featureID of [...this._pending]) {
+          const feature = this.scene.features.get(featureID);
+          if (feature) {
+            consider(feature);
+          } else {                              // it's gone, and its label with it
+            this._labeled.delete(featureID);
+            this._unplaced.delete(featureID);
+            if (this._featureBoxes.has(featureID)) {
+              this.resetFeature(featureID);
+            }
+          }
+        }
       }
+      this._pending.clear();
 
       // Points first, then lines (so line labels can avoid point labels)
       this.labelPoints(points);
@@ -436,6 +503,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (showDebug) {
       this.debugContainer!.visible = true;
       this.renderDebug();
+      this.renderDebugAvoids();
     } else {
       this.debugContainer!.visible = false;
     }
@@ -631,6 +699,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   public labelPoints(features: PixiFeaturePoint[]): void {
     // Sort by container y-position (north-to-south in world coords) for stable placement priority.
     features.sort((a, b) => a.container.position.y - b.container.position.y);
+    const tempVec: Vec2 = [0, 0];
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -641,7 +710,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!feature.label) continue;  // no label needed
 
       const measurement = this.measureLabel(feature.label, 'normal');
+      this._didPlace = false;
       this.placeTextLabel(feature, measurement);
+
+      if (!this._didPlace) {   // no room: remember where it would have gone (anywhere around the point)
+        const origin = feature.geometry?.world?.origin;
+        if (origin) {
+          const [x, y] = this.scene.worldToLabel(origin[0], origin[1], tempVec);
+          const dx = measurement.width + 50;
+          const dy = measurement.height + 50;
+          this._unplaced.set(featureID, [x - dx, y - dy, x + dx, y + dy]);
+        }
+      }
     }
   }
 
@@ -694,7 +774,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
 
       const measurement = this.measureLabel(feature.label, 'normal');
+      this._didPlace = false;
       this.placeRopeLabel(feature, measurement, labelCoords);
+      if (!this._didPlace) this._noteUnplaced(featureID, labelCoords);
     }
   }
 
@@ -750,7 +832,69 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
       }
 
+      this._didPlace = false;
       this.placeRopeLabel(feature, measurement, coords);
+      if (!this._didPlace) this._noteUnplaced(featureID, coords);
+    }
+  }
+
+
+  /**
+   * Remembers a line or polygon that had a label and no room for it, so that it's tried again
+   * when room is made along it (see `_retryUnplaced`).
+   * @param featureID - The feature
+   * @param coords - The coordinates its label would have run along, in label space
+   */
+  protected _noteUnplaced(featureID: FeatureID, coords: Vec2[]): void {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of coords) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (minX <= maxX) {
+      this._unplaced.set(featureID, [minX, minY, maxX, maxY]);
+    }
+  }
+
+
+  /**
+   * Puts the features that had no room for their label back on the list to be placed, where
+   * room has been made since: a label was taken away, or something that labels avoid was
+   * hidden, moved or destroyed (the vertices of a way that isn't selected anymore).
+   * Nothing else would try them again: a feature is only looked at when it changes.
+   */
+  protected _retryUnplaced(): void {
+    const size = this.scene.avoidGrid.cellSize;
+
+    let freed = this._freed;
+    this._freed = [];
+    for (const c of this.scene.takeAvoidFrees()) {
+      freed.push([c[0] * size, c[1] * size, (c[2] + 1) * size, (c[3] + 1) * size]);
+    }
+    if (!freed.length || !this._unplaced.size) return;
+
+    if (freed.length > MAX_FREED) {   // too many to compare one by one
+      const all: LabelRoom = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const box of freed) {
+        if (box[0] < all[0]) all[0] = box[0];
+        if (box[1] < all[1]) all[1] = box[1];
+        if (box[2] > all[2]) all[2] = box[2];
+        if (box[3] > all[3]) all[3] = box[3];
+      }
+      freed = [all];
+    }
+
+    for (const [featureID, room] of this._unplaced) {
+      for (const box of freed) {
+        if (box[0] <= room[2] && box[2] >= room[0] && box[1] <= room[3] && box[3] >= room[1]) {
+          this._unplaced.delete(featureID);
+          this._labeled.delete(featureID);
+          this._pending.add(featureID);
+          break;
+        }
+      }
     }
   }
 
@@ -903,6 +1047,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           tint: style?.label?.color ?? 0xeeeeee
         };
         this._placeholders.set(labelID, props);
+        this._didPlace = true;
 
         this._cacheBox(labelItem);
         spatial.addItems(SPATIAL_LABELS, labelItem);
@@ -1140,6 +1285,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         tint: style?.label?.color ?? 0xeeeeee
       };
       this._placeholders.set(labelID, props);
+      this._didPlace = true;
     });
 
     // Bulk insert any items we collected..
@@ -1217,6 +1363,44 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!seenTextures.has(str)) {
         textureManager.free('text', textureID);
         this._textureIDs.delete(str);
+      }
+    }
+  }
+
+
+  /**
+   * Shows what labels avoid, as red boxes, in the label debug view (`context.setDebug('label')`).
+   * The avoids are marks in the scene's avoid grid, made by the features themselves, so this
+   * asks every feature for the cells it marked. (A walk over the whole scene, on every frame:
+   * for the debug view only.)
+   */
+  public renderDebugAvoids(): void {
+    const size = this.scene.avoidGrid.cellSize;
+    const debugAvoids = this._debugAvoids;
+    const seen = new Set<FeatureID>();
+
+    for (const feature of this.scene.features.values()) {
+      const cells = feature.avoidCells;
+      if (!cells) continue;
+      seen.add(feature.id);
+
+      const existing = debugAvoids.get(feature.id);
+      if (existing?.cells === cells) continue;      // (a feature gets a new array when its cells change)
+      existing?.sprite.destroy();
+
+      const x = cells[0] * size;
+      const y = cells[1] * size;
+      const w = (cells[2] - cells[0] + 1) * size;
+      const h = (cells[3] - cells[1] + 1) * size;
+      const sprite = getDebugBBox(x, y, w, h, 0xff0000, 0.65, `${feature.id}-avoid-debug`);   // red (avoid)
+      this.debugContainer!.addChild(sprite);
+      debugAvoids.set(feature.id, { sprite: sprite, cells: cells });
+    }
+
+    for (const [featureID, { sprite }] of debugAvoids) {
+      if (!seen.has(featureID)) {
+        sprite.destroy();
+        debugAvoids.delete(featureID);    // (deleting from a Map while iterating over it is safe)
       }
     }
   }

@@ -112,6 +112,10 @@ export class PixiScene extends EventEmitter {
   protected _toScreen: PIXI.Matrix;
   /** Cells where something to avoid was drawn over a placed label (see `avoidHit`) */
   protected _avoidHits: CellRect[];
+  /** Cells that something to avoid has left (see `avoidFreed`) */
+  protected _avoidFrees: CellRect[];
+  /** The features that were drawn, shown, hidden or destroyed since the labels layer last asked (see `featureChanged`) */
+  protected _changedFeatureIDs: Set<FeatureID>;
   /** The zoom the cull box was made at */
   protected _cullZoom: number;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
@@ -147,6 +151,8 @@ export class PixiScene extends EventEmitter {
     this.labelOffset = new PIXI.Point();
     this._toScreen = new PIXI.Matrix();
     this._avoidHits = [];
+    this._avoidFrees = [];
+    this._changedFeatureIDs = new Set<FeatureID>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -781,6 +787,7 @@ export class PixiScene extends EventEmitter {
     // Label space is a new one. Every feature is drawn again, and marks what it covers again.
     this.avoidGrid.clear();
     this._avoidHits = [];
+    this._avoidFrees = [];
 
     for (const layer of this.layers.values()) {
       layer.dirtyTransform();
@@ -833,6 +840,29 @@ export class PixiScene extends EventEmitter {
 
 
   /**
+   * A feature tells the scene that it has been drawn again, shown, hidden or destroyed, or has
+   * another label. The labels layer takes these (`takeChangedFeatures`) and looks at the labels
+   * of those features only: it used to walk every feature in the scene on every frame to find
+   * the ones that had changed.
+   * @param feature - The feature
+   */
+  public featureChanged(feature: AbstractPixiFeature): void {
+    this._changedFeatureIDs.add(feature.id);
+  }
+
+
+  /**
+   * Returns the features that changed since the last call (see `featureChanged`), and forgets them.
+   * @return Their IDs. A feature may be gone by now.
+   */
+  public takeChangedFeatures(): Set<FeatureID> {
+    const changed = this._changedFeatureIDs;
+    this._changedFeatureIDs = new Set<FeatureID>();
+    return changed;
+  }
+
+
+  /**
    * A feature that labels avoid was drawn where a label is. The labels layer takes these and
    * places the labels it finds there again, somewhere else (`takeAvoidHits`).
    * @param cells - The cells of the avoid grid that the feature covers
@@ -859,6 +889,36 @@ export class PixiScene extends EventEmitter {
     const hits = this._avoidHits;
     this._avoidHits = [];
     return hits;
+  }
+
+
+  /**
+   * A feature that labels avoid isn't where it was: it was hidden, moved or destroyed. The
+   * labels layer tries the labels again that had no room there (`takeAvoidFrees`).
+   * @param cells - The cells of the avoid grid that the feature covered
+   */
+  public avoidFreed(cells: CellRect): void {
+    this._avoidFrees.push(cells);
+  }
+
+
+  /**
+   * How many features that labels avoid have left their place since the labels layer last looked.
+   * @return The number waiting
+   */
+  public get numAvoidFrees(): number {
+    return this._avoidFrees.length;
+  }
+
+
+  /**
+   * Returns the cells that something to avoid has left since the last call, and forgets them.
+   * @return The cells, one rectangle for each feature
+   */
+  public takeAvoidFrees(): CellRect[] {
+    const frees = this._avoidFrees;
+    this._avoidFrees = [];
+    return frees;
   }
 
 

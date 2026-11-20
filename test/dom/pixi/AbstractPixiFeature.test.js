@@ -15,7 +15,7 @@ describe('AbstractPixiFeature', () => {
 
   beforeEach(() => {
     const context = new Rapid.MockContext();
-    const scene = { context: context, gfx: {}, addFeature: () => {}, removeFeature: () => {} };
+    const scene = { context: context, gfx: {}, addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
     layer = new AbstractPixiLayer(scene);
   });
 
@@ -75,6 +75,62 @@ describe('AbstractPixiFeature', () => {
       feature.unsetClass('hover');
       assert.isTrue(feature.dirty);
       assert.isFalse(feature.needsStyle);
+    });
+  });
+
+
+  // A label is placed again when its feature's shape, text or visibility changed, and the labels
+  // layer hears which features to look at from the scene.
+  describe('labelDirty', () => {
+    it('is true for a new feature, and false once the labels layer has looked at it', () => {
+      const feature = makeFeature();
+      assert.isTrue(feature.labelDirty);
+      feature.labelPlaced();
+      assert.isFalse(feature.labelDirty);
+    });
+
+    it('stays false when a class is set or unset: a hover leaves the label where it is', () => {
+      const feature = makeFeature();
+      feature.labelPlaced();
+      feature.setClass('hover');
+      assert.isFalse(feature.labelDirty);
+      feature.update();
+      feature.unsetClass('hover');
+      assert.isFalse(feature.labelDirty);
+    });
+
+    it('is true again when the label text changes, the feature is hidden, or it is marked dirty', () => {
+      const feature = makeFeature();
+      feature.labelPlaced();
+      feature.label = 'Main Street';
+      assert.isTrue(feature.labelDirty);
+
+      feature.labelPlaced();
+      feature.visible = false;
+      assert.isTrue(feature.labelDirty);
+
+      feature.labelPlaced();
+      feature.dirty = true;
+      assert.isTrue(feature.labelDirty);
+    });
+
+    it('tells the scene when it is drawn, hidden, relabeled or destroyed', () => {
+      const told = [];
+      layer.scene.featureChanged = feature => told.push(feature.id);
+      const feature = makeFeature('f1');
+      assert.deepEqual(told, ['f1']);                 // drawn
+
+      feature.update();                               // nothing to draw: nothing to tell
+      assert.lengthOf(told, 1);
+      feature.setClass('hover');
+      feature.update();                               // drawn again
+      assert.lengthOf(told, 2);
+      feature.label = 'Main Street';
+      assert.lengthOf(told, 3);
+      feature.visible = false;
+      assert.lengthOf(told, 4);
+      feature.destroy();
+      assert.lengthOf(told, 5);
     });
   });
 

@@ -390,6 +390,63 @@ test('marks every point in view for labels to avoid, and puts no label over a po
 
 
 // ..and when there are many features to make, as after a load, they're made over several frames too.
+
+test('leaves every label where it is while features are hovered', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // Where each label is, in label space
+  const placements = () => page.evaluate(() => {
+    const labels = rapidContext.systems.gfx.scene.layers.get('labels');
+    const result = {};
+    for (const [labelID, props] of labels._placeholders) {
+      result[labelID] = (props.kind === 'text') ? [props.x, props.y] : props.coords;
+    }
+    return result;
+  });
+
+  // The labeled lines: a hovered line gets its vertices drawn, along where its label runs
+  const wayIDs = await page.evaluate(() => {
+    const scene = rapidContext.systems.gfx.scene;
+    const labels = scene.layers.get('labels');
+    const ids = [];
+    for (const feature of scene.layers.get('osm').features.values()) {
+      if (feature.type === 'LineString' && feature.visible && labels._featureBoxes.has(feature.id)) {
+        ids.push(feature.data.id);
+      }
+    }
+    return ids.slice(0, 8);
+  });
+  expect(wayIDs.length).toBeGreaterThan(0);
+
+  const before = await placements();
+  expect(Object.keys(before).length).toBeGreaterThan(0);
+
+  for (const wayID of wayIDs) {
+    const vertices = await page.evaluate(id => {
+      const { gfx } = rapidContext.systems;
+      gfx.scene.setClass('hover', id);
+      gfx.requestFrame();
+      return rapidContext.systems.editor.staging.graph.entity(id).nodes.length;
+    }, wayID);
+    expect(vertices).toBeGreaterThan(1);
+    await waitForIdle(page);
+    expect(await placements()).toEqual(before);
+
+    await page.evaluate(id => {
+      const { gfx } = rapidContext.systems;
+      gfx.scene.unsetClass('hover', id);
+      gfx.requestFrame();
+    }, wayID);
+    await waitForIdle(page);
+    expect(await placements()).toEqual(before);
+  }
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
 test('makes features over several frames when there are many to make, and ends up with all of them', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);

@@ -1895,8 +1895,8 @@ differently from the plan above:
   one cached at the last render: marks were off by one step of a pan.
 - **A frame is asked for when a point lands on a label** after the frame's placement
   (`numWaiting`), or the label would stay there until something else drew a frame.
-- **The label debug view (`context.setDebug('label')`) no longer shows the avoids in red.**
-  There are no boxes to show. Drawing the grid's taken cells would bring it back.
+- **The label debug view (`context.setDebug('label')`) shows the avoids in red again,** one
+  box for each feature that has marked cells (`renderDebugAvoids()`, from `feature.avoidCells`).
 
 | Užice, z16 | Boxes | Grid |
 |---|---|---|
@@ -1909,8 +1909,36 @@ Checked in Užice after a load, a zoom in to where viewfields are drawn, two rot
 back out and pans: every drawn point in view is marked where it's drawn, and none is under
 another feature's label. The e2e test does the same on the small map, turned and zoomed too.
 
-What's left of the cost is steps 5 and 6: the two walks over every feature (the 1.1 to 1.4 ms),
-and placing everything in one frame (the 28 to 44 ms).
+### What was built (Nov 20: step 5)
+
+A feature tells the scene when it's drawn again, hidden, shown, given another label or
+destroyed (`PixiScene.featureChanged()`), and the labels layer looks at those features only
+(`takeChangedFeatures()`, kept in `_pending` until a frame places). After a zoom or a reset
+it looks at every feature once (`_placeAll`). A frame of a pan in Užice went from 1.1 to
+1.4 ms to 0.1 ms (median); the frame that places everything after a zoom is 26 ms.
+
+- **A class doesn't mark the label out of date** (`setClass()`, `unsetClass()`). The feature
+  is drawn again and says so, the labels layer finds `labelDirty` false, and leaves the label.
+- **That wasn't enough for a hover.** A hovered way gets its vertices and midpoints drawn, and
+  those were avoids: in downtown Seattle 30 hovers took 189 labels away and moved 89. Now the
+  layer says which of them are **handles** (`RelatedIDs.handleIDs` in `PixiLayerOsm`: related
+  to what's selected or being drawn, not to what's only hovered), and only handles and the
+  vertices that are always drawn get `labelAvoid`. The same 30 hovers move nothing. A hovered
+  way's vertices can be under a label until the way is selected; then the label moves.
+- **A feature that found no room is tried again when room is made.** With the walk, every
+  unlabeled feature was tried in every placement. Without it, a way that lost its label to
+  the vertices of a selection never got one back. So the layer keeps the features that got no
+  label with the box where it would have gone (`_unplaced`), and puts them back on the list
+  when something is freed there: an avoid is hidden, moved or destroyed
+  (`PixiScene.avoidFreed()`), or a label is taken away. Past 64 freed boxes in a frame they're
+  compared as one box around them all.
+- A label that moved for a selection stays where it went when the selection ends, as decided.
+  Of the labels a selection takes, one in a few doesn't come back afterwards, because another
+  label took its place in the meantime.
+- Not done: a selected way with many vertices often has no run between its handles that's
+  long enough, so it has no label while it's selected. See "Open questions".
+
+What's left of the cost is step 6: placing everything in one frame (26 to 44 ms).
 
 ### Order of work
 
@@ -1925,8 +1953,8 @@ label) and against the table above, and can ship on its own.
 4. **(Done.) Points mark themselves; `gatherAvoids()` and its boxes go.** Placement asks the grid.
    Compare the labels placed before and after at the test places: they'll differ a little
    (cells are coarser than boxes), and that needs a look, not just a count.
-5. **`scene.featureChanged()` replaces the walks.** A class change reaches the label as a
-   new tint and doesn't place it again.
+5. **(Done.) `scene.featureChanged()` replaces the walks.** A class change doesn't place the
+   label again, and neither do the vertices of a hovered way.
 6. **Placement in parts,** with the gate.
 7. **(Done, with step 4.) Labels mark their cells; a pin on a label takes it away** (rule 3). Until this step the
    index is asked for every new pin, as today. Only the label that's hit moves.
@@ -1954,6 +1982,12 @@ label) and against the table above, and can ship on its own.
     where it went: moving back would be a second jump.
 
 ### Open questions
+
+- **A selected way's own label.** Bryan wants a selected way to keep a label. Its vertices and
+  midpoints are avoids, and a short segment has no room between them, so the label is often
+  gone while the way is selected (as before this work). It could be let through for the
+  selected way's own handles, drawn beside the way, or shown some other way (the sidebar
+  has the name).
 
 - **Order between frames.** Within a batch, points are placed before lines, so line labels
   fit around point labels. Across batches a line's label can be there first. Today has the

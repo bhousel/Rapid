@@ -21,6 +21,7 @@ describe('PixiLayerOsm', () => {
         if (!features.has(featureID)) {
           features.set(featureID, {
             data: null, geometry: null, dirty: false, update: () => {},
+            labelAvoid: false, updateAvoid: function() { this.avoidUpdates = (this.avoidUpdates ?? 0) + 1; },
             addChildData: (parentID, childIDs) => layer.addChildData(parentID, childIDs)
           });
         }
@@ -32,6 +33,9 @@ describe('PixiLayerOsm', () => {
     layer._gatherMidpoints = () => framesOfMidpoints[frame++];
     return layer;
   }
+
+  // What's related to the selection: nothing is selected, so nothing is there to be grabbed
+  const RELATED = { descendantIDs: new Set(), siblingIDs: new Set(), handleIDs: new Set() };
 
   function midpointProps(id, loc, wayID = 'w1', edge = ['n1', 'n2']) {
     return { type: 'midpoint', serviceID: 'osm', isNew: true, id: id, wayID: wayID, edge: edge,
@@ -46,12 +50,12 @@ describe('PixiLayerOsm', () => {
     const c = midpointProps('c', [0.002, 0]);
     const layer = makeLayer(context, [[a, b], [a, c]]);
 
-    layer.renderMidpoints(1, viewport, {}, {});
+    layer.renderMidpoints(1, viewport, {}, RELATED);
     const first = layer._midpoints.get('a');
     assert.isOk(first);
     assert.sameMembers([...layer._midpoints.keys()], ['a', 'b']);
 
-    layer.renderMidpoints(2, viewport, {}, {});
+    layer.renderMidpoints(2, viewport, {}, RELATED);
     assert.strictEqual(layer._midpoints.get('a'), first);   // same MarkerData reused
     assert.sameMembers([...layer._midpoints.keys()], ['a', 'c']);   // 'b' dropped, map stays bounded
     assert.sameMembers([...layer.getSelfAndDescendants('w1')], ['w1', 'a', 'c']);   // and unlinked from its way
@@ -64,9 +68,9 @@ describe('PixiLayerOsm', () => {
     const after = midpointProps('a', [0, 0], 'w2');   // same segment, same key
     const layer = makeLayer(context, [[before], [after]]);
 
-    layer.renderMidpoints(1, viewport, {}, {});
+    layer.renderMidpoints(1, viewport, {}, RELATED);
     const first = layer._midpoints.get('a');
-    layer.renderMidpoints(2, viewport, {}, {});
+    layer.renderMidpoints(2, viewport, {}, RELATED);
     const second = layer._midpoints.get('a');
 
     assert.notStrictEqual(second, first);
@@ -83,8 +87,8 @@ describe('PixiLayerOsm', () => {
       [midpointProps('a', [0, 0], 'w1', ['n1', 'n3'])]
     ]);
 
-    layer.renderMidpoints(1, viewport, {}, {});
-    layer.renderMidpoints(2, viewport, {}, {});
+    layer.renderMidpoints(1, viewport, {}, RELATED);
+    layer.renderMidpoints(2, viewport, {}, RELATED);
     assert.deepEqual(layer._midpoints.get('a').props.edge, ['n1', 'n3']);
   });
 
@@ -94,10 +98,10 @@ describe('PixiLayerOsm', () => {
     const a = midpointProps('a', [0, 0]);
     const layer = makeLayer(context, [[a], [a]]);
 
-    layer.renderMidpoints(1, viewport, {}, {});
+    layer.renderMidpoints(1, viewport, {}, RELATED);
     layer.clearChildData('w1');                     // what `renderLines` does when the way changes
     layer.addChildData('w1', ['n1', 'n2']);
-    layer.renderMidpoints(2, viewport, {}, {});
+    layer.renderMidpoints(2, viewport, {}, RELATED);
 
     assert.sameMembers([...layer.getSelfAndDescendants('w1')], ['w1', 'n1', 'n2', 'a']);
   });
@@ -1179,4 +1183,23 @@ describe('PixiLayerOsm', () => {
     });
   });
 
+
+  it('has labels keep clear of the midpoints of a selected way, and not of a hovered one', () => {
+    const context = new Rapid.MockContext();
+    const viewport = new Rapid.sdk.Viewport();
+    const a = midpointProps('a', [0, 0]);
+    const layer = makeLayer(context, [[a], [a], [a]]);
+    const feature = layer.features.get('osm-midpoint-a');
+
+    layer.renderMidpoints(1, viewport, {}, RELATED);     // its way is only hovered
+    assert.isFalse(feature.labelAvoid);
+
+    const selected = { descendantIDs: new Set(['w1']), siblingIDs: new Set(), handleIDs: new Set(['w1']) };
+    layer.renderMidpoints(2, viewport, {}, selected);    // now it's selected
+    assert.isTrue(feature.labelAvoid);
+    assert.strictEqual(feature.avoidUpdates, 1);         // it marked its place
+
+    layer.renderMidpoints(3, viewport, {}, selected);    // nothing new
+    assert.strictEqual(feature.avoidUpdates, 1);
+  });
 });

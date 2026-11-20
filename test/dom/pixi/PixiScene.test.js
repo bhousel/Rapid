@@ -251,6 +251,8 @@ describe('PixiScene', () => {
       scene.labelOffset = new PIXI.Point();
       scene._toScreen = new PIXI.Matrix();
       scene._avoidHits = [];
+      scene._avoidFrees = [];
+      scene._changedFeatureIDs = new Set();
       scene.avoidGrid = new AvoidGrid(2);
       return { scene, stage, origin };
     }
@@ -300,6 +302,27 @@ describe('PixiScene', () => {
       assert.strictEqual(scene.numAvoidHits, 1);
       assert.deepEqual(scene.takeAvoidHits(), [[1, 2, 3, 4]]);
       assert.deepEqual(scene.takeAvoidHits(), []);
+    });
+
+    it('hands over where something to avoid has left, once, and forgets it when label space changes', () => {
+      const { scene } = makeScene();
+      scene.avoidFreed([1, 2, 3, 4]);
+      assert.strictEqual(scene.numAvoidFrees, 1);
+      assert.deepEqual(scene.takeAvoidFrees(), [[1, 2, 3, 4]]);
+      assert.deepEqual(scene.takeAvoidFrees(), []);
+
+      scene.avoidFreed([1, 2, 3, 4]);
+      scene.dirtyTransform();
+      assert.strictEqual(scene.numAvoidFrees, 0);
+    });
+
+    it('hands over the features that changed, each once', () => {
+      const { scene } = makeScene();
+      scene.featureChanged({ id: 'osm-w1' });
+      scene.featureChanged({ id: 'osm-n1' });
+      scene.featureChanged({ id: 'osm-w1' });
+      assert.deepEqual([...scene.takeChangedFeatures()], ['osm-w1', 'osm-n1']);
+      assert.strictEqual(scene.takeChangedFeatures().size, 0);
     });
   });
 

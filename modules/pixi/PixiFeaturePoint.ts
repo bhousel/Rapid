@@ -116,6 +116,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.updateHitArea();
     this.updateHalo();
     this.updateAvoid();
+    this.scene.featureChanged(this);
   }
 
 

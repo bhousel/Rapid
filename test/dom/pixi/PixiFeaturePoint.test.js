@@ -18,7 +18,7 @@ describe('PixiFeaturePoint', () => {
   beforeEach(() => {
     const context = new Rapid.MockContext();
     const gfx = { textureManager: { getTexture: () => PIXI.Texture.WHITE } };
-    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {} };
+    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
     const layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);

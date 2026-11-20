@@ -7,7 +7,7 @@ import { PixiLayerLabels } from '../../../modules/pixi/PixiLayerLabels.ts';
 // grid as they're drawn (see `AbstractPixiFeature.updateAvoid`), and the labels layer places
 // against the grid.
 describe('PixiLayerLabels', () => {
-  let layer, spatial, grid, hits;
+  let layer, spatial, grid, hits, frees, changed;
 
   // A stand-in for a point feature drawn 10 px wide at [x, y] of label space
   function pointAt(id, x, y, avoided = true) {
@@ -36,8 +36,14 @@ describe('PixiLayerLabels', () => {
       avoidGrid: grid,
       labelOffset: new PIXI.Point(0, 0),
       takeAvoidHits: () => hits.splice(0),
-      numAvoidHits: 0
+      numAvoidHits: 0,
+      takeAvoidFrees: () => frees.splice(0),
+      get numAvoidFrees() { return frees.length; },
+      takeChangedFeatures: () => new Set(changed.splice(0)),
+      features: new Map()
     };
+    frees = [];
+    changed = [];
 
     // (The constructor installs a bitmap font, which needs a canvas that draws text.)
     const install = PIXI.BitmapFont.install;
@@ -119,6 +125,59 @@ describe('PixiLayerLabels', () => {
       assert.deepEqual(labelBoxes().map(item => item.contents.featureID), ['osm-n2']);
       assert.isFalse(layer._labeled.has('osm-n1'));
       assert.isTrue(layer._labeled.has('osm-n2'));
+    });
+  });
+
+  // A feature is only looked at again when it changes, so one that found no room has to be told
+  // when room is made.
+  describe('_retryUnplaced', () => {
+    it('tries a feature again when what was in its way is gone, and leaves the others', () => {
+      layer._labeled.add('osm-w1').add('osm-w2');
+      layer._unplaced.set('osm-w1', [100, 100, 300, 120]);
+      layer._unplaced.set('osm-w2', [100, 500, 300, 520]);
+
+      frees.push(grid.cellsOf(200, 104, 210, 114));        // a vertex along w1 is hidden
+      layer._retryUnplaced();
+      assert.isTrue(layer._pending.has('osm-w1'));
+      assert.isFalse(layer._labeled.has('osm-w1'));
+      assert.isFalse(layer._unplaced.has('osm-w1'));
+      assert.isFalse(layer._pending.has('osm-w2'));
+      assert.isTrue(layer._unplaced.has('osm-w2'));
+    });
+
+    it('tries a feature again where a label was taken away', () => {
+      layer.placeTextLabel(pointAt('osm-n1', 100, 100, false), MEASURE);
+      layer._labeled.add('osm-n1').add('osm-w1');
+      layer._unplaced.set('osm-w1', [0, 90, 400, 130]);
+
+      layer.resetFeature('osm-n1');
+      layer._pending.clear();
+      layer._retryUnplaced();
+      assert.isTrue(layer._pending.has('osm-w1'));
+    });
+
+    it('asks for a frame while room was made and something waits for it', () => {
+      assert.strictEqual(layer.numWaiting, 0);
+      frees.push(grid.cellsOf(200, 104, 210, 114));
+      assert.strictEqual(layer.numWaiting, 0);             // nothing is waiting for room
+      layer._unplaced.set('osm-w1', [100, 100, 300, 120]);
+      assert.strictEqual(layer.numWaiting, 1);
+    });
+  });
+
+  describe('labelPoints', () => {
+    it('remembers a point that got no room for its label', () => {
+      layer.measureLabel = () => MEASURE;
+      layer.scene.worldToLabel = (x, y, out) => { out[0] = 105; out[1] = 105; return out; };
+      grid.mark('avoid', grid.cellsOf(0, 0, 400, 400));    // everything around it is taken
+      const point = pointAt('osm-n1', 100, 100);
+      point.label = 'Cafe';
+      point.geometry = { world: { origin: [0, 0] } };
+      point.container.position = { y: 0 };
+
+      layer.labelPoints([point]);
+      assert.lengthOf(labelBoxes(), 0);
+      assert.isTrue(layer._unplaced.has('osm-n1'));
     });
   });
 });

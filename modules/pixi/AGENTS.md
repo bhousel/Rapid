@@ -69,6 +69,12 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   it's hidden or destroyed. Nothing gathers avoids from containers anymore. A new kind of
   feature that labels should avoid overrides `updateAvoid()` and calls `_setAvoid()` with its
   box in label space (`scene.worldToLabel()`).
+  Vertices and midpoints that are only drawn because their way is hovered aren't avoids
+  (`related.handleIDs` in `PixiLayerOsm`): a hover must leave every label where it is.
+- **A feature's `update()` ends with `this.scene.featureChanged(this)`.** That's how the labels
+  layer knows which features to look at; it doesn't walk the scene. Setting `visible` or
+  `label`, and `destroy()`, say so themselves. A class (`setClass()`) doesn't mark the label
+  out of date, so don't make a hover or a selection set `dirty = true` on a feature.
 - **Put an OSM feature in its tile's container with `_setTile()`**, not by setting
   `parentContainer`. After the view crosses a whole zoom level, features move to the new zoom's
   tiles a whole old tile at a time (`_retile()`), and a feature moved on its own in between

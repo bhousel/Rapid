@@ -24,7 +24,7 @@ describe('PixiFeaturePolygon', () => {
       textureManager: { getTexture: () => null, getPatternTexture: () => null },
       pixi: { renderer: { type: 0 } }
     };
-    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {} };
+    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
     layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);

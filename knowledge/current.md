@@ -155,10 +155,13 @@ Still to do, in about this order:
   **`pixi-8.23` is merged** (PR #10, Nov 20). On branch `label-avoids`: labels
   avoid each point again, not each tile of points (broken since the points were split by tile),
   and `graphics-system.md` section 14 is the plan for label placement. Built so far (steps 1 to
-  4 and 7): points mark themselves in `scene.avoidGrid` as
-  they're drawn, and labels are placed against it. In Užice the frame that places everything
-  after a zoom went from 104 to 132 ms to about 29. To do: step 5 (features say when they're
-  drawn, no walks; a hover must not move a label) and step 6 (placement in parts).
+  5 and 7): points mark themselves in `scene.avoidGrid` as
+  they're drawn, and labels are placed against it; features tell the scene when they change
+  (`featureChanged()`), so the labels layer walks nothing, and a hover moves no label (a
+  hovered way's vertices aren't avoids). In Užice the frame that places everything
+  after a zoom went from 104 to 132 ms to about 27, a frame of a pan from 5 ms to 0.1.
+  To do: step 6 (placement in parts). Open: a selected way often has no room for its label
+  between its own vertices.
   Next: what's left of the garbage (Pixi's line builder with round joins is a quarter of it;
   `syncShader`), the 1.7 GB alive (a copy of the style per feature; ways' coordinates as
   arrays of pairs), labels placed in one

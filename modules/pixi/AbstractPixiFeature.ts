@@ -154,6 +154,7 @@ export class AbstractPixiFeature {
    */
   public destroy(): void {
     this._setAvoid(null);
+    this.scene.featureChanged(this);    // (its label goes with it)
     this.layer.removeFeature(this);
     this.scene.removeFeature(this);
 
@@ -194,6 +195,7 @@ export class AbstractPixiFeature {
     this.layer.work.updated++;
     this._geomDirty = false;
     this._styleDirty = false;
+    this.scene.featureChanged(this);
   }
 
 
@@ -271,6 +273,7 @@ export class AbstractPixiFeature {
     } else if (!this.dirty) {
       this.updateAvoid();
     }
+    this.scene.featureChanged(this);
   }
 
 
@@ -311,6 +314,7 @@ export class AbstractPixiFeature {
 
     if (old) {
       grid.unmark('avoid', old);
+      scene.avoidFreed(old);
     }
     if (cells) {
       grid.mark('avoid', cells);
@@ -343,6 +347,26 @@ export class AbstractPixiFeature {
       this._needsStyle = true;
       this._transformOnly = false;
     }
+  }
+
+
+  /**
+   * Whether the Feature's label has to be placed again: its shape, its label or its visibility
+   * changed since the label was placed. (Not for a hover or a selection: see `setClass`.)
+   * The labels layer reads this when the Feature tells the scene it changed
+   * (`PixiScene.featureChanged`), and clears it with `labelPlaced()`.
+   * @return `true` if the label is out of date
+   */
+  public get labelDirty(): boolean {
+    return this._labelDirty;
+  }
+
+
+  /**
+   * The labels layer has looked at this Feature's label, as it is now.
+   */
+  public labelPlaced(): void {
+    this._labelDirty = false;
   }
 
 
@@ -475,6 +499,7 @@ export class AbstractPixiFeature {
     if (str === this._label) return;  // no change
     this._label = str;
     this._labelDirty = true;
+    this.scene.featureChanged(this);
   }
 
 
@@ -508,9 +533,8 @@ export class AbstractPixiFeature {
     if (hasClass) return;  // nothing to do
 
     this._classes.add(classID);
-    this._styleDirty = true;
-    this._labelDirty = true;
-    this._transformOnly = false;
+    this._styleDirty = true;      // (not the label: a class changes how a feature looks, not where
+    this._transformOnly = false;  //  its label goes. A label that's placed again can land elsewhere.)
   }
 
 
@@ -527,7 +551,6 @@ export class AbstractPixiFeature {
 
     this._classes.delete(classID);
     this._styleDirty = true;
-    this._labelDirty = true;
     this._transformOnly = false;
   }
 
