@@ -1938,7 +1938,26 @@ it looks at every feature once (`_placeAll`). A frame of a pan in Užice went fr
 - Not done: a selected way with many vertices often has no run between its handles that's
   long enough, so it has no label while it's selected. See "Open questions".
 
-What's left of the cost is step 6: placing everything in one frame (26 to 44 ms).
+### What was built (Nov 20: step 6)
+
+The features that are ready for a label go on a queue (`PixiLayerLabels._queue`), and each
+frame places what it has time for (`_placeQueued()`): the features in view first, and of
+those the points, then the lines, then the polygons. It stops when `frame.hasTime()` says no,
+after a minimum of 25 features, and reports itself waiting so that another frame follows.
+
+- **No labels while the zoom or rotation is changing.** Every label is taken away when
+  either changes, so during a pinch or a turn the labels placed between two steps only flashed
+  (Bryan saw it as a flicker; frames that the gesture asked for placed everything at once,
+  whatever the time). Now placement waits until zoom and rotation have stayed the same for
+  150 ms (`SETTLE_MS`), urgent frames too. Checked with 60 small steps of each, a short pause
+  in the middle: no label at any step, all of them 0.4 to 0.8 s after the last one in Seattle.
+- **A frame the user asked for places what changed in it, not the whole queue.** An edit's own
+  labels are there at once; a queue left over from a zoom still goes by the time.
+- **The gate is as planned:** nothing but the user's own change is placed while features in
+  view are waiting to be drawn.
+- In Užice after a zoom, labels come in over four to seven frames of 2 to 8 ms each, inside
+  the frame's budget (24 ms for APP when nothing else is going on), where one frame took 26 to
+  44 ms. They're all there about 0.4 s after the zoom, 0.15 s of which is the wait.
 
 ### Order of work
 
@@ -1955,7 +1974,7 @@ label) and against the table above, and can ship on its own.
    (cells are coarser than boxes), and that needs a look, not just a count.
 5. **(Done.) `scene.featureChanged()` replaces the walks.** A class change doesn't place the
    label again, and neither do the vertices of a hovered way.
-6. **Placement in parts,** with the gate.
+6. **(Done.) Placement in parts,** with the gate, and not while the zoom or rotation changes.
 7. **(Done, with step 4.) Labels mark their cells; a pin on a label takes it away** (rule 3). Until this step the
    index is asked for every new pin, as today. Only the label that's hit moves.
 

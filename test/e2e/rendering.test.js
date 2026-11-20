@@ -447,6 +447,42 @@ test('leaves every label where it is while features are hovered', async ({ page,
 });
 
 
+
+test('places no labels while the zoom or rotation is changing, and places them once the view holds still', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const numLabels = () => page.evaluate(() => rapidContext.systems.gfx.scene.layers.get('labels')._placeholders.size);
+  expect(await numLabels()).toBeGreaterThan(0);
+
+  // A pinch, then a turn: a small step each frame. Every step takes all labels away, so any
+  // that were placed between two steps would only flash.
+  for (const [dz, dr] of [[0.01, 0], [0, 0.01]]) {
+    const shown = await page.evaluate(async ([dz, dr]) => {
+      const { gfx } = rapidContext.systems;
+      const viewport = rapidContext.viewport;
+      const labels = gfx.scene.layers.get('labels');
+      let most = 0;
+      for (let i = 0; i < 30; i++) {
+        const t = viewport.transform.props;
+        const c = viewport.center();
+        const k = 2 ** dz;
+        gfx.setTransformAsync({ x: c[0] + (t.x - c[0]) * k, y: c[1] + (t.y - c[1]) * k, z: t.z + dz, r: t.r + dr }, 0);
+        await new Promise(resolve => { requestAnimationFrame(resolve); });
+        most = Math.max(most, labels._placeholders.size);
+      }
+      return most;
+    }, [dz, dr]);
+    expect(shown).toBe(0);
+
+    await waitForIdle(page);
+    expect(await numLabels()).toBeGreaterThan(0);
+  }
+
+  expect(consoleErrors).toEqual([]);
+});
+
 test('makes features over several frames when there are many to make, and ends up with all of them', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);

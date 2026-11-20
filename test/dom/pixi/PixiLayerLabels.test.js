@@ -180,4 +180,64 @@ describe('PixiLayerLabels', () => {
       assert.isTrue(layer._unplaced.has('osm-n1'));
     });
   });
+
+  // Labels are placed over several frames: each frame takes what it has time for from the queue.
+  describe('_placeQueued', () => {
+    const viewBox = new Rapid.sdk.Extent([0, 0], [100, 100]);
+
+    // 30 points in view and 30 outside it, all ready for a label, queued with the outside ones first
+    function queuePoints() {
+      layer.measureLabel = () => MEASURE;
+      for (const where of ['out', 'in']) {
+        for (let i = 0; i < 30; i++) {
+          const point = pointAt(`osm-${where}${i}`, i * 200, (where === 'in') ? 0 : 5000, false);
+          const at = (where === 'in') ? [50, 50] : [500, 500];
+          point.label = 'Cafe';
+          point.visible = true;
+          point.dirty = false;
+          point.geometry = { world: { extent: new Rapid.sdk.Extent(at, at) } };
+          point.container.position = { y: i };
+          layer.scene.features.set(point.id, point);
+          layer._queue.add(point.id);
+        }
+      }
+    }
+    const tried = where => [...layer._labeled].filter(id => id.startsWith(`osm-${where}`)).length;
+
+    it('places the features in view first, and stops after a minimum when the frame is out of time', () => {
+      queuePoints();
+      const done = layer._placeQueued(layer._queue, { viewBox: viewBox, hasTime: () => false }, false);
+      assert.isFalse(done);
+      assert.strictEqual(tried('in'), 25);
+      assert.strictEqual(tried('out'), 0);
+      assert.strictEqual(layer._queue.size, 35);           // the rest waits for the next frame
+    });
+
+    it('goes on to the features outside the view while there is time', () => {
+      queuePoints();
+      const done = layer._placeQueued(layer._queue, { viewBox: viewBox, hasTime: () => true }, false);
+      assert.isTrue(done);
+      assert.strictEqual(tried('in'), 30);
+      assert.strictEqual(tried('out'), 30);
+      assert.strictEqual(layer._queue.size, 0);
+    });
+
+    it('places all it was given when forced, whatever the time', () => {
+      queuePoints();
+      const done = layer._placeQueued(['osm-in0', 'osm-out0'], { viewBox: viewBox, hasTime: () => false }, true);
+      assert.isTrue(done);
+      assert.strictEqual(layer._labeled.size, 2);
+      assert.strictEqual(layer._queue.size, 58);
+    });
+
+    it('drops a feature that is gone or waiting to be drawn again, without trying it', () => {
+      queuePoints();
+      layer.scene.features.get('osm-in0').dirty = true;
+      layer.scene.features.delete('osm-in1');
+      layer._placeQueued(layer._queue, { viewBox: viewBox, hasTime: () => true }, false);
+      assert.isFalse(layer._labeled.has('osm-in0'));
+      assert.isFalse(layer._labeled.has('osm-in1'));
+      assert.strictEqual(layer._queue.size, 0);
+    });
+  });
 });
