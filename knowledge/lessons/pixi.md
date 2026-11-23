@@ -6,7 +6,6 @@ How Pixi behaves, and what that means for Rapid.
 - **Pixi v8 `textureSpace: 'local'` stretches the texture to fit each stroked shape's bounding box** — read `node_modules/pixi.js/lib/scene/graphics/shared/utils/generateTextureFillMatrix.mjs` for the exact math. In the `'local'` branch, Pixi computes `bounds = shape.getBounds()` of the current stroke instruction and maps UV so (0,0) = top-left of bounds, (1,1) = bottom-right. The user-supplied `style.matrix` is then composed on top. A dash texture stroked one segment at a time (as `DashLine` did, before it was replaced by `LineMesh`) stretches one full cycle across each segment with `'local'` — longer segments = bigger dashes. Use `textureSpace: 'global'` for tiled patterns where the cycle length must be independent of segment length. (`'global'` is misnamed: it does NOT use worldTransform; it just normalizes UV by `texture.source.width/height` per pixel.)
 - **Rapid supports the WebGL1 renderer path** — e.g. `?renderer=webgl1` in the URL. WebGL1 only supports REPEAT wrap on power-of-two textures, so a texture that repeats (a dash pattern from `PixiTextures.getDashTexture()`) is a power of 2 wide, with the pattern stretched over all of it: its texture coordinates count in repeats of the pattern, not in texels, so the width doesn't show.
 - **Pre-multiplied matrices: scale BEFORE rotate** — with uniform scale, scale-then-rotate and rotate-then-scale produce the same matrix. With non-uniform scale the order matters. In Pixi's pre-multiply convention (`scale()`, `rotate()`, `translate()` all pre-multiply), do `m.identity(); m.scale(sx, sy); m.rotate(angle); m.translate(tx, ty)` — result is `M = T * R * S`, so a vector is first scaled (in the texture's own axes), then rotated, then translated. Reverse order tilts the texture's axes.
-- **A halo's `scale` vs container scale are independent axes** — `drawHalo()`'s `scale` says how many of the container's units a screen pixel is (it multiplies the halo's width and dashes). Container scale controls the Pixi transform hierarchy. For Line/Polygon features (`container.scale = 1`, drawing in world units), pass `localScale` (`2^(WORLD_ZOOM-zoom)`). For Point features (`container.scale = 1/worldScale`, drawing in CSS pixels), pass `1`. Don't conflate the two.
 - **`viewZoom` vs `styleZoom`: always use the right zoom for each purpose** — `viewZoom = viewport.transform.zoom` is the true Mercator zoom; use it for scale chain math (`worldScale = 2^(viewZoom - WORLD_ZOOM)`). `styleZoom = map?.effectiveZoom() ?? viewZoom` is latitude-adjusted; use it only for LOD thresholds and visual style decisions (e.g. `styleZoom < 16`). Mixing them causes features to scale incorrectly at high latitudes. Name them explicitly in functions that need both.
 - **Don't accept "works for one caller" as a fix for a shared utility** — If a `useTexture: true`/`false` toggle changes visible output for the same input, that's a bug in the utility, not a configuration choice for callers. Look at the math before reaching for a workaround.
 - **Pixi v8 renderer is NOT re-entrant** — never call `renderer.render()` or `renderer.generateTexture()` inside a layer's render path. The renderer shares batcher / renderPipes / renderTarget state across the whole frame; a nested render corrupts whichever slots are in flight. Symptom: intermittent visual glitches (garbled textures, smeared/wrong-UV meshes) on the FIRST frame an object enters the scene, which self-heal on the next clean render. Label texture creation is now deferred through `SchedulerSystem.schedule()` so it runs after frame callbacks. Remaining known risk: `PixiFeaturePolygon` still uses `PIXI.GpuGraphicsContext` + `buildContextBatches` to extract geometry; replace that with direct tessellation.
@@ -109,3 +108,25 @@ How Pixi behaves, and what that means for Rapid.
   it was more than half full of live vertices stops growing at twice its peak, in theory. With
   things that come and go at every zoom it was at three times what it used and climbing. Count
   the room against the use after the churn a real session makes, not after a load.
+- **A thing that comes and goes belongs in a small batch of its own.** A batch that gets or
+  loses a thing builds its whole index buffer again (in the order of every thing's `order`).
+  A hover's glow in the batch of a town's roads made every hover 11 ms of DRAW in Užice, where
+  hiding a line there had been a byte per vertex. In a batch that holds only glows it's 0.8.
+  A thing that changes *in place* (same vertex count) is cheap anywhere: only what was written
+  is sent to the GPU.
+- **A number that's the same at both edges of a strip says nothing in between.** The first
+  glow gave each vertex "1 at the strip's edge, 0 on the line", and a segment's two sides are
+  both edges: the fragment shader got 1 everywhere, and faded the glow to nothing. For a
+  distance across a strip, interpolate something signed (or a vector, and take its length):
+  one side's normal to the other's goes through 0 on the line.
+- **WGSL reserves names that GLSL allows:** `from`, `filter`, `target`, `type`, `mod`, `self`,
+  `set`, and about 140 more. A variable called `from` in the WGSL made the map black with
+  `renderer=webgpu`, with a warning in the console and every test passing (they draw with
+  WebGL). `test/dom/pixi/shaders.test.js` checks the names; it doesn't compile anything.
+- **An upload of our own has to premultiply as Pixi's does.** `AtlasAllocator`'s WebGPU
+  uploader left `premultipliedAlpha` off, and the WebGL one sets `UNPACK_PREMULTIPLY_ALPHA`.
+  Icons hid it (their faint edges are a pixel wide); a picture that fades over 16 pixels was
+  a hard disc.
+- **An animation frame is a whole DRAW.** Pixi renders the scene or nothing, so moving one
+  halo's dashes draws every batch: 0.2 ms on the CPU, and 5 to 14 ms of GPU on an M4. That's
+  why what moves is paced (`AnimationPacer`), and rests.

@@ -9,7 +9,7 @@ import { PixiFeaturePolygon } from '../../../modules/pixi/PixiFeaturePolygon.ts'
 // `lowRes` sprite, or in full (a fill and strokes). The Pixi objects for a level are made
 // when it's first needed and destroyed when it isn't: most polygons around a view are small.
 describe('PixiFeaturePolygon', () => {
-  let layer, feature, haloParent, map;
+  let layer, feature, halos, map, scene;
 
   // A square about 26 world units wide: 26 px on screen at zoom 16, 13 px at 15, 1.6 px at 12
   const SQUARE = { type: 'Polygon', coordinates: [[[0, 0], [0.0005, 0], [0.0005, 0.0005], [0, 0.0005], [0, 0]]] };
@@ -20,6 +20,25 @@ describe('PixiFeaturePolygon', () => {
   function drawAt(zoom) {
     feature.dirty = true;
     feature.update(viewportAt(zoom));
+  }
+
+  // What a line in a `LineBatch` holds in its first vertex: 12 floats (10 is its width in
+  // pixels, negative for a line whose dashes march) and 8 bytes (its color and opacity, then
+  // its dashes; for a glow, 5 and the least width of the line it's around in sixteenths)
+  const floatsOf = item => Array.from(item.batch._floats.subarray(item.first * 12, item.first * 12 + 12));
+  const bytesOf = item => Array.from(item.batch._bytes.subarray(item.first * 8, item.first * 8 + 8));
+
+  // How far the line that an item follows is from the middle of the polygon, at the most, in
+  // the polygon's own coordinates. (Its vertices are written from the batch's place in the world.)
+  function reachOf(item) {
+    const floats = item.batch._floats;
+    const dx = feature.container.position.x - item.batch.position.x;
+    const dy = feature.container.position.y - item.batch.position.y;
+    let max = 0;
+    for (let vertex = item.first; vertex < item.first + item.count; vertex++) {
+      max = Math.max(max, Math.abs(floats[vertex * 12] - dx), Math.abs(floats[vertex * 12 + 1] - dy));
+    }
+    return max;
   }
 
   beforeEach(() => {
@@ -34,9 +53,11 @@ describe('PixiFeaturePolygon', () => {
       },
       pixi: { renderer: { type: 0 } }
     };
-    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
-    haloParent = new PIXI.Container();
-    scene.layers.set('map-ui', { halo: haloParent });
+    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    // The map UI layer has the batch that draws every halo. (Its place in the world isn't the polygon's.)
+    halos = new LineBatch();
+    halos.position.set(8388600, 8388590);
+    scene.layers.set('map-ui', { haloBatchAt: () => halos });
     layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);
@@ -44,6 +65,9 @@ describe('PixiFeaturePolygon', () => {
     feature = new PixiFeaturePolygon(layer, 'p1');
     feature.geometry = part;
     feature.style = { fill: { color: 0xff0000, type: 'full' } };
+  });
+  afterEach(() => {
+    if (!halos.destroyed) halos.destroy();
   });
 
   it('makes no Pixi objects until it is drawn', () => {
@@ -297,65 +321,190 @@ describe('PixiFeaturePolygon', () => {
     });
   });
 
+  // The halo of a selected polygon is lines in a batch of the map UI layer's, above everything
+  // on the map: for each ring a dark line, and yellow dashes over it that march along it.
+  // The square's outline is 2 pixels wide, and a hit is good 5 pixels around it: the halo is 6
+  // pixels from the ring.
   describe('the select halo', () => {
-    // How far a ring's vertices are from the middle of the square, at the least and at the most
-    function reachOf(mesh) {
-      const positions = mesh.geometry.positions;
-      let min = Infinity;
-      let max = 0;
-      for (let i = 0; i < positions.length; i += 2) {
-        const reach = Math.max(Math.abs(positions[i]), Math.abs(positions[i + 1]));
-        min = Math.min(min, reach);
-        max = Math.max(max, reach);
-      }
-      return [min, max];
-    }
+    const halfOf = () => Math.abs(feature.geometry.local.flat[0][0]);    // of the square, in its own coordinates
 
-    it('is a dashed ring outside the outer ring', () => {
+    it('is two lines along a ring outside the outer ring: dashes that march, over a darker line', () => {
       feature.setClass('select');
       drawAt(17);
-      const halo = feature.halo;
-      assert.strictEqual(halo.parent, haloParent);
-      assert.strictEqual(halo.children.length, 1);
-      assert.strictEqual(halo.children[0].texture, dashTexture);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(halos.size, 2);
 
-      // The ring is 3 units outside the square, and its own line is 1 unit wide.
-      const ring = feature.geometry.local.flat[0];
-      const half = Math.abs(ring[0]);
-      const [, max] = reachOf(halo.children[0]);
-      assert.closeTo(max, half + 3 + 0.5, 1e-3);
+      const [under, dashes] = feature.haloItems;
+      assert.strictEqual(under.batch, halos);
+      assert.strictEqual(dashes.batch, halos);
+      assert.isAbove(dashes.order, under.order);
+      assert.strictEqual(floatsOf(under)[10], -4, '4 pixels wide, and it marches');
+      assert.deepEqual(bytesOf(under), [0, 0, 0, 140, 0, 0, 0, 0]);          // black, a little over half opaque, not dashed
+      assert.strictEqual(floatsOf(dashes)[10], -2);
+      assert.deepEqual(bytesOf(dashes), [255, 255, 0, 255, 6, 3, 0, 0]);     // yellow, in dashes of 6 with gaps of 3
+
+      // A pixel is half a unit of the ring's coordinates: the lines are 3 units outside the square.
+      assert.closeTo(reachOf(under), halfOf() + 3, 1e-3);
+      assert.closeTo(reachOf(dashes), halfOf() + 3, 1e-3);
+
+      // Nothing of it is in the polygon's own container.
+      assert.deepEqual(feature.container.children.map(child => child.label), ['fill', 'strokes']);
     });
 
     it('has a ring inside the outer ring too, in wireframe', () => {
       map.wireframeMode = true;
       feature.setClass('select');
       drawAt(17);
-      assert.strictEqual(feature.halo.children.length, 2);
+      assert.lengthOf(feature.haloItems, 4);
+      assert.strictEqual(halos.size, 4);
 
       // The outline is 1 pixel wide there: the rings are 2.75 units either side of the square.
-      const half = Math.abs(feature.geometry.local.flat[0][0]);
-      assert.closeTo(reachOf(feature.halo.children[0])[1], half + 2.75 + 0.5, 1e-3);
-      assert.closeTo(reachOf(feature.halo.children[1])[1], half - 2.75 + 0.5, 1e-3);
+      const [outerUnder, outerDashes, innerUnder, innerDashes] = feature.haloItems;
+      assert.closeTo(reachOf(outerUnder), halfOf() + 2.75, 1e-3);
+      assert.closeTo(reachOf(outerDashes), halfOf() + 2.75, 1e-3);
+      assert.closeTo(reachOf(innerUnder), halfOf() - 2.75, 1e-3);
+      assert.closeTo(reachOf(innerDashes), halfOf() - 2.75, 1e-3);
+      assert.strictEqual(floatsOf(innerUnder)[10], -4);
+      assert.strictEqual(floatsOf(innerDashes)[10], -2);
+
+      map.wireframeMode = false;    // and it loses the inner one when there's a fill to hit again
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(halos.size, 2);
+      assert.isNull(innerUnder.batch);
+      assert.isNull(innerDashes.batch);
     });
 
     it('is drawn around a polygon that is only a sprite', () => {
       feature.setClass('select');
       drawAt(15);
       assert.strictEqual(feature.lod, 1);
-      assert.strictEqual(feature.halo.children.length, 1);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.closeTo(reachOf(feature.haloItems[1]), halfOf() + 12, 1e-3);    // a pixel is 2 units at zoom 15
     });
 
-    it('is destroyed, with its meshes, when the polygon isn\'t selected', () => {
+    it('keeps its lines through a zoom, the same distance from the ring on screen', () => {
       feature.setClass('select');
       drawAt(17);
-      const halo = feature.halo;
-      const ring = halo.children[0];
+      const [under, dashes] = feature.haloItems;
+
+      feature.dirtyTransform();
+      feature.update(viewportAt(18));    // a pixel is a quarter of a unit
+      assert.strictEqual(feature.haloItems[0], under);
+      assert.strictEqual(feature.haloItems[1], dashes);
+      assert.strictEqual(halos.size, 2);
+      assert.closeTo(reachOf(under), halfOf() + 1.5, 1e-3);
+      assert.closeTo(reachOf(dashes), halfOf() + 1.5, 1e-3);
+      assert.strictEqual(floatsOf(dashes)[10], -2, 'still 2 pixels wide: the shader keeps that');
+    });
+
+    it('follows a polygon that changed', () => {
+      feature.setClass('select');
+      drawAt(17);
+      const before = reachOf(feature.haloItems[1]);
+
+      const wider = new Rapid.GeometryPart(feature.context);
+      wider.setData({ type: 'Polygon', coordinates: [[[0, 0], [0.001, 0], [0.001, 0.001], [0, 0.001], [0, 0]]] });
+      feature.geometry = wider;
+      feature.update(viewportAt(17));
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(halos.size, 2);
+      assert.closeTo(reachOf(feature.haloItems[1]), halfOf() + 3, 1e-3);
+      assert.isAbove(reachOf(feature.haloItems[1]), before + 10);
+    });
+
+    it('is taken out of the batch when the polygon isn\'t selected', () => {
+      feature.setClass('select');
+      drawAt(17);
+      const [under, dashes] = feature.haloItems;
 
       feature.unsetClass('select');
       drawAt(17);
-      assert.isNull(feature.halo);
-      assert.isTrue(halo.destroyed);
-      assert.isTrue(ring.destroyed);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.strictEqual(halos.size, 0);
+      assert.isNull(under.batch);
+      assert.isNull(dashes.batch);
+    });
+
+    it('is taken out of the batch when the polygon is too small to draw', () => {
+      feature.setClass('select');
+      drawAt(17);
+      drawAt(12);
+      assert.isFalse(feature.visible);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.strictEqual(halos.size, 0);
+    });
+
+    it('is hidden and shown with the polygon', () => {
+      feature.setClass('select');
+      drawAt(17);
+      const [under, dashes] = feature.haloItems;
+
+      feature.visible = false;
+      assert.isFalse(under.visible);
+      assert.isFalse(dashes.visible);
+      assert.strictEqual(bytesOf(dashes)[3], 0, 'an opacity of 0 draws nothing');
+
+      feature.visible = true;
+      assert.isTrue(under.visible);
+      assert.isTrue(dashes.visible);
+      assert.strictEqual(bytesOf(dashes)[3], 255);
+      assert.strictEqual(bytesOf(under)[3], 140);
+    });
+
+    it('is taken out of the batch when the polygon is destroyed', () => {
+      feature.setClass('select');
+      drawAt(17);
+      assert.strictEqual(halos.size, 2);
+      feature.destroy();
+      assert.strictEqual(halos.size, 0);
+    });
+
+    it('is nothing where there\'s no map UI layer to draw it', () => {
+      scene.layers.delete('map-ui');
+      feature.setClass('select');
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.isOk(feature.fill, 'the polygon is drawn all the same');
+
+      feature.unsetClass('select');
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 0);
+    });
+
+    it('has no halo for a hover or a highlight', () => {
+      feature.setClass('hover');
+      feature.setClass('highlight');
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.strictEqual(halos.size, 0);
+    });
+  });
+
+  // A polygon that draws itself glows by a filter on its container.
+  describe('the glow of a polygon that draws itself', () => {
+    it('is a filter on its container while it is hovered or highlighted', () => {
+      drawAt(17);
+      assert.isNotOk(feature.container.filters?.length);
+
+      for (const classID of ['hover', 'highlight']) {
+        feature.setClass(classID);
+        feature.update(viewportAt(17));
+        assert.lengthOf(feature.container.filters, 1, classID);
+        assert.deepEqual(feature.container.children.map(child => child.label), ['fill', 'strokes']);
+
+        feature.unsetClass(classID);
+        feature.update(viewportAt(17));
+        assert.isNotOk(feature.container.filters?.length, classID);
+      }
+    });
+
+    it('is taken away while the polygon is hidden', () => {
+      feature.setClass('hover');
+      drawAt(17);
+      assert.lengthOf(feature.container.filters, 1);
+      drawAt(12);    // too small to draw
+      assert.isNotOk(feature.container.filters?.length);
     });
   });
 
@@ -370,7 +519,7 @@ describe('PixiFeaturePolygon', () => {
     let fills, outlines, calls, context;
 
     function watch(target, name) {
-      ['add', 'remove', 'setFill', 'setStroke', 'setStyle'].forEach(method => {
+      ['add', 'remove', 'setFill', 'setStroke', 'setStyle', 'addGlow', 'setGlow', 'setGlowStyle'].forEach(method => {
         if (!target[method]) return;
         const original = target[method].bind(target);
         target[method] = (...args) => {
@@ -486,18 +635,29 @@ describe('PixiFeaturePolygon', () => {
       assert.isTrue(feature.ringItems[0].visible);
     });
 
-    it('shows a small polygon\'s outline while it is hovered, drawn by the polygon itself', () => {
+    it('gives a small polygon its outline while it is hovered or highlighted, in the batch, with its glow', () => {
       drawAt(15);
-      feature.setClass('hover');
-      feature.update(viewportAt(15));
-      assert.lengthOf(feature.ringItems, 0);
-      assert.isOk(feature.strokes);
-      assert.isAbove(feature.strokes.children[0].strokeMesh.vertexCount, 0);
+      for (const classID of ['hover', 'highlight']) {
+        calls = [];
+        feature.setClass(classID);
+        feature.update(viewportAt(15));
+        assert.strictEqual(feature.lod, 1);
+        assert.lengthOf(feature.ringItems, 1, classID);
+        assert.isTrue(feature.ringItems[0].visible);
+        assert.lengthOf(feature._glowItems, 1);
+        assert.strictEqual(outlines.size, 2);
+        assert.isNull(feature.strokes, 'nothing of its own');
+        assert.lengthOf(feature.container.children, 0);
+        assert.deepEqual(calls, ['fills.setStyle', 'outlines.add', 'outlines.addGlow']);
 
-      feature.unsetClass('hover');
-      feature.update(viewportAt(15));
-      assert.isNull(feature.strokes);
-      assert.lengthOf(feature.ringItems, 0);
+        calls = [];
+        feature.unsetClass(classID);
+        feature.update(viewportAt(15));
+        assert.lengthOf(feature.ringItems, 0);
+        assert.lengthOf(feature._glowItems, 0);
+        assert.strictEqual(outlines.size, 0);
+        assert.deepEqual(calls, ['fills.setStyle', 'outlines.remove', 'outlines.remove']);
+      }
     });
 
     it('is hit in its fill and near its edge when it is small, though it has no outline', () => {
@@ -666,32 +826,237 @@ describe('PixiFeaturePolygon', () => {
       });
     });
 
-    // The glow of a hovered or highlighted polygon is a filter on its container, so its
-    // outlines are drawn there while it glows. Its fill stays in the batch.
+    // The glow of a hovered or highlighted polygon is drawn by the outlines' batch too: a strip
+    // around each ring, over every outline, in which the shader draws the glow. So the
+    // polygon stays as it is in its batches, and out of the scene.
     describe('a polygon that glows', () => {
-      it('draws its outlines itself meanwhile, and goes back to the batch after', () => {
+      const GLOW_ABOVE = 1e15;
+      const roundMesh = ring => Rapid.geomStrokeMesh(ring, { closed: true, cap: 'round', join: 'round' });
+
+      // A layer with many polygons gives the outlines' batch a small batch for the glows: one
+      // that comes or goes doesn't have the outlines' index buffer built again.
+      it('has its glows in the batch that the outlines\' batch has for glows, and leaves the outlines\' batch as it is', () => {
+        const glows = new LineBatch();
+        outlines.glows = glows;
+        setShape(BIG);
         drawAt(16);
-        const { fillItem } = feature;
-        const ring = feature.ringItems[0];
-        assert.isFalse(feature.drawsInContainer());
+        const size = outlines.size;
+        calls = [];
 
         feature.setClass('hover');
-        assert.isTrue(feature.drawsInContainer());
         feature.update(viewportAt(16));
-        assert.isOk(feature.strokes);
-        assert.isAbove(feature.strokes.children[0].strokeMesh.vertexCount, 0);
-        assert.isFalse(feature.fill.visible, 'no fill of its own');
-        assert.lengthOf(feature.container.filters, 1);
-        assert.isTrue(fillItem.visible, 'the fill stays in its batch');
-        assert.isFalse(ring.visible);
+        assert.deepEqual(calls, ['fills.setStyle', 'outlines.setStyle', 'outlines.setStyle']);
+        assert.lengthOf(feature.glowItems, 2);
+        assert.isTrue(feature.glowItems.every(item => item.batch === glows && item.visible));
+        assert.strictEqual(glows.size, 2);
+        assert.strictEqual(outlines.size, size);
+
+        feature.visible = false;
+        assert.isTrue(feature.glowItems.every(item => !item.visible));
+        feature.visible = true;
+        assert.isTrue(feature.glowItems.every(item => item.visible));
 
         feature.unsetClass('hover');
         feature.update(viewportAt(16));
+        assert.lengthOf(feature.glowItems, 0);
+        assert.strictEqual(glows.size, 0);
+        assert.strictEqual(outlines.size, size);
+
+        outlines.glows = null;
+        glows.destroy();
+      });
+
+      it('stays in its batches and out of the scene, with a glow around each ring in the outlines\' batch', () => {
+        setShape(BIG);
+        feature.container.zIndex = -160000;
+        drawAt(16);
+        const { fillItem } = feature;
+        const rings = feature.ringItems.slice();
+        assert.lengthOf(feature._glowItems, 0);
+        assert.isFalse(feature.drawsInContainer());
+
+        calls = [];
+        feature.setClass('hover');
+        assert.isFalse(feature.drawsInContainer(), 'a hover gives it nothing to draw itself');
+        feature.update(viewportAt(16));
         assert.isNull(feature.strokes);
         assert.isNull(feature.fill);
-        assert.isTrue(ring.visible);
-        assert.strictEqual(feature.ringItems[0], ring);
+        assert.lengthOf(feature.container.children, 0);
+        assert.isNotOk(feature.container.filters?.length, 'no filter');
         assert.isFalse(feature.drawsInContainer());
+
+        // The fill and the outlines are the batches' items they were, restyled where they are.
+        assert.strictEqual(feature.fillItem, fillItem);
+        assert.isTrue(fillItem.visible);
+        assert.lengthOf(feature.ringItems, 2);
+        assert.isTrue(rings.every((ring, i) => ring === feature.ringItems[i] && ring.visible && ring.batch === outlines));
+        assert.deepEqual(calls, ['fills.setStyle', 'outlines.setStyle', 'outlines.setStyle', 'outlines.addGlow', 'outlines.addGlow']);
+
+        // A glow for each ring: around a line 2 pixels wide, in the hover's yellow, over every outline.
+        const glows = feature._glowItems.slice();
+        const flat = feature.geometry.local.flat;
+        assert.lengthOf(glows, 2);
+        assert.strictEqual(outlines.size, 4);
+        glows.forEach((glow, i) => {
+          assert.strictEqual(glow.batch, outlines);
+          assert.isTrue(glow.visible);
+          assert.strictEqual(glow.order, GLOW_ABOVE);
+          assert.isAbove(glow.order, rings[i].order);
+          assert.deepEqual(floatsOf(glow).slice(10, 12), [2, 0], 'a least width of 0: a strip, not a line');
+          assert.deepEqual(bytesOf(glow).slice(0, 6), [255, 255, 0, 255, 5, 32]);
+          // ..along the ring itself, with round corners for the glow to go around
+          assert.strictEqual(glow.count, roundMesh(flat[i]).vertexCount);
+          assert.isAbove(glow.count, rings[i].count);
+          assert.closeTo(reachOf(glow), reachOf(rings[i]), 1e-3);
+        });
+
+        calls = [];
+        feature.unsetClass('hover');
+        feature.update(viewportAt(16));
+        assert.lengthOf(feature._glowItems, 0);
+        assert.isTrue(glows.every(glow => glow.batch === null));
+        assert.strictEqual(outlines.size, 2);
+        assert.isTrue(rings.every((ring, i) => ring === feature.ringItems[i] && ring.visible));
+        assert.strictEqual(feature.fillItem, fillItem);
+        assert.deepEqual(calls, ['fills.setStyle', 'outlines.setStyle', 'outlines.setStyle', 'outlines.remove', 'outlines.remove']);
+        assert.isFalse(feature.drawsInContainer());
+      });
+
+      it('glows in the highlight\'s color, and changes color where it is', () => {
+        drawAt(16);
+        feature.setClass('highlight');
+        feature.update(viewportAt(16));
+        const glow = feature._glowItems[0];
+        const first = glow.first;
+        assert.deepEqual(bytesOf(glow).slice(0, 5), [0x70, 0x92, 0xff, 255, 5]);
+
+        calls = [];
+        feature.setClass('hover');     // a hover is over a highlight
+        feature.update(viewportAt(16));
+        assert.strictEqual(feature._glowItems[0], glow);
+        assert.strictEqual(glow.first, first, 'written where it was');
+        assert.deepEqual(bytesOf(glow).slice(0, 5), [255, 255, 0, 255, 5]);
+        assert.deepEqual(calls.filter(call => /Glow|add|remove|setStroke/.test(call)), ['outlines.setGlowStyle']);
+
+        feature.unsetClass('hover');
+        feature.update(viewportAt(16));
+        assert.strictEqual(feature._glowItems[0], glow);
+        assert.deepEqual(bytesOf(glow).slice(0, 5), [0x70, 0x92, 0xff, 255, 5]);
+      });
+
+      it('is around an outline as wide as the style says', () => {
+        feature.style = { fill: { color: 0xff0000, type: 'full', width: 5 } };
+        feature.setClass('hover');
+        drawAt(16);
+        const glow = feature._glowItems[0];
+        assert.deepEqual(floatsOf(glow).slice(10, 12), [5, 0]);
+        assert.strictEqual(bytesOf(glow)[5], 80);    // in sixteenths of a pixel
+      });
+
+      it('leaves the glow as it is for a zoom', () => {
+        feature.setClass('hover');
+        drawAt(16);
+        const glow = feature._glowItems[0];
+
+        calls = [];
+        feature.dirtyTransform();
+        feature.update(viewportAt(17));
+        assert.strictEqual(feature._glowItems[0], glow);
+        assert.strictEqual(outlines.size, 2);
+        assert.deepEqual(calls.filter(call => /add|remove|setStroke|setGlow$/.test(call)), []);
+      });
+
+      it('moves its glow to a shape that changed, and takes away the glow of a ring that\'s gone', () => {
+        setShape(BIG);
+        feature.setClass('hover');
+        drawAt(16);
+        const [outer, hole] = feature._glowItems;
+
+        calls = [];
+        setShape(SQUARE);
+        feature.update(viewportAt(16));
+        assert.lengthOf(feature._glowItems, 1);
+        assert.strictEqual(feature._glowItems[0], outer);
+        assert.strictEqual(outer.batch, outlines);
+        assert.isNull(hole.batch);
+        assert.strictEqual(outlines.size, 2);    // an outline and its glow
+        assert.deepEqual(calls.filter(call => /Glow/.test(call)), ['outlines.setGlow']);
+        assert.strictEqual(outer.count, roundMesh(feature.geometry.local.flat[0]).vertexCount);
+        assert.closeTo(reachOf(outer), reachOf(feature.ringItems[0]), 1e-3);
+        assert.closeTo(reachOf(outer), feature.geometry.local.extent.max[0], 0.5);
+        assert.deepEqual(bytesOf(outer).slice(0, 5), [255, 255, 0, 255, 5]);
+      });
+
+      it('gets a glow for a ring it didn\'t have', () => {
+        feature.setClass('hover');
+        drawAt(16);
+        const outer = feature._glowItems[0];
+
+        setShape(BIG);
+        feature.update(viewportAt(16));
+        assert.lengthOf(feature._glowItems, 2);
+        assert.strictEqual(feature._glowItems[0], outer);
+        assert.strictEqual(feature._glowItems[1].batch, outlines);
+        assert.strictEqual(feature._glowItems[1].order, GLOW_ABOVE);
+        assert.strictEqual(outlines.size, 4);
+      });
+
+      it('is hidden and shown with the polygon, and its outlines and fill with it', () => {
+        drawAt(16);
+        feature.setClass('highlight');
+        feature.update(viewportAt(16));
+        const glow = feature._glowItems[0];
+
+        feature.visible = false;
+        assert.isFalse(glow.visible);
+        assert.strictEqual(bytesOf(glow)[3], 0);
+        assert.isFalse(feature.ringItems[0].visible);
+        assert.isFalse(feature.fillItem.visible);
+
+        feature.visible = true;
+        assert.isTrue(glow.visible);
+        assert.strictEqual(bytesOf(glow)[3], 255);
+        assert.isTrue(feature.ringItems[0].visible);
+        assert.isTrue(feature.fillItem.visible);
+      });
+
+      it('is shown again when a polygon that was too small to draw is large enough', () => {
+        feature.setClass('hover');
+        drawAt(16);
+        const glow = feature._glowItems[0];
+        feature.dirtyTransform();
+        feature.update(viewportAt(12));
+        assert.isFalse(feature.visible);
+        assert.isFalse(glow.visible);
+
+        feature.dirtyTransform();
+        feature.update(viewportAt(16));
+        assert.strictEqual(feature._glowItems[0], glow);
+        assert.isTrue(glow.visible);
+      });
+
+      it('leaves the batch with the polygon: when it draws itself, and when it\'s destroyed', () => {
+        feature.setClass('hover');
+        drawAt(16);
+        assert.strictEqual(outlines.size, 2);
+
+        feature.fillBatch = null;    // it draws itself now, under a filter
+        drawAt(16);
+        assert.lengthOf(feature._glowItems, 0);
+        assert.strictEqual(outlines.size, 0);
+        assert.isOk(feature.strokes);
+        assert.lengthOf(feature.container.filters, 1);
+
+        feature.fillBatch = fills;   // and back
+        drawAt(16);
+        assert.lengthOf(feature._glowItems, 1);
+        assert.isNull(feature.strokes);
+        assert.isNotOk(feature.container.filters?.length);
+        assert.strictEqual(outlines.size, 2);
+
+        feature.destroy();
+        assert.strictEqual(outlines.size, 0);
+        assert.strictEqual(fills.size, 0);
       });
 
       it('has a fill tinted with the glow\'s color in the batch meanwhile, and twice as opaque', () => {
@@ -728,15 +1093,6 @@ describe('PixiFeaturePolygon', () => {
         assert.strictEqual(opacityOf(feature.fillItem), 255);
       });
 
-      it('doesn\'t show its outlines in the batch when it\'s hidden and shown while it glows', () => {
-        drawAt(16);
-        feature.setClass('highlight');
-        feature.update(viewportAt(16));
-        feature.visible = false;
-        feature.visible = true;
-        assert.isFalse(feature.ringItems[0].visible);
-        assert.isTrue(feature.fillItem.visible);
-      });
     });
 
     it('says where it\'s drawn: its fill\'s batch and its order there, or its own container', () => {
@@ -780,11 +1136,39 @@ describe('PixiFeaturePolygon', () => {
       assert.strictEqual(outlines.users, 0);
     });
 
-    it('gets its halo as without batches', () => {
+    it('gets its halo as without batches: in the map UI\'s batch, not its own', () => {
       feature.setClass('select');
       drawAt(16);
-      assert.isOk(feature.halo);
-      assert.isAbove(feature.halo.children.length, 0);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.isTrue(feature.haloItems.every(item => item.batch === halos));
+      assert.strictEqual(outlines.size, 1, 'the outline, and nothing of the halo');
+      assert.isFalse(feature.drawsInContainer());
+
+      // 6 pixels outside the ring, and a pixel is a unit at zoom 16
+      const half = Math.abs(feature.geometry.local.flat[0][0]);
+      assert.closeTo(reachOf(feature.haloItems[1]), half + 6, 1e-3);
+      const batched = feature.haloItems.map(item => [item.count, reachOf(item), floatsOf(item)[10], bytesOf(item)]);
+
+      feature.fillBatch = null;    // the same halo for a polygon that draws itself
+      drawAt(16);
+      assert.isOk(feature.fill);
+      assert.deepEqual(feature.haloItems.map(item => [item.count, reachOf(item), floatsOf(item)[10], bytesOf(item)]), batched);
+
+      feature.unsetClass('select');
+      drawAt(16);
+      assert.strictEqual(halos.size, 0);
+    });
+
+    it('has a halo and a glow at once, each in its own batch', () => {
+      feature.setClass('select');
+      feature.setClass('hover');
+      drawAt(16);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.lengthOf(feature._glowItems, 1);
+      assert.strictEqual(halos.size, 2);
+      assert.strictEqual(outlines.size, 2);
+      assert.strictEqual(bytesOf(feature._glowItems[0])[4], 5);
+      assert.deepEqual(bytesOf(feature.haloItems[1]).slice(4), [6, 3, 0, 0]);
     });
   });
 

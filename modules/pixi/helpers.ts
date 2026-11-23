@@ -1,16 +1,23 @@
 import * as PIXI from 'pixi.js';
 import { geomStrokeMesh } from '../geo/index.ts';
+import { GlowFilter } from 'pixi-filters';
 import { LineMesh } from './lib/LineMesh.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import type { PixiTextures } from './PixiTextures.ts';
+import type { LineBatch, LineBatchItem, LineBatchStyle } from './lib/LineBatch.ts';
 
 
-// The halo around what's selected: a yellow line 2 pixels wide, in dashes of 6 with gaps of 3.
-const HALO_COLOR = 0xffff00;
-const HALO_ALPHA = 0.9;
-const HALO_WIDTH = 2;
-const HALO_DASH = [6, 3];
+// The halo around what's selected: a yellow line 2 pixels wide, in dashes of 6 with gaps of 3
+// that march along it, over a darker line 4 pixels wide. (The dark line is there so that the
+// dashes show on any background, a yellow road as well as a black one.)
+const HALO_DASHES: LineBatchStyle = { width: 2, minWidth: 2, color: 0xffff00, alpha: 1, dash: [6, 3], marches: true };
+const HALO_UNDER: LineBatchStyle = { width: 4, minWidth: 4, color: 0x000000, alpha: 0.55, marches: true };
+
+/** The color of a hover: the glow around what the pointer is over, and the tint of an area's fill */
+export const HOVER_COLOR = 0xffff00;
+
+/** The color of a highlight: the same, for what something in the sidebar points at */
+export const HIGHLIGHT_COLOR = 0x7092ff;
 
 /** Where a point is in a container's own coordinates, while `containerHit()` works */
 const _local = new PIXI.Point();
@@ -98,6 +105,41 @@ export function drawOrder(a: PIXI.Container, b: PIXI.Container): number {
 
 
 /**
+ * The color that a feature glows in: a hover's, a highlight's, or none.
+ * @param classes - The feature's classes
+ * @return The color as 0xRRGGBB, or `null` if the feature doesn't glow
+ */
+export function glowColor(classes: ReadonlySet<ClassID>): number | null {
+  return classes.has('hover') ? HOVER_COLOR : classes.has('highlight') ? HIGHLIGHT_COLOR : null;
+}
+
+
+/**
+ * Gives a container the glow of a hover or a highlight, or takes it away. This is for a
+ * feature that draws itself, with display objects in its container: the glow is a filter on
+ * the container. (A feature that batches draw has its glow drawn there, by their shaders.)
+ * @param container - The feature's container
+ * @param color - The glow's color, or `null` for no glow
+ */
+export function setGlowFilter(container: PIXI.Container, color: number | null): void {
+  if (color === null) {
+    if (container.filters) {
+      container.filters = null!;
+    }
+  } else if (!container.filters) {
+    const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: color });
+    glow.resolution = 2;
+    container.filters = [glow];
+  } else {
+    const glow = (container.filters as PIXI.Filter[])[0];
+    if (glow instanceof GlowFilter && new PIXI.Color(glow.color).toNumber() !== color) {    // a hover over a highlight
+      glow.color = color;
+    }
+  }
+}
+
+
+/**
  * Draws rings as lines, each a `LineMesh` child of a container. The children are made as rings
  * come and destroyed as they go, so call it again with the container it drew into before.
  * The container's `tint` and `alpha` color them.
@@ -132,20 +174,41 @@ export function drawRings(
 
 
 /**
- * Draws the halo of a selected feature: dashed yellow lines along the rings.
- * @param halo - The feature's halo container (see `drawRings`)
- * @param rings - The rings to draw, in the container's coordinates
- * @param scale - How many of those coordinates a screen pixel is
- * @param textures - The texture manager, for the dash pattern
+ * Draws the halo of a selected feature: dashed yellow lines along the rings, in a batch of
+ * lines whose dashes march (see `LineBatch`, and `PixiLayerMapUI.haloBatchAt`). Each ring is
+ * two lines there, a dark one and the dashes over it. Call it again with the same list for
+ * other rings (they're written where the old ones were if they have as many points), and with
+ * no rings to take the halo away.
+ * @param batch - The batch to draw in
+ * @param items - The feature's halo in the batch so far. It's brought up to date: two items for each ring.
+ * @param rings - The rings to draw, each as `[x, y, x, y, …]` in world units from the place given
+ * @param x - Where the rings' coordinates start, in the world
+ * @param y - The same, for y
  */
-export function drawHalo(halo: PIXI.Container, rings: ArrayLike<number>[], scale: number, textures: PixiTextures): void {
-  let dashLength = 0;
-  for (const part of HALO_DASH) {
-    dashLength += part * scale;
+export function drawHalo(batch: LineBatch, items: LineBatchItem[], rings: ArrayLike<number>[], x: number, y: number): void {
+  const dx = x - batch.position.x;
+  const dy = y - batch.position.y;
+
+  for (let i = 0; i < rings.length; i++) {
+    // (a miter longer than the line is wide becomes a bevel: an outline can turn sharply)
+    const strokeMesh = geomStrokeMesh(rings[i], { closed: true, cap: 'butt', join: 'miter', miterLimit: 2 });
+    for (let k = 0; k < 2; k++) {
+      const style = k ? HALO_DASHES : HALO_UNDER;
+      const item = items[i * 2 + k];
+      if (item?.batch === batch) {
+        batch.setStroke(item, strokeMesh, dx, dy);
+        batch.setStyle(item, style);
+      } else {
+        item?.batch?.remove(item);
+        items[i * 2 + k] = batch.add(strokeMesh, dx, dy, style, k);
+      }
+    }
   }
-  halo.tint = HALO_COLOR;
-  halo.alpha = HALO_ALPHA;
-  drawRings(halo, rings, HALO_WIDTH * scale, textures.getDashTexture(HALO_DASH), dashLength);
+
+  while (items.length > rings.length * 2) {   // a ring fewer than before
+    const item = items.pop()!;
+    item.batch?.remove(item);
+  }
 }
 
 

@@ -605,22 +605,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    // The batches work out their lines' widths from this, on every frame. (A zoom changes
-    // nothing else in them.) Lines are narrower below zoom 17, and have no casing and no
-    // markers (oneway arrows) below 16.
+    // (The scene has told the batches' shaders about the view: see `PixiScene.setBatchViews`.)
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
-    LineBatch.setView({
-      pixel: 2 ** (WORLD_ZOOM - viewZoom),
-      narrow: (styleZoom < 16) ? 4 : (styleZoom < 17) ? 2 : 0,
-      wireframe: !!map?.wireframeMode,
-      casing: styleZoom >= 16,
-      markers: styleZoom >= 16
-    });
-    FillBatch.setView({
-      pixel: 2 ** (WORLD_ZOOM - viewZoom),
-      rotation: viewport.transform.rotation,
-      wireframe: !!map?.wireframeMode
-    });
     this._moveBatchOrigins(viewport);
 
     const showsVertices = styleZoom >= MIN_VERTEX_ZOOM;
@@ -2141,7 +2127,29 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._polygonFills = batch as FillBatch;
     } else {
       this._polygonOutlines = batch as LineBatch;
+      this._polygonOutlines.glows = this._glowBatch(this.polygonContainer!, OUTLINE_BATCH + 1, origin);
     }
+    return batch;
+  }
+
+
+  /**
+   * Makes the batch that draws the glows of a batch's lines, while they're hovered or
+   * highlighted: over all of them. It's a batch of its own because a glow comes and goes with
+   * every move of the pointer, and a batch that gets or loses a line builds its index buffer
+   * again and sends its vertices to the GPU again: 9 ms for the batch of a town's roads. This
+   * one holds a glow or two. (While it holds none, it draws nothing.)
+   * @param parent - The container that the lines' batch is in
+   * @param zIndex - Where it's drawn there: after the lines' batch
+   * @param origin - Where its coordinates start, in the world's (see `_moveBatchOrigins`)
+   * @return The batch
+   */
+  protected _glowBatch(parent: PIXI.Container, zIndex: number, origin: Vec2): LineBatch {
+    const batch = new LineBatch();
+    batch.label = 'glows';
+    batch.zIndex = zIndex;
+    batch.position.set(origin[0], origin[1]);
+    parent.addChild(batch);
     return batch;
   }
 
@@ -2167,6 +2175,15 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     batch.position.set(origin[0], origin[1]);
     this.pointContainer!.addChild(batch);
     this._points = batch;
+
+    // The glows of hovered points, under every point: a batch of its own, as the lines' glows
+    // have (see `_glowBatch`), so that a hover leaves the points' batch as it is.
+    const glows = new PointBatch();
+    glows.label = 'glows';
+    glows.zIndex = POINT_BATCH - 1;
+    glows.position.set(origin[0], origin[1]);
+    this.pointContainer!.addChild(glows);
+    batch.glows = glows;
     return batch;
   }
 
@@ -2205,6 +2222,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         pair.casings = batch;
       } else {
         pair.strokes = batch;
+        batch.glows = this._glowBatch(levelContainer, STROKE_BATCH + 1, origin);
       }
     }
     return batch;
@@ -2231,10 +2249,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     for (const pair of this._lineBatches.values()) {
       if (isFar(pair.casings)) pair.casings.moveOrigin(Math.round(x), Math.round(y));
       if (isFar(pair.strokes)) pair.strokes.moveOrigin(Math.round(x), Math.round(y));
+      const glows = pair.strokes?.glows ?? null;
+      if (isFar(glows)) glows.moveOrigin(Math.round(x), Math.round(y));
     }
+    const outlineGlows = this._polygonOutlines?.glows ?? null;
+    if (isFar(outlineGlows)) outlineGlows.moveOrigin(Math.round(x), Math.round(y));
     if (isFar(this._polygonFills)) this._polygonFills.moveOrigin(Math.round(x), Math.round(y));
     if (isFar(this._polygonOutlines)) this._polygonOutlines.moveOrigin(Math.round(x), Math.round(y));
     if (isFar(this._points)) this._points.moveOrigin(Math.round(x), Math.round(y));
+    const pointGlows = this._points?.glows ?? null;
+    if (isFar(pointGlows)) pointGlows.moveOrigin(Math.round(x), Math.round(y));
   }
 
 
@@ -2644,12 +2668,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const nodes = graph.childNodes(way);
       if (!nodes.length) continue;  // no nodes?
 
-      // swap order for reverse-drawn ways
-      const isReverse = (way.tags.oneway === '-1');
-
+      // A midpoint points the way its line is drawn, from each node to the next, whatever the
+      // tags say about the way of travel (`oneway=-1`): the oneway arrows show that.
       for (let i = 0; i < nodes.length - 1; i++) {
-        const node1 = isReverse ? nodes[i + 1] : nodes[i];
-        const node2 = isReverse ? nodes[i] : nodes[i + 1];
+        const node1 = nodes[i];
+        const node2 = nodes[i + 1];
 
         // gather world coordinates of the nodes
         const coord1 = graph.geometry(node1).parts[0].world?.coords as Vec2;

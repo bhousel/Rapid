@@ -1,13 +1,11 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { GlowFilter } from 'pixi-filters';
 import { PointBatch } from './lib/PointBatch.ts';
-import { drawHalo } from './helpers.ts';
+import { glowColor } from './helpers.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
-import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PointBatchItem, PointBatchQuad } from './lib/PointBatch.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
@@ -33,10 +31,19 @@ const VIEWFIELDS_ABOVE = 2 ** 25;
 const TEMP: Vec2 = [0, 0];
 const TEMP_BOX: [number, number, number, number] = [0, 0, 0, 0];
 
+// The glow behind a hovered or highlighted point: a disc of the glow's color, twice as wide as
+// the marker (and at least `GLOW_MIN_SIZE` pixels), that's solid out to half its radius and
+// fades from there. It breathes (see `PixiScene.animate`).
+const GLOW_SCALE = 2;
+const GLOW_MIN_SIZE = 30;
+const GLOW_ALPHA = 0.9;
+
 // What `_layout()` worked out, for the feature that's being drawn: its pictures, the lowest
-// first (the viewfields, then the marker, then the icon), and which of them is which.
-// The objects are used again for every feature, so that drawing one makes none.
+// first (the glow, then the viewfields, then the marker, then the icon), and which of them is
+// which. The objects are used again for every feature, so that drawing one makes none.
 const QUADS: PointBatchQuad[] = [];
+let _glowQuad = -1;
+let _firstViewfield = 0;
 let _numViewfields = 0;
 let _markerQuad = -1;
 let _iconQuad = -1;
@@ -49,7 +56,7 @@ let _iconQuad = -1;
 function quadAt(index: number): PointBatchQuad {
   let quad = QUADS[index];
   if (!quad) {
-    quad = { texture: PIXI.Texture.EMPTY, x: 0, y: 0, width: 0, height: 0, anchorX: 0.5, anchorY: 0.5, rotation: 0, color: 0xffffff, alpha: 1, turns: false };
+    quad = { texture: PIXI.Texture.EMPTY, x: 0, y: 0, width: 0, height: 0, anchorX: 0.5, anchorY: 0.5, rotation: 0, color: 0xffffff, alpha: 1, turns: false, pulses: false };
     QUADS[index] = quad;
   }
   return quad;
@@ -98,8 +105,8 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
  * (`drawsInContainer()`). A zoom or a rotation changes nothing in a batch.
  *
  * Without a batch, the pictures are sprites in the feature's container, which is scaled and
- * turned to undo the map's zoom and rotation. A point that's hovered or highlighted is drawn
- * that way too, while it is: its glow is a filter on the container.
+ * turned to undo the map's zoom and rotation. A hovered or highlighted point has one picture
+ * more, either way: a glow behind the others.
  * (See `design/graphics-system.md` section 15.)
  *
  * Properties available:
@@ -107,6 +114,7 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
  * - `marker`      - `PIXI.Sprite` for the marker (or `null` while a batch draws the point)
  * - `icon`        - `PIXI.Sprite` for the icon (or `null` if there's none to draw)
  * - `viewfields`  - `PIXI.Container` containing the viewfields (or `null` if none)
+ * - `glow`        - `PIXI.Sprite` for the glow of a hover or a highlight (or `null` if there's none to draw)
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePoint extends AbstractPixiFeature {
@@ -117,6 +125,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public icon: PIXI.Sprite | null;
   /** PIXI.Container containing the viewfields (or null if none) */
   public viewfields: PIXI.Container | null;
+  /** PIXI.Sprite for the glow of a hover or a highlight (or null while there's none, or a batch draws it) */
+  public glow: PIXI.Sprite | null;
   /** How the marker is turned on screen, in radians (a midpoint points along its way). Set it before `update()`. */
   public markerRotation: number;
   /** Narrows the inherited `PixiFeatureProps` props to `PixiFeaturePointProps` */
@@ -126,6 +136,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   protected _batch: PointBatch | null;
   /** The point in a batch, if a batch draws it */
   protected _item: PointBatchItem | null;
+  /** The point's glow in the batch that its batch has for glows, while it's hovered or highlighted there */
+  protected _glowItem: PointBatchItem | null;
   /** Whether the point was last drawn with sprites of its own, in its container */
   protected _ownDraw: boolean;
   /** Whether the point's batch couldn't draw it the last time it was drawn (see `drawsInContainer`) */
@@ -158,6 +170,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this._box = [0, 0, -1, -1];
     this._batch = null;
     this._item = null;
+    this._glowItem = null;
     this._ownDraw = false;
     this._unbatchable = false;
     this._turns = false;
@@ -168,6 +181,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.marker = null;
     this.icon = null;
     this.viewfields = null;
+    this.glow = null;
   }
 
 
@@ -219,20 +233,28 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
+   * The point's glow in a batch of its own, while the point is hovered or highlighted and its
+   * batch has one for glows (see `PointBatch.glows`)
+   * @return The glows' batch's item, or `null`
+   * @readonly
+   */
+  public get glowItem(): PointBatchItem | null {
+    return this._glowItem;
+  }
+
+
+  /**
    * Whether this point draws something in its own container, and so has to be in the scene (the
    * layer asks before `update()`, to know whether to give it a place there).
-   * A point that a batch draws has nothing in its container, unless:
-   * - it's hovered or highlighted: the glow is a filter on the container, so the point is drawn
-   *   there, by sprites of its own, while it is
-   * - the batch couldn't draw it the last time: one of its pictures isn't in the texture that
-   *   batches draw from (`PointBatch.canDraw`). That's only known once it's drawn, so a layer
-   *   asks again after `update()`.
+   * A point that a batch draws has nothing in its container, unless the batch couldn't draw
+   * it the last time: one of its pictures isn't in the texture that batches draw from
+   * (`PointBatch.canDraw`). That's only known once it's drawn, so a layer asks again after
+   * `update()`.
    * @return `true` if its container has to be in the scene
    */
   public drawsInContainer(): boolean {
     const batch = this._batch;
     if (!batch || batch.destroyed) return true;
-    if (this._classes.has('hover') || this._classes.has('highlight')) return true;
     return this._unbatchable;
   }
 
@@ -297,9 +319,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public override set visible(val: boolean) {
     super.visible = val;
     const item = this._item;
+    const glowItem = this._glowItem;
     const inBatch = val && !this._ownDraw;
     if (item && item.visible !== inBatch) {
       item.batch?.setVisible(item, inBatch);
+    }
+    if (glowItem && glowItem.visible !== inBatch) {
+      glowItem.batch?.setVisible(glowItem, inBatch);
     }
   }
 
@@ -328,6 +354,11 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * Destroys the sprites, if this feature has them.
    */
   protected _dropSprites(): void {
+    if (this.glow) {
+      this.scene.removePulsing(this.glow);
+      this.glow.destroy();
+      this.glow = null;
+    }
     if (this.marker) {
       this.marker.destroy();
       this.marker = null;
@@ -352,6 +383,17 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const item = this._item;
     if (item) item.batch?.remove(item);
     this._item = null;
+    this._dropGlowItem();
+  }
+
+
+  /**
+   * Takes the point's glow out of the batch that draws it, if one does.
+   */
+  protected _dropGlowItem(): void {
+    const item = this._glowItem;
+    if (item) item.batch?.remove(item);
+    this._glowItem = null;
   }
 
 
@@ -444,7 +486,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const lod = (styleZoom < 16) ? 0 : (styleZoom < 17 || isWireframe) ? 1 : 2;
     const screenScale = (lod === 2) ? 1.0 : 0.8;
     const hasViewfields = (style.viewfield?.angles?.length ?? 0) > 0;
-    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
     const batch = (this._batch && !this._batch.destroyed) ? this._batch : null;
     const item = this._item;
 
@@ -453,9 +494,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // Only the zoom or the rotation changed, and the batch has the point as it's drawn now:
     // nothing to do. (This runs for every point after a zoom, so it makes no objects.)
     if (this.onlyTransformDirty && lod === this.lod && (
-      lod === 0 || (item && item.batch === batch && !this._ownDraw && !this._turns && !hasGlow)
+      lod === 0 || (item && item.batch === batch && !this._ownDraw && !this._turns)
     )) {
-      if (this.halo) this._setTransform(viewZoom, bearing, screenScale);
+      // (A selected point's halo is drawn around its container's place, at its scale.)
+      if (this._classes.has('select')) this._setTransform(viewZoom, bearing, screenScale);
       this.visible = (lod > 0);
       this._styleDirty = false;
       return;
@@ -478,16 +520,16 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     }
 
     const missing = this._layout(lod, bearing);
-    const count = _numViewfields + (_markerQuad >= 0 ? 1 : 0) + (_iconQuad >= 0 ? 1 : 0);
+    const count = _firstViewfield + _numViewfields + (_markerQuad >= 0 ? 1 : 0) + (_iconQuad >= 0 ? 1 : 0);
 
-    // A batch draws the point if every picture is in the batch's texture, unless the point glows.
-    let inBatch = !!batch && !hasGlow;
+    // A batch draws the point if every picture is in the batch's texture.
+    let inBatch = !!batch;
     for (let i = 0; inBatch && i < count; i++) {
       inBatch = PointBatch.canDraw(QUADS[i].texture);
     }
 
     this._ownDraw = !inBatch;
-    this._unbatchable = (!!batch && !hasGlow && !inBatch);
+    this._unbatchable = (!!batch && !inBatch);
     this._turns = (_numViewfields > 0);
     this.visible = true;
 
@@ -496,13 +538,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       this._drawBatched(batch!, count, hasViewfields);
 
     } else {
-      // Sprites of this feature's own, in its container. A point that's only here for its glow
-      // keeps its place in the batch, hidden, until the glow is gone.
-      if (batch && item?.batch === batch) {
-        batch.setVisible(item, false);
-      } else {
-        this._dropItem();
-      }
+      // Sprites of this feature's own, in its container.
+      this._dropItem();
       this._drawSprites(bearing);
     }
 
@@ -544,6 +581,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     let count = 0;
     let missing = false;
 
+    // The glow of a hover or a highlight, under everything: its place is kept, and it's
+    // filled in once the marker is known.
+    const color = glowColor(this._classes);
+    const glowTexture = (color !== null) ? textureManager.getTexture('symbol', 'glow') : null;
+    _glowQuad = (glowTexture && glowTexture !== PIXI.Texture.EMPTY) ? count++ : -1;
+    _firstViewfield = count;
+
     // Pinlike markers are circles at lower zoom, and where viewfields are present.
     const markerID = (isPin && (lod === 1 || vfAngles.length > 0)) ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
     const isCircular = /(circle|midpoint)$/i.test(markerID);
@@ -574,8 +618,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
           quad.color = style.viewfield.color ?? 0x333333;
           quad.alpha = style.viewfield.opacity ?? 1;
           quad.turns = true;
+          quad.pulses = false;
         }
-        _numViewfields = count;
+        _numViewfields = count - _firstViewfield;
       }
     }
 
@@ -599,6 +644,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         quad.color = style.marker.color ?? 0xffffff;
         quad.alpha = style.marker.opacity ?? 1;
         quad.turns = false;
+        quad.pulses = false;
         _markerQuad = count++;
 
         const w = Math.abs(quad.width);
@@ -633,16 +679,47 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         quad.color = style.icon.color ?? 0x111111;
         quad.alpha = style.icon.opacity ?? 1;
         quad.turns = false;
+        quad.pulses = false;
         _iconQuad = count++;
       }
     }
 
-    // The box of all of it, on screen: around the corners of each picture, as it's turned.
+    // The glow: a disc behind the marker's middle, twice as wide as the marker.
+    if (_glowQuad >= 0) {
+      const quad = quadAt(_glowQuad);
+      const size = Math.max(GLOW_MIN_SIZE, GLOW_SCALE * Math.max(markerBox[2] - markerBox[0], markerBox[3] - markerBox[1]));
+      quad.texture = glowTexture!;
+      quad.x = (markerBox[0] + markerBox[2]) / 2;
+      quad.y = (markerBox[1] + markerBox[3]) / 2;
+      quad.width = size;
+      quad.height = size;
+      quad.anchorX = 0.5;
+      quad.anchorY = 0.5;
+      quad.rotation = 0;
+      quad.color = color!;
+      quad.alpha = GLOW_ALPHA;
+      quad.turns = false;
+      quad.pulses = true;
+    }
+
+    this._layoutBox(count, bearing);
+    return missing;
+  }
+
+
+  /**
+   * Works out the box of everything the point draws, on screen: around the corners of each
+   * picture that `_layout()` worked out, as it's turned.
+   * (Not the glow: a hover must leave every label where it is.)
+   * @param count - How many pictures there are
+   * @param bearing - The map's rotation, in radians
+   */
+  protected _layoutBox(count: number, bearing: number): void {
     const scale = this._screenScale;
     const box = this._box;
     box[0] = box[1] = Infinity;
     box[2] = box[3] = -Infinity;
-    for (let i = 0; i < count; i++) {
+    for (let i = _firstViewfield; i < count; i++) {
       const quad = QUADS[i];
       const turn = quad.rotation + (quad.turns ? bearing : 0);
       const cos = Math.cos(turn);
@@ -666,12 +743,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         if (y > box[3]) box[3] = y;
       }
     }
-    if (!count) {
+    if (count === _firstViewfield) {
       box[0] = box[1] = 0;
       box[2] = box[3] = -1;
     }
-
-    return missing;
   }
 
 
@@ -700,14 +775,39 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       item = this._item = null;
     }
 
-    if (!count) {
+    // The glow, if there's one, is the first of the pictures. Where the batch has a batch for
+    // glows it goes there, and the point's own pictures stay as many as they were: a hover
+    // then writes them where they are, and nothing else in the batch changes.
+    const glows = (_glowQuad >= 0) ? batch.glows : null;
+    const start = glows ? 1 : 0;
+    const own = count - start;
+
+    if (own <= 0) {
       this._dropItem();
+      return;
     } else if (item) {
-      batch.set(item, QUADS, count, x, y, scale);
+      batch.set(item, QUADS, own, x, y, scale, start);
       batch.setOrder(item, order);
       batch.setVisible(item, true);
     } else {
-      this._item = batch.add(QUADS, count, x, y, scale, order);
+      this._item = batch.add(QUADS, own, x, y, scale, order, start);
+    }
+
+    let glowItem = this._glowItem;
+    if (glowItem && glowItem.batch !== glows) {
+      this._dropGlowItem();
+      glowItem = null;
+    }
+    if (glows) {
+      const gx = position.x - glows.position.x;
+      const gy = position.y - glows.position.y;
+      if (glowItem) {
+        glows.set(glowItem, QUADS, 1, gx, gy, scale);
+        glows.setOrder(glowItem, order);
+        glows.setVisible(glowItem, true);
+      } else {
+        this._glowItem = glows.add(QUADS, 1, gx, gy, scale, order);
+      }
     }
   }
 
@@ -720,6 +820,27 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   protected _drawSprites(bearing: number): void {
     const container = this.container;
 
+    // The glow of a hover or a highlight, under everything. Its opacity follows the scene's
+    // clock, as a glow in a batch does.
+    let glow = this.glow;
+    if (_glowQuad >= 0) {
+      if (!glow) {
+        glow = new PIXI.Sprite();
+        glow.label = 'glow';
+        glow.eventMode = 'none';
+        glow.sortableChildren = false;
+        this.glow = glow;
+        container.addChildAt(glow, 0);
+      }
+      const quad = QUADS[_glowQuad];
+      this._drawSprite(glow, quad);
+      this.scene.addPulsing(glow, quad.alpha);
+    } else if (glow) {
+      this.scene.removePulsing(glow);
+      glow.destroy();
+      this.glow = null;
+    }
+
     // The viewfields, in a container below the marker that turns back with the map
     // (the feature's container is turned to keep the marker and the icon upright).
     let viewfields = this.viewfields;
@@ -731,7 +852,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         viewfields.sortableChildren = false;
         viewfields.visible = true;
         this.viewfields = viewfields;
-        container.addChildAt(viewfields, 0);
+        container.addChildAt(viewfields, this.glow ? 1 : 0);   // above the glow
       }
 
       // if # of viewfields has changed, or if the texture name has changed, recreate them
@@ -741,7 +862,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
           sprite.destroy();
         }
         for (let i = 0; i < _numViewfields; i++) {
-          const vfSprite = new PIXI.Sprite(QUADS[i].texture);
+          const vfSprite = new PIXI.Sprite(QUADS[_firstViewfield + i].texture);
           vfSprite.eventMode = 'none';
           viewfields.addChild(vfSprite);
         }
@@ -751,7 +872,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
       viewfields.rotation = bearing;
       for (let i = 0; i < _numViewfields; i++) {
-        this._drawSprite(viewfields.getChildAt(i) as PIXI.Sprite, QUADS[i]);
+        this._drawSprite(viewfields.getChildAt(i) as PIXI.Sprite, QUADS[_firstViewfield + i]);
       }
 
     } else if (viewfields) {  // Had viewfields before and now should not
@@ -769,7 +890,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       marker.eventMode = 'none';
       marker.sortableChildren = false;
       this.marker = marker;
-      container.addChildAt(marker, this.viewfields ? 1 : 0);   // above the viewfields
+      container.addChildAt(marker, (this.glow ? 1 : 0) + (this.viewfields ? 1 : 0));   // above the glow and the viewfields
     }
     if (_markerQuad >= 0) {
       this._drawSprite(marker, QUADS[_markerQuad]);
@@ -868,76 +989,28 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
+   * Shows or hides the halo of a selected point: the edge of its hit area (so `updateHitArea`
+   * comes first). The glow of a hover or a highlight is one of the point's pictures (see `_layout`).
    */
   public updateHalo(): void {
-    const showHover = (this.visible && this._classes.has('hover'));
-    const showSelect = (this.visible && this._classes.has('select') && !this.props.isVirtual);
-    const showHighlight = (this.visible && this._classes.has('highlight'));
-
-    // Hover
-    if (showHover) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else if (showHighlight) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0x7092ff });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else {
-      if (this.container.filters) {
-        this.container.filters = null!;
-      }
+    const shape = this.container.hitArea;
+    if (!this.visible || !this._classes.has('select') || this.props.isVirtual || !shape) {
+      this._drawHalo(null);
+      return;
     }
 
-    // Select
-    if (showSelect) {
-      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
-      const haloParent = mapui.halo;
-      if (!haloParent) return;
-
-      if (!this.halo) {
-        this.halo = new PIXI.Container();
-        this.halo.label = `${this.id}-halo`;
-        this.halo.eventMode = 'none';
-        haloParent.addChild(this.halo);
-      } else if (this.halo.parent !== haloParent) {
-        this.halo.parent?.removeChild(this.halo);
-        haloParent.addChild(this.halo);
+    const rings: number[][] = [];
+    if (shape instanceof PIXI.Circle) {
+      const ring: number[] = [];
+      for (let i = 0; i < HALO_CIRCLE_POINTS; i++) {
+        const angle = 2 * Math.PI * i / HALO_CIRCLE_POINTS;
+        ring.push(shape.x + shape.radius * Math.cos(angle), shape.y + shape.radius * Math.sin(angle));
       }
-
-      // Make the halo transform mimic the container transform.
-      // The container is scaled so that children are drawn in _screen_ coordinates.
-      // This means that the halo is drawn in _screen_ coordinates.
-      this.halo.position = this.container.position;
-      this.halo.rotation = this.container.rotation;
-      this.halo.scale = this.container.scale;
-
-      // The halo is the edge of the hit area.
-      const shape = this.container.hitArea;
-      const rings: number[][] = [];
-      if (shape instanceof PIXI.Circle) {
-        const ring: number[] = [];
-        for (let i = 0; i < HALO_CIRCLE_POINTS; i++) {
-          const angle = 2 * Math.PI * i / HALO_CIRCLE_POINTS;
-          ring.push(shape.x + shape.radius * Math.cos(angle), shape.y + shape.radius * Math.sin(angle));
-        }
-        rings.push(ring);
-      } else if (shape instanceof PIXI.Rectangle) {
-        rings.push([shape.left, shape.top, shape.right, shape.top, shape.right, shape.bottom, shape.left, shape.bottom]);
-      }
-      drawHalo(this.halo, rings, 1, this.gfx.textureManager!);
-
-    } else {
-      if (this.halo) {
-        this.halo.destroy({ children: true });
-        this.halo = null;
-      }
+      rings.push(ring);
+    } else if (shape instanceof PIXI.Rectangle) {
+      rings.push([shape.left, shape.top, shape.right, shape.top, shape.right, shape.bottom, shape.left, shape.bottom]);
     }
+    this._drawHalo(rings);
   }
 
 }

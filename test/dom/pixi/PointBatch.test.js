@@ -119,6 +119,67 @@ describe('PointBatch', () => {
     }
   });
 
+  it('writes which pictures pulse: a glow does, behind a marker that doesn\'t', () => {
+    const item = batch.add([
+      quad({ color: 0xffff00, alpha: 0.9, pulses: true }),     // the glow of a hover
+      quad({ color: 0x336699 })                                // the marker
+    ], 2, 0, 0);
+    for (let i = 0; i < 4; i++) {
+      assert.deepEqual(bytesOf(item, i).slice(0, 7), [255, 255, 0, 230, 0, 255, 255]);
+      assert.deepEqual(bytesOf(item, 4 + i).slice(0, 7), [0x33, 0x66, 0x99, 255, 0, 255, 0]);
+    }
+
+    // Written again without the glow, where it was: nothing pulses there anymore
+    batch.set(item, [quad({ color: 0x336699 }), quad({ color: 0x336699 })], 2, 0, 0);
+    for (let i = 0; i < 8; i++) {
+      assert.strictEqual(bytesOf(item, i)[6], 0, `vertex ${i}`);
+    }
+  });
+
+  it('writes pictures from further along the list, when it\'s told where to start', () => {
+    const quads = [quad({ color: 0xffff00, pulses: true }), quad({ color: 0x336699, width: 20, height: 20 }), quad({ texture: cafe, width: 8, height: 8 })];
+    const own = batch.add(quads, 2, 5, 5, 1, 0, 1);      // the marker and the icon, not the glow before them
+    assert.strictEqual(own.count, 8);
+    assert.deepEqual(bytesOf(own, 0).slice(0, 3), [0x33, 0x66, 0x99]);
+    closeTo(cornersOf(own, 0), [[-10, -10], [10, -10], [10, 10], [-10, 10]]);
+    closeTo(cornersOf(own, 1), [[-4, -4], [4, -4], [4, 4], [-4, 4]]);
+    assert.strictEqual(bytesOf(own, 0)[6], 0);
+
+    batch.set(own, quads, 1, 5, 5, 1, 2);                // the icon alone
+    assert.strictEqual(own.count, 4);
+    closeTo(cornersOf(own, 0), [[-4, -4], [4, -4], [4, 4], [-4, 4]]);
+
+    const first = batch.add(quads, 1, 0, 0);             // from the first, unless told
+    assert.deepEqual(bytesOf(first, 0).slice(0, 3), [255, 255, 0]);
+  });
+
+  it('has no batch for its points\' glows until it\'s given one, and destroys the one it has with it', () => {
+    assert.isNull(batch.glows);
+    const glows = new PointBatch();
+    batch.glows = glows;
+    batch.destroy();
+    assert.isTrue(glows.destroyed);
+    assert.isNull(batch.glows);
+
+    // ..unless that one is gone already, as when their container destroyed both
+    const other = new PointBatch();
+    other.glows = new PointBatch();
+    other.glows.destroy();
+    assert.doesNotThrow(() => other.destroy());
+  });
+
+  it('tells every batch\'s shader how bright the pictures that pulse are now', () => {
+    const other = new PointBatch();
+    assert.strictEqual(other.shader, batch.shader);
+    other.destroy();
+
+    const uniforms = batch.shader.resources.pointUniforms.uniforms;
+    PointBatch.setTime(0.6);
+    assert.strictEqual(uniforms.uPulse, 0.6);
+    PointBatch.setTime(1);
+    assert.strictEqual(uniforms.uPulse, 1);
+  });
+
   it('hides a point by one byte of each vertex, and leaves its pictures\' opacity alone', () => {
     const item = batch.add([quad({ alpha: 0.5 }), quad({ alpha: 0 })], 2, 0, 0);
     batch.setVisible(item, false);

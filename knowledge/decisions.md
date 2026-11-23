@@ -145,7 +145,8 @@ Step 8 of section 15, the rest. Choices someone might undo:
   or selected, in the map UI's container, where Pixi's hit test finds them before anything of
   the OSM layer's. A second batch there was the alternative (no sprites made on a hover); the
   sprites are a few dozen for a typical way.
-- **A hovered or highlighted point draws itself too,** under its glow, like a line.
+- **A hovered or highlighted point draws itself too,** under its glow, like a line. *(Until
+  step 10: its glow is a picture in a batch now.)*
 - **A point's sprites are made when it first draws itself,** so `feature.marker` is `null`
   until then. The midpoints used to turn `feature.marker`: they set `markerRotation` now.
 - **Labels and the avoid grid ask the point where it's drawn** (`labelBox()`, arithmetic), not
@@ -177,15 +178,46 @@ Step 9 of section 15. Choices someone might undo:
   And there's no limit of 100 markers on a segment anymore (it was there for the sprites).
 - **Arrows point back along a way tagged `oneway=-1`** (`OsmWay.isOneWayBackward()`,
   `lineMarker.scale: [-1, 1]`). They pointed along the way it was drawn, whatever the tag:
-  wrong for those ways. The midpoints already turned around for them.
+  wrong for those ways. (The midpoints turned around for them too, which was wrong the other
+  way: see the next entry.)
 - **An area under 20 pixels has no outline in the batch** (Bryan, Nov 23: "at least
   _something_ is drawn, and if a user hovers over it, they will see"; "I'd prefer to draw
   something imperfect than draw nothing that the user can see and risk them thinking there is
   nothing mapped there"). Not in wireframe mode, where the outline is all there is.
 - **A hovered area's fill is tinted halfway to the hover's color** (yellow; blue for a
   highlight) and twice as opaque (Bryan, Nov 23: tinted "for now"; what matters today is that
-  a user sees what they're hovering). He expects to change it: see "Hovers and selections that
-  move" in `backlog.md`.
+  a user sees what they're hovering). He's seen it since: "looking really good now, I can
+  easily tell what's being hovered."
+
+## Hovers and selections are drawn by the shaders, and they move (Nov 2026)
+Step 10 of section 15 (Bryan's idea, Nov 23: animated by shader code, so that they don't lean
+on color alone, with frames at regular intervals). Choices someone might undo:
+- **A midpoint points the way its line is drawn** (Bryan, Nov 23), not the way of travel. The
+  arrows show travel. `_gatherMidpoints()` had swapped the nodes for `oneway=-1` since 2022,
+  from when the whole line was drawn reversed.
+- **A glow is geometry with a distance in it, not a filter.** A strip around the line, faded
+  by the fragment shader from the line's edge out, hollow over the line. No blur, no extra
+  render target, and the feature stays in its batches.
+- **A glow is over everything of its level** (a line's), over every outline (an area's) and
+  under every point (a point's). The filter's was at the feature's own place among the
+  others. One place for all of them is what a batch of glows gives, and "light on top" reads
+  the same everywhere.
+- **Glows are in batches of their own,** though that's three more meshes. In the batch of
+  what it's around, each hover had that batch's index buffer built again (11 ms in Užice).
+- **A halo is two lines,** a dark one under the yellow dashes, so that it shows on any
+  background. Its dashes march; a glow breathes. Both are a uniform from the clock.
+- **20 animation frames a second, not 60,** because each one draws the whole scene. Enough for
+  dashes that move a pixel a frame.
+- **The animation gives way:** to a slow machine (it takes a third of the ticks at most, by
+  how long the browser takes to come back), to idleness (it rests after 30 seconds without a
+  change), and to `prefers-reduced-motion` (it never starts). All three are in
+  `AnimationPacer` and `PixiScene.animated`. Bryan didn't ask for them, and kept them when
+  he saw the result (Nov 23: "wouldn't change anything about it"). The numbers are guesses.
+- **Rejected for now: drawing the still scene to a texture,** and animating over it. It would
+  make an animation frame nearly free and allow 60 a second. It's a change to how every frame
+  is drawn, and wants numbers from weak hardware first.
+- **`GlowFilter` stays for features that draw themselves** in layers without batches (Rapid's
+  and custom data's lines and areas). Every layer's points have the new glow.
 
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 

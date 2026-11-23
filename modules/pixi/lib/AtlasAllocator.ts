@@ -376,7 +376,8 @@ const glUploadAtlasResource: GLUploadHandler = {
 const gpuUploadAtlasResource: GPUUploadHandler = {
   type: 'atlas',
   upload(slab: AtlasSource, gpuTexture: GPUTexture, gpu: { device: GPUDevice }): void {
-    // const premultipliedAlpha = slab.alphaMode === 'premultiply-alpha-on-upload';
+    // (As the WebGL uploader does: without it, a picture's faint edges are drawn too bright.)
+    const premultipliedAlpha = slab.alphaMode === 'premultiply-alpha-on-upload';
 
     for (const item of slab.items.values()) {
       if (item.uploaded || !item.source) continue;
@@ -388,7 +389,7 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
 
       gpu.device.queue.copyExternalImageToTexture(
         { source: src },
-        { texture: gpuTexture, origin: { x: x, y: y } },
+        { texture: gpuTexture, origin: { x: x, y: y }, premultipliedAlpha: premultipliedAlpha },
         { width: w, height: h }
       );
 

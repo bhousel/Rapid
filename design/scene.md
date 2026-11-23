@@ -39,30 +39,34 @@ origin
 │  │  │  ├ fills         a `FillBatch`: every polygon's fill, the largest first
 │  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill (a polygon
 │  │  │  │               under 20 pixels has none)
+│  │  │  ├ glows         a `LineBatch`: the glow around the outlines of a hovered polygon
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area).
-│  │  │                  Only the polygons that draw something themselves are in these (the
-│  │  │                  outlines of a hovered one): the rest aren't in the scene
+│  │  │                  Only the polygons that draw something themselves are in these (none,
+│  │  │                  while the layer draws in batches): the rest aren't in the scene
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
 │  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
 │  │        ├ strokes              a `LineBatch`: every stroke, above every casing, and then the
 │  │        │                      markers along the lines (oneway arrows), above every stroke
+│  │        ├ glows                a `LineBatch`: the glow around a hovered line of the level
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
 │  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile.
-│  │                               Only the lines that draw themselves are in these (a hovered
-│  │                               line): the rest aren't in the scene
+│  │                               Only the lines that draw themselves are in these (one with
+│  │                               dashes or markers that a batch can't draw): the rest aren't
+│  │                               in the scene
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
 │  │  ├ polygons         the order they first draw (so external data is above OSM, and a dataset's
 │  │  └ lines            polygons are above OSM lines, as before)
 │  └ …
 ├ points
 │  ├ osm                 OSM points, interesting vertices and the virtual POI pins
+│  │  ├ glows            a `PointBatch`: the glow behind a hovered point, under every point
 │  │  ├ points           a `PointBatch`: every one of them, from north to south, the ones with
 │  │  │                  viewfields last
 │  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude. Only the
-│  │  │                  points that draw themselves are in these (a hovered one): the rest
-│  │  │                  aren't in the scene
+│  │  │                  points that draw themselves are in these (one with a picture from
+│  │  │                  another texture): the rest aren't in the scene
 │  │  └ viewfields       the same, for points with viewfields, above the tiles
 │  └ <spatialID>         other layers' points, straight in the container
 ├ debug-over
@@ -74,8 +78,10 @@ origin
 ├ labels                 screen-space, not interactive
 ├ blocks                 edit blocks, straight in the group: always interactive (they catch the pointer
 │                        on purpose, and show `not-allowed`)
-└ ui                     PixiLayerMapUI: lasso, geolocation, and `selected` (the vertices and midpoints
-                         of the selected/hovered ways, so the user can grab them above everything)
+└ ui                     PixiLayerMapUI: lasso, geolocation, `halo` (one `LineBatch` for the halos of
+                         everything that's selected, in any layer), and `selected` (the vertices and
+                         midpoints of the selected/hovered ways, so the user can grab them above
+                         everything)
 ```
 
 The rule: **a layer never adds a feature straight into a group.** It asks the scene for the container
@@ -151,8 +157,8 @@ testing from Pixi:
   point answers by its hit area, a shape in pixels around where the point is on screen. A line
   answers by its distance from the pointer in world coordinates, and an area by that distance
   from its rings or by being in its fill. None of that is Pixi's: a feature that its batches
-  draw isn't in the scene. (One that draws itself, like a hovered point, answers by the rules
-  Pixi has for one container: `containerHit()`.)
+  draw isn't in the scene. (One that draws itself, like a vertex of what's selected, answers by
+  the rules Pixi has for one container: `containerHit()`.)
 - **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
   what draws each (`sceneContainer`: a feature's own container, a line's strokes' batch, an
   area's fills' batch, the points' batch), and in one batch by the feature's order there.
@@ -356,7 +362,8 @@ What it changed (dev build, from tapes; DRAW in ms):
   moves the view, at Seattle as much as in Užice. A class of lines with a handful of members doesn't need a container per tile:
   splitting only the classes that are big would get most of that back. Not tried.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
-  touches a big group.
+  touches a big group. *(Done, Nov 23: halos are one batch in the `ui` group, and a hover's glow is
+  in a small batch beside what it's around. See section 15 of `graphics-system.md`, step 10.)*
 
 ## 4. Later
 

@@ -1,6 +1,7 @@
 import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
 import { AbstractPixiFeature } from '../../../modules/pixi/AbstractPixiFeature.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
+import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
 
 
 describe('AbstractPixiFeature', () => {
@@ -16,7 +17,7 @@ describe('AbstractPixiFeature', () => {
 
   beforeEach(() => {
     const context = new Rapid.MockContext();
-    const scene = { context: context, gfx: {}, addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    const scene = { context: context, gfx: {}, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
     layer = new AbstractPixiLayer(scene);
   });
 
@@ -50,6 +51,160 @@ describe('AbstractPixiFeature', () => {
 
     it('doesn\'t hit a feature that has no hit area and draws nothing', () => {
       assert.isFalse(makeFeature().hitTest({ x: 5, y: 5 }));
+    });
+  });
+
+
+  // A selected feature's halo is lines in a batch that the map UI layer has, above everything
+  // on the map: two for each ring (a dark line, and the dashes that march over it). A subclass
+  // works out the rings, in its container's coordinates.
+  describe('the halo', () => {
+    const FLOATS = 12;
+    const BYTES = 8;
+    const square = [0, 0, 10, 0, 10, 10, 0, 10];
+    const triangle = [20, 0, 30, 0, 25, 8];
+    let batch, asked;
+
+    // The box of the points on the line that an item's vertices belong to: [minX, minY, maxX, maxY]
+    const boxOf = item => {
+      const box = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < item.count; i++) {
+        const o = (item.first + i) * FLOATS;
+        box[0] = Math.min(box[0], batch._floats[o]);
+        box[1] = Math.min(box[1], batch._floats[o + 1]);
+        box[2] = Math.max(box[2], batch._floats[o]);
+        box[3] = Math.max(box[3], batch._floats[o + 1]);
+      }
+      return box;
+    };
+    const closeTo = (actual, expected) => {
+      actual.forEach((v, i) => assert.closeTo(v, expected[i], 1e-3, `[${i}]`));
+    };
+    const alphaOf = item => batch._bytes[item.first * BYTES + 3];
+
+    beforeEach(() => {
+      batch = new LineBatch();
+      asked = [];
+      layer.scene.layers.set('map-ui', { haloBatchAt: (x, y) => { asked.push([x, y]); return batch; } });
+    });
+    afterEach(() => {
+      if (!batch.destroyed) batch.destroy();
+    });
+
+    it('has none until it is drawn', () => {
+      const feature = makeFeature();
+      assert.deepEqual(feature.haloItems, []);
+      feature._drawHalo(null);     // none, and none to take away
+      feature._drawHalo([]);
+      assert.deepEqual(asked, [], 'the map UI layer isn\'t asked for a batch that nothing needs');
+      assert.strictEqual(batch.size, 0);
+    });
+
+    it('is two lines for each ring, in the map UI layer\'s batch, around the feature\'s place in the world', () => {
+      const feature = makeFeature();
+      feature.container.position.set(1000, 2000);
+      batch.position.set(900, 2100);
+      feature._drawHalo([square, triangle]);
+
+      assert.deepEqual(asked, [[1000, 2000]], 'the batch is asked for where the feature is');
+      assert.lengthOf(feature.haloItems, 4);
+      assert.strictEqual(batch.size, 4);
+      for (const item of feature.haloItems) {
+        assert.strictEqual(item.batch, batch);
+        assert.isTrue(item.visible);
+      }
+      closeTo(boxOf(feature.haloItems[0]), [100, -100, 110, -90]);
+      closeTo(boxOf(feature.haloItems[1]), [100, -100, 110, -90]);
+      closeTo(boxOf(feature.haloItems[2]), [120, -100, 130, -92]);
+    });
+
+    it('is as large and turned as its container is: the rings are in the container\'s coordinates', () => {
+      const feature = makeFeature();
+      feature.container.scale.set(0.5, 0.5);      // (a point's container, at zoom 17)
+      feature._drawHalo([square]);
+      closeTo(boxOf(feature.haloItems[0]), [0, 0, 5, 5]);
+
+      feature.container.scale.set(2, 2);
+      feature.container.rotation = Math.PI / 2;   // x goes down, y goes left
+      feature._drawHalo([square]);
+      closeTo(boxOf(feature.haloItems[0]), [-20, 0, 0, 20]);
+      assert.lengthOf(feature.haloItems, 2, 'the lines it had, drawn again');
+      assert.strictEqual(batch.size, 2);
+    });
+
+    it('is taken away for no rings', () => {
+      const feature = makeFeature();
+      feature._drawHalo([square]);
+      feature._drawHalo(null);
+      assert.deepEqual(feature.haloItems, []);
+      assert.strictEqual(batch.size, 0);
+
+      feature._drawHalo([square]);
+      feature._drawHalo([]);
+      assert.deepEqual(feature.haloItems, []);
+      assert.strictEqual(batch.size, 0);
+    });
+
+    it('is hidden and shown with the feature', () => {
+      const feature = makeFeature();
+      feature._drawHalo([square]);
+      const items = [...feature.haloItems];
+
+      feature.visible = false;
+      for (const item of items) {
+        assert.isFalse(item.visible);
+        assert.strictEqual(alphaOf(item), 0);
+      }
+      assert.strictEqual(batch.size, 2, 'it keeps its place in the batch');
+
+      feature.visible = true;
+      for (const item of items) {
+        assert.isTrue(item.visible);
+        assert.isAbove(alphaOf(item), 0);
+      }
+    });
+
+    it('is hidden when it is drawn for a feature that is hidden', () => {
+      const feature = makeFeature();
+      feature.visible = false;
+      feature._drawHalo([square]);
+      assert.lengthOf(feature.haloItems, 2);
+      for (const item of feature.haloItems) {
+        assert.isFalse(item.visible);
+      }
+
+      feature.visible = true;
+      for (const item of feature.haloItems) {
+        assert.isTrue(item.visible);
+      }
+    });
+
+    it('leaves the batch when the feature is destroyed', () => {
+      const feature = makeFeature();
+      feature._drawHalo([square, triangle]);
+      assert.strictEqual(batch.size, 4);
+      feature.destroy();
+      assert.strictEqual(batch.size, 0);
+      assert.deepEqual(feature.haloItems, []);
+    });
+
+    it('is not drawn, and nothing throws, where there is no map UI layer', () => {
+      const feature = makeFeature();
+      layer.scene.layers.delete('map-ui');
+      feature._drawHalo([square]);
+      assert.deepEqual(feature.haloItems, []);
+      feature.visible = false;
+      feature.visible = true;
+      feature.destroy();
+    });
+
+    it('is taken away when the map UI layer has no batch to give anymore', () => {
+      const feature = makeFeature();
+      feature._drawHalo([square]);
+      layer.scene.layers.set('map-ui', { haloBatchAt: () => null });
+      feature._drawHalo([square]);
+      assert.deepEqual(feature.haloItems, []);
+      assert.strictEqual(batch.size, 0);
     });
   });
 

@@ -168,18 +168,19 @@ export async function osmSceneState(page) {
       // there. Its own container is in the scene only while it draws something itself.
       const item = part => (part ? (part.visible ? 'shown' : 'hidden') : 'none');
       // An area's fill and outlines, and a point, are in batches too. A point that draws itself
-      // (hovered, or a vertex of what's hovered) has sprites, and is hidden in its batch or not in one.
+      // (a vertex of what's hovered or selected, above everything) has sprites, and no batch.
+      // The glow of a hover is in the batches as well, and a selection's halo in the map UI's.
       let batched = '';
       if (feature.type === 'LineString') {
-        batched = `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}, arrows ${item(feature.arrowItem)}, sided ${item(feature.sidedItem)}`;
+        batched = `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}, arrows ${item(feature.arrowItem)}, sided ${item(feature.sidedItem)}, glow ${item(feature.glowItem)}`;
       } else if (feature.type === 'Polygon') {
-        batched = `batches: fill ${item(feature.fillItem)}, outlines ${feature.ringItems.map(item).join(' ') || 'none'}`;
+        batched = `batches: fill ${item(feature.fillItem)}, outlines ${feature.ringItems.map(item).join(' ') || 'none'}, glows ${feature.glowItems.map(item).join(' ') || 'none'}`;
       } else if (feature.type === 'Point') {
-        batched = `batch: ${item(feature.item)}, ${feature.marker ? 'sprites' : 'no sprites'}`;
+        batched = `batch: ${item(feature.item)}${feature.item ? ` of ${feature.item.count / 4}` : ''}, glow ${item(feature.glowItem)}, ${feature.marker ? 'sprites' : 'no sprites'}${feature.glow ? ' and a glow' : ''}`;
       }
       results.push([
         feature.id, feature.container.parent?.label ?? 'not in the scene', [...feature.classes].sort().join(','),
-        feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`, batched
+        feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`, batched, `halo ${feature.haloItems.length}`
       ].join(' | '));
     }
     return results.sort();

@@ -32,6 +32,8 @@ export interface PointBatchQuad {
   alpha: number;
   /** Whether it turns with the map (a viewfield: it points somewhere on the ground), not staying upright on screen */
   turns: boolean;
+  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatch.setTime`) */
+  pulses?: boolean;
 }
 
 /** One point in a batch. `PointBatch.add()` returns it, and the caller keeps it to change the point or take it out. */
@@ -45,7 +47,8 @@ export type PointBatchItem = BatchItem;
 //   bytes   0 - 3   aColor     red, green, blue, opacity
 //           4       aFlags.x   255 if the picture turns with the map
 //           5       aFlags.y   255 if the point is shown, 0 if it's hidden
-//           6, 7               not used
+//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatch.setTime`)
+//           7                  not used
 const FLOATS = 6;
 const BYTES = 8;
 const SHOWN_BYTE = 5;
@@ -77,6 +80,8 @@ uniform mat3 uTransformMatrix;
 uniform vec4 uColor;
 uniform vec4 uWorldColorAlpha;
 
+uniform float uPulse;
+
 out vec4 vColor;
 out vec2 vUV;
 
@@ -99,6 +104,11 @@ void main() {
 
   vUV = aUV;
   vColor = vec4(aColor.rgb * aColor.a, aColor.a) * uColor * uWorldColorAlpha;
+
+  // A picture that pulses (a glow) is as bright as the clock says.
+  if (aFlags.z > 0.5) {
+    vColor *= uPulse;
+  }
 }
 `;
 
@@ -133,8 +143,13 @@ struct LocalUniforms {
 
 @group(0) @binding(0) var<uniform> globalUniforms: GlobalUniforms;
 @group(1) @binding(0) var<uniform> localUniforms: LocalUniforms;
+struct PointUniforms {
+  uPulse: f32,
+}
+
 @group(2) @binding(0) var uTexture: texture_2d<f32>;
 @group(2) @binding(1) var uSampler: sampler;
+@group(2) @binding(2) var<uniform> pointUniforms: PointUniforms;
 
 struct VSOutput {
   @builtin(position) position: vec4<f32>,
@@ -164,6 +179,9 @@ fn mainVert(
   }
   out.vUV = aUV;
   out.vColor = vec4<f32>(aColor.rgb * aColor.a, aColor.a) * localUniforms.uColor * globalUniforms.uWorldColorAlpha;
+  if (aFlags.z > 0.5) {
+    out.vColor = out.vColor * pointUniforms.uPulse;
+  }
   return out;
 }
 
@@ -177,9 +195,21 @@ fn mainFrag(
 `;
 
 
-// Every batch draws with the same shader, from the same texture.
+// Every batch draws with the same shader, from the same texture, at the same moment.
 let _shader: PIXI.Shader | null = null;
 let _source: PIXI.TextureSource | null = null;
+let _uniforms: PIXI.UniformGroup | null = null;
+
+/**
+ * Returns the uniforms that say how the pictures that pulse are drawn at this moment.
+ * @return The uniform group
+ */
+function pointUniforms(): PIXI.UniformGroup {
+  _uniforms ??= new PIXI.UniformGroup({
+    uPulse: { value: 1, type: 'f32' }
+  });
+  return _uniforms;
+}
 
 /**
  * Returns the shader that every batch draws with, making it the first time.
@@ -194,7 +224,8 @@ function pointShader(): PIXI.Shader {
     },
     resources: {
       uTexture: PIXI.Texture.WHITE.source,
-      uSampler: PIXI.Texture.WHITE.source.style
+      uSampler: PIXI.Texture.WHITE.source.style,
+      pointUniforms: pointUniforms()
     }
   });
   return _shader;
@@ -239,9 +270,32 @@ function quadIndices(count: number): Uint16Array {
  */
 export class PointBatch extends VertexBatch {
 
+  /**
+   * The batch that the glows of this batch's points are drawn in, if its owner made one: a
+   * small batch, drawn before this one. A glow comes and goes with every move of the pointer,
+   * and a point that got one picture more in this batch would have the batch's index buffer
+   * built again: 7 ms where the batch holds a town's points. It's destroyed with this batch.
+   * (`null`: a point's glow is the lowest of its pictures in this batch.)
+   */
+  public glows: PointBatch | null;
+
+
   /** Makes a batch with no points in it. It draws nothing until one is added. */
   public constructor() {
     super(LAYOUT, pointShader());
+    this.glows = null;
+  }
+
+
+  /**
+   * Destroys the batch, and the batch of its points' glows with it.
+   * @param options - Pixi's options for destroying a display object
+   */
+  public override destroy(options?: PIXI.DestroyOptions): void {
+    const glows = this.glows;
+    this.glows = null;
+    if (glows && !glows.destroyed) glows.destroy(options);
+    super.destroy(options);
   }
 
 
@@ -256,6 +310,16 @@ export class PointBatch extends VertexBatch {
     shader.resources.uTexture = used;
     shader.resources.uSampler = used.style;
     _source = source;
+  }
+
+
+  /**
+   * Says how bright the pictures that pulse are at this moment, in every batch (a glow
+   * breathes). Call it before a frame is drawn; nothing in any batch changes for it.
+   * @param pulse - How bright, from 0 to 1
+   */
+  public static setTime(pulse: number): void {
+    pointUniforms().uniforms.uPulse = pulse;
   }
 
 
@@ -278,11 +342,12 @@ export class PointBatch extends VertexBatch {
    * @param y - The same, for y
    * @param scale - How much larger than the pictures say everything is drawn (1 for as they say)
    * @param order - Where it's drawn among the others (higher is on top; points with the same number in the order they were added)
+   * @param start - Which of `quads` is the first to use
    * @return The point in the batch, to change or remove it with
    */
-  public add(quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, order: number = 0): PointBatchItem {
+  public add(quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, order: number = 0, start: number = 0): PointBatchItem {
     const item = this._addItem(count * 4, quadIndices(count), order);
-    this._write(item, quads, count, x, y, scale);
+    this._write(item, quads, count, x, y, scale, start);
     return item;
   }
 
@@ -296,11 +361,12 @@ export class PointBatch extends VertexBatch {
    * @param x - Where the point is, in the batch's coordinates
    * @param y - The same, for y
    * @param scale - How much larger than the pictures say everything is drawn
+   * @param start - Which of `quads` is the first to use
    */
-  public set(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1): void {
+  public set(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, start: number = 0): void {
     if (item.batch !== this) return;
     this._resizeItem(item, count * 4, quadIndices(count));
-    this._write(item, quads, count, x, y, scale);
+    this._write(item, quads, count, x, y, scale, start);
   }
 
 
@@ -312,8 +378,9 @@ export class PointBatch extends VertexBatch {
    * @param x - Where the point is, in the batch's coordinates
    * @param y - The same, for y
    * @param scale - How much larger than the pictures say everything is drawn
+   * @param start - Which of `quads` is the first of them
    */
-  protected _write(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number): void {
+  protected _write(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number, start: number): void {
     const floats = this._floats;
     const bytes = this._bytes;
     const shown = item.visible ? item.alpha : 0;
@@ -321,7 +388,7 @@ export class PointBatch extends VertexBatch {
     let p = item.first * BYTES;
 
     for (let i = 0; i < count; i++) {
-      const quad = quads[i];
+      const quad = quads[start + i];
       const uvs = quad.texture.uvs;
       const cos = Math.cos(quad.rotation);
       const sin = Math.sin(quad.rotation);
@@ -338,6 +405,7 @@ export class PointBatch extends VertexBatch {
       const b = color & 0xff;
       const a = Math.round(Math.min(Math.max(quad.alpha, 0), 1) * 255);
       const turns = quad.turns ? 255 : 0;
+      const pulses = quad.pulses ? 255 : 0;
 
       // Its corners: top left, top right, bottom right, bottom left (as a texture's `uvs` has them)
       for (let corner = 0; corner < 4; corner++) {
@@ -366,6 +434,7 @@ export class PointBatch extends VertexBatch {
         bytes[p + 3] = a;
         bytes[p + 4] = turns;
         bytes[p + 5] = shown;
+        bytes[p + 6] = pulses;
         o += FLOATS;
         p += BYTES;
       }

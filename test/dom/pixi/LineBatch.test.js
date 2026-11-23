@@ -1,4 +1,4 @@
-import { LineBatch, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatch, LINE_GLOW, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatch.ts';
 import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
 
 
@@ -523,6 +523,235 @@ describe('LineBatch', () => {
       assert.strictEqual(batch.size, 0);
       other.destroy();
     });
+  });
+
+  // The glow of a hovered or highlighted line is a strip along the line too, wider than the
+  // line by `LINE_GLOW` pixels on each side. The shader fades it with the distance from the
+  // line, which it gets from where each vertex is from the nearest point of the line.
+  describe('a glow', () => {
+    const GLOW = { width: 8, minWidth: 3, color: 0xffff00, alpha: 1 };
+    const round = geomStrokeMesh([0, 0, 10, 0, 10, 10], { cap: 'round', join: 'round' });
+
+    it('is the line\'s vertices, with the line\'s width and a least width of 0, which says it\'s a strip', () => {
+      const item = batch.addGlow(round, 100, -50, GLOW, 7);
+      assert.strictEqual(batch.size, 1);
+      assert.strictEqual(item.count, round.vertexCount);
+      assert.strictEqual(item.indices, round.indices);
+      assert.strictEqual(item.order, 7);
+
+      for (let i = 0; i < round.vertexCount; i++) {
+        const v = round.vertices.subarray(i * 7, i * 7 + 7);
+        const f = floatsOf(item, i);
+        assert.closeTo(f[0], v[0] + 100, 1e-4, 'x');
+        assert.closeTo(f[1], v[1] - 50, 1e-4, 'y');
+        assert.deepEqual(f.slice(2, 4), [v[2], v[3]], 'offset');
+        assert.deepEqual(f.slice(10, 12), [8, 0]);
+      }
+      assert.isAbove(LINE_GLOW, 0);
+    });
+
+    it('has its color in each vertex, the number that says it\'s a glow, and the line\'s least width in sixteenths', () => {
+      const item = batch.addGlow(round, 0, 0, GLOW);
+      const blue = batch.addGlow(straight, 0, 0, { width: 3, minWidth: 1.5, color: 0x7092ff, alpha: 0.5 });
+      for (let i = 0; i < round.vertexCount; i++) {
+        assert.deepEqual(bytesOf(item, i).slice(0, 6), [255, 255, 0, 255, 5, 48]);
+      }
+      for (let i = 0; i < straight.vertexCount; i++) {
+        assert.deepEqual(bytesOf(blue, i).slice(0, 6), [0x70, 0x92, 0xff, 128, 5, 24]);
+      }
+      // (5 is above every kind of marker: the shaders tell them apart by it)
+      for (const layout of Object.values(LINE_MARKERS)) {
+        assert.isBelow(layout.code, 5);
+      }
+    });
+
+    it('never has a least width that doesn\'t fit in a byte', () => {
+      const item = batch.addGlow(straight, 0, 0, { ...GLOW, minWidth: 40 });
+      assert.strictEqual(bytesOf(item)[5], 255);
+    });
+
+    it('knows where each vertex is from the line: its normal on a segment\'s side, in half widths', () => {
+      // A straight line that goes right: its sides are up and down from it
+      const item = batch.addGlow(straight, 0, 0, GLOW);
+      const seen = new Set();
+      for (let i = 0; i < straight.vertexCount; i++) {
+        const side = straight.vertices[i * 7 + 6];
+        const [gx, gy] = floatsOf(item, i).slice(4, 6);
+        assert.closeTo(gx, 0, 1e-6, `vertex ${i}, x`);
+        assert.closeTo(Math.abs(gy), 1, 1e-6, `vertex ${i}, y`);
+        seen.add(`${side},${Math.sign(gy)}`);
+      }
+      assert.strictEqual(seen.size, 2, 'one way on one side, the other way on the other: 0 on the line between them');
+    });
+
+    it('leaves out what a vertex is along the line: the tip of a miter is as far from the line as any edge', () => {
+      const sharp = geomStrokeMesh([0, 0, 10, 0, 10, 10], { join: 'miter', miterLimit: 10 });
+      const item = batch.addGlow(sharp, 0, 0, GLOW);
+      let tips = 0;
+      for (let i = 0; i < sharp.vertexCount; i++) {
+        const v = sharp.vertices.subarray(i * 7, i * 7 + 7);
+        const [gx, gy] = floatsOf(item, i).slice(4, 6);
+        if (v[6] === 0) continue;
+        assert.closeTo(Math.hypot(gx, gy), 1, 1e-5, `vertex ${i} is one half width from its segment`);
+        assert.closeTo(gx * v[2] + gy * v[3], 1, 1e-5, `vertex ${i}: the part of its offset that's across the line`);
+        if (v[5] !== 0) {
+          tips++;
+          assert.isAbove(Math.hypot(v[2], v[3]), 1.3, 'the vertex itself is further from the corner');
+        }
+      }
+      assert.isAbove(tips, 0);
+    });
+
+    it('goes around a round end or corner: the vertices on the circle are a half width away, the middle is on the line', () => {
+      const item = batch.addGlow(round, 0, 0, GLOW);
+      let around = 0;
+      let middles = 0;
+      for (let i = 0; i < round.vertexCount; i++) {
+        const v = round.vertices.subarray(i * 7, i * 7 + 7);
+        if (v[6] !== 0) continue;
+        const [gx, gy] = floatsOf(item, i).slice(4, 6);
+        if (v[2] === 0 && v[3] === 0) {
+          middles++;
+          assert.deepEqual([gx, gy], [0, 0]);
+        } else {
+          around++;
+          assert.closeTo(gx, v[2], 1e-6);
+          assert.closeTo(gy, v[3], 1e-6);
+          assert.closeTo(Math.hypot(gx, gy), 1, 1e-5);
+        }
+      }
+      assert.isAbove(around, 4, 'two ends and a corner');
+      assert.isAbove(middles, 1);
+    });
+
+    it('keeps a vertex\'s second place as the stroke mesh has it: beside its segment, or on the line', () => {
+      const item = batch.addGlow(round, 0, 0, GLOW);
+      assert.isAbove(round.fallbacks.length, 0);
+      for (let f = 0; f < round.fallbacks.length; f += 6) {
+        const i = round.fallbacks[f];
+        const floats = floatsOf(item, i);
+        assert.deepEqual(floats.slice(6, 8), [round.fallbacks[f + 2], round.fallbacks[f + 3]]);
+        assert.include([0, 1], Math.round(Math.hypot(floats[6], floats[7]) * 1e5) / 1e5);
+      }
+    });
+
+    it('changes its color and the line\'s width where it is, and keeps where its vertices are from the line', () => {
+      const item = batch.addGlow(round, 0, 0, GLOW);
+      const before = Array.from({ length: round.vertexCount }, (_, i) => floatsOf(item, i).slice(0, 10));
+      batch.setGlowStyle(item, { width: 12, minWidth: 4, color: 0x7092ff, alpha: 1 });
+      for (let i = 0; i < round.vertexCount; i++) {
+        assert.deepEqual(floatsOf(item, i).slice(0, 10), before[i]);
+        assert.deepEqual(floatsOf(item, i).slice(10, 12), [12, 0]);
+        assert.deepEqual(bytesOf(item, i).slice(0, 6), [0x70, 0x92, 0xff, 255, 5, 64]);
+      }
+    });
+
+    it('goes around another line: where it was if it has as many vertices, otherwise at the end', () => {
+      const item = batch.addGlow(round, 0, 0, GLOW);
+      batch.add(straight, 0, 0, STYLE);
+      const first = item.first;
+
+      const moved = geomStrokeMesh([0, 0, 10, 0, 10, 20], { cap: 'round', join: 'round' });
+      assert.strictEqual(moved.vertexCount, round.vertexCount);
+      batch.setGlow(item, moved, 5, 5, GLOW);
+      assert.strictEqual(item.first, first);
+      assert.closeTo(floatsOf(item, 0)[0], moved.vertices[0] + 5, 1e-4);
+      assert.deepEqual(bytesOf(item, 0).slice(4, 6), [5, 48]);
+
+      const longer = geomStrokeMesh([0, 0, 10, 0, 10, 10, 20, 10], { cap: 'round', join: 'round' });
+      batch.setGlow(item, longer, 0, 0, GLOW);
+      assert.notStrictEqual(item.first, first);
+      assert.strictEqual(item.count, longer.vertexCount);
+      for (let i = 0; i < longer.vertexCount; i++) {
+        assert.deepEqual(floatsOf(item, i).slice(10, 12), [8, 0], `vertex ${i}`);
+        assert.deepEqual(bytesOf(item, i).slice(0, 6), [255, 255, 0, 255, 5, 48], `vertex ${i}`);
+        const v = longer.vertices.subarray(i * 7, i * 7 + 7);
+        if (v[6] === 0) assert.deepEqual(floatsOf(item, i).slice(4, 6), [v[2], v[3]], `vertex ${i}`);
+      }
+    });
+
+    it('is hidden like a line, and stays hidden when it changes', () => {
+      const item = batch.addGlow(round, 0, 0, GLOW);
+      batch.setVisible(item, false);
+      assert.strictEqual(bytesOf(item, 2)[3], 0);
+      batch.setGlowStyle(item, { ...GLOW, color: 0xffffff });
+      assert.strictEqual(bytesOf(item, 2)[3], 0);
+      batch.setGlow(item, round, 1, 1, GLOW);
+      assert.strictEqual(bytesOf(item, 2)[3], 0);
+      batch.setVisible(item, true);
+      assert.strictEqual(bytesOf(item, 2)[3], 255);
+    });
+
+    it('is never as transparent as a hidden one', () => {
+      const item = batch.addGlow(straight, 0, 0, { ...GLOW, alpha: 0 });
+      assert.strictEqual(bytesOf(item)[3], 1);
+    });
+
+    it('ignores the glow of another batch', () => {
+      const other = new LineBatch();
+      const item = other.addGlow(straight, 0, 0, GLOW);
+      batch.setGlow(item, round, 0, 0, GLOW);
+      batch.setGlowStyle(item, { ...GLOW, color: 0 });
+      assert.strictEqual(item.count, straight.vertexCount);
+      assert.strictEqual(other._bytes[item.first * BYTES], 255);
+      assert.strictEqual(batch.size, 0);
+      other.destroy();
+    });
+  });
+
+  // A line that marches is as wide as it says at every zoom, and its dashes move along it
+  // with the clock: the halo around what's selected.
+  describe('a line that marches', () => {
+    const HALO = { width: 2, minWidth: 2, color: 0xffff00, alpha: 1, dash: [6, 3], marches: true };
+
+    it('says so by a negative width in each vertex', () => {
+      const item = batch.add(corner, 0, 0, HALO);
+      const still = batch.add(corner, 0, 0, { ...HALO, marches: false });
+      for (let i = 0; i < corner.vertexCount; i++) {
+        assert.deepEqual(floatsOf(item, i).slice(10, 12), [-2, 2]);
+        assert.deepEqual(bytesOf(item, i), [255, 255, 0, 255, 6, 3, 0, 0]);
+        assert.deepEqual(floatsOf(still, i).slice(10, 12), [2, 2]);
+      }
+      batch.setStyle(item, { ...HALO, marches: false });
+      assert.deepEqual(floatsOf(item).slice(10, 12), [2, 2]);
+    });
+
+    it('still marches when its shape changes and it moves to the end', () => {
+      const item = batch.add(straight, 0, 0, HALO);
+      batch.add(straight, 0, 0, STYLE);
+      batch.setStroke(item, corner, 0, 0);
+      assert.strictEqual(item.count, corner.vertexCount);
+      for (let i = 0; i < corner.vertexCount; i++) {
+        assert.deepEqual(floatsOf(item, i).slice(10, 12), [-2, 2], `vertex ${i}`);
+        assert.deepEqual(bytesOf(item, i), [255, 255, 0, 255, 6, 3, 0, 0], `vertex ${i}`);
+      }
+    });
+  });
+
+  it('tells every batch\'s shader what the clock says: how bright the glows are, how far the dashes have marched', () => {
+    const uniforms = batch.shader.resources.lineUniforms.uniforms;
+    LineBatch.setTime({ pulse: 0.75, shift: 120.5 });
+    assert.deepEqual([uniforms.uGlow, uniforms.uShift], [0.75, 120.5]);
+    LineBatch.setView({ pixel: 0.5, narrow: 0, wireframe: false, casing: true, markers: true });
+    assert.deepEqual([uniforms.uGlow, uniforms.uShift, uniforms.uPixel], [0.75, 120.5, 0.5], 'the view\'s numbers are others');
+    LineBatch.setTime({ pulse: 1, shift: 0 });
+    assert.deepEqual([uniforms.uGlow, uniforms.uShift], [1, 0]);
+    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+  });
+
+  it('has no batch for its lines\' glows until it\'s given one, and destroys the one it has with it', () => {
+    assert.isNull(batch.glows);
+    const glows = new LineBatch();
+    batch.glows = glows;
+    batch.destroy();
+    assert.isTrue(glows.destroyed);
+    assert.isNull(batch.glows);
+
+    // ..unless that one is gone already, as when their container destroyed both
+    const other = new LineBatch();
+    other.glows = new LineBatch();
+    other.glows.destroy();
+    assert.doesNotThrow(() => other.destroy());
   });
 
   it('brings itself up to date when Pixi is about to render it', () => {

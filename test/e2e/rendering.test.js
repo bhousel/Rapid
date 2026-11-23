@@ -535,12 +535,13 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
   expect(result.bandsChanged).toBeGreaterThan(0);
 
   // Every point, vertex and virtual pin is in the one batch of points, with no sprites, and
-  // isn't in the scene: the batch is all there is under the points' container
+  // isn't in the scene: the batch is all there is under the points' container, with the
+  // batch for the glows of hovered points under it
   expect(result.points).toBeGreaterThan(20);
   expect(result.pointsNotInBatch).toBe(0);
   expect(result.pointsWithSprites).toBe(0);
   expect(result.pointsInScene).toBe(0);
-  expect(result.pointContainers).toEqual(['points']);
+  expect(result.pointContainers).toEqual(['glows', 'points']);
   expect(result.pointsWithIcons).toBeGreaterThan(5);
   // The zoom left the batch as it was: the shader keeps the points their size on screen
   expect(result.pointBatchChanged).toBe(false);
@@ -928,7 +929,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
       pointsOrderedOtherwise: points.filter(feature => feature.item?.order !== expectedOrder(feature)).length,
       pointsWithViewfields: points.filter(feature => feature.style.viewfield.angles.length).length,
       pointBatchOutOfOrder: pointOrders.some((order, i) => i > 0 && order < pointOrders[i - 1]),
-      pointBatchFirst: layer.pointContainer.children[0] === layer.pointBatch,
+      pointBatchFirst: layer.pointContainer.children[0] === layer.pointBatch.glows && layer.pointContainer.children[1] === layer.pointBatch,
       outOfOrder: outOfOrder
     };
   });
@@ -945,7 +946,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
   expect(result.points).toBeGreaterThan(10);
   expect(result.pointsOrderedOtherwise).toBe(0);
   expect(result.pointBatchOutOfOrder).toBe(false);
-  expect(result.pointBatchFirst).toBe(true);    // under any point that draws itself (a hovered one)
+  expect(result.pointBatchFirst).toBe(true);    // under any point that draws itself, and over the points' glows
   expect(result.outOfOrder).toBe(0);
 
   await waitForIdle(page);
@@ -1226,8 +1227,8 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 // batched. A mesh that crosses that line in a frame where its tile's render group is rebuilt made
 // Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`), until
 // something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
-// always batched, so crossing the line changes nothing. (Halos, the lasso, a hovered feature and
-// the lines of the other layers are `LineMesh`es. The OSM layer's lines and outlines are in
+// always batched, so crossing the line changes nothing. (The lasso and the lines of the other
+// layers are `LineMesh`es. The OSM layer's lines and outlines are in
 // `LineBatch`es, which have a shader of their own and are never batched by Pixi: the test
 // turns those off to get an outline's `LineMesh` in a tile.)
 test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {

@@ -1,18 +1,16 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { GlowFilter } from 'pixi-filters';
 import { LineBatch, LINE_MARKERS } from './lib/LineBatch.ts';
 import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
-import { drawHalo } from './helpers.ts';
+import { glowColor, setGlowFilter } from './helpers.ts';
 import { geomLineSegments, geomStrokeMesh } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
-import type { LineBatchItem, LineBatchMarkers, LineBatchStyle, LineMarkerKind } from './lib/LineBatch.ts';
+import type { LineBatchGlow, LineBatchItem, LineBatchMarkers, LineBatchStyle, LineMarkerKind } from './lib/LineBatch.ts';
 import type { LineStyleProps } from '../lib/Style.ts';
-import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { StrokeMesh, StrokeOptions } from '../geo/stroke.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
@@ -29,6 +27,13 @@ const SIDED_OFFSET = 7;
 // In a batch, the markers along a line are drawn over every stroke of its level (see
 // `_drawBatched`). (A line's place among the others is its road class and ID, far below this.)
 const MARKERS_ABOVE = 1e6;
+
+// ..and the glow of a hovered or highlighted line over those.
+const GLOW_ABOVE = 2e6;
+
+// The stroke mesh that a glow's strip is made from: the glow goes around the line's ends and corners
+const GLOW_CAP = 'round';
+const GLOW_JOIN = 'round';
 
 // The stroke mesh that the markers' strip is made from: no caps, and the simplest corners
 const MARKER_CAP = 'butt';
@@ -130,8 +135,11 @@ function sidedKind(image: Nullable<string>): LineMarkerKind | null | undefined {
  *
  * Without batches, the casing and the stroke are each a `LineMesh` in the feature's container,
  * and a zoom works out where its vertices are for the new width; the markers are sprites, made
- * again at every zoom. A line that's hovered or
- * highlighted is drawn that way too, while it is: its glow is a filter on the container.
+ * again at every zoom.
+ *
+ * The glow of a hovered or highlighted line is a strip in the strokes' batch as well
+ * (`glowItem`), which the shader fades out from the line's edge. For a line without batches
+ * it's a filter on the container.
  * (See `design/graphics-system.md` section 15.)
  *
  * Properties available:
@@ -166,6 +174,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   protected _arrowItem: LineBatchItem | null;
   /** The markers beside the line (sided) in the strokes' batch, if the style has them and a batch draws the line */
   protected _sidedItem: LineBatchItem | null;
+  /** The glow around the line in the strokes' batch, while the line is hovered or highlighted and a batch draws it */
+  protected _glowItem: LineBatchItem | null;
   /** The cap and join that the casing in the batch was built with */
   protected _casingShape: string;
   /** The cap and join that the stroke in the batch was built with */
@@ -185,6 +195,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._strokeItem = null;
     this._arrowItem = null;
     this._sidedItem = null;
+    this._glowItem = null;
     this._casingShape = '';
     this._strokeShape = '';
 
@@ -257,16 +268,13 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   /**
    * Whether this line draws something in its own container, and so has to be in the scene (the
    * layer asks before `update()`, to know whether to give it a place there).
-   * A line whose casing and stroke are in batches draws nothing itself, unless:
-   * - it's hovered or highlighted: the glow is a filter on the container, so the line is drawn
-   *   there, by meshes of its own, while it is
-   * - it has markers along it that a batch has no shape for (none of Rapid's styles has):
-   *   those are sprites in the container
+   * A line whose casing and stroke are in batches draws nothing itself (its glow, when it's
+   * hovered or highlighted, is in a batch too), unless it has markers along it that a batch
+   * has no shape for (none of Rapid's styles has): those are sprites in the container.
    * @return `true` if its container has to be in the scene
    */
   public drawsInContainer(): boolean {
     if (!this._batchesFor()) return true;
-    if (this._classes.has('hover') || this._classes.has('highlight')) return true;
     return !this._markersBatchable();
   }
 
@@ -351,6 +359,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._strokeItem?.batch?.setVisible(this._strokeItem, inBatch);
     this._arrowItem?.batch?.setVisible(this._arrowItem, inBatch);
     this._sidedItem?.batch?.setVisible(this._sidedItem, inBatch);
+    this._glowItem?.batch?.setVisible(this._glowItem, inBatch);
   }
 
 
@@ -395,6 +404,16 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
+   * The glow around the line in the strokes' batch, while a batch draws it there
+   * @return The batch's item, or `null`
+   * @readonly
+   */
+  public get glowItem(): LineBatchItem | null {
+    return this._glowItem;
+  }
+
+
+  /**
    * Destroys the meshes of the casing and the stroke, if this feature has them.
    */
   protected _dropMeshes(): void {
@@ -417,6 +436,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._arrowItem = null;
     this._sidedItem?.batch?.remove(this._sidedItem);
     this._sidedItem = null;
+    this._glowItem?.batch?.remove(this._glowItem);
+    this._glowItem = null;
     this._batchPart = null;
   }
 
@@ -466,10 +487,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this.lod = (styleZoom < 16) ? 1 : 2;
 
     // The casing and the stroke are in the layer's batches if it gave them and they can draw
-    // the line. A line that glows draws itself meanwhile: the glow is a filter on its container.
-    const isBatched = this._batchesFor();
-    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
-    const inBatches = (isBatched && !hasGlow);
+    // the line: then its markers and its glow are too.
+    const inBatches = this._batchesFor();
 
     // The markers along the line (oneway arrows, sided markers): sprites in the container,
     // unless the strokes' batch draws them (see `_drawBatched`).
@@ -518,16 +537,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this._batchPart = this._geom;
 
     } else {
-      // Meshes of this feature's own, in its container. A line that's only here for its glow
-      // keeps its place in the batches, hidden, until the glow is gone.
-      if (isBatched) {
-        if (this._casingItem) this._casingItem.batch?.setVisible(this._casingItem, false);
-        if (this._strokeItem) this._strokeItem.batch?.setVisible(this._strokeItem, false);
-        if (this._arrowItem) this._arrowItem.batch?.setVisible(this._arrowItem, false);
-        if (this._sidedItem) this._sidedItem.batch?.setVisible(this._sidedItem, false);
-      } else {
-        this._dropItems();
-      }
+      // Meshes of this feature's own, in its container.
+      this._dropItems();
       this._drawMeshes(flat[0], hasCasing, styleZoom, localScale, isWireframe);
       this._meshPart = this._geom;
     }
@@ -685,6 +696,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const strokeStyle = style.stroke;
     const hasStroke = !!strokeStyle && strokeStyle.opacity !== 0;
     const isSameLine = (this._batchPart === this._geom);
+    const color = glowColor(this._classes);
     // (If a batch has no shape for one of the line's markers, the line draws them all itself.)
     const inBatch = this._markersBatchable();
     const arrows = inBatch ? (arrowKind(style.lineMarker?.image) ?? null) : null;
@@ -696,7 +708,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       isAsWanted(this._casingItem, casingBatch, hasCasing) &&
       isAsWanted(this._strokeItem, batch, hasStroke) &&
       isAsWanted(this._arrowItem, batch, !!arrows) &&
-      isAsWanted(this._sidedItem, batch, !!sided)
+      isAsWanted(this._sidedItem, batch, !!sided) &&
+      isAsWanted(this._glowItem, batch.glows ?? batch, color !== null)
     ) {
       return;
     }
@@ -773,11 +786,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     this._drawBatchedMarkers(batch, coords, origin, closed, (builtShape === `${MARKER_CAP}/${MARKER_JOIN}`) ? built : null, arrows, sided, order, isSameLine);
 
-    // (A line that was hidden, or drew itself, is shown again: `update()` made it visible before this.)
-    if (this._casingItem) casingBatch.setVisible(this._casingItem, true);
-    if (this._strokeItem) batch.setVisible(this._strokeItem, true);
-    if (this._arrowItem) batch.setVisible(this._arrowItem, true);
-    if (this._sidedItem) batch.setVisible(this._sidedItem, true);
+    this._drawBatchedGlow(batch.glows ?? batch, coords, origin, closed, (builtShape === `${GLOW_CAP}/${GLOW_JOIN}`) ? built : null, color, hasCasing, order, isSameLine);
   }
 
 
@@ -819,6 +828,65 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const sidedMarkers = sided && { kind: sided, color: style.stroke?.color ?? 0xcccccc, alpha: 1 };
     this._arrowItem = this._batchMarkers(batch, this._arrowItem, arrowMarkers, strip, dx, dy, MARKERS_ABOVE + order, isSameLine);
     this._sidedItem = this._batchMarkers(batch, this._sidedItem, sidedMarkers, strip, dx, dy, MARKERS_ABOVE + order, isSameLine);
+  }
+
+
+  /**
+   * Draws the glow of a hovered or highlighted line in a batch, or takes it away: a strip
+   * over everything of the level, that the batch's shader draws a glow in from the line's
+   * edge outward. It's made from a stroke mesh with round ends and corners.
+   * @param batch - The batch for the glow: the one that the strokes' batch has for them, or the strokes' batch itself
+   * @param coords - The line's points as `[x, y, x, y, …]`, in container-local space
+   * @param origin - Where those coordinates start, in the world's
+   * @param closed - Whether the line ends where it starts
+   * @param built - A stroke mesh with round ends and corners that was just built for this line, if there is one
+   * @param color - The glow's color, or `null` if the line doesn't glow
+   * @param hasCasing - Whether the style has a casing that can be seen
+   * @param order - The line's place among the lines of the batch
+   * @param isSameLine - Whether the line is the one that was last drawn in the batches
+   */
+  protected _drawBatchedGlow(
+    batch: LineBatch,
+    coords: number[],
+    origin: Vec2,
+    closed: boolean,
+    built: StrokeMesh | null,
+    color: number | null,
+    hasCasing: boolean,
+    order: number,
+    isSameLine: boolean
+  ): void {
+    const item = this._glowItem;
+    if (color === null) {
+      item?.batch?.remove(item);
+      this._glowItem = null;
+      return;
+    }
+
+    // (The glow starts at the edge of what's drawn widest: the casing, if there's one.)
+    const style = this._style;
+    const widest = hasCasing ? style.casing : style.stroke;
+    const glow: LineBatchGlow = {
+      width: widest?.width || 3,
+      minWidth: hasCasing ? MIN_CASING_WIDTH : MIN_STROKE_WIDTH,
+      color: color,
+      alpha: 1
+    };
+
+    if (item?.batch === batch && isSameLine) {
+      batch.setGlowStyle(item, glow);
+      return;
+    }
+
+    const dx = origin[0] - batch.position.x;
+    const dy = origin[1] - batch.position.y;
+    const around = built ?? geomStrokeMesh(coords, { cap: GLOW_CAP, join: GLOW_JOIN, closed: closed });
+    if (item?.batch === batch) {
+      batch.setGlow(item, around, dx, dy, glow);
+    } else {
+      item?.batch?.remove(item);
+      this._glowItem = batch.addGlow(around, dx, dy, glow, GLOW_ABOVE + order);
+    }
   }
 
 
@@ -952,64 +1020,19 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * Show/Hide halo (expects `this._hitArea` to be already set up by `update()`)
    * @param viewport - Pixi viewport to use for rendering
    */
-  public updateHalo(viewport: Viewport): void {
-    const showHover = (this.visible && this._classes.has('hover'));
-    const showSelect = (this.visible && this._classes.has('select'));
-    const showHighlight = (this.visible && this._classes.has('highlight'));
+  public updateHalo(_viewport: Viewport): void {
+    // The glow of a hover or a highlight. A line that batches draw has it there (see
+    // `_drawBatched`); one that draws itself gets a filter on its container.
+    const drawsItself = !!this.stroke;
+    setGlowFilter(this.container, (this.visible && drawsItself) ? glowColor(this._classes) : null);
 
-    // Hover
-    if (showHover) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else if (showHighlight) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0x7092ff });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else {
-      if (this.container.filters) {
-        this.container.filters = null!;
-      }
-    }
-
-    // Select
-    if (showSelect && this._hitArea) {
-      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
-      const haloParent = mapui.halo;
-      if (!haloParent) return;
-
-      if (!this.halo) {
-        this.halo = new PIXI.Container();
-        this.halo.label = `${this.id}-halo`;
-        this.halo.eventMode = 'none';
-        haloParent.addChild(this.halo);
-      } else if (this.halo.parent !== haloParent) {
-        this.halo.parent?.removeChild(this.halo);
-        haloParent.addChild(this.halo);
-      }
-
-      // Have the halo transform mimic the container transform.
-      // This means that the halo is drawn in _world_ coordinates.
-      this.halo.position = this.container.position;
-      this.halo.rotation = this.container.rotation;
-      this.halo.scale = this.container.scale;
-
-      // The halo is the edge of the hit area: a ring around an open line, and one on each
-      // side of a line that ends where it starts.
-      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
+    // The halo of a selection is the edge of the hit area: a ring around an open line, and one
+    // on each side of a line that ends where it starts.
+    if (this.visible && this._classes.has('select') && this._hitArea) {
       const outline = this._hitArea.outline(HALO_SHAPE);
-      const rings = outline.inner ? [outline.outer, outline.inner] : [outline.outer];
-      drawHalo(this.halo, rings, localScale, this.gfx.textureManager!);
-
+      this._drawHalo(outline.inner ? [outline.outer, outline.inner] : [outline.outer]);
     } else {
-      if (this.halo) {
-        this.halo.destroy({ children: true });
-        this.halo = null;
-      }
+      this._drawHalo(null);
     }
   }
 

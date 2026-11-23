@@ -1,3 +1,6 @@
+import { ANIMATION_GAP_FACTOR, ANIMATION_REST_MS, AnimationPacer } from '../../../modules/pixi/lib/AnimationPacer.ts';
+
+
 describe('GraphicsSystem', () => {
 
   // Which layers are shown: saved in settings, and a link's `layers=` overrides that until they change.
@@ -156,6 +159,114 @@ describe('GraphicsSystem', () => {
       scene.disableLayers(['osm', 'rapid']);
       assert.isFalse(saved.has('layers.enabled'));
       assert.strictEqual(urlParams.get('layers'), 'osm,rapid');
+    });
+  });
+
+
+  // While something that's shown moves by itself (a hover's glow, a selection's dashes), the
+  // frame loop draws the scene again as it is, when its `AnimationPacer` says one is due.
+  // These tests run the tick of a system made without its constructor, with what a tick uses.
+  describe('animation frames', () => {
+    let gfx, scene, pacer, calls;
+
+    beforeEach(() => {
+      calls = [];
+      pacer = new AnimationPacer();
+      scene = {
+        animated: true,
+        animate: (now, isResting) => calls.push(['animate', now, isResting])
+      };
+      gfx = Object.assign(Object.create(Rapid.GraphicsSystem.prototype), {
+        _started: true,
+        _paused: false,
+        _pixiTickTime: Infinity,     // (Pixi's own scheduler doesn't get a turn here)
+        _glTimer: null,
+        _drawPending: false,
+        _appPending: false,
+        _isTempTransformed: false,
+        _animationPacer: pacer,
+        _animationFrames: 0,
+        scene: scene,
+        textureManager: { loaded: true },
+        pixi: { render: () => calls.push(['render']) },
+        _updateTransform: () => false,
+        _followTransform: () => calls.push(['follow']),
+        _passAllowed: () => true,
+        _app: () => calls.push(['app'])
+      });
+    });
+
+    it('draws the scene again when a frame is due: what moves is moved first, then Pixi renders', () => {
+      const before = performance.now();
+      pacer.changed(before - 100);     // the last frame was a while ago
+      gfx._tick(16.7);
+
+      assert.deepEqual(calls.map(call => call[0]), ['animate', 'render']);
+      assert.isAtLeast(calls[0][1], before);
+      assert.isFalse(calls[0][2], 'not the last one before a rest');
+      assert.strictEqual(gfx.animationFrames, 1);
+    });
+
+    it('waits for the pacer\'s gap before the next one', () => {
+      pacer.changed(performance.now() - 100);
+      gfx._tick(16.7);
+      gfx._tick(16.7);
+      assert.strictEqual(gfx.animationFrames, 1);
+      assert.isFalse(pacer.isDue(performance.now()));
+    });
+
+    it('draws none when nothing in the scene moves', () => {
+      scene.animated = false;
+      pacer.changed(performance.now() - 100);
+      gfx._tick(16.7);
+      assert.deepEqual(calls, []);
+      assert.strictEqual(gfx.animationFrames, 0);
+    });
+
+    it('draws none while a frame is being prepared, or while the view has moved on from what\'s drawn', () => {
+      pacer.changed(performance.now() - 100);
+      gfx._appPending = true;
+      gfx._tick(16.7);
+      assert.deepEqual(calls, [['app']]);
+
+      gfx._appPending = false;
+      gfx._isTempTransformed = true;
+      gfx._tick(16.7);
+      assert.deepEqual(calls, [['app']]);
+      assert.strictEqual(gfx.animationFrames, 0);
+    });
+
+    it('draws none before the textures are there, and doesn\'t count one', () => {
+      gfx.textureManager.loaded = false;
+      pacer.changed(performance.now() - 100);
+      gfx._tick(16.7);
+      assert.deepEqual(calls, []);
+      assert.strictEqual(gfx.animationFrames, 0);
+    });
+
+    it('tells the pacer how long the browser took to come back after an animation frame', () => {
+      pacer.changed(performance.now() - 100);
+      gfx._tick(16.7);
+      assert.strictEqual(gfx.animationFrames, 1);
+      gfx._tick(60);                   // the GPU needed that long
+      assert.strictEqual(pacer.gap, 60 * ANIMATION_GAP_FACTOR);
+    });
+
+    it('settles what moves with one last frame when nothing else was drawn for a while, then rests', () => {
+      pacer.changed(performance.now() - ANIMATION_REST_MS - 100);
+      gfx._tick(16.7);
+      assert.deepEqual(calls.map(call => call[0]), ['animate', 'render']);
+      assert.isTrue(calls[0][2], 'the last one before a rest');
+
+      gfx._tick(16.7);
+      gfx._tick(16.7);
+      assert.strictEqual(gfx.animationFrames, 1);
+
+      // ..until something is drawn again
+      pacer.changed(performance.now() - 100);
+      gfx._tick(16.7);
+      assert.strictEqual(gfx.animationFrames, 2);
+      assert.isFalse(calls.at(-2)[2]);
     });
   });
 });

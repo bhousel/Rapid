@@ -75,14 +75,17 @@ said otherwise. Biggest or most wanted first.
   container per tile for a class of lines with few members; hide the tiles outside the view so Pixi
   skips them. Watch for: wrong overlaps at tile edges (polygons; pins side by side across a tile edge
   are ordered by tile, 1% of overlapping pairs).
-- **Hovers and selections that move, drawn by the shaders** (Bryan, Nov 23). A hover is a
-  yellow glow (a filter on a container) and a tinted fill; a selection is a dashed halo, which
-  "we don't do a great job with" around lines. Animating them in shader code would make them
-  easier to see, and wouldn't lean on color alone, which matters for colorblind users. It
-  means a uniform for time, and drawing frames at a steady rate while something is hovered or
-  selected, not only when something changed: the frames are cheap enough for that now. It
-  would also take the last features out of the scene (a hovered line or point draws itself
-  for its glow), and the `GlowFilter` with them.
+- **Animation frames that don't draw the whole scene.** A glow breathes and a halo marches
+  (step 10 of section 15) by drawing every batch again 20 times a second: 13 ms of GPU a frame
+  in Užice on an M4. Drawing what's still into a texture once, and then that texture with what
+  moves over it, would make an animation frame two draw calls, and 60 a second affordable.
+  Wants numbers from weak hardware first: `AnimationPacer` slows the animation down there, and
+  nobody has seen it do so.
+- **How hovers and selections look, now that a shader draws them.** The first version is a
+  soft yellow glow that breathes and yellow dashes that march over a dark line. Open: more
+  than color and movement for a colorblind user (a pattern in the glow, a second color in the
+  dashes), a glow that shows on a yellow road, and the other layers' lines and areas, which
+  still glow by `GlowFilter`.
 - **A small area's edge, drawn by the fills' shader.** An area under 20 pixels is its fill
   alone since step 9 (Bryan: a grey block is fine, something is drawn; a hover shows its
   outline). Section 15 ("A lower level of detail for small areas") has a way to give it back

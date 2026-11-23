@@ -17,6 +17,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   removes Pixi's events ticker); `SchedulerSystem` runs the frame
   loop, and Rapid renders only when something changed. Don't add `app.ticker` callbacks or call
   `app.render()` from a layer or feature: mark it dirty and let the next frame draw it.
+  (One thing draws without a change: while something is hovered or selected, `GraphicsSystem`
+  draws the scene again as it is, for what the shaders move. See "What moves by itself" below.)
 - **Nothing renders inside `render()`.** `renderer.generateTexture()` calls `renderer.render()`, which
   corrupts a render already in progress, so texture work is queued through the scheduler (see
   `PixiLayerLabels`).
@@ -87,27 +89,56 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     in the world) and `gfx.origin` (the world's place on screen). Where a feature is drawn among
     the others is `feature.sceneContainer` and `sceneOrder` (`featureOrder()` in `helpers.ts`).
   - **A feature is in the scene only when it draws something itself**
-    (`drawsInContainer()`): what a hovered or highlighted feature needs under its glow,
-    because a glow is a filter on the container (a line or a point draws itself whole there,
-    a line with its arrows as sprites; an area its outlines, and its fill in the batch is
-    tinted with the glow's color and more opaque meanwhile). **A hover has to show:** if a
-    change takes away what a user sees under the pointer, put something in its place. Anything new that a feature draws in its own container has to be said there,
-    or it's drawn nowhere.
+    (`drawsInContainer()`): markers that a batch has no shape for, a picture from another
+    texture, a vertex that's drawn above everything. A hover or a selection isn't a reason:
+    their glow and halo are in batches too (below). Anything new that a feature draws in its
+    own container has to be said there, or it's drawn nowhere.
+  - **A hover's glow is in a batch of glows** (`LineBatch.glows`, `PointBatch.glows`): a strip
+    around a line or around each ring of an area (`feature.glowItem`, `glowItems`), and a
+    picture behind a point (`glowItem`, or the `glow` sprite of a point that draws itself). An
+    area's fill is tinted meanwhile. **A hover has to show:** if a change takes away what a
+    user sees under the pointer, put something in its place. Put what comes and goes with the
+    pointer in a small batch of its own, not in the batch of what it's around: a batch that
+    gets or loses a thing builds its index buffer again, which was 11 ms a hover in Užice.
+  - **A selection's halo is lines in the map UI layer's batch** (`feature.haloItems`, from
+    `_drawHalo()` and `drawHalo()` in `helpers.ts`; `PixiLayerMapUI.haloBatchAt()`): two for
+    each ring, a dark one and yellow dashes that march over it. There's no `feature.halo`
+    container. A halo's rings are the outline of its feature at the distance a click reaches
+    (`geomStrokeOutline()`), given in the feature's container's coordinates.
   - **What the batches share is `VertexBatch`** (`lib/VertexBatch.ts`): the buffers, a thing
     that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
     for), the order, the origin that follows the view. A new kind of batch says what a vertex
     holds, and writes it.
-  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): an area's outlines, halos, the
-    lasso, and the lines of layers that give no batch. Call `setStroke()` for a new width: it
+  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): the lasso, and the lines and
+    outlines of layers that give no batch. Call `setStroke()` for a new width: it
     moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
     are the mesh's `tint` and `alpha`.
   - **A line feature may have no `stroke` or `casing` mesh** (`null` while a batch draws it).
-    To know what's drawn, read `strokeItem`, `casingItem`, `arrowItem` and `sidedItem`.
-- **Halos and the lasso are `LineMesh`es too,** drawn with `drawHalo()` and `drawRings()`
-  (`helpers.ts`) into a container that keeps its meshes from one call to the next. A halo's rings
-  are the outline of its feature at the distance a click reaches (`geomStrokeOutline()`). There's
+    To know what's drawn, read `strokeItem`, `casingItem`, `arrowItem`, `sidedItem` and `glowItem`.
+- **The lasso is `LineMesh`es too,** drawn with `drawRings()` (`helpers.ts`) into a container
+  that keeps its meshes from one call to the next. There's
   no `DashLine` anymore, and nothing of ours calls Pixi's `buildLine`. Don't use Pixi's
   `DashLineShader`: it needs `SmoothGraphics`, and a context with it is never batched.
+- **What moves by itself is moved by a shader, from the clock.** A glow breathes and a halo's
+  dashes march because of two uniforms that every batch shares (`LineBatch.setTime()`,
+  `PointBatch.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
+  - **Don't write to a batch, or draw a feature again, to animate something.** Give the
+    shader what it needs in the vertices once, and a uniform for the moment.
+  - **`PixiScene.animated` says whether frames should keep coming** (something has the
+    hover, highlight or select class). `GraphicsSystem` then draws the scene again when its
+    `AnimationPacer` says so: 20 times a second, less when the browser is slow to come back,
+    not after 30 seconds without a change, never with `prefers-reduced-motion`. Something new
+    that moves has to make `animated` true while it's shown, and has to look right standing
+    still (reduced motion, the rest).
+  - **An animation frame is a whole DRAW** (13 ms of GPU in Užice on an M4), with no APP and
+    no `draw` event. Don't raise the rate, or animate something that's always on screen,
+    without measuring what that does where the GPU is weak.
+  - **A sprite that should pulse with the glows** is registered with `scene.addPulsing()`,
+    and taken back with `removePulsing()` before it's destroyed.
+- **A shader is written twice,** in GLSL and in WGSL, and only the GLSL is drawn with by a
+  test. After changing one, look at the map with `renderer=webgpu` in the url. WGSL reserves
+  names that GLSL doesn't (`from`, `filter`, `target`, `type`, `mod`, `self`, `set`...):
+  `test/dom/pixi/shaders.test.js` checks for those.
 - **A line's hit area is a distance, not a shape** (`lib/LineHitArea.ts`): a point hits when it's
   within a few pixels of the line. A feature keeps the one it has and calls `set()` when the line
   or the zoom changes. Don't build a polygon around a line to hit-test it.
@@ -144,8 +175,11 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     be hit where Pixi hits it drawn with sprites.
 - **Look at what a change does to a hovered, a selected and a dragged feature,** in a
   screenshot. Moving lines into batches took the glow off every hovered line, and every test
-  passed: the tests looked at classes, and the glow is a filter on a container that had nothing
-  left in it.
+  passed: the tests looked at classes, and the glow was a filter on a container that had nothing
+  left in it. It happened again when the glow moved into the batch: the item was there,
+  visible, and the shader faded it to nothing. So the e2e tests count the pixels a glow
+  changes (`glowPixels()` in `test/e2e/select.test.js`): **for something a shader draws,
+  test the pixels,** not only the state that asks for it.
 - **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
   for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
   that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in

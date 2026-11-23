@@ -1,7 +1,12 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode` and `interactiveChildren`, as a renderer does in the app
+import { GlowFilter } from 'pixi-filters';
+import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
 import { LineMesh } from '../../../modules/pixi/lib/LineMesh.ts';
-import { containerHit, drawHalo, drawOrder, drawRings, featureOrder, ringsContain, triangulate } from '../../../modules/pixi/helpers.ts';
+import {
+  containerHit, drawHalo, drawOrder, drawRings, featureOrder, glowColor, ringsContain, setGlowFilter, triangulate,
+  HIGHLIGHT_COLOR, HOVER_COLOR
+} from '../../../modules/pixi/helpers.ts';
 
 
 describe('pixi helpers', () => {
@@ -59,21 +64,192 @@ describe('pixi helpers', () => {
     });
   });
 
+  // A halo is lines in a batch (the map UI layer's): for each ring a dark line, and yellow
+  // dashes over it. A vertex there is 12 floats (0, 1 the point on the line; 10, 11 its width
+  // and least width, the width negative for a line whose dashes march) and 8 bytes (color,
+  // opacity, dashes).
   describe('drawHalo', () => {
-    it('draws yellow dashes 2 pixels wide, whatever a pixel is in the container\'s coordinates', () => {
-      const asked = [];
-      const textures = { getDashTexture: dash => { asked.push(dash); return dashTexture; } };
-      const halo = new PIXI.Container();
+    const FLOATS = 12;
+    const BYTES = 8;
+    let batch;
 
-      drawHalo(halo, [square], 1, textures);
-      assert.strictEqual(halo.tint, 0xffff00);
-      assert.closeTo(halo.alpha, 0.9, 1e-6);
-      assert.deepEqual(asked, [[6, 3]]);
-      assert.strictEqual(halo.children[0].texture, dashTexture);
-      assert.closeTo(widthOf(halo.children[0]), 2, 1e-4);
+    beforeEach(() => {
+      batch = new LineBatch();
+    });
+    afterEach(() => {
+      if (!batch.destroyed) batch.destroy();
+    });
 
-      drawHalo(halo, [square], 0.25, textures);    // zoomed in by 4: a pixel is a quarter of a unit
-      assert.closeTo(widthOf(halo.children[0]), 0.5, 1e-4);
+    const floatsOf = (item, i = 0) => Array.from(item.batch._floats.subarray((item.first + i) * FLOATS, (item.first + i + 1) * FLOATS));
+    const bytesOf = (item, i = 0) => Array.from(item.batch._bytes.subarray((item.first + i) * BYTES, (item.first + i + 1) * BYTES));
+    // The box of the points on the line that an item's vertices belong to: [minX, minY, maxX, maxY]
+    const boxOf = item => {
+      const box = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < item.count; i++) {
+        const [x, y] = floatsOf(item, i);
+        box[0] = Math.min(box[0], x);
+        box[1] = Math.min(box[1], y);
+        box[2] = Math.max(box[2], x);
+        box[3] = Math.max(box[3], y);
+      }
+      return box;
+    };
+
+    it('draws each ring as two lines: a dark one, and yellow dashes over it', () => {
+      const items = [];
+      drawHalo(batch, items, [square, triangle], 0, 0);
+      assert.lengthOf(items, 4);
+      assert.strictEqual(batch.size, 4);
+
+      for (const ring of [0, 1]) {
+        const [under, dashes] = [items[ring * 2], items[ring * 2 + 1]];
+        assert.strictEqual(under.batch, batch);
+        assert.strictEqual(under.count, dashes.count, 'along the same line');
+        assert.isBelow(under.order, dashes.order, 'the dashes are drawn over the dark line');
+        for (let i = 0; i < under.count; i++) {
+          assert.deepEqual(floatsOf(under, i).slice(10), [-4, 4], 'the dark line is 4 pixels wide');
+          assert.deepEqual(bytesOf(under, i), [0, 0, 0, Math.round(0.55 * 255), 0, 0, 0, 0]);
+          assert.deepEqual(floatsOf(dashes, i).slice(10), [-2, 2], 'the dashes are 2 pixels wide');
+          assert.deepEqual(bytesOf(dashes, i), [255, 255, 0, 255, 6, 3, 0, 0]);
+        }
+      }
+      assert.deepEqual(boxOf(items[1]), [0, 0, 10, 10]);
+      assert.deepEqual(boxOf(items[3]), [20, 0, 30, 8]);
+    });
+
+    it('makes both lines march: their width is written as negative, which the shader reads so', () => {
+      const items = [];
+      drawHalo(batch, items, [square], 0, 0);
+      for (const item of items) {
+        assert.isBelow(floatsOf(item)[10], 0);
+      }
+    });
+
+    it('puts the rings where they are in the world, in the batch\'s coordinates', () => {
+      batch.position.set(1000, 2000);
+      const items = [];
+      drawHalo(batch, items, [square], 1100, 2050);
+      assert.deepEqual(boxOf(items[0]), [100, 50, 110, 60]);
+      assert.deepEqual(boxOf(items[1]), [100, 50, 110, 60]);
+    });
+
+    it('closes each ring, whether or not its last point repeats its first', () => {
+      const repeated = [];
+      const open = [];
+      drawHalo(batch, repeated, [square], 0, 0);
+      drawHalo(batch, open, [square.slice(0, 8)], 0, 0);
+      assert.strictEqual(open[0].count, repeated[0].count);
+      assert.strictEqual(open[0].indices.length, repeated[0].indices.length);
+    });
+
+    it('writes a ring that changed where the old one was, if it has as many points', () => {
+      const items = [];
+      drawHalo(batch, items, [square], 0, 0);
+      const [under, dashes] = items;
+      const first = [under.first, dashes.first];
+
+      const moved = square.map(v => v + 5);
+      drawHalo(batch, items, [moved], 0, 0);
+      assert.deepEqual(items, [under, dashes], 'the same items');
+      assert.deepEqual([under.first, dashes.first], first, 'in the same place');
+      assert.strictEqual(batch.size, 2);
+      assert.deepEqual(boxOf(dashes), [5, 5, 15, 15]);
+      assert.deepEqual(floatsOf(dashes).slice(10), [-2, 2]);
+      assert.deepEqual(bytesOf(under).slice(0, 4), [0, 0, 0, Math.round(0.55 * 255)]);
+    });
+
+    it('keeps a hidden halo hidden when its rings change', () => {
+      const items = [];
+      drawHalo(batch, items, [square], 0, 0);
+      for (const item of items) batch.setVisible(item, false);
+
+      drawHalo(batch, items, [triangle], 0, 0);     // another number of points
+      for (const item of items) {
+        assert.isFalse(item.visible);
+        assert.strictEqual(bytesOf(item)[3], 0);
+      }
+    });
+
+    it('takes away the lines of a ring that\'s gone, and all of them for no rings', () => {
+      const items = [];
+      drawHalo(batch, items, [square, triangle], 0, 0);
+      const kept = items.slice(0, 2);
+
+      drawHalo(batch, items, [square], 0, 0);
+      assert.deepEqual(items, kept);
+      assert.strictEqual(batch.size, 2);
+
+      drawHalo(batch, items, [], 0, 0);
+      assert.lengthOf(items, 0);
+      assert.strictEqual(batch.size, 0);
+    });
+
+    it('moves a halo that was in another batch into this one', () => {
+      const other = new LineBatch();
+      const items = [];
+      drawHalo(other, items, [square], 0, 0);
+      assert.strictEqual(other.size, 2);
+
+      drawHalo(batch, items, [square], 0, 0);
+      assert.strictEqual(other.size, 0);
+      assert.strictEqual(batch.size, 2);
+      assert.lengthOf(items, 2);
+      for (const item of items) {
+        assert.strictEqual(item.batch, batch);
+      }
+      other.destroy();
+    });
+  });
+
+  describe('glowColor', () => {
+    it('is yellow for a hover, blue for a highlight, and nothing otherwise', () => {
+      assert.strictEqual(glowColor(new Set(['hover'])), 0xffff00);
+      assert.strictEqual(glowColor(new Set(['highlight'])), 0x7092ff);
+      assert.isNull(glowColor(new Set()));
+      assert.isNull(glowColor(new Set(['select', 'drawing'])));
+      assert.strictEqual(HOVER_COLOR, 0xffff00);
+      assert.strictEqual(HIGHLIGHT_COLOR, 0x7092ff);
+    });
+
+    it('is the hover\'s for what is both hovered and highlighted', () => {
+      assert.strictEqual(glowColor(new Set(['highlight', 'select', 'hover'])), HOVER_COLOR);
+    });
+  });
+
+  // For a feature that draws itself: one that batches draw has its glow drawn there.
+  describe('setGlowFilter', () => {
+    it('gives a container one glow filter in the color, and keeps it when asked again', () => {
+      const container = new PIXI.Container();
+      setGlowFilter(container, HOVER_COLOR);
+      assert.lengthOf(container.filters, 1);
+      const filter = container.filters[0];
+      assert.instanceOf(filter, GlowFilter);
+      assert.strictEqual(new PIXI.Color(filter.color).toNumber(), 0xffff00);
+
+      setGlowFilter(container, HOVER_COLOR);
+      assert.lengthOf(container.filters, 1);
+      assert.strictEqual(container.filters[0], filter);
+    });
+
+    it('gives the filter it has another color, when a hover comes over a highlight', () => {
+      const container = new PIXI.Container();
+      setGlowFilter(container, HIGHLIGHT_COLOR);
+      const filter = container.filters[0];
+      setGlowFilter(container, HOVER_COLOR);
+      assert.strictEqual(container.filters[0], filter);
+      assert.strictEqual(new PIXI.Color(filter.color).toNumber(), 0xffff00);
+      setGlowFilter(container, HIGHLIGHT_COLOR);
+      assert.strictEqual(new PIXI.Color(filter.color).toNumber(), 0x7092ff);
+    });
+
+    it('takes the filter away for no color, and does nothing to a container without one', () => {
+      const container = new PIXI.Container();
+      setGlowFilter(container, null);
+      assert.isNotOk(container.filters?.length);
+
+      setGlowFilter(container, HIGHLIGHT_COLOR);
+      setGlowFilter(container, null);
+      assert.isNotOk(container.filters?.length);
     });
   });
 

@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { containerHit } from './helpers.ts';
+import { containerHit, drawHalo } from './helpers.ts';
 import { utilDeepMerge } from '../util/deep_merge.ts';
 import { styleDefaults } from '../lib/Style.ts';
 
@@ -9,8 +9,10 @@ import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { LineBatchItem } from './lib/LineBatch.ts';
 import type { MinimalStyleProps, StyleProps } from '../lib/Style.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { SingularGeometryType } from '../lib/types.ts';
 import type { Viewport } from '@rapid-sdk/math';
@@ -44,7 +46,7 @@ export type PixiFeatureProps = Record<string, unknown>;
  * - `allowInteraction`    - `true` if the Feature is allowed to be interactive (emits Pixi events)
  * - `dirty`               - `true` if the Feature needs to be rebuilt
  * - `lod`                 - Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
- * - `halo`                - A PIXI.Container() that contains the graphics for the Feature's halo (if it has one)
+ * - `haloItems`           - The lines of the Feature's halo in the map UI's batch (none unless it's selected)
  */
 export class AbstractPixiFeature {
 
@@ -64,8 +66,6 @@ export class AbstractPixiFeature {
   public props: Partial<PixiFeatureProps>;
   /** Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full) */
   public lod: number;
-  /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
-  public halo: PIXI.Container | null;
   /**
    * How far outside the box of its geometry the Feature can be hit, in pixels: a line a few
    * pixels from it, a pin above its point. A subclass sets it when it draws. A layer that finds
@@ -78,6 +78,8 @@ export class AbstractPixiFeature {
    */
   public labelAvoid: boolean;
 
+  /** The lines of the Feature's halo, in the map UI's batch (see `_drawHalo`) */
+  protected _haloItems: LineBatchItem[];
   /** The cells of the scene's avoid grid that this Feature has marked, if any */
   protected _avoidCells: CellRect | null;
   /** The generation of the avoid grid that `_avoidCells` is for */
@@ -132,7 +134,7 @@ export class AbstractPixiFeature {
     container.eventMode = 'static';
 
     this.lod = 2;   // full detail
-    this.halo = null;
+    this._haloItems = [];
     this.hitReach = 0;
     this.labelAvoid = false;
     this._avoidCells = null;
@@ -179,10 +181,10 @@ export class AbstractPixiFeature {
     this.context = null!;
     this.props = null!;
 
-    if (this.halo) {
-      this.halo.destroy({ children: true });
-      this.halo = null;
+    for (const item of this._haloItems) {
+      item.batch?.remove(item);
     }
+    this._haloItems = [];
 
     this._geom = null;
     this._style = null!;
@@ -214,6 +216,69 @@ export class AbstractPixiFeature {
    * @abstract
    */
   public updateHalo(viewport: Viewport): void {
+  }
+
+
+  /**
+   * The lines of this Feature's halo in the map UI's batch: two for each ring (a dark line, and
+   * the dashes that march over it). Empty unless the Feature is selected.
+   * @return The batch's items
+   * @readonly
+   */
+  public get haloItems(): readonly LineBatchItem[] {
+    return this._haloItems;
+  }
+
+
+  /**
+   * Draws the halo of a selected Feature, or takes it away: dashed lines along the given
+   * rings, above everything on the map, in the map UI layer's batch (see `drawHalo()` in
+   * `helpers.ts`). The batch's shader keeps the lines their width in pixels and moves their
+   * dashes, so a halo is drawn again only when its rings change (a zoom changes how far from
+   * the Feature they are).
+   * @param rings - The rings, each as `[x, y, x, y, …]` in the container's own coordinates
+   *   (as its hit area is), or `null` for no halo
+   */
+  protected _drawHalo(rings: ArrayLike<number>[] | null): void {
+    if (!rings?.length && !this._haloItems.length) return;    // none, and none to take away
+
+    const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI | undefined;
+    const container = this.container;
+    const position = container.position;
+    const batch = (rings?.length && mapui?.haloBatchAt) ? mapui.haloBatchAt(position.x, position.y) : null;
+
+    if (!rings || !batch) {
+      for (const item of this._haloItems) {
+        item.batch?.remove(item);
+      }
+      this._haloItems.length = 0;
+      return;
+    }
+
+    // From the container's coordinates to the world's, less the container's place there:
+    // turned and scaled as the container is. (A point's is in pixels, upright on screen.)
+    const cos = Math.cos(container.rotation);
+    const sin = Math.sin(container.rotation);
+    const scaleX = container.scale.x;
+    const scaleY = container.scale.y;
+    const inWorld: Float64Array[] = [];
+    for (const ring of rings) {
+      const turned = new Float64Array(ring.length);
+      for (let i = 0; i < ring.length; i += 2) {
+        const x = ring[i] * scaleX;
+        const y = ring[i + 1] * scaleY;
+        turned[i] = x * cos - y * sin;
+        turned[i + 1] = x * sin + y * cos;
+      }
+      inWorld.push(turned);
+    }
+
+    drawHalo(batch, this._haloItems, inWorld, position.x, position.y);
+    if (!this.visible) {
+      for (const item of this._haloItems) {
+        batch.setVisible(item, false);
+      }
+    }
   }
 
 
@@ -306,7 +371,9 @@ export class AbstractPixiFeature {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
     this.layer.visibilityChanged(this, val);
-    if (this.halo) this.halo.visible = val;
+    for (const item of this._haloItems) {
+      item.batch?.setVisible(item, val);
+    }
     this._labelDirty = true;
     // What's hidden isn't in a label's way. What's shown is, where it was drawn. (If it's
     // waiting to be drawn again, it marks its place when it is.)

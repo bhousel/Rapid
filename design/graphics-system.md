@@ -20,7 +20,10 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > 6: the OSM layer finds its features under the pointer through the spatial index, and draws its
 > lines in two batches per level with a shader of our own (`modules/pixi/lib/LineBatch.ts`): every
 > casing, then every stroke. A line that its batches draw isn't in Pixi's scene. Of step 8: areas
-> are in two batches too (`FillBatch` for every fill, a `LineBatch` for every outline).
+> are in two batches too (`FillBatch` for every fill, a `LineBatch` for every outline). Points are in
+> one (`PointBatch`), the markers along lines are drawn by the lines' shader (step 9), and a
+> hover's glow and a selection's halo are in batches whose shaders move them (step 10), with
+> frames drawn at intervals while they do.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -3294,6 +3297,151 @@ level's strokes' batch and no line is in the scene; an area has outlines only fr
 and the shader's arrows cover the pixels that sprites' do. Sixty-seven ways of breaking the new
 code were each caught by a test.
 
+### What was built (Nov 23: step 10, hovers and selections in the shaders)
+
+**Decided (Bryan, Nov 23):**
+- **The tinted hover fill stays:** "hover fill is looking really good now, I can easily tell
+  what's being hovered."
+- **A midpoint points the way its line is drawn,** whatever the tags say: with `oneway=-1`
+  "the triangular midpoints also switch direction - this feels wrong to me - these should
+  always point in the direction the line is drawn."
+- **What's below is as he wants it** (Nov 23, after seeing it): "wouldn't change anything
+  about it."
+
+**The midpoints first.** Nothing reverses the way, and it wasn't new: `_gatherMidpoints()` has
+swapped a segment's two nodes for `oneway=-1` since January 2022 (`5224863af`). That was a
+month after the whole line was drawn reversed for that tag, so that its arrows pointed the way
+of travel (`a3130ead2`). The arrows got their own reversal later (Oct 2022, and a marker style
+now), and the midpoints kept theirs. The swap is gone; `actionAddMidpoint` finds the edge either
+way around.
+
+**A hover's glow and a selection's halo are drawn by the batches' shaders, and they move.**
+Until now a glow was a `GlowFilter` on a feature's container, so a hovered line or point left
+its batch and drew itself in the scene, with sprites for its arrows, and a hovered area drew
+its outlines there. A halo was a `LineMesh` for each ring, with a dash texture. Now:
+
+- **A line's glow is a strip along it** (`LineBatch.addGlow()`): the line's stroke mesh with
+  round ends and corners, as wide as the line and 12 pixels more on each side. The fragment
+  shader fades it from the line's edge outward, and draws nothing over the line itself. For
+  that it needs the distance from the line at every pixel, so each vertex has where it is from
+  the nearest point of the line (`_writeAround()`): across a segment that runs from one
+  side's normal to the other's through 0, and the length of what's interpolated is the
+  distance. (It's in the two floats where a line has its distance along itself: a glow has no
+  dashes.)
+- **An area's glow is the same strip around each ring,** on both sides of its outline, and
+  its fill is tinted as before. A small area gets its outline while it's hovered.
+- **A point's glow is a picture:** a disc that fades out (`PixiTextures._cacheGlow()`, in the
+  symbol atlas), behind the middle of the marker, twice its size and at least 30 pixels. A
+  point that draws itself (a vertex above everything, a midpoint, another layer's marker) has
+  it as a sprite, and no filter either.
+- **Glows are in small batches of their own** (`LineBatch.glows`, `PointBatch.glows`): one
+  after each level's strokes, one after the areas' outlines, one under the points. The first
+  version put a glow in the batch of what it's around, and a hover in Užice took 11 ms of
+  DRAW: a batch that gets or loses a thing builds its index buffer again, for a town's roads.
+  In a batch of its own a glow costs what it weighs. An empty batch draws nothing.
+- **A halo is two lines along each ring, in one batch for all halos** in the map UI layer
+  (`haloBatchAt()`, `drawHalo()`): a dark line 4 pixels wide, and yellow dashes 2 pixels wide
+  over it, so the dashes show on a yellow road and on a pale background alike. They **march**
+  (a negative width says so): as wide as they say at every zoom and in wireframe, with
+  dashes that the shader moves along the line.
+- **So nothing of the OSM layer is in the scene for a hover or a selection,** apart from the
+  vertices and midpoints that are drawn above everything. A hovered oneway keeps its arrows
+  in the batch. `GlowFilter` is left for the lines and areas of layers without batches.
+
+**The clock.** Two numbers move everything, and they're uniforms that every batch shares
+(`LineBatch.setTime()`, `PointBatch.setTime()`): how bright a glow is (it breathes: down to
+55% and back in 1.6 seconds) and how far the dashes have marched (20 pixels a second).
+`PixiScene.animate(now)` sets them before each frame is drawn, and the opacity of the sprites
+that pulse. Nothing in a batch is written, and no feature is drawn again. (The view's uniforms
+moved to the scene too, `setBatchViews()`: the halo batch isn't the OSM layer's.)
+
+**Animation frames.** Rapid has drawn a frame only when something changed. While something
+is hovered, highlighted or selected (`PixiScene.animated`), `GraphicsSystem` now draws the
+scene again as it is, with the clock further on (`_drawAnimation()`): no APP, no frame in the
+stats, no `draw` event. `AnimationPacer` says when:
+
+- **20 a second** on a screen that shows 60: every third tick, and none while other frames
+  are drawn that often (they move the clock too).
+- **A third of the ticks at most.** After an animation frame the next waits two and a half
+  times as long as the browser took to come back, up to half a second. Where the GPU needs
+  longer than a tick for a frame, the animation slows down instead of taking all of its time.
+- **It rests** after 30 seconds in which nothing else was drawn, with one last frame that
+  leaves the glows at their brightest, and goes on when something is drawn again. An editor
+  left open with something selected doesn't keep the GPU busy.
+- **Not at all with `prefers-reduced-motion`:** the glow and the halo are there, and still.
+
+An animation frame costs what any DRAW costs, because Pixi draws the whole scene:
+
+| | Seattle (z17.5) | Užice (z16) |
+|---|---|---|
+| DRAW, on the CPU | 0.2 ms | 0.2 ms |
+| on the GPU (timer query) | 5.3 ms | 13.6 ms |
+| animation frames a second | 20 | 20 |
+| `requestAnimationFrame` a second meanwhile | 60 | 60 |
+
+So in Užice a selection keeps this machine's GPU busy a quarter of the time. That's an M4;
+see the open questions.
+
+**What a hover costs,** the frame after the class changes, medians of 12 features in Užice
+(APP + DRAW, ms):
+
+| | before | glows in their features' batches | glows in their own |
+|---|---|---|---|
+| a road | 2.2 + 2.2 | 2.2 + 11.4 | 1.3 + 0.8 |
+| an area | 3.8 + 1.7 | 1.9 + 7.2 | 1.8 + 2.7 |
+| a pin | (drew itself) | 1.2 + 9.1 | 1.3 + 0.7 |
+
+**What changed that someone might notice:**
+- **Glows are softer and they breathe;** halos have a dark line under their dashes, and the
+  dashes move.
+- **A line's glow is over everything of its level,** where the filter's was at the line's
+  own place among the others. A point's is under every point.
+- **An area's pin glows with it,** and so does any vertex or midpoint that's hovered.
+- **Other layers' points have the new glow** (they use `PixiFeaturePoint`); their lines and
+  areas have the filter still.
+
+**Two things found by looking, which no test had caught:**
+- **The first glow drew nothing.** Its strip said only whether a vertex was at the edge, and
+  both sides of a segment are: the distance was the same all the way across, and the shader
+  faded everything out. The feature had its glow item, visible, in the right batch. The e2e
+  tests now count the pixels that a glow changes (`glowPixels()` in `select.test.js`).
+- **The map was black with `renderer=webgpu`:** the WGSL named a variable `from`, which WGSL
+  reserves and GLSL doesn't. Nothing compiles the WGSL in a test, so `shaders.test.js` checks
+  the names each shader declares against WGSL's lists. Also under WebGPU, the atlas uploaded
+  its pictures without premultiplying them (the WebGL uploader does), which made the glow a
+  hard disc and every picture's faint edge too bright; `AtlasAllocator` passes
+  `premultipliedAlpha` now.
+
+**Open:**
+- **Weak hardware.** The pacer is the guard against an animation that the GPU can't keep up
+  with, and it's untested on a machine where that happens. The lasting answer is to not draw
+  the scene again: draw what's still to a texture once, and an animation frame is that
+  texture and what moves over it. Then the rate could be 60.
+- **The animation runs while what's selected is off screen** (`animated` looks at classes).
+  It rests after 30 seconds like any other.
+- **30 seconds, 20 frames a second, 1.6 seconds a breath, 12 pixels of glow** are first
+  guesses, each a constant.
+- **Where a line turns sharply between short segments, the glow is brighter inside the
+  corner,** and can reach over the line: the strip overlaps itself there, as a wide stroke
+  does (see "Translucent strokes" below).
+- **Color still does most of the work.** Movement helps a colorblind user find the halo and
+  the glow; the glow's yellow on a yellow road is still weak, and its shape is all it has.
+
+**Tests:** the glow, its distance vector, a line that marches and the clock in
+`LineBatch.test.js`; pictures that pulse and from where in `PointBatch.test.js`;
+`AnimationPacer.test.js`; the frame loop's animation frames in `GraphicsSystem.test.js`;
+`animated`, `animate()`, `setBatchViews()` and the sprites that pulse in `PixiScene.test.js`;
+`drawHalo()`, `setGlowFilter()`, the halo of any feature in `helpers.test.js` and
+`AbstractPixiFeature.test.js`; the halo batch in `PixiLayerMapUI.test.js`; glows and halos of
+lines, areas and points in their features' tests; the glow batches, and the midpoints, in
+`PixiLayerOsm.test.js`; the glow's picture in `PixiTextures.test.js`; WGSL names in
+`shaders.test.js`. The e2e tests: a hovered road, area and pin stay in their batches and
+their glow changes the pixels around them, on both sides, and none elsewhere; a halo is a
+click's reach from its road, marches, holds still for a user who asked for less motion, and
+keeps its width in wireframe; the animation stops when nothing is hovered or selected; and
+with less motion asked for, a glow is on the screen after the one frame that a hover makes, and
+off it after the next. Seventy-eight ways of breaking the new code were each caught by a test.
+
 ### Order of work
 
 Each step is measured on the tapes of Seattle, Staten Island and Užice (`bun run measure --tape`),
@@ -3343,6 +3491,11 @@ and compared by screenshot with the build before it.
    keep one line in ten in the scene: 103 of Seattle's 160 draw calls. The stroke's shader has
    the distance along the line, and can draw them from it.
    **Done (Nov 23):** a strip in the strokes' batch for each line with markers (above).
+10. **Hovers and selections in the shaders, animated** (Bryan, Nov 23). The glow of a hover
+   was a filter on a container, which kept hovered features in the scene; a halo was a mesh
+   with a dash texture.
+   **Done (Nov 23):** glows and halos in batches, a clock in the shaders, and animation frames
+   (above).
 
 Steps 2 to 5 are section 7's step 6, in more detail and in a different order: strokes before
 bands, because the stroke mesh is the simpler product and the larger share of the garbage, and it
@@ -3367,9 +3520,9 @@ settles how typed arrays reach Pixi before the hard geometry starts.
 - **The frame of a zoom is still 125 ms in Užice,** half of it DRAW. Not looked at yet: every
   mesh's vertices are copied into Pixi's batch again (24 bytes a vertex), and the features move
   to other tiles when a whole zoom level is crossed.
-- **Dashes without textures everywhere.** The OSM layer's lines get their dashes from the
-  batch's shader (step 6). Outlines of areas, halos, the lasso and the other layers' lines are
-  `LineMesh`es with a texture per pattern, and Pixi's batch holds 16 textures.
+- **Dashes without textures everywhere.** The OSM layer's lines and outlines get their dashes
+  from the batch's shader (steps 6 and 8), and halos too (step 10). The lasso and the other
+  layers' lines are `LineMesh`es with a texture per pattern, and Pixi's batch holds 16 textures.
 - **A halo that doesn't cross itself.** It's the outline as built (step 4), loops and all: fine
   around most features, tangled around a tight curve or a staircase's arcs at z16, as it was
   before. Clipper would clean it (step 5 has it now): under 0.1 ms for a way of a few dozen

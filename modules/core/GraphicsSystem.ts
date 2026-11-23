@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { findChangedRenderGroups, GLCallCounter, GLTimer, readInstructionStats } from '../pixi/lib/RenderStats.ts';
+import { AnimationPacer } from '../pixi/lib/AnimationPacer.ts';
 import { FramePacer } from '../pixi/lib/FramePacer.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
@@ -180,6 +181,10 @@ export class GraphicsSystem extends AbstractSystem {
   protected _glTimer: GLTimer<RenderFrame> | null;
   /** When Pixi's system ticker last got a turn (`performance.now()`) */
   protected _pixiTickTime: number;
+  /** Decides when the scene is drawn again only because something in it moves by itself */
+  protected _animationPacer: AnimationPacer;
+  /** How many times the scene was drawn again only because something in it moves by itself (see `animationFrames`) */
+  protected _animationFrames: number;
 
 
   /**
@@ -244,6 +249,8 @@ export class GraphicsSystem extends AbstractSystem {
     this._glCounter = null;
     this._glTimer = null;
     this._pixiTickTime = 0;
+    this._animationPacer = new AnimationPacer();
+    this._animationFrames = 0;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -498,6 +505,9 @@ export class GraphicsSystem extends AbstractSystem {
       PIXI.Ticker.system.update(now);
     }
 
+    // The tick after an animation frame says how the machine keeps up with them.
+    this._animationPacer.tick(deltaMS);
+
     // Collect any GPU times that have arrived for earlier frames.
     if (this._glTimer) {
       for (const { tag: frame, ms } of this._glTimer.poll()) {
@@ -550,6 +560,32 @@ export class GraphicsSystem extends AbstractSystem {
     if (follow) {
       this._followTransform();
     }
+
+    // Nothing to prepare and nothing to draw, but something that's shown moves by itself: draw
+    // the scene again as it is, now and then, with the clock further on. (Not while the view
+    // has moved on from what's drawn: the next frame is for that.)
+    if (!this._appPending && !this._isTempTransformed && this._animationPacer.isDue(tickStart) && this.scene?.animated) {
+      this._drawAnimation(tickStart);
+    }
+  }
+
+
+  /**
+   * Draws the scene again as the last frame left it, at a later moment: what moves by itself
+   * has moved (see `PixiScene.animate`). There's no APP pass, no frame for the stats and no
+   * `draw` event: nothing changed that anyone has to hear about. `AnimationPacer` says when:
+   * no more often than the machine keeps up with, and not for long after the last change (the
+   * last one before a rest draws what moves where it stays).
+   * @param now - The moment (`performance.now()`)
+   */
+  protected _drawAnimation(now: number): void {
+    if (!this.textureManager?.loaded || !this.pixi || !this.scene) return;
+
+    const pacer = this._animationPacer;
+    this.scene.animate(now, pacer.isResting(now));
+    this.pixi.render();
+    pacer.animated(now);
+    this._animationFrames++;
   }
 
 
@@ -594,6 +630,16 @@ export class GraphicsSystem extends AbstractSystem {
    */
   public get renderFrames(): RenderFrame[] {
     return this._renderFrames.slice();
+  }
+
+
+  /**
+   * How many times the scene was drawn again only because something in it moves by itself
+   * (the glow of a hover, the dashes around a selection). Those aren't in `renderFrames`.
+   * @return The count since the system started
+   */
+  public get animationFrames(): number {
+    return this._animationFrames;
   }
 
 
@@ -1106,6 +1152,8 @@ export class GraphicsSystem extends AbstractSystem {
     if (frame) glTimer?.begin(frame);
     const t0 = performance.now();
 
+    this.scene?.animate(t0);    // what moves by itself is where it is at this moment
+    this._animationPacer.changed(t0);
     this.pixi!.render();
 
     const drawMs = performance.now() - t0;

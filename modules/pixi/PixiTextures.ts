@@ -37,6 +37,9 @@ const PATTERNS = [
 const PATTERN_TILE = 32;       // the size of a pattern's tile, in texels (and in pixels on screen)
 const PATTERN_COLUMNS = 8;     // how many patterns a row of the atlas has
 
+// The size of the `glow` texture, in texels (see `_cacheGlow`)
+const GLOW_SIZE = 64;
+
 
 /**
  * PixiTextures does the work of managing the textures.
@@ -155,6 +158,7 @@ export class PixiTextures {
     this._dashTextures.clear();
 
     this._cacheGraphics();
+    this._cacheGlow();
 
     // Point batches draw from the symbol atlas: its first texture, which has the markers now,
     // and gets the icons as they load. (What a second one would hold, points draw with sprites.)
@@ -227,6 +231,31 @@ export class PixiTextures {
     const source = new PIXI.CanvasSource({ resource: canvas, resolution: 1, addressMode: 'clamp-to-edge', scaleMode: 'linear' });
     this._patternAtlas = new PIXI.Texture({ source: source, label: 'pattern-atlas' });
     FillBatch.setPatterns({ texture: this._patternAtlas, columns: PATTERN_COLUMNS, cell: cell, tile: PATTERN_TILE });
+  }
+
+
+  /**
+   * Makes the `glow` texture of the symbol atlas: a white disc that's solid out to half its
+   * radius and fades to nothing at its edge. A hovered or highlighted point has it behind its
+   * marker, tinted (`PixiFeaturePoint`). It's drawn on a canvas: a gradient is no `Graphics`.
+   */
+  protected _cacheGlow(): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = GLOW_SIZE;
+    canvas.height = GLOW_SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const half = GLOW_SIZE / 2;
+    const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+    for (let i = 0; i <= 8; i++) {      // from half the radius out, the square of what's left
+      const left = 1 - i / 8;
+      gradient.addColorStop(0.5 + 0.5 * i / 8, `rgba(255, 255, 255, ${left * left})`);
+    }
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
+    this.allocate('symbol', 'glow', GLOW_SIZE, GLOW_SIZE, canvas);
   }
 
 

@@ -7,8 +7,9 @@ import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
 // A line always has a stroke. Its casing is drawn from zoom 16, if the style has one that can
 // be seen, and the mesh for it exists only then. A line that its layer gave a batch has no
 // meshes: its casing and stroke are drawn there, with the other lines.
+// The halo of a selected line is in a batch too, the map UI layer's, whatever draws the line.
 describe('PixiFeatureLine', () => {
-  let feature, effectiveZoom, context, haloParent;
+  let feature, effectiveZoom, context, scene, haloBatch;
   const dashTexture = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 16, height: 1 }) });
   const viewportAt = zoom => ({ transform: { zoom: zoom, rotation: 0 } });
 
@@ -27,15 +28,28 @@ describe('PixiFeatureLine', () => {
     effectiveZoom = 17;
     context.systems.map = { effectiveZoom: () => effectiveZoom, wireframeMode: false };
     const gfx = { textureManager: { getTexture: () => null, getDashTexture: () => dashTexture } };
-    const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
-    haloParent = new PIXI.Container();
-    scene.layers.set('map-ui', { halo: haloParent });
+    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+
+    // The map UI layer makes its batch of halos where the first halo is, as the real one does.
+    haloBatch = null;
+    scene.layers.set('map-ui', {
+      haloBatchAt: (x, y) => {
+        if (!haloBatch) {
+          haloBatch = new LineBatch();
+          haloBatch.position.set(x, y);
+        }
+        return haloBatch;
+      }
+    });
     const layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);
     part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.001]] });
     feature = new PixiFeatureLine(layer, 'w1');
     feature.geometry = part;
+  });
+  afterEach(() => {
+    if (haloBatch && !haloBatch.destroyed) haloBatch.destroy();
   });
 
   it('makes no meshes until it is drawn', () => {
@@ -206,7 +220,7 @@ describe('PixiFeatureLine', () => {
 
     // Counts what the feature asks of a batch
     function watch(target, name) {
-      ['add', 'remove', 'setStroke', 'setStyle', 'addMarkers', 'setMarkers', 'setMarkerStyle'].forEach(method => {
+      ['add', 'remove', 'setStroke', 'setStyle', 'addMarkers', 'setMarkers', 'setMarkerStyle', 'addGlow', 'setGlow', 'setGlowStyle'].forEach(method => {
         const original = target[method].bind(target);
         target[method] = (...args) => {
           calls.push(`${name}.${method}`);
@@ -414,61 +428,308 @@ describe('PixiFeatureLine', () => {
       assert.strictEqual(batch.size, 0);
     });
 
-    // The glow of a hovered or highlighted line is a filter on its container, so the line has to
-    // be drawn there while it glows. It keeps its place in the batches, hidden.
+    // The glow of a hovered or highlighted line is in the strokes' batch too: a strip around the
+    // line, over everything of its level, in which the batch's shader draws the glow. The line
+    // stays in its batches and out of the scene, and has no filter.
     describe('a line that glows', () => {
-      ['hover', 'highlight'].forEach(classID => {
-        it(`draws itself while it has the ${classID} class, and goes back to its batches after`, () => {
+      const bytesOf = item => Array.from(batch._bytes.subarray(item.first * 8, item.first * 8 + 8));
+      const widthOf = item => Array.from(batch._floats.subarray(item.first * 12 + 10, item.first * 12 + 12));
+      const roundMesh = () => Rapid.geomStrokeMesh(feature.geometry.local.flat[0], { cap: 'round', join: 'round', closed: false });
+
+      function glow(classID = 'hover') {
+        feature.setClass(classID);
+        feature.update(viewportAt(effectiveZoom));
+      }
+
+      // A layer with many lines gives the strokes' batch a small batch for the glows: one that
+      // comes or goes doesn't have the strokes' index buffer built again.
+      it('has its glow in the batch that the strokes\' batch has for glows, and leaves the strokes\' batch as it is', () => {
+        const glows = new LineBatch();
+        batch.glows = glows;
+        feature.container.zIndex = 4.25;
+        drawAt(17, style);
+        calls = [];
+
+        glow();
+        assert.deepEqual(calls, ['casings.setStyle', 'strokes.setStyle']);
+        const item = feature.glowItem;
+        assert.strictEqual(item.batch, glows);
+        assert.isTrue(item.visible);
+        assert.strictEqual(glows.size, 1);
+        assert.strictEqual(batch.size, 1, 'the stroke alone');
+        assert.deepEqual(Array.from(glows._bytes.subarray(item.first * 8, item.first * 8 + 6)), [255, 255, 0, 255, 5, 48]);
+
+        // A zoom leaves it alone there
+        calls = [];
+        feature.dirtyTransform();
+        feature.update(viewportAt(effectiveZoom));
+        assert.deepEqual(calls, [], 'nothing is written again');
+        assert.strictEqual(feature.glowItem, item);
+        assert.strictEqual(glows.size, 1);
+
+        // Hidden and shown with the line, and gone with the class
+        feature.visible = false;
+        assert.isFalse(item.visible);
+        feature.visible = true;
+        assert.isTrue(item.visible);
+        feature.unsetClass('hover');
+        feature.update(viewportAt(effectiveZoom));
+        assert.isNull(feature.glowItem);
+        assert.strictEqual(glows.size, 0);
+        assert.strictEqual(batch.size, 1);
+
+        batch.glows = null;
+        glows.destroy();
+      });
+
+      [['hover', [0xff, 0xff, 0x00]], ['highlight', [0x70, 0x92, 0xff]]].forEach(([classID, rgb]) => {
+        it(`gets a glow in the strokes' batch while it has the ${classID} class, and draws nothing itself`, () => {
+          feature.container.zIndex = 4.25;
           drawAt(17, style);
           const { casingItem, strokeItem } = feature;
+          assert.isNull(feature.glowItem);
           calls = [];
 
-          feature.setClass(classID);
-          feature.update(viewportAt(17));
-          assert.isOk(feature.casing);
-          assert.isOk(feature.stroke);
-          assert.isAbove(feature.stroke.strokeMesh.vertexCount, 0);
-          assert.lengthOf(feature.container.filters, 1);
-          assert.strictEqual(feature.strokeItem, strokeItem, 'still in its batch');
-          assert.isFalse(strokeItem.visible, '..hidden');
-          assert.isFalse(casingItem.visible);
-          assert.deepEqual(calls, []);
-
-          feature.unsetClass(classID);
-          feature.update(viewportAt(17));
-          assert.isNull(feature.stroke);
+          glow(classID);
+          assert.deepEqual(calls, ['casings.setStyle', 'strokes.setStyle', 'strokes.addGlow']);
           assert.isNull(feature.casing);
+          assert.isNull(feature.stroke);
+          assert.lengthOf(feature.container.children, 0);
           assert.isNotOk(feature.container.filters?.length);
+          assert.isFalse(feature.drawsInContainer());
           assert.strictEqual(feature.strokeItem, strokeItem);
           assert.isTrue(strokeItem.visible);
           assert.isTrue(casingItem.visible);
-          assert.deepEqual(calls, ['casings.setStyle', 'strokes.setStyle']);
+
+          // In the glow's color, around the casing (5 pixels wide, and never under 3): the
+          // number 5 says it's a glow, and the least width is in sixteenths of a pixel.
+          const item = feature.glowItem;
+          assert.strictEqual(item.batch, batch);
+          assert.isTrue(item.visible);
+          assert.deepEqual(bytesOf(item), [...rgb, 255, 5, 48, 0, 0]);
+          assert.deepEqual(widthOf(item), [5, 0]);
+          assert.strictEqual(batch.size, 2);
+          assert.strictEqual(casingBatch.size, 1, 'nothing of it in the casings\' batch');
+
+          // ..over every stroke and every marker of the level
+          assert.strictEqual(item.order, 2e6 + 4.25);
+          assert.isAbove(item.order, 1e6 + 1000);
+
+          // When the class goes, so does the glow.
+          calls = [];
+          feature.unsetClass(classID);
+          feature.update(viewportAt(17));
+          assert.isNull(feature.glowItem);
+          assert.isNull(item.batch);
+          assert.strictEqual(batch.size, 1);
+          assert.deepEqual(calls, ['casings.setStyle', 'strokes.setStyle', 'strokes.remove']);
+          assert.strictEqual(feature.strokeItem, strokeItem);
+          assert.isTrue(strokeItem.visible);
         });
       });
 
-      it('isn\'t shown in its batches when the feature is hidden and shown while it glows', () => {
-        drawAt(17, style);
-        feature.setClass('hover');
-        feature.update(viewportAt(17));
-        feature.visible = false;
-        feature.visible = true;
-        assert.isFalse(feature.strokeItem.visible);
+      it('goes around the line\'s ends and corners, whatever the line\'s own caps and joins are', () => {
+        drawAt(17, { casing: { width: 5, cap: 'butt', join: 'miter' }, stroke: { width: 3, cap: 'butt', join: 'miter' } });
+        glow();
+        const item = feature.glowItem;
+        const mesh = roundMesh();
+        assert.strictEqual(item.count, mesh.vertexCount);
+        assert.deepEqual(Array.from(item.indices), Array.from(mesh.indices));
+        assert.isAbove(item.count, feature.strokeItem.count);
+
+        // ..at the line's place in the batch
+        const [x, y] = feature.geometry.world.origin;
+        const local = feature.geometry.local.flat[0];
+        assert.closeTo(batch._floats[item.first * 12], local[0] + x - 8388608, 1e-3);
+        assert.closeTo(batch._floats[item.first * 12 + 1], local[1] + y - 8388608, 1e-3);
       });
 
-      it('gets its new shape in the batches when it changed while it glowed', () => {
-        drawAt(17, style);
+      it('is made from the stroke\'s mesh when that was just built with round ends and corners', () => {
         feature.setClass('hover');
+        drawAt(17, { casing: { width: 5, cap: 'round', join: 'round' }, stroke: { width: 3, cap: 'round', join: 'round' } });
+        assert.strictEqual(feature.glowItem.indices, feature.strokeItem.indices);
+        assert.strictEqual(feature.glowItem.count, feature.strokeItem.count);
+
+        // ..and from one of its own when the line was in the batches already
+        feature.unsetClass('hover');
         feature.update(viewportAt(17));
+        glow();
+        assert.notStrictEqual(feature.glowItem.indices, feature.strokeItem.indices);
+        assert.deepEqual(Array.from(feature.glowItem.indices), Array.from(feature.strokeItem.indices));
+      });
+
+      it('is around the stroke, and never under 2 pixels, for a line without a casing', () => {
+        feature.setClass('hover');
+        drawAt(17, { casing: { opacity: 0 }, stroke: { width: 4, color: 0xffffff } });
+        assert.deepEqual(widthOf(feature.glowItem), [4, 0]);
+        assert.strictEqual(bytesOf(feature.glowItem)[5], 32);
+      });
+
+      it('changes color and width where it is, for another class or another style', () => {
+        drawAt(17, style);
+        glow();
+        const item = feature.glowItem;
+        const first = item.first;
+        calls = [];
+
+        feature.unsetClass('hover');
+        glow('highlight');
+        assert.strictEqual(feature.glowItem, item);
+        assert.strictEqual(item.first, first);
+        assert.deepEqual(calls, ['casings.setStyle', 'strokes.setStyle', 'strokes.setGlowStyle']);
+        assert.deepEqual(bytesOf(item).slice(0, 5), [0x70, 0x92, 0xff, 255, 5]);
+
+        drawAt(17, { casing: { width: 9, color: 0x444444 }, stroke: { width: 3, color: 0xffffff } });
+        assert.strictEqual(feature.glowItem, item);
+        assert.deepEqual(widthOf(item), [9, 0]);
+      });
+
+      it('glows in the hover\'s color when it\'s highlighted too', () => {
+        drawAt(17, style);
+        feature.setClass('highlight');
+        glow('hover');
+        assert.deepEqual(bytesOf(feature.glowItem).slice(0, 3), [0xff, 0xff, 0x00]);
+      });
+
+      it('is hidden and shown in the batch with the feature, the line with it', () => {
+        drawAt(17, style);
+        glow();
+        feature.visible = false;
+        assert.isFalse(feature.glowItem.visible);
+        assert.isFalse(feature.strokeItem.visible);
+        feature.visible = true;
+        assert.isTrue(feature.glowItem.visible);
+        assert.isTrue(feature.strokeItem.visible);
+        assert.isTrue(feature.casingItem.visible);
+      });
+
+      it('follows a line that changed while it glowed', () => {
+        drawAt(17, style);
+        glow();
+        const item = feature.glowItem;
+        calls = [];
 
         const part = new Rapid.GeometryPart(context);
         part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.002]] });
         feature.geometry = part;
         drawAt(17);
+        assert.deepEqual(calls, ['casings.setStroke', 'casings.setStyle', 'strokes.setStroke', 'strokes.setStyle', 'strokes.setGlow']);
+        assert.strictEqual(feature.glowItem, item);
+        assert.strictEqual(item.count, roundMesh().vertexCount);
+
+        // Some of its vertices are at the line's new end
+        const [x, y] = feature.geometry.world.origin;
+        const local = feature.geometry.local.flat[0];
+        let reached = false;
+        for (let i = 0; i < item.count; i++) {
+          const o = (item.first + i) * 12;
+          if (Math.abs(batch._floats[o] - (local[4] + x - 8388608)) < 1e-2 && Math.abs(batch._floats[o + 1] - (local[5] + y - 8388608)) < 1e-2) reached = true;
+        }
+        assert.isTrue(reached);
+
+        // ..and the line itself is as it changed, with nothing more to do when the glow goes
         calls = [];
+        feature.unsetClass('hover');
+        feature.update(viewportAt(17));
+        assert.deepEqual(calls, ['casings.setStyle', 'strokes.setStyle', 'strokes.remove']);
+      });
+
+      it('is left alone by a zoom, like the line', () => {
+        drawAt(17, style);
+        glow();
+        const item = feature.glowItem;
+        calls = [];
+        for (const zoom of [18, 15, 16.5, 19]) {
+          feature.dirtyTransform();
+          effectiveZoom = zoom;
+          feature.update(viewportAt(zoom));
+        }
+        assert.deepEqual(calls, []);
+        assert.strictEqual(feature.glowItem, item);
+        assert.isTrue(item.visible);
+      });
+
+      it('is put back if the batch has lost it, though only the zoom changed', () => {
+        drawAt(17, style);
+        glow();
+        const item = feature.glowItem;
+        batch.remove(item);
+
+        feature.dirtyTransform();
+        feature.update(viewportAt(17.5));
+        assert.notStrictEqual(feature.glowItem, item);
+        assert.strictEqual(feature.glowItem.batch, batch);
+        assert.isTrue(feature.glowItem.visible);
+      });
+
+      it('goes with the line to other batches, and leaves the batch when the line is destroyed', () => {
+        drawAt(17, style);
+        glow();
+        const item = feature.glowItem;
+        const other = new LineBatch();
+        const otherCasings = new LineBatch();
+        feature.batch = other;
+        feature.casingBatch = otherCasings;
+        drawAt(17);
+        assert.isNull(item.batch);
+        assert.strictEqual(batch.size, 0);
+        assert.strictEqual(feature.glowItem.batch, other);
+        assert.strictEqual(other.size, 2);
+
+        feature.destroy();
+        assert.strictEqual(other.size, 0);
+        other.destroy();
+        otherCasings.destroy();
+      });
+
+      it('leaves the markers along the line in the batch, under it', () => {
+        drawAt(17, { ...style, lineMarker: { image: 'oneway' }, sidedMarker: { image: 'sided' } });
+        const { arrowItem, sidedItem } = feature;
+        glow();
+        assert.strictEqual(feature.arrowItem, arrowItem);
+        assert.strictEqual(feature.sidedItem, sidedItem);
+        assert.isTrue(arrowItem.visible);
+        assert.isTrue(sidedItem.visible);
+        assert.isAbove(feature.glowItem.order, arrowItem.order);
+        assert.lengthOf(feature.container.children, 0, 'no sprites');
+        assert.isFalse(feature.drawsInContainer());
+      });
+
+      it('is a filter on the container of a line that draws itself, and nothing in a batch', () => {
+        feature.batch = null;
+        feature.casingBatch = null;
+        drawAt(17, style);
+        assert.isNotOk(feature.container.filters?.length);
+
+        glow();
+        assert.isNull(feature.glowItem);
+        assert.strictEqual(batch.size, 0);
+        assert.lengthOf(feature.container.filters, 1);
+        assert.strictEqual(new PIXI.Color(feature.container.filters[0].color).toNumber(), 0xffff00);
+        assert.isOk(feature.stroke);
 
         feature.unsetClass('hover');
         feature.update(viewportAt(17));
-        assert.deepEqual(calls, ['casings.setStroke', 'casings.setStyle', 'strokes.setStroke', 'strokes.setStyle']);
+        assert.isNotOk(feature.container.filters?.length);
+      });
+
+      it('moves from the filter to the batch, and back, as the line does', () => {
+        feature.batch = null;
+        feature.casingBatch = null;
+        feature.setClass('hover');
+        drawAt(17, style);
+        assert.lengthOf(feature.container.filters, 1);
+
+        feature.batch = batch;
+        feature.casingBatch = casingBatch;
+        drawAt(17);
+        assert.isNotOk(feature.container.filters?.length);
+        assert.strictEqual(feature.glowItem.batch, batch);
+
+        drawAt(17, { stroke: { width: 3, dash: [1, 2, 3, 4, 5, 6] } });    // dashes that a batch can't draw
+        assert.isNull(feature.glowItem);
+        assert.strictEqual(batch.size, 0);
+        assert.lengthOf(feature.container.filters, 1);
       });
     });
 
@@ -527,8 +788,9 @@ describe('PixiFeatureLine', () => {
         drawAt(17, { ...style, lineMarker: { image: 'oneway' } });
         assert.strictEqual(markerBytes(feature.arrowItem)[4], 1);
 
-        // ..and as sprites, while the line draws itself
-        feature.setClass('hover');
+        // ..and as sprites, when the line draws itself
+        feature.batch = null;
+        feature.casingBatch = null;
         drawAt(17, { ...style, lineMarker: { image: 'oneway', scale: [-1, 1] } });
         const [first] = sprites();
         assert.isBelow(first.scale.x, 0);
@@ -608,25 +870,24 @@ describe('PixiFeatureLine', () => {
         assert.strictEqual(batch.size, 0);
       });
 
-      it('are sprites while the line glows, and the batch\'s again after', () => {
+      it('are sprites while the line draws itself, and the batch\'s again after', () => {
         drawAt(17, { ...oneway, sidedMarker: { image: 'sided' } });
         const item = feature.arrowItem;
-        const sided = feature.sidedItem;
 
-        feature.setClass('hover');
-        feature.update(viewportAt(17));
-        assert.isFalse(item.visible);
-        assert.isFalse(sided.visible);
+        feature.batch = null;
+        feature.casingBatch = null;
+        drawAt(17);
+        assert.isNull(feature.arrowItem);
+        assert.isNull(feature.sidedItem);
+        assert.isNull(item.batch);
         assert.isAbove(sprites().length, 0);
-        feature.visible = false;
-        feature.visible = true;
-        assert.isFalse(item.visible, 'not shown in the batch while the line draws them');
 
-        feature.unsetClass('hover');
-        feature.update(viewportAt(17));
-        assert.strictEqual(feature.arrowItem, item);
-        assert.isTrue(item.visible);
-        assert.isTrue(sided.visible);
+        feature.batch = batch;
+        feature.casingBatch = casingBatch;
+        drawAt(17);
+        assert.strictEqual(feature.arrowItem.batch, batch);
+        assert.strictEqual(feature.sidedItem.batch, batch);
+        assert.isTrue(feature.arrowItem.visible);
         assert.lengthOf(sprites(), 0);
         assert.lengthOf(feature.container.children, 0);
       });
@@ -705,16 +966,13 @@ describe('PixiFeatureLine', () => {
         assert.isTrue(feature.drawsInContainer());
       });
 
-      it('is true while the line glows', () => {
+      it('is false while the line glows or is selected: batches draw the glow and the halo too', () => {
         feature.style = style;
-        feature.setClass('hover');
-        assert.isTrue(feature.drawsInContainer());
-        feature.unsetClass('hover');
-        feature.setClass('highlight');
-        assert.isTrue(feature.drawsInContainer());
-        feature.unsetClass('highlight');
-        feature.setClass('select');    // a halo is drawn elsewhere
-        assert.isFalse(feature.drawsInContainer());
+        for (const classID of ['hover', 'highlight', 'select']) {
+          feature.setClass(classID);
+          assert.isFalse(feature.drawsInContainer(), classID);
+          feature.unsetClass(classID);
+        }
       });
 
       it('is false for a line with markers along it that the batch draws', () => {
@@ -744,8 +1002,17 @@ describe('PixiFeatureLine', () => {
       assert.strictEqual(feature.sceneContainer, batch);
       assert.strictEqual(feature.sceneOrder, -8.5);
 
-      feature.setClass('hover');
+      feature.setClass('hover');    // a glow changes nothing about it
       feature.update(viewportAt(17));
+      assert.strictEqual(feature.sceneContainer, batch);
+      assert.strictEqual(feature.sceneOrder, -8.5);
+
+      feature.visible = false;
+      assert.strictEqual(feature.sceneContainer, feature.container);
+      assert.strictEqual(feature.sceneOrder, 0);
+      feature.visible = true;
+
+      drawAt(17, { stroke: { width: 3, dash: [1, 2, 3, 4, 5, 6] } });    // dashes that a batch can't draw
       assert.strictEqual(feature.sceneContainer, feature.container);
       assert.strictEqual(feature.sceneOrder, 0);
     });
@@ -756,7 +1023,32 @@ describe('PixiFeatureLine', () => {
       const [x, y] = feature.geometry.local.flat[0];
       assert.isTrue(feature.container.hitArea.contains(x + 1, y + 3.5));
       assert.strictEqual(feature.hitReach, 7.5);
-      assert.isOk(feature.halo);
+
+      // The halo is in the map UI's batch, not in the line's.
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(feature.haloItems[0].batch, haloBatch);
+      assert.strictEqual(haloBatch.size, 2);
+      assert.strictEqual(batch.size, 1);
+      assert.strictEqual(casingBatch.size, 1);
+      assert.isFalse(feature.drawsInContainer());
+    });
+
+    it('moves its halo with the zoom, though the batches have nothing to do', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const items = [...feature.haloItems];
+      const coords = feature.geometry.local.flat[0];
+      const at = item => [haloBatch._floats[item.first * 12], haloBatch._floats[item.first * 12 + 1]];
+      assert.isFalse(Rapid.geomStrokeContains(coords, 3.7, ...at(items[1])));    // 7.5 pixels from the line: 3.75 units
+      calls = [];
+
+      feature.dirtyTransform();
+      effectiveZoom = 18;
+      feature.update(viewportAt(18));
+      assert.deepEqual(calls, []);
+      assert.deepEqual(feature.haloItems, items);
+      assert.isTrue(Rapid.geomStrokeContains(coords, 1.9, ...at(items[1])));     // ..and now 1.875
+      assert.isFalse(Rapid.geomStrokeContains(coords, 1.85, ...at(items[1])));
     });
   });
 
@@ -858,60 +1150,184 @@ describe('PixiFeatureLine', () => {
     });
   });
 
+  // The halo of a selected line is two lines for each ring around it, in the map UI layer's
+  // batch: a dark one, and yellow dashes over it. Both march (the batch's shader moves their
+  // dashes, and keeps them their width in pixels), so a halo is written only when its rings change.
   describe('the select halo', () => {
     const style = { casing: { width: 5 }, stroke: { width: 3 } };
+    const bytesOf = item => Array.from(haloBatch._bytes.subarray(item.first * 8, item.first * 8 + 8));
+    const widthOf = item => Array.from(haloBatch._floats.subarray(item.first * 12 + 10, item.first * 12 + 12));
 
-    it('is a dashed ring around the line, at the edge of its hit area', () => {
+    // Where an item's vertices are on their line, in the feature's own coordinates
+    function pointsOf(item) {
+      const dx = haloBatch.position.x - feature.container.position.x;
+      const dy = haloBatch.position.y - feature.container.position.y;
+      const points = [];
+      for (let i = 0; i < item.count; i++) {
+        const o = (item.first + i) * 12;
+        points.push([haloBatch._floats[o] + dx, haloBatch._floats[o + 1] + dy]);
+      }
+      return points;
+    }
+
+    // Whether every vertex of an item is a distance from the feature's line, in its coordinates
+    function assertAround(item, distance, message = '') {
+      const coords = feature.geometry.local.flat[0];
+      const points = pointsOf(item);
+      assert.isAbove(points.length, 8);
+      points.forEach(([x, y], i) => {
+        assert.isTrue(Rapid.geomStrokeContains(coords, distance + 0.01, x, y), `vertex ${i} is too far from the line ${message}`);
+        assert.isFalse(Rapid.geomStrokeContains(coords, distance - 0.01, x, y), `vertex ${i} is too near the line ${message}`);
+      });
+    }
+
+    it('is a dark line and yellow dashes over it around the line, at the edge of its hit area', () => {
+      assert.lengthOf(feature.haloItems, 0);
       feature.setClass('select');
       drawAt(17, style);
-      const halo = feature.halo;
-      assert.strictEqual(halo.parent, haloParent);
-      assert.strictEqual(halo.children.length, 1);
-      assert.strictEqual(halo.children[0].texture, dashTexture);
-      assert.strictEqual(halo.tint, 0xffff00);
-      assert.deepEqual([halo.position.x, halo.position.y], [feature.container.position.x, feature.container.position.y]);
+      const [under, dashes] = feature.haloItems;
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(under.batch, haloBatch);
+      assert.strictEqual(dashes.batch, haloBatch);
+      assert.strictEqual(haloBatch.size, 2);
+      assert.isAbove(dashes.order, under.order);
+      assert.deepEqual([haloBatch.position.x, haloBatch.position.y], [feature.container.position.x, feature.container.position.y]);
 
-      // The ring is 3.75 units from the line, and its own line is 1 unit wide (2 pixels).
-      const coords = feature.geometry.local.flat[0];
-      const positions = halo.children[0].geometry.positions;
-      assert.isAbove(positions.length, 16);
-      for (let i = 0; i < positions.length; i += 2) {
-        assert.isTrue(Rapid.geomStrokeContains(coords, 3.75 + 1.1, positions[i], positions[i + 1]), `vertex ${i / 2} is too far from the line`);
-        assert.isFalse(Rapid.geomStrokeContains(coords, 3.75 - 1.1, positions[i], positions[i + 1]), `vertex ${i / 2} is too near the line`);
-      }
+      // Dashes of 6 pixels, 3 apart, 2 wide, over a line 4 wide. (A negative width: they march.)
+      assert.deepEqual(bytesOf(dashes), [0xff, 0xff, 0x00, 255, 6, 3, 0, 0]);
+      assert.deepEqual(widthOf(dashes), [-2, 2]);
+      assert.deepEqual(bytesOf(under).slice(0, 3), [0, 0, 0]);
+      assert.isAbove(bytesOf(under)[3], 0);
+      assert.isBelow(bytesOf(under)[3], 255);
+      assert.deepEqual(bytesOf(under).slice(4), [0, 0, 0, 0], 'no dashes');
+      assert.deepEqual(widthOf(under), [-4, 4]);
+
+      // The ring is 7.5 pixels from the line: 3.75 units. It ends where it starts.
+      assertAround(dashes, 3.75);
+      assertAround(under, 3.75);
+      assert.strictEqual(dashes.indices, under.indices, 'one stroke mesh for both');
+      assert.lengthOf(feature.container.children.filter(child => child.label !== 'casing' && child.label !== 'stroke'), 0, 'nothing of it in the line\'s container');
     });
 
-    it('is two rings for a line that ends where it starts', () => {
+    it('is written relative to the batch\'s place in the world, wherever that is', () => {
+      const [x, y] = feature.geometry.world.origin;
+      scene.layers.get('map-ui').haloBatchAt(x - 50, y + 20);    // another feature's halo was first
+      feature.setClass('select');
+      drawAt(17, style);
+      assert.deepEqual([haloBatch.position.x, haloBatch.position.y], [x - 50, y + 20]);
+      assertAround(feature.haloItems[1], 3.75);
+
+      const item = feature.haloItems[1];
+      const local = feature.geometry.local.flat[0];
+      let minX = Infinity;
+      for (let i = 0; i < item.count; i++) {
+        minX = Math.min(minX, haloBatch._floats[(item.first + i) * 12]);
+      }
+      assert.closeTo(minX, local[0] - 3.75 + 50, 1e-3);    // the line starts at its left end
+    });
+
+    it('is two rings for a line that ends where it starts, one on each side', () => {
       const part = new Rapid.GeometryPart(context);
       part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.001], [0, 0.001], [0, 0]] });
       feature.geometry = part;
       feature.setClass('select');
       drawAt(17, style);
-      assert.strictEqual(feature.halo.children.length, 2);
+      assert.lengthOf(feature.haloItems, 4);
+      assert.strictEqual(haloBatch.size, 4);
+      assert.deepEqual(feature.haloItems.map(item => bytesOf(item)[4]), [0, 6, 0, 6]);
+      assertAround(feature.haloItems[1], 3.75, '(outer)');
+      assertAround(feature.haloItems[3], 3.75, '(inner)');
+
+      // The second ring is inside the first
+      const xs = item => pointsOf(item).map(point => point[0]);
+      assert.isAbove(Math.min(...xs(feature.haloItems[3])), Math.min(...xs(feature.haloItems[1])));
+      assert.isBelow(Math.max(...xs(feature.haloItems[3])), Math.max(...xs(feature.haloItems[1])));
     });
 
-    it('keeps its meshes through a zoom, and is destroyed with them when the line isn\'t selected', () => {
+    it('keeps its lines through a zoom, at the new zoom\'s distance, and takes them out when the line isn\'t selected', () => {
       feature.setClass('select');
       drawAt(17, style);
-      const halo = feature.halo;
-      const ring = halo.children[0];
+      const [under, dashes] = feature.haloItems;
+      const first = dashes.first;
 
       drawAt(18);
-      assert.strictEqual(feature.halo, halo);
-      assert.strictEqual(halo.children[0], ring);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(feature.haloItems[0], under);
+      assert.strictEqual(feature.haloItems[1], dashes);
+      assert.strictEqual(dashes.first, first);
+      assert.strictEqual(haloBatch.size, 2);
+      assertAround(dashes, 1.875);    // a pixel is a quarter of a unit now
+      assert.deepEqual(widthOf(dashes), [-2, 2], 'the same width in pixels: the shader keeps it');
 
       feature.unsetClass('select');
       drawAt(18);
-      assert.isNull(feature.halo);
-      assert.isTrue(halo.destroyed);
-      assert.isTrue(ring.destroyed);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.isNull(under.batch);
+      assert.isNull(dashes.batch);
+      assert.strictEqual(haloBatch.size, 0);
+    });
+
+    it('follows a line that changed', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.002, 0]] });
+      feature.geometry = part;
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 2);
+      assert.strictEqual(haloBatch.size, 2);
+      assertAround(feature.haloItems[0], 3.75);
+      assertAround(feature.haloItems[1], 3.75);
+    });
+
+    it('is hidden and shown with the line', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const items = [...feature.haloItems];
+      feature.visible = false;
+      assert.deepEqual(items.map(item => item.visible), [false, false]);
+      feature.visible = true;
+      assert.deepEqual(items.map(item => item.visible), [true, true]);
+    });
+
+    it('leaves the batch when the line is destroyed', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const items = [...feature.haloItems];
+      feature.destroy();
+      assert.strictEqual(haloBatch.size, 0);
+      assert.deepEqual(items.map(item => item.batch), [null, null]);
     });
 
     it('is not drawn while the line is being drawn', () => {
       feature.setClass('select');
       feature.setClass('drawing');
       drawAt(17, style);
-      assert.isNull(feature.halo);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.isNull(haloBatch);
+    });
+
+    it('is not drawn for a line that\'s only hovered or highlighted', () => {
+      feature.setClass('hover');
+      feature.setClass('highlight');
+      drawAt(17, style);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.isNull(haloBatch);
+    });
+
+    it('is left out, and nothing breaks, where there\'s no map UI layer or it has no batch to give', () => {
+      scene.layers.delete('map-ui');
+      feature.setClass('select');
+      drawAt(17, style);
+      assert.lengthOf(feature.haloItems, 0);
+      assert.isFalse(feature.dirty);
+
+      scene.layers.set('map-ui', { haloBatchAt: () => null });    // before the layer has its containers
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 0);
+      feature.unsetClass('select');
+      drawAt(17);
+      assert.lengthOf(feature.haloItems, 0);
     });
   });
 });

@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
 import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
@@ -141,6 +142,56 @@ describe('PixiLayerOsm', () => {
     });
   });
 
+
+  // A midpoint is an arrowhead that shows which way its line is drawn. The oneway arrows show
+  // the way of travel, which a tag can turn around; the midpoints don't follow that.
+  describe('_gatherMidpoints', () => {
+    function gather(tags) {
+      const context = new Rapid.MockContext();
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0.001, 0] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [0.001, -0.001] });
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: tags });
+      const graph = new Rapid.Graph(context, [n1, n2, n3, way]);
+      context.systems.editor = { staging: { graph: graph } };
+
+      const layer = new PixiLayerOsm({ context: context, gfx: {}, layers: new Map() });
+      const data = { lines: new Map([['w1', way]]), polygons: new Map() };
+      const related = { descendantIDs: new Set(['w1']), siblingIDs: new Set(), handleIDs: new Set() };
+      return layer._gatherMidpoints({}, data, related);
+    }
+
+    it('makes one for each segment of a selected way, pointing from each node to the next', () => {
+      const midpoints = gather({ highway: 'residential' });
+      assert.lengthOf(midpoints, 2);
+      assert.deepEqual(midpoints.map(midpoint => midpoint.edge), [['n1', 'n2'], ['n2', 'n3']]);
+      assert.closeTo(midpoints[0].rotation, 0, 1e-6);              // east
+      assert.closeTo(midpoints[1].rotation, Math.PI / 2, 1e-3);    // south (y is down)
+      assert.closeTo(midpoints[0].loc[0], 0.0005, 1e-9);
+      assert.strictEqual(midpoints[0].wayID, 'w1');
+    });
+
+    it('points the same way along a oneway, whichever way its tags say that travel goes', () => {
+      const plain = gather({ highway: 'residential' });
+      for (const oneway of ['yes', '-1', 'reversible']) {
+        const midpoints = gather({ highway: 'residential', oneway: oneway });
+        assert.deepEqual(midpoints.map(midpoint => midpoint.edge), [['n1', 'n2'], ['n2', 'n3']], `oneway=${oneway}`);
+        assert.deepEqual(midpoints.map(midpoint => midpoint.rotation), plain.map(midpoint => midpoint.rotation), `oneway=${oneway}`);
+        assert.deepEqual(midpoints.map(midpoint => midpoint.id), plain.map(midpoint => midpoint.id), `oneway=${oneway}`);
+      }
+    });
+
+    it('makes none for a way that is not selected', () => {
+      const context = new Rapid.MockContext();
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0.001, 0] });
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      context.systems.editor = { staging: { graph: new Rapid.Graph(context, [n1, n2, way]) } };
+      const layer = new PixiLayerOsm({ context: context, gfx: {}, layers: new Map() });
+      const none = { descendantIDs: new Set(), siblingIDs: new Set(), handleIDs: new Set() };
+      assert.lengthOf(layer._gatherMidpoints({}, { lines: new Map([['w1', way]]), polygons: new Map() }, none), 0);
+    });
+  });
 
   it('reuses the midpoints it drew last frame and forgets the ones it no longer draws', () => {
     const context = new Rapid.MockContext();
@@ -295,6 +346,29 @@ describe('PixiLayerOsm', () => {
         layer._moveBatchOrigins(viewport);
         assert.deepEqual([fills.position.x, fills.position.y], [41000, 1000]);
         assert.deepEqual([outlines.position.x, outlines.position.y], [41000, 1000]);
+        assert.deepEqual([outlines.glows.position.x, outlines.glows.position.y], [41000, 1000]);
+      });
+
+      // A glow comes and goes with every move of the pointer. In the outlines' batch each one
+      // would have the whole batch's index buffer built again.
+      it('gives the outlines\' batch a small batch for their glows, drawn after it and destroyed with it', () => {
+        const fills = layer._polygonBatch(true, polygonAt([10, 10], [20, 20]));
+        const outlines = layer._polygonBatch(false, polygonAt([10, 10], [20, 20]));
+        const glows = outlines.glows;
+        assert.instanceOf(glows, LineBatch);
+        assert.strictEqual(glows.label, 'glows');
+        assert.strictEqual(glows.parent, layer.polygonContainer);
+        assert.isAbove(glows.zIndex, outlines.zIndex);
+        assert.isBelow(glows.zIndex, layer._polygonTileContainer(part([10, 10], [20, 20]), 16).parent.zIndex, 'under what a polygon draws itself');
+        assert.deepEqual([glows.position.x, glows.position.y], [15, 15]);
+        assert.isNull(glows.glows);
+        assert.strictEqual(layer._polygonBatch(false, polygonAt([50, 50], [60, 60])).glows, glows);
+        assert.notInclude(layer.polygonBatches, glows);
+        assert.isNotOk(fills.glows);
+
+        layer._removeEmptyContainers();
+        assert.isTrue(outlines.destroyed);
+        assert.isTrue(glows.destroyed);
       });
     });
 
@@ -450,10 +524,39 @@ describe('PixiLayerOsm', () => {
 
       it('makes another batch in place of one that was destroyed with its container', () => {
         const batch = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
+        const glows = batch.glows;
         batch.destroy();
+        assert.isTrue(glows.destroyed);
         const next = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
         assert.notStrictEqual(next, batch);
         assert.isFalse(next.destroyed);
+        assert.notStrictEqual(next.glows, glows);
+        assert.isFalse(next.glows.destroyed);
+      });
+
+      it('gives a level\'s strokes a small batch for their glows, drawn after them and destroyed with them', () => {
+        const strokes = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
+        const casings = layer._lineBatch(level, true, lineAt([10, 10], [20, 20]));
+        const glows = strokes.glows;
+        assert.instanceOf(glows, LineBatch);
+        assert.strictEqual(glows.label, 'glows');
+        assert.strictEqual(glows.parent, level);
+        assert.isAbove(glows.zIndex, strokes.zIndex);
+        assert.isBelow(glows.zIndex, layer._lineTileContainer(level, -20, part([10, 10], [20, 20]), 16).parent.zIndex, 'under what a line draws itself');
+        assert.deepEqual([glows.position.x, glows.position.y], [15, 15]);
+        assert.isNull(casings.glows, 'the casings have none');
+        assert.strictEqual(layer._lineBatch(level, false, lineAt([50, 50], [60, 60])).glows, glows);
+        assert.notInclude(layer.lineBatches, glows);
+        assert.notStrictEqual(layer._lineBatch(new PIXI.Container(), false, lineAt([10, 10], [20, 20])).glows, glows, 'each level has its own');
+
+        // It holds nothing, and its lines' batch is what says whether the two are still wanted
+        strokes.add(stroke, 0, 0, style);
+        layer._removeEmptyContainers();
+        assert.isFalse(glows.destroyed);
+        strokes.remove(strokes._items[0]);
+        layer._removeEmptyContainers();
+        assert.isTrue(strokes.destroyed);
+        assert.isTrue(glows.destroyed);
       });
 
       // A batch's vertices are 32-bit floats, relative to its place in the world.
@@ -466,6 +569,7 @@ describe('PixiLayerOsm', () => {
           batch.add(stroke, 5, 5, style);
           layer._moveBatchOrigins(viewportAt(1000 + 200000, 1000, 16));    // 200,000 pixels away at zoom 16
           assert.deepEqual([batch.position.x, batch.position.y], [1000, 1000]);
+          assert.deepEqual([batch.glows.position.x, batch.glows.position.y], [1000, 1000]);
           layer._moveBatchOrigins(viewportAt(1000 + 30000, 1000, 19));     // 240,000 pixels away at zoom 19
           assert.deepEqual([batch.position.x, batch.position.y], [1000, 1000]);
         });
@@ -479,6 +583,7 @@ describe('PixiLayerOsm', () => {
           layer._moveBatchOrigins(viewportAt(1000 + 40000.4, 1000, 19));    // 320,000 pixels away
           assert.deepEqual([strokes.position.x, strokes.position.y], [41000, 1000]);
           assert.deepEqual([casings.position.x, casings.position.y], [41000, 1000]);
+          assert.deepEqual([strokes.glows.position.x, strokes.glows.position.y], [41000, 1000], 'and the batch of its lines\' glows');
           assert.strictEqual(strokes._floats[item.first * 12] + strokes.position.x, xBefore + 1000);
         });
 
@@ -493,7 +598,8 @@ describe('PixiLayerOsm', () => {
     });
 
     // Points, vertices and virtual pins are drawn in one batch (`PointBatch`). The few that draw
-    // themselves (a hovered one) are in the containers of their tiles, over the batch.
+    // themselves (one with a picture from another texture) are in the containers of their tiles,
+    // over the batch.
     describe('point batch', () => {
       const placed = (x, y) => ({ world: { extent: new Rapid.sdk.Extent([x, y], [x, y]), origin: [x, y] } });
 
@@ -527,6 +633,29 @@ describe('PixiLayerOsm', () => {
         const viewfields = layer._pointTileContainer(pointAt(10, 10), true, 16);
         assert.isBelow(batch.zIndex, tile.parent.zIndex);
         assert.isBelow(batch.zIndex, viewfields.parent.zIndex);
+      });
+
+      // A hover then leaves the points' batch as it is (see `PointBatch.glows`).
+      it('gives the batch a small batch for its points\' glows, drawn under every point, that follows the view and goes with it', () => {
+        const batch = layer._pointBatch(placed(300, 10));
+        const glows = batch.glows;
+        assert.instanceOf(glows, batch.constructor);
+        assert.strictEqual(glows.label, 'glows');
+        assert.strictEqual(glows.parent, layer.pointContainer);
+        assert.isBelow(glows.zIndex, batch.zIndex);
+        assert.deepEqual([glows.position.x, glows.position.y], [300, 10]);
+        assert.isNull(glows.glows);
+        assert.strictEqual(layer._pointBatch(placed(500, 500)).glows, glows);
+
+        const viewport = { transform: { zoom: 19 }, center: () => [0, 0], screenToWorld: () => [40300, 10] };    // 320,000 pixels away
+        layer._moveBatchOrigins(viewport);
+        assert.deepEqual([batch.position.x, batch.position.y], [40300, 10]);
+        assert.deepEqual([glows.position.x, glows.position.y], [40300, 10]);
+
+        layer._removeEmptyContainers();
+        assert.isTrue(batch.destroyed);
+        assert.isTrue(glows.destroyed);
+        assert.isNull(layer.pointBatch);
       });
 
       it('gives a point the batch, and no place in the scene', () => {

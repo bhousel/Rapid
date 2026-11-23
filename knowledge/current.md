@@ -41,43 +41,32 @@ are in [`design/graphics-system.md`](../design/graphics-system.md). What's left 
 follow-ups" in `backlog.md`.
 
 **Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
-order of work, Bryan's decisions and the measurements). Done: steps 1 to 6, 8 and 9.
-- The stroke mesh (`modules/geo/stroke.ts`); lines' casings and strokes, areas' outlines, halos and
-  the lasso drawn from it (`modules/pixi/lib/LineMesh.ts`). A zoom in Užice allocates half of what
-  it did.
-- A line hit by its distance from the pointer (`LineHitArea`); `lineToPoly()` and `DashLine` gone.
-- Partial fills as bands of real geometry (`modules/geo/band.ts`, with `clipper2-ts`): no stencil
-  masks, 44 to 76% fewer draw calls in the three places, no more time on a zoom.
-- Step 6 (committed, `6860f8d1d` and `9edfa2381`):
-  - The OSM layer finds its features under the pointer through the spatial index
-    (`PixiLayerOsm.hitTest()`, `PixiScene.hitTest()`): a pointer event in Užice is 0.07 ms of
-    hit test where Pixi's walk took 8.
-  - Its lines are drawn in two batches a level (`modules/pixi/lib/LineBatch.ts`, a `Mesh` with
-    our own shader): every casing, then every stroke (Bryan's decision; he likes the look).
-  - A line that its batches draw isn't in Pixi's scene. A hovered line draws itself meanwhile
-    (its glow is a filter on its container), and a line with oneway arrows stays in the scene.
-- Step 8 (committed, `4f906a9af` and `26cf4e07f`): areas in two batches, every fill
-  (`lib/FillBatch.ts`) and then every outline; points, vertices and the pins of areas in one
-  (`lib/PointBatch.ts`), sized in pixels and kept upright by the shader. Pixi's tickers are
-  off. Labels and the avoid grid ask a point where it's drawn.
-- Step 9 (not committed yet, Nov 23): the markers along lines (oneway arrows, the triangles of
-  a line with sides) are a strip in the strokes' batch, drawn by the lines' fragment shader.
-  With it:
-  - An area under 20 pixels is its fill alone, with no outline (Bryan: fine, something is
-    drawn, and a hover shows the outline).
-  - A hovered area's fill is tinted halfway to the hover's yellow, and twice as opaque (Bryan
-    asked for a tint "for now"). **He hasn't seen how it looks.**
-  - Arrows point back along a way tagged `oneway=-1`. They didn't before: **Bryan hasn't been
-    asked**, it was wrong and a few lines to fix.
-  - Every OSM feature is out of Pixi's scene, except what's hovered, highlighted, or a vertex
-    of the selection.
+order of work, Bryan's decisions and the measurements). Done and committed: steps 1 to 6 and 8
+to 10; step 7 (a worker) was skipped as probably unnecessary (Bryan). **Bryan (Nov 23): this is
+where the branch stops; a PR is next.**
+- The OSM layer's lines, areas and points are drawn in batches with shaders of our own
+  (`modules/pixi/lib/`: `LineBatch`, `FillBatch`, `PointBatch`), from stroke meshes and bands
+  built once (`modules/geo/stroke.ts`, `band.ts`). A zoom changes nothing in a batch. The
+  layer finds its features under the pointer through the spatial index. Seattle is 20 draw
+  calls where it was 385.
+- **Step 10 (Nov 23): hovers and selections in the shaders, animated.**
+  - A hover's glow is a strip (lines, areas) or a picture (points) in a small batch of glows;
+    a selection's halo is two marching lines for each ring in the map UI layer's batch. No
+    OSM feature is in Pixi's scene for a hover or a selection, and none has a filter.
+  - While something is hovered or selected the scene is drawn again 20 times a second
+    (`AnimationPacer`): less on a machine that doesn't keep up, not after 30 seconds without
+    a change, never with `prefers-reduced-motion`. Bryan has seen it and wouldn't change
+    anything (Nov 23); the numbers are still first guesses.
+  - A midpoint points the way its line is drawn, whatever `oneway=-1` says (Bryan asked).
+  - The map was black under `renderer=webgpu` on the way (a WGSL reserved word); fixed, and
+    WebGPU's atlas uploads are premultiplied now.
 
-Next: nothing of section 15's order of work is left. Candidates, for Bryan to pick: hovers and
-selections drawn (and animated) by the shaders (his idea, Nov 23; `backlog.md`), the other
-layers' features in batches, or numbers from weaker hardware. Step 7 (a worker) was skipped as
-probably unnecessary (Bryan). Bryan (Nov 23): fewer draw calls are a result in themselves,
-since the M4 we measure on hides their cost. `renderer=canvas` is blank since the lines became
-meshes, and stays that way (`quirks.md`).
+Next: nothing of section 15's order of work is left. Candidates, for Bryan to pick: numbers
+from weaker hardware (the animation's pacing is untested where the GPU is slow), animation
+frames that don't draw the whole scene, the other layers' features in batches (`backlog.md`).
+Bryan (Nov 23): fewer draw calls are a result in themselves, since the M4 we measure on hides
+their cost. `renderer=canvas` is blank since the lines became meshes, and stays that way
+(`quirks.md`).
 
 Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
 

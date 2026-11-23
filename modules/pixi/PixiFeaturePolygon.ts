@@ -1,10 +1,9 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { GlowFilter } from 'pixi-filters';
 import { LineBatch } from './lib/LineBatch.ts';
 import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
-import { drawHalo, ringsContain, triangulate } from './helpers.ts';
+import { glowColor, ringsContain, setGlowFilter, triangulate } from './helpers.ts';
 import { geomAreaBand, geomStrokeContains, geomStrokeMesh, geomStrokeOutline } from '../geo/index.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
@@ -13,27 +12,24 @@ import type { BandPolygon } from '../geo/band.ts';
 import type { FillBatch, FillBatchItem } from './lib/FillBatch.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { LineBatchItem } from './lib/LineBatch.ts';
-import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
 const INRADIUS_PRECISION = 1;   // a polygon's `inradius` may be this much short of the truth (see `GeometryPart`)
 const HIT_PADDING = 10;   // pixels around an outline's width that still hit it, and where its halo is drawn
 
-// The colors of a hover and of a highlight: the glow around the outlines, and the tint of the fill
-const HOVER_COLOR = 0xffff00;
-const HIGHLIGHT_COLOR = 0x7092ff;
-
 // The fill of a hovered or highlighted polygon, while a batch draws it: this much of the way to
-// the hover's color, and this many times as opaque. (Its outlines glow. The fill can't: a glow
-// is a filter on a container, and the fill stays in its batch, under the smaller polygons
-// inside it.)
+// the glow's color, and this many times as opaque. (The glow itself is around the outlines.)
 const LIT_FILL_TINT = 0.5;
 const LIT_FILL_OPACITY = 2;
 
 // A polygon smaller than this, in pixels, is drawn in less detail: a batch draws its fill and
 // no outline. (An outline is 3 triangles a corner, a rectangle's fill is 2.)
 const SMALL_SIZE = 20;
+
+// In the outlines' batch, the glow of a hovered or highlighted polygon is over every outline.
+// (A polygon's place among the others is its area, negative: nowhere near this.)
+const GLOW_ABOVE = 1e15;
 
 
 /**
@@ -64,8 +60,9 @@ function mixColors(a: number, b: number, t: number): number {
  * then a run of triangles in its batch, worked out once, and each ring's outline a run of
  * vertices in the other. The feature has nothing in its container, and needn't be in the scene
  * (`drawsInContainer()`). A zoom changes nothing in a batch, unless the polygon gets or loses
- * its middle. A hovered or highlighted polygon draws its outlines itself while it is, under
- * the glow's filter; its fill stays in the batch.
+ * its middle. A hovered or highlighted polygon has its fill tinted with the glow's color
+ * meanwhile, and a glow around each of its outlines, drawn by the outlines' batch
+ * (`glowItems`).
  *
  * Properties available:
  * - `fillBatch`   - `FillBatch` that draws the fill, if the layer gave it one
@@ -104,6 +101,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   protected _fillItem: FillBatchItem | null;
   /** The outlines in their batch, one for each ring, if a batch draws them */
   protected _ringItems: LineBatchItem[];
+  /** The glow around each ring in the outlines' batch, while the polygon is hovered or highlighted and batches draw it */
+  protected _glowItems: LineBatchItem[];
   /** The polygon that the fill and the outlines in the batches were built from */
   protected _batchPart: GeometryPart | null;
   /** The band that the fill in the batch is (see `_bandFor`), or `null` if it's the whole polygon */
@@ -128,6 +127,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._strokeBatch = null;
     this._fillItem = null;
     this._ringItems = [];
+    this._glowItems = [];
     this._batchPart = null;
     this._batchBand = null;
     this._batchPattern = -1;
@@ -257,9 +257,11 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public override set visible(val: boolean) {
     super.visible = val;
     if (this._fillItem) this._fillItem.batch?.setVisible(this._fillItem, val);
-    const showRings = val && !this.strokes;
     for (const item of this._ringItems) {
-      item.batch?.setVisible(item, showRings);
+      item.batch?.setVisible(item, val);
+    }
+    for (const item of this._glowItems) {
+      item.batch?.setVisible(item, val);
     }
   }
 
@@ -278,16 +280,25 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
   /**
+   * The glow around each ring in the outlines' batch, while the polygon is hovered or
+   * highlighted and batches draw it
+   * @return The batch's items (none if the polygon doesn't glow, or draws itself)
+   * @readonly
+   */
+  public get glowItems(): readonly LineBatchItem[] {
+    return this._glowItems;
+  }
+
+
+  /**
    * Whether this polygon draws something in its own container, and so has to be in the scene
    * (the layer asks before `update()`, to know whether to give it a place there).
-   * A polygon whose fill and outlines are in batches draws nothing itself, unless it's hovered
-   * or highlighted: the glow is a filter on the container, so the outlines are drawn there,
-   * by meshes of its own, while it is.
+   * A polygon whose fill and outlines are in batches draws nothing itself: its glow, when
+   * it's hovered or highlighted, is in the outlines' batch too.
    * @return `true` if its container has to be in the scene
    */
   public drawsInContainer(): boolean {
-    if (!this._isBatched()) return true;
-    return this._classes.has('hover') || this._classes.has('highlight');
+    return !this._isBatched();
   }
 
 
@@ -362,6 +373,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       item.batch?.remove(item);
     }
     this._ringItems.length = 0;
+    for (const item of this._glowItems) {
+      item.batch?.remove(item);
+    }
+    this._glowItems.length = 0;
     this._batchPart = null;
     this._batchBand = null;
     this._batchPattern = -1;
@@ -445,8 +460,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     const isBatched = this._isBatched();
-    const glowColor = this._classes.has('hover') ? HOVER_COLOR : this._classes.has('highlight') ? HIGHLIGHT_COLOR : null;
-    const hasGlow = (glowColor !== null);
+    const litColor = glowColor(this._classes);
 
     // Cull really tiny shapes
     if (screenW < 4 && screenH < 4) {  // so tiny
@@ -464,21 +478,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.visible = true;
       this._dropLowRes();
       const patternNumber = (texture === PIXI.Texture.WHITE) ? 0 : textureManager.getPatternNumber(pattern);
-      const hasOutlines = (this.lod === 2 || isWireframe);
-      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe, glowColor, hasOutlines);
-
-      // A polygon that glows draws its outlines itself meanwhile, under the glow's filter, and
-      // hides the ones in the batch. Its fill stays where it is, tinted and more opaque meanwhile.
-      if (hasGlow) {
-        this._needShapes();
-        this._drawShapes(viewport, texture, textureMatrix, doFullFill, true);
-      } else {
-        this._dropShapes();
-      }
-      const showRings = !hasGlow;
-      for (const item of this._ringItems) {
-        item.batch?.setVisible(item, showRings);
-      }
+      // (A hovered or highlighted one has its outline whatever its size, in its glow.)
+      const hasOutlines = (this.lod === 2 || isWireframe || litColor !== null);
+      this._dropShapes();
+      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe, litColor, hasOutlines);
 
     // Very small, swap with lowRes sprite
     } else if (local.surround && (screenW < SMALL_SIZE && screenH < SMALL_SIZE)) {
@@ -638,9 +641,57 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const item = ringItems.pop()!;
       item.batch?.remove(item);
     }
+    for (const item of ringItems) {   // (one that was hidden with the feature is shown again)
+      strokeBatch.setVisible(item, true);
+    }
+
+    this._drawBatchedGlow(strokeBatch.glows ?? strokeBatch, flat, litColor, lineWidth, isSame);
 
     this._batchPart = part;
     this.hitReach = ((isWireframe ? 1 : lineWidth) + HIT_PADDING) / 2;
+  }
+
+
+  /**
+   * Draws the glow of a hovered or highlighted polygon in a batch, or takes it away: a strip
+   * around each ring, over every outline, that the batch's shader draws a glow in from the
+   * outline's edge outward (on both sides of it).
+   * @param glowBatch - The batch for the glows: the one that the outlines' batch has for them, or the outlines' batch itself
+   * @param flat - The polygon's rings, each as `[x, y, x, y, …]`, in container-local space
+   * @param color - The glow's color, or `null` if the polygon doesn't glow
+   * @param lineWidth - The outline's width, in pixels
+   * @param isSame - Whether the polygon is the one that was last drawn in the batches
+   */
+  protected _drawBatchedGlow(glowBatch: LineBatch, flat: number[][], color: number | null, lineWidth: number, isSame: boolean): void {
+    const origin = this.container.position;
+    const glowItems = this._glowItems;
+    const numGlows = (color !== null) ? flat.length : 0;
+
+    for (let i = 0; i < numGlows; i++) {
+      const item = glowItems[i];
+      const inBatch = (item?.batch === glowBatch);
+      const glow = { width: lineWidth, minWidth: lineWidth, color: color!, alpha: 1 };
+      if (item && inBatch && isSame) {
+        glowBatch.setGlowStyle(item, glow);
+        glowBatch.setVisible(item, true);
+        continue;
+      }
+
+      const around = geomStrokeMesh(flat[i], { closed: true, cap: 'round', join: 'round' });
+      const dx = origin.x - glowBatch.position.x;
+      const dy = origin.y - glowBatch.position.y;
+      if (item && inBatch) {
+        glowBatch.setGlow(item, around, dx, dy, glow);
+        glowBatch.setVisible(item, true);
+      } else {
+        item?.batch?.remove(item);
+        glowItems[i] = glowBatch.addGlow(around, dx, dy, glow, GLOW_ABOVE);
+      }
+    }
+    while (glowItems.length > numGlows) {
+      const item = glowItems.pop()!;
+      item.batch?.remove(item);
+    }
   }
 
 
@@ -722,9 +773,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param texture - The fill's pattern, or `PIXI.Texture.WHITE` for none
    * @param textureMatrix - How the pattern is laid out
    * @param doFullFill - Whether to fill the whole polygon, not only along its edge
-   * @param outlinesOnly - Whether to draw no fill here (a batch draws it)
    */
-  protected _drawShapes(viewport: Viewport, texture: PIXI.Texture, textureMatrix: PIXI.Matrix, doFullFill: boolean, outlinesOnly: boolean = false): void {
+  protected _drawShapes(viewport: Viewport, texture: PIXI.Texture, textureMatrix: PIXI.Matrix, doFullFill: boolean): void {
     const context = this.context;
     const map = context.systems.map;
     const isWireframe = !!map?.wireframeMode;
@@ -739,7 +789,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const fill = this.fill!;
     const strokes = this.strokes!;
 
-    fill.visible = !isWireframe && !outlinesOnly;
+    fill.visible = !isWireframe;
     strokes.visible = true;
 
     // In wireframe there's no fill: it holds no geometry then.
@@ -881,66 +931,23 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const map = this.context.systems.map;
     const viewZoom = viewport.transform.zoom;
     const wireframeMode = map?.wireframeMode;
-    const showHover = (this.visible && this._classes.has('hover'));
-    const showSelect = (this.visible && this._classes.has('select'));
-    const showHighlight = (this.visible && this._classes.has('highlight'));
 
-    // Hover
-    if (showHover) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: HOVER_COLOR });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else if (showHighlight) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: HIGHLIGHT_COLOR });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else {
-      if (this.container.filters) {
-        this.container.filters = null!;
-      }
-    }
+    // The glow of a hover or a highlight. A polygon that batches draw has it there (see
+    // `_drawBatched`); one that draws itself gets a filter on its container.
+    const drawsItself = !this._fillItem && !this._ringItems.length;
+    setGlowFilter(this.container, (this.visible && drawsItself) ? glowColor(this._classes) : null);
 
-    // Select
+    // The halo of a selection follows the outer ring, as far outside it as a hit can be (see
+    // `_drawShapes`), and inside it too in wireframe, where there's no fill to hit.
     const outer = this._geom?.local?.flat?.[0];
-    if (showSelect && outer?.length) {
-      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
-      const haloParent = mapui.halo;
-      if (!haloParent) return;
-
-      if (!this.halo) {
-        this.halo = new PIXI.Container();
-        this.halo.label = `${this.id}-halo`;
-        this.halo.eventMode = 'none';
-        haloParent.addChild(this.halo);
-      } else if (this.halo.parent !== haloParent) {
-        this.halo.parent?.removeChild(this.halo);
-        haloParent.addChild(this.halo);
-      }
-
-      // Have the halo transform mimic the container transform.
-      // This means that the halo is drawn in _world_ coordinates.
-      this.halo.position = this.container.position;
-      this.halo.rotation = this.container.rotation;
-      this.halo.scale = this.container.scale;
-
-      // The halo follows the outer ring, as far outside it as a hit can be (see `_drawShapes`),
-      // and inside it too in wireframe, where there's no fill to hit.
+    if (this.visible && this._classes.has('select') && outer?.length) {
       const localScale = 2 ** (WORLD_ZOOM - viewZoom);
       const lineWidth = wireframeMode ? 1 : this._style.fill?.width || 2;
       const distance = (lineWidth + HIT_PADDING) * localScale / 2;
       const outline = geomStrokeOutline(outer, distance, { closed: true, join: 'round' });
-      const rings = (wireframeMode && outline.inner) ? [outline.outer, outline.inner] : [outline.outer];
-      drawHalo(this.halo, rings, localScale, this.gfx.textureManager!);
-
+      this._drawHalo((wireframeMode && outline.inner) ? [outline.outer, outline.inner] : [outline.outer]);
     } else {
-      if (this.halo) {
-        this.halo.destroy({ children: true });
-        this.halo = null;
-      }
+      this._drawHalo(null);
     }
   }
 

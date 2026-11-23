@@ -19,7 +19,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 | `PixiEvents.ts` | Binds pointer/keyboard/wheel events once and re-dispatches them to other code, with the feature under the pointer on each pointer event |
 | `PixiTextures.ts` | Texture atlas management and sprite generation |
 | `RenderFrame.ts` | One frame of the map, with the stats gathered while it's made (see `design/graphics-system.md`) |
-| `helpers.ts` | Shared rendering helper functions: halos and rings, whether a point hits a container, which of two containers is drawn on top |
+| `helpers.ts` | Shared rendering helper functions: halos and rings, a hover's color and its filter for features that draw themselves, whether a point hits a container, which of two containers is drawn on top |
 | `index.ts` | Barrel export file |
 
 ### Base Classes
@@ -67,11 +67,11 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 
 | File | Description |
 |------|-------------|
-| `LineMesh.ts` | Draws one line from a stroke mesh: an area's outline, a halo, the lasso, a line of a layer that doesn't batch its lines |
+| `LineMesh.ts` | Draws one line from a stroke mesh: the lasso, and the lines and outlines of a layer that doesn't batch them |
 | `VertexBatch.ts` | The base of the batches: many things in one draw call, each a run of vertices in its buffers |
-| `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes, and the outlines of its areas |
+| `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes, the outlines of its areas, the glows of what's hovered, and the halos of what's selected (which move) |
 | `FillBatch.ts` | Draws the fills of many areas in one draw call, with their patterns from one atlas texture |
-| `PointBatch.ts` | Draws many points in one draw call: their markers, icons and viewfields, from the symbol atlas, at a size on screen |
+| `PointBatch.ts` | Draws many points in one draw call: their markers, icons and viewfields, from the symbol atlas, at a size on screen, and the glow behind a hovered one |
 | `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
