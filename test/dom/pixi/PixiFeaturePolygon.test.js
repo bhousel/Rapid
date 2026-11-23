@@ -4,7 +4,7 @@ import { PixiFeaturePolygon } from '../../../modules/pixi/PixiFeaturePolygon.ts'
 
 
 // A polygon is drawn at one of three levels of detail, by its size on screen: not at all, as a
-// `lowRes` sprite, or in full (a fill, its mask, strokes). The Pixi objects for a level are made
+// `lowRes` sprite, or in full (a fill and strokes). The Pixi objects for a level are made
 // when it's first needed and destroyed when it isn't: most polygons around a view are small.
 describe('PixiFeaturePolygon', () => {
   let layer, feature, haloParent, map;
@@ -43,7 +43,6 @@ describe('PixiFeaturePolygon', () => {
   it('makes no Pixi objects until it is drawn', () => {
     assert.isNull(feature.lowRes);
     assert.isNull(feature.fill);
-    assert.isNull(feature.mask);
     assert.isNull(feature.strokes);
     assert.strictEqual(feature.container.children.length, 0);
   });
@@ -66,13 +65,13 @@ describe('PixiFeaturePolygon', () => {
     assert.isNull(feature.strokes);
   });
 
-  it('makes the fill, the mask and the strokes for a polygon drawn in full', () => {
+  it('makes the fill and the strokes for a polygon drawn in full', () => {
     drawAt(17);
     assert.strictEqual(feature.lod, 2);
     assert.isNull(feature.lowRes);
     assert.isTrue(feature.fill.visible);
     assert.strictEqual(feature.strokes.children.length, 1);     // one ring
-    assert.deepEqual(feature.container.children.map(child => child.label), ['fill', 'strokes', 'mask']);
+    assert.deepEqual(feature.container.children.map(child => child.label), ['fill', 'strokes']);
   });
 
   it('destroys what the level of detail no longer shows', () => {
@@ -84,8 +83,6 @@ describe('PixiFeaturePolygon', () => {
     assert.isTrue(fill.destroyed);
     assert.isTrue(stroke.destroyed);
     assert.isNull(feature.fill);
-    assert.isNull(feature.mask);
-    assert.isNull(feature.maskSource);
     assert.isOk(feature.lowRes);
 
     const lowRes = feature.lowRes;
@@ -141,6 +138,119 @@ describe('PixiFeaturePolygon', () => {
     assert.strictEqual(feature.strokes.children[0], outer);
     assert.notStrictEqual(outer.strokeMesh, strokeMesh);
     assert.isTrue(hole.destroyed);
+  });
+
+  // A partial fill fills a band 32 pixels wide along the inside of the edge. The band is geometry
+  // (`geomAreaBand`), drawn by the fill itself: there's no mask.
+  describe('a partial fill', () => {
+    // A square about 186 world units wide: at zoom 16, a band of 32 leaves a middle of 122.
+    const BIG = { type: 'Polygon', coordinates: [[[0, 0], [0.004, 0], [0.004, 0.004], [0, 0.004], [0, 0]]] };
+    // A cross as wide, with arms about 40 units wide: nowhere in it is 32 from its edge.
+    const CROSS = { type: 'Polygon', coordinates: [[
+      [0.00157, 0], [0.00243, 0], [0.00243, 0.00157], [0.004, 0.00157], [0.004, 0.00243], [0.00243, 0.00243],
+      [0.00243, 0.004], [0.00157, 0.004], [0.00157, 0.00243], [0, 0.00243], [0, 0.00157], [0.00157, 0.00157], [0.00157, 0]
+    ]] };
+
+    function use(geojson, style = { fill: { color: 0x00ff00 } }) {
+      const part = new Rapid.GeometryPart(feature.context);
+      part.setData(geojson);
+      feature.geometry = part;
+      feature.style = style;
+      return Math.abs(part.local.flat[0][0]);    // half the shape's width: its coordinates are around its middle
+    }
+
+    // The rings that are cut out of the fill
+    const cuts = () => feature.fill.context.instructions[0].data.hole?.shapePath.shapePrimitives ?? [];
+
+    it('fills the band along the edge and leaves the middle, with no mask', () => {
+      const half = use(BIG);
+      drawAt(16);
+      assert.deepEqual(feature.container.children.map(child => child.label), ['fill', 'strokes']);
+      assert.isNotOk(feature.fill.mask);
+
+      const context = feature.fill.context;
+      assert.strictEqual(context.instructions.length, 1);
+      assert.strictEqual(cuts().length, 1);    // the middle
+      assert.isTrue(context.containsPoint({ x: half - 5, y: 0 }), 'near the edge');
+      assert.isTrue(context.containsPoint({ x: half - 30, y: half - 30 }), 'in a corner');
+      assert.isFalse(context.containsPoint({ x: half - 34, y: 0 }), 'past the band');
+      assert.isFalse(context.containsPoint({ x: 0, y: 0 }), 'the middle');
+    });
+
+    it('fills a polygon whole that has no middle at that width, though its box is wide', () => {
+      use(CROSS);
+      drawAt(16);
+      assert.strictEqual(feature.lod, 2);
+      assert.strictEqual(feature.fill.context.instructions.length, 1);
+      assert.strictEqual(cuts().length, 0);
+      assert.isTrue(feature.fill.context.containsPoint({ x: 0, y: 0 }));
+    });
+
+    it('gives the same polygon a middle where the band is narrow enough for one', () => {
+      use(CROSS);
+      drawAt(18);    // the band is 8 units wide there, the arms 40
+      assert.strictEqual(cuts().length, 1);
+      assert.isFalse(feature.fill.context.containsPoint({ x: 0, y: 0 }));
+    });
+
+    it('fills a polygon whole when its style says so', () => {
+      use(BIG, { fill: { color: 0x00ff00, type: 'full' } });
+      drawAt(16);
+      assert.strictEqual(cuts().length, 0);
+      assert.isTrue(feature.fill.context.containsPoint({ x: 0, y: 0 }));
+    });
+
+    it('cuts the polygon\'s holes out of the band too', () => {
+      const half = use({ type: 'Polygon', coordinates: [BIG.coordinates[0], [[0.0019, 0.0019], [0.0021, 0.0019], [0.0021, 0.0021], [0.0019, 0.0021], [0.0019, 0.0019]]] });
+      drawAt(17);    // the band is 16 units wide: one along the outer edge, and one around the hole in the middle
+      const context = feature.fill.context;
+      assert.strictEqual(context.instructions.length, 2);
+      assert.isTrue(context.containsPoint({ x: half - 5, y: 0 }), 'along the outer edge');
+      assert.isFalse(context.containsPoint({ x: half / 2, y: 0 }), 'between the two');
+      assert.isTrue(context.containsPoint({ x: 10, y: 0 }), 'beside the hole');
+      assert.isFalse(context.containsPoint({ x: 0, y: 0 }), 'in the hole');
+    });
+
+    it('keeps the band while the polygon and the zoom are the same', () => {
+      use(BIG);
+      drawAt(16);
+      const band = feature._band;
+      assert.isOk(band);
+
+      drawAt(16);    // as for a hover, or a new style
+      assert.strictEqual(feature._band, band);
+    });
+
+    it('works the band out again for another zoom, at the width of that zoom', () => {
+      const half = use(BIG);
+      drawAt(16);
+      const band = feature._band;
+      assert.isTrue(feature.fill.context.containsPoint({ x: half - 30, y: 0 }));
+
+      drawAt(16.5);    // 32 pixels are 22.6 units there
+      assert.notStrictEqual(feature._band, band);
+      assert.isFalse(feature.fill.context.containsPoint({ x: half - 30, y: 0 }));
+      assert.isTrue(feature.fill.context.containsPoint({ x: half - 20, y: 0 }));
+    });
+
+    it('works the band out again for a polygon that changed', () => {
+      use(BIG);
+      drawAt(16);
+      const band = feature._band;
+      use(BIG);    // the same shape, in a new part
+      drawAt(16);
+      assert.notStrictEqual(feature._band, band);
+      assert.deepEqual(feature._band, band);
+    });
+
+    it('holds no fill in wireframe', () => {
+      use(BIG);
+      drawAt(16);
+      map.wireframeMode = true;
+      drawAt(16);
+      assert.isFalse(feature.fill.visible);
+      assert.strictEqual(feature.fill.context.instructions.length, 0);
+    });
   });
 
   // The square's outline is 2 pixels wide, and a hit is good 5 pixels around it: 6 pixels from the ring.

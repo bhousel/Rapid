@@ -4,26 +4,32 @@ import { GlowFilter } from 'pixi-filters';
 import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
 import { drawHalo } from './helpers.ts';
-import { geomStrokeMesh, geomStrokeOutline } from '../geo/index.ts';
+import { geomAreaBand, geomStrokeMesh, geomStrokeOutline } from '../geo/index.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BandPolygon } from '../geo/band.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
+const INRADIUS_PRECISION = 1;   // a polygon's `inradius` may be this much short of the truth (see `GeometryPart`)
 const HIT_PADDING = 10;   // pixels around an outline's width that still hit it, and where its halo is drawn
 
 
 /**
  * This class renders a Polygon feature.
  *
+ * A partial fill fills a band along the inside of the polygon's edge, 32 pixels wide. The band
+ * is real geometry (`geomAreaBand()`): the `fill` draws its polygons, and a click hits them.
+ * There's no stencil mask. Most polygons are too narrow to have a middle that the band leaves
+ * empty, and are filled whole (see `_bandFor`, and `design/graphics-system.md` section 15).
+ *
  * Properties available:
  * - `lowRes`     - `PIXI.Sprite` for a replacement graphic to display at low resolution
  * - `fill`       - `PIXI.Graphic` for the fill Graphics (below)
  * - `strokes`    - `PIXI.Container` for the outlines (above): a `LineMesh` for each ring
- * - `mask`       - `PIXI.Mesh` for the mask (applied to fill)
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePolygon extends AbstractPixiFeature {
@@ -32,17 +38,19 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public lowRes: PIXI.Sprite | null;
   /** PIXI.Graphics for the fill (below) */
   public fill: PIXI.Graphics | null;
-  /** PIXI.Mesh for the mask (applied to fill) */
-  public mask: PIXI.Mesh | null;
-  /** Source graphics for generating mask geometry */
-  public maskSource: PIXI.Graphics | null;
   /** Container for the outlines: a `LineMesh` for each ring */
   public strokes: PIXI.Container | null;
   /** Debug surrounding rectangle graphics (optional) */
   public debugSurround?: PIXI.Graphics | null;
 
-  /** Whether `fill` and `mask` hold geometry from the last time they were drawn */
+  /** Whether `fill` holds geometry from the last time it was drawn */
   protected _hasFill: boolean;
+  /** The band of the last partial fill, or `null` if that was the whole polygon (see `_bandFor`) */
+  protected _band: BandPolygon[] | null;
+  /** The polygon that `_band` is the band of */
+  protected _bandPart: GeometryPart | null;
+  /** The width that `_band` was worked out for, in the polygon's coordinates */
+  protected _bandWidth: number;
   /** The polygon that the stroke meshes of the outlines were built from */
   protected _meshPart: GeometryPart | null;
 
@@ -56,14 +64,15 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     this._hasFill = false;
     this._meshPart = null;
+    this._band = null;
+    this._bandPart = null;
+    this._bandWidth = 0;
 
     // The Pixi objects are made when a level of detail first needs them (see `update`): of
     // 36,000 polygons around a view of Užice at z16, 1,900 are drawn in full, 12,000 as a
     // `lowRes` sprite, and the rest are too small to draw at all.
     this.lowRes = null;
     this.fill = null;
-    this.mask = null;
-    this.maskSource = null;
     this.strokes = null;
 
     // // Debug surrounding rectangle
@@ -89,15 +98,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.fill.destroy();
       this.fill = null;
     }
-    if (this.mask) {
-      this.mask.geometry?.destroy(true);   // (the mesh doesn't destroy its geometry)
-      this.mask.destroy();
-      this.mask = null;
-    }
-    if (this.maskSource) {
-      this.maskSource.destroy();
-      this.maskSource = null;
-    }
     if (this.strokes) {
       this.strokes.destroy({ children: true });
       this.strokes = null;
@@ -108,6 +108,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     this._meshPart = null;
+    this._band = null;
+    this._bandPart = null;
 
     super.destroy();
   }
@@ -296,8 +298,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
   /**
-   * Makes the objects that draw the polygon in full, if this feature has none: the fill, its
-   * mask, and the container of the strokes.
+   * Makes the objects that draw the polygon in full, if this feature has none: the fill, and
+   * the container of the strokes.
    */
   protected _needShapes(): void {
     if (this.fill) return;
@@ -309,21 +311,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     fill.visible = false;
     this.fill = fill;
 
-    // When partially filling areas: we really want to define the mask as a stroke
-    // drawn within the inside of the area shape.  Graphics defined as a stroke
-    // _can_ be used as a mask, but they do not participate in hit testing!
-    // (note: in pixi v8 they now do, but they don't yet respect the `alignment` property)
-    // So we'll create the mask graphic and then copy its attributes into a mesh
-    // which _does_ hit test properly.
-    const maskGeometry = new PIXI.MeshGeometry({});
-    maskGeometry.batchMode = 'batch';   // see `_setMaskGeometry()`
-    const mask = new PIXI.Mesh({ geometry: maskGeometry });
-    mask.label = 'mask';
-    mask.eventMode = 'static';
-    mask.visible = false;
-    this.mask = mask;
-    this.maskSource = new PIXI.Graphics();  // not added to scene
-
     const strokes = new PIXI.Container();
     strokes.label = 'strokes';
     strokes.eventMode = 'static';
@@ -331,7 +318,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     strokes.visible = false;
     this.strokes = strokes;
 
-    this.container.addChild(fill, strokes, mask);
+    this.container.addChild(fill, strokes);
   }
 
 
@@ -343,25 +330,20 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   protected _dropShapes(): void {
     if (!this.fill) return;
 
-    this.fill.mask = null;
     this.fill.destroy();
     this.fill = null;
-    if (this.mask) {
-      this.mask.geometry?.destroy(true);   // (the mesh doesn't destroy its geometry)
-      this.mask.destroy();
-      this.mask = null;
-    }
-    this.maskSource?.destroy();
-    this.maskSource = null;
     this.strokes?.destroy({ children: true });
     this.strokes = null;
     this._hasFill = false;
     this._meshPart = null;
+    this._band = null;
+    this._bandPart = null;
   }
 
 
   /**
-   * Draws the polygon in full: its strokes, and its fill with the mask for a partial fill.
+   * Draws the polygon in full: its strokes, and its fill (the whole polygon, or the band along
+   * its edge for a partial fill).
    * @param viewport - Pixi viewport to use for rendering
    * @param texture - The fill's pattern, or `PIXI.Texture.WHITE` for none
    * @param textureMatrix - How the pattern is laid out
@@ -380,21 +362,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const dash = style.stroke?.dash ?? null;
 
     const fill = this.fill!;
-    const mask = this.mask!;
-    const maskSource = this.maskSource!;
     const strokes = this.strokes!;
 
-    // The mask is visible only while it masks a visible fill. Pixi still updates a visible mask
-    // that nothing draws, at its place in an old batch, over other features (pixijs#12388).
     fill.visible = !isWireframe;
-    mask.visible = !isWireframe;
     strokes.visible = true;
 
     // In wireframe there's no fill: it holds no geometry then.
     if (!fill.visible && this._hasFill) {
       fill.clear();
-      fill.mask = null;
-      this._setMaskGeometry(new PIXI.MeshGeometry({}));
       this._hasFill = false;
     }
 
@@ -460,68 +435,30 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         textureSpace: 'global'
       };
 
+      // A partial fill fills the band along the inside of the edge, if that leaves a middle.
+      const band = doFullFill ? null : this._bandFor(PARTIALFILLWIDTH * localScale);
+
       this._hasFill = true;
       fill.clear();
-      for (let i = 0; i < flat.length; i++) {
-        fill.poly(flat[i]);
-        if (i === 0) {
-          fill.fill(fillStyle);
-        } else {
-          fill.cut();
-        }
-      }
-
-      // bhousel 4/1/26: Meshes are not supported for the new experimental Pixi
-      // Canvas renderer yet.
-      const renderer = this.gfx!.pixi!.renderer;
-      if (renderer.type === PIXI.RendererType.CANVAS) {
-        doFullFill = true;
-      }
-
-      if (doFullFill) {
-        mask.visible = false;
-        fill.mask = null;
-
-      } else {  // partial fill
-        const maskStyle: PIXI.StrokeStyle = {
-          alpha: 1,
-          color: 0xff0000,
-          width: PARTIALFILLWIDTH * localScale,
-          cap: 'butt',
-          join: 'bevel'
-        };
-
-        // Generate mask around the edges of the shape
-        maskSource.clear();
-        for (let i = 0; i < flat.length; i++) {
-          maskSource.poly(flat[i]);
-          if (i === 0) {               // outer
-            maskStyle.alignment = 1;   // left
-            maskSource.stroke(maskStyle);
-          } else {                     // holes
-            maskStyle.alignment = 0;   // right
-            maskSource.stroke(maskStyle);
+      if (band) {
+        for (const polygon of band) {
+          fill.poly(polygon.outer).fill(fillStyle);
+          if (polygon.holes.length) {
+            // (All of a polygon's holes in one cut: a second `cut()` would cut the polygon before it too.)
+            for (const hole of polygon.holes) {
+              fill.poly(hole);
+            }
+            fill.cut();
           }
         }
-
-        // Compute the mask's geometry, then copy its attributes into the mesh's geometry
-        // This lets us use the Mesh as the mask and properly hit test against it.
-        const graphicsContext = maskSource.context;
-        const gpuContext = new PIXI.GpuGraphicsContext();
-        gpuContext.context = graphicsContext;
-        gpuContext.isBatchable = false;
-
-        PIXI.buildContextBatches(graphicsContext, gpuContext);
-
-        this._setMaskGeometry(new PIXI.MeshGeometry({
-          indices: new Uint32Array(gpuContext.geometryData.indices),
-          positions: new Float32Array(gpuContext.geometryData.vertices),
-          uvs: new Float32Array(gpuContext.geometryData.uvs)
-        }));
-        maskSource.clear();   // it was only the source of that geometry
-
-        mask.visible = true;
-        fill.mask = mask;
+      } else {
+        fill.poly(flat[0]).fill(fillStyle);
+        if (flat.length > 1) {
+          for (let i = 1; i < flat.length; i++) {
+            fill.poly(flat[i]);
+          }
+          fill.cut();
+        }
       }
     }
 
@@ -529,21 +466,34 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
   /**
-   * Gives the mask a new geometry, and destroys the one it had.
-   * (Pixi keeps a replaced geometry's buffers until its own collector finds them unused.)
-   * The mask is always batched, whatever its size (Rapid#1636, pixijs#12437). In Pixi's `'auto'`
-   * mode a mesh is batched only up to 100 vertices, and one that crosses that line in a frame where
-   * its render group is rebuilt throws in `MeshPipe.updateRenderable` on a later frame, or stops
-   * following its parent. (Measured: always batching costs no more than `'auto'`; never batching
-   * costs ~1 ms of DRAW a frame in Seattle.)
-   * @param geometry - The new geometry
+   * Works out the band of a partial fill: the part of the polygon within a distance of its
+   * edge (`geomAreaBand()`), which is what's filled, and what a click hits.
+   *
+   * It's kept from one draw to the next, while the polygon and the width are the same: a hover
+   * or a restyle draws again without either changing. A zoom changes the width.
+   *
+   * Most polygons have no middle at that distance, and are filled whole. The polygon's
+   * `inradius` (the widest circle that fits in it) says so without working anything out, for
+   * all but the ones that are close to having one.
+   *
+   * @param width - The band's width, in the polygon's coordinates
+   * @return The band's polygons, or `null` if the band is the whole polygon
    */
-  protected _setMaskGeometry(geometry: PIXI.MeshGeometry): void {
-    const mask = this.mask!;
-    const old = mask.geometry;
-    geometry.batchMode = 'batch';
-    mask.geometry = geometry;
-    old?.destroy(true);
+  protected _bandFor(width: number): BandPolygon[] | null {
+    const part = this._geom!;
+    if (this._bandPart === part && this._bandWidth === width) return this._band;
+
+    const local = part.local!;
+    let band: BandPolygon[] | null = null;
+    if (width < (local.inradius ?? 0) + INRADIUS_PRECISION) {
+      band = geomAreaBand(local.flat as number[][], width);
+      if (band?.length === 0) band = null;   // (nothing to shrink: fill what there is)
+    }
+
+    this._band = band;
+    this._bandPart = part;
+    this._bandWidth = width;
+    return band;
   }
 
 

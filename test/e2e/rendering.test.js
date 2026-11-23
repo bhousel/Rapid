@@ -751,11 +751,96 @@ test('draws a point again when its icon arrives, without another pass', async ({
 });
 
 
+// A partial fill fills a band along the inside of an area's edge. The band is geometry
+// (`geomAreaBand()`) that the area's own fill draws, so there's no stencil mask, in any area
+// fill mode. (A mask was a mesh of its own, and where pixijs#12437 and #12388 bit: Rapid#1636.)
+// An area with no middle 32 pixels from its edge is filled whole.
+test('draws partial fills as bands along the edge, with no stencil mask in any area fill mode', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+    const bandWidth = 32 * 2 ** (16 - rapidContext.viewport.transform.zoom);
+
+    const state = () => {
+      const found = { filled: 0, banded: 0, whole: 0, masked: 0, wrong: [] };
+      for (const feature of layer.features.values()) {
+        const fill = feature.fill;
+        if (!fill || !feature.visible) continue;    // not a polygon drawn in full
+        if (fill.mask) found.masked++;
+        if (!fill.visible) continue;
+        found.filled++;
+
+        // A band has more rings cut out of it than the polygon has holes, or is in several pieces.
+        const local = feature.geometry.local;
+        const context = fill.context;
+        let cuts = 0;
+        for (const instruction of context.instructions) {
+          cuts += instruction.data.hole?.shapePath.shapePrimitives.length ?? 0;
+        }
+        const isBand = (context.instructions.length > 1 || cuts > local.flat.length - 1);
+        const [x, y] = local.poi;    // the point furthest from the polygon's edge
+        const hitsMiddle = context.containsPoint({ x: x, y: y });
+        if (isBand) {
+          found.banded++;
+          // (The polygon's `inradius` may be 1 short of the truth.)
+          if (hitsMiddle && local.inradius > bandWidth) found.wrong.push(`${feature.id}: a band that fills its middle`);
+          if (local.inradius + 1 < bandWidth) found.wrong.push(`${feature.id}: a band in a polygon with no middle`);
+        } else {
+          found.whole++;
+          if (!hitsMiddle) found.wrong.push(`${feature.id}: filled whole, but not in its middle`);
+        }
+        if (map.areaFillMode === 'partial' && !isBand && local.inradius > bandWidth + 1 && feature.style.fill?.type !== 'full') {
+          const [width, height] = local.extent.dimensions();
+          if (Math.min(width, height) >= 70 * bandWidth / 32) found.wrong.push(`${feature.id}: filled whole, with a middle`);
+        }
+      }
+      return found;
+    };
+
+    const counts = {};
+    for (const mode of ['partial', 'full', 'wireframe', 'partial']) {
+      map.areaFillMode = mode;
+      await nextFrame();
+      while (gfx.pending) {
+        await nextFrame();
+      }
+      gfx.immediateRedraw();
+      await nextFrame();
+      await nextFrame();
+      counts[mode] = state();
+      counts[mode].stencilMasks = gfx.lastRenderFrame.draw.instructions.stencilMask ?? 0;
+    }
+    return counts;
+  });
+
+  expect(result.partial.banded).toBeGreaterThan(0);
+  expect(result.partial.whole).toBeGreaterThan(0);
+  expect(result.full.banded).toBe(0);
+  expect(result.full.whole).toBe(result.partial.filled);
+  expect(result.wireframe.filled).toBe(0);
+  for (const mode of ['partial', 'full', 'wireframe']) {
+    expect(result[mode].wrong).toEqual([]);
+    expect(result[mode].masked).toBe(0);
+    expect(result[mode].stencilMasks).toBe(0);
+  }
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
+
 // Rapid#1636, pixijs#12437: in Pixi's 'auto' batch mode, a mesh of 100 vertices or fewer is
-// batched. A partial fill's mask that crosses that line in a frame where its tile's render group is
-// rebuilt made Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`),
-// until something rebuilt it. The masks are always batched now, so crossing the line changes nothing.
-test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
+// batched. A mesh that crosses that line in a frame where its tile's render group is rebuilt made
+// Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`), until
+// something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
+// always batched, so crossing the line changes nothing.
+test('keeps drawing a line whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -769,40 +854,37 @@ test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame it
       await nextFrame();
       await nextFrame();
     };
-    // A mask geometry of n vertices, as `_drawShapes()` makes one (with uvs)
-    const strip = n => {
-      const positions = new Float32Array(n * 2);
-      const indices = [];
-      for (let i = 0; i < n; i++) {
-        positions[i * 2] = (i >> 1) * 4;
-        positions[i * 2 + 1] = (i & 1) * 4;
-      }
-      for (let i = 0; i + 2 < n; i++) indices.push(i, i + 1, i + 2);
-      return new PIXI.MeshGeometry({ positions, uvs: new Float32Array(n * 2), indices: new Uint32Array(indices) });
+    // The stroke mesh of a zigzag of n points: 4 vertices at each corner
+    const zigzag = n => {
+      const coords = [];
+      for (let i = 0; i < n; i++) coords.push(i * 4, (i & 1) * 4);
+      return Rapid.geomStrokeMesh(coords);
     };
 
     const layer = scene.layers.get('osm');
-    const feature = [...layer.features.values()].find(feature => feature.visible && feature.mask?.visible);
+    const feature = [...layer.features.values()].find(feature => feature.visible && feature.stroke?.strokeMesh?.vertexCount);
     if (!feature) return { found: false };
 
-    const mask = feature.mask;
+    const mesh = feature.stroke;
     const tile = feature.container.parent;
+    const large = zigzag(60);
+    const small = zigzag(10);
     const batched = [];
 
-    // A mask of 200 vertices (more than Pixi batches in 'auto' mode), that Pixi has never batched,
-    // like one first drawn zoomed in. (A mask that was batched once keeps its old place in a batch,
-    // and Pixi writes it there instead of throwing.)
-    mask.unload();
-    feature._setMaskGeometry(strip(200));
+    // A mesh of more vertices than Pixi batches in 'auto' mode, that Pixi has never batched, like
+    // one first drawn zoomed in. (A mesh that was batched once keeps its old place in a batch, and
+    // Pixi writes it there instead of throwing.)
+    mesh.unload();
+    mesh.setStroke(large, 1);
     await drawFrame();
-    batched.push(mask.batched);
+    batched.push(mesh.batched);
 
-    // In one frame: the tile's render group is rebuilt (a child added), and the mask gets 50 vertices
+    // In one frame: the tile's render group is rebuilt (a child added), and the mesh gets fewer
     const child = new PIXI.Container();
     tile.addChild(child);
-    feature._setMaskGeometry(strip(50));
+    mesh.setStroke(small, 1);
     await drawFrame();
-    batched.push(mask.batched);
+    batched.push(mesh.batched);
 
     // Then frames that move the tile, without a rebuild: the anchor moves its container
     const [x, y] = scene.anchor;
@@ -813,54 +895,16 @@ test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame it
 
     tile.removeChild(child);
     child.destroy();
-    feature.dirty = true;   // draw its real mask again
+    feature._meshPart = null;   // draw its real line again
+    feature.dirty = true;
     gfx.immediateRedraw();
-    return { found: true, batched: batched };
+    return { found: true, vertices: [large.vertexCount, small.vertexCount], batched: batched };
   });
 
   expect(result.found).toBe(true);
+  expect(result.vertices[0]).toBeGreaterThan(100);
+  expect(result.vertices[1]).toBeLessThan(100);
   expect(result.batched).toEqual([true, true]);
-
-  await waitForIdle(page);
-  expect(consoleErrors).toEqual([]);
-});
-
-
-// pixijs#12295, #12388: a stencil mask that's still visible when nothing draws it (its fill hidden,
-// or no longer masked) keeps its place from an earlier batch, and Pixi writes it there when an
-// ancestor moves, over other features' vertices. So a mask is visible only while its fill is.
-test('shows a partial fill\'s mask only with its fill, in every area fill mode', async ({ page, consoleErrors }) => {
-  await startRapid(page, TEST_MAP);
-  await waitForOsmData(page);
-  await waitForIdle(page);
-
-  const result = await page.evaluate(async () => {
-    const { gfx, map } = rapidContext.systems;
-    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
-    const layer = gfx.scene.layers.get('osm');
-
-    const counts = {};
-    for (const mode of ['partial', 'full', 'wireframe', 'partial']) {
-      map.areaFillMode = mode;
-      await nextFrame();
-      while (gfx.pending) {
-        await nextFrame();
-      }
-      const polygons = [...layer.features.values()].filter(feature => feature.visible && feature.mask);
-      counts[mode] = {
-        masks: polygons.filter(feature => feature.mask.visible).length,
-        alone: polygons.filter(feature => feature.mask.visible && !(feature.fill.visible && feature.fill.mask === feature.mask)).length
-      };
-    }
-    return counts;
-  });
-
-  expect(result.partial.masks).toBeGreaterThan(0);
-  expect(result.full.masks).toBe(0);
-  expect(result.wireframe.masks).toBe(0);
-  for (const mode of ['partial', 'full', 'wireframe']) {
-    expect(result[mode].alone).toBe(0);
-  }
 
   await waitForIdle(page);
   expect(consoleErrors).toEqual([]);

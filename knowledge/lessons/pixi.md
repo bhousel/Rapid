@@ -36,4 +36,5 @@ How Pixi behaves, and what that means for Rapid.
   frame that moved the tile without a rebuild. It reproduced in a few lines by doing those steps
   with a render after each (headless Chromium, `node_modules/pixi.js/dist/pixi.min.js`). In Rapid it
   also needed a mask that Pixi had never batched: one batched once keeps a stale place in an old
-  batch and is written there instead of throwing (the e2e test calls `mask.unload()` first).
+  batch and is written there instead of throwing (the e2e test, which is about a `LineMesh` now
+  that the masks are gone, calls `mesh.unload()` first).

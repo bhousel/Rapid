@@ -71,6 +71,8 @@ export interface GeometryPartLocalData {
   centroid?: Vec2;
   /** Local Pole of Inaccessability (useful for label placement) */
   poi?: Vec2;
+  /** How far the pole of inaccessability is from the polygon's edge: the widest circle that fits inside has this radius */
+  inradius?: number;
   /** Local area (unsigned magnitude) */
   area?: number;
   /** Winding direction of the outer ring: +1 = CCW, -1 = CW (in y-up math space) */
@@ -110,6 +112,7 @@ class LocalFrame implements GeometryPartLocalData {
   protected _hull: Vec2[] | undefined | Unset;
   protected _centroid: Vec2 | undefined | Unset;
   protected _poi: Vec2 | undefined | Unset;
+  protected _inradius: number | Unset;
   protected _flat: number[][] | Unset;
   protected _surround: SurroundingRectangle | undefined | Unset;
 
@@ -128,6 +131,7 @@ class LocalFrame implements GeometryPartLocalData {
     this._hull = UNSET;
     this._centroid = UNSET;
     this._poi = UNSET;
+    this._inradius = UNSET;
     this._flat = UNSET;
     this._surround = UNSET;
   }
@@ -219,6 +223,44 @@ class LocalFrame implements GeometryPartLocalData {
       this._poi = this.poiIsCentroid ? this.centroid : polylabel(this.coords as Vec2[][]) as Vec2;   // it expects outer + rings
     }
     return this._poi;
+  }
+
+  /**
+   * How far the pole of inaccessability is from the polygon's edge (holes' edges included):
+   * the radius of the widest circle that fits inside. It says at a glance whether the polygon
+   * has a middle that a partial fill leaves empty (`geomAreaBand`).
+   * The pole is found to within 1 unit, so the true radius is this or up to 1 more.
+   * 0 for lines and degenerate rings.
+   */
+  public get inradius(): number {
+    if (this._inradius === UNSET) {
+      let inradius = 0;
+      const poi = this.poiIsCentroid ? undefined : this.poi;
+      if (poi) {
+        let nearest = Infinity;   // squared
+        for (const ring of this._rings) {
+          for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const ax = ring[j][0];
+            const ay = ring[j][1];
+            const dx = ring[i][0] - ax;
+            const dy = ring[i][1] - ay;
+            const px = poi[0] - ax;
+            const py = poi[1] - ay;
+            const length2 = dx * dx + dy * dy;
+            let t = (length2 > 0) ? (px * dx + py * dy) / length2 : 0;
+            if (t < 0) t = 0;
+            if (t > 1) t = 1;
+            const ex = px - t * dx;
+            const ey = py - t * dy;
+            const distance2 = ex * ex + ey * ey;
+            if (distance2 < nearest) nearest = distance2;
+          }
+        }
+        if (Number.isFinite(nearest)) inradius = Math.sqrt(nearest);
+      }
+      this._inradius = inradius;
+    }
+    return this._inradius;
   }
 
   /** Flattened coordinate data (Pixi prefers this) - one flat array per ring. */

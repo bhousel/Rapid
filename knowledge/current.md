@@ -41,18 +41,21 @@ are in [`design/graphics-system.md`](../design/graphics-system.md). What's left 
 follow-ups" in `backlog.md`.
 
 **Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
-order of work, Bryan's decisions and the measurements). Done: steps 1 to 4. The stroke mesh
-(`modules/geo/stroke.ts`); lines' casings and strokes, areas' outlines, halos and the lasso drawn
-from it (`modules/pixi/lib/LineMesh.ts`); a line hit by its distance from the pointer
-(`LineHitArea`); `lineToPoly()` and `DashLine` gone. Step 3 halved what a zoom allocates in Užice;
-step 4 changed no numbers, as expected. Next is step 5: partial-fill bands instead of stencil
-masks, which starts with cleaning up an outline that crosses itself (`geomStrokeOutline()` doesn't;
-try Clipper2 first and measure it). Open (in the doc's "Open questions"): the frame of a zoom itself
-is still 125 ms in Užice, and a pointer move there is 8 ms of Pixi's hit test. `renderer=canvas`
-draws no lines now, and stays that way (`quirks.md`).
+order of work, Bryan's decisions and the measurements). Done: steps 1 to 5.
+- The stroke mesh (`modules/geo/stroke.ts`); lines' casings and strokes, areas' outlines, halos and
+  the lasso drawn from it (`modules/pixi/lib/LineMesh.ts`). A zoom in Užice allocates half of what
+  it did.
+- A line hit by its distance from the pointer (`LineHitArea`); `lineToPoly()` and `DashLine` gone.
+- Partial fills as bands of real geometry (`modules/geo/band.ts`, with `clipper2-ts`): no stencil
+  masks, 44 to 76% fewer draw calls in the three places, no more time on a zoom.
 
-Waiting on Pixi: pixijs#12437 (our partial-fill masks are always batched until it's fixed;
-`PixiFeaturePolygon._setMaskGeometry()`).
+Next is step 6: the static tier, for lines first, which needs hit-testing through the spatial index
+first (a pointer move in Užice is 7 ms of Pixi's hit test now). Before it, maybe: a fill mesh of our
+own, since a `Graphics` fill is triangulated again at every zoom ("Open questions" in the doc).
+Also open there: the frame of a zoom itself is still 125 ms in Užice. `renderer=canvas` is blank
+since the lines became meshes, and stays that way (`quirks.md`).
+
+Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first

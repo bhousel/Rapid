@@ -41,14 +41,30 @@ The structure and the reasoning are in `design/scene.md`; these are the choices 
 - **No reordering while drawing.** With the datasets non-interactive the OSM line is reachable anyway;
   lifting OSM visually is a preference for a layer-order UI later (`zIndex` per container makes it cheap).
 
-## Partial fill masks are always batched (Nov 2026)
-Pixi's `'auto'` batch mode batches a `Mesh` up to 100 vertices, and a mask that crossed that line in a
+## Meshes that change get a fixed batch mode (Nov 2026)
+Pixi's `'auto'` batch mode batches a `Mesh` up to 100 vertices, and one that crossed that line in a
 frame where its tile was rebuilt crashed Pixi (pixijs#12437, Rapid#1636). Chosen: `batchMode = 'batch'`
-on every mask geometry (`PixiFeaturePolygon._setMaskGeometry()`), which measured the same as `'auto'`.
+on the geometry of every mesh whose geometry we replace (found with the masks that partial fills had,
+which are gone; every `LineMesh` now), which measured the same as `'auto'`.
 Rejected: `'no-batch'` (about 1 ms more DRAW a frame in Seattle, where 261 of 300 masks were batched),
-and replacing the mask when `mask.batched` would change (the old #1636 workaround; more code, and only
-keeps `'auto'`'s batching). Revisit when Pixi fixes #12437, or when partial fills stop using a mask
-(`design/graphics-system.md` section 4).
+and replacing the mesh when `batched` would change (the old #1636 workaround; more code, and only
+keeps `'auto'`'s batching). Revisit when Pixi fixes #12437.
+
+## Partial fills are bands of real geometry, offset by Clipper2 (Nov 2026)
+A partial fill fills the part of an area within 32 pixels of its edge. That was a full fill under a
+stencil mask (a stroke along the inside of the edge); it's now the band itself, as polygons
+(`geomAreaBand()`): the area minus the area shrunk by 32 pixels. Chosen for the shrinking and its
+cleanup: `clipper2-ts`, a TypeScript port of Clipper2 (18 KB gzipped, BSL-1.0, pinned to an exact
+version: its versions look like prereleases). Measured on every partial fill of three dense views
+(`design/graphics-system.md` section 15, step 5).
+Rejected: `clipper2-wasm` (twice as fast, but 96 KB, an asynchronous start, and it needs
+`'wasm-unsafe-eval'` in our CSP), `clipper-lib` (Clipper 1, unmaintained since 2019), `clipper2-js`
+(wrong answers on our data), and writing the cleanup ourselves (it's a sweep-line clipper: what
+Clipper is). An inside stroke without cleanup (option A in section 4) pokes out of narrow areas and
+covers pixels twice.
+Most partial fills have no middle at that width and are filled whole, which a polygon's `inradius`
+says before Clipper is asked. Bryan asked for the trial, and agreed to `clipper2-ts` (Nov 23). Keep
+`clipper2-wasm` in mind for later; he doesn't want to relax the CSP for it now.
 
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 

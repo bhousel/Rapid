@@ -1226,8 +1226,8 @@ export class GraphicsSystem extends AbstractSystem {
 
     // For testing, allow user to override the renderer preference:
     // `renderer=val` should be one of: 'canvas', 'webgpu', 'webgl1', 'webgl2', 'webgl'
-    // (With 'canvas', lines and the outlines of areas aren't drawn: they're meshes (`LineMesh`),
-    // and Pixi's canvas renderer has no mesh pipe.)
+    // (With 'canvas', nothing is drawn: lines and the outlines of areas are meshes (`LineMesh`),
+    // Pixi's canvas renderer has no mesh pipe, and it throws on the first frame that updates one.)
     const renderParam = urlhash?.initialHashParams.get('renderer') ?? '';
     let renderPreference: 'canvas' | 'webgl' | 'webgpu';
     let renderGLVersion: 1 | 2 = 2;

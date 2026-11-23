@@ -12,10 +12,11 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
 > without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
 > rendering follow-ups". The plan is in section 7. Section 15 is where the renderer could go from
-> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 4 are built on
+> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 5 are built on
 > `linebuilder_refactor`: lines, the outlines of areas, halos and the lasso are drawn from stroke
 > meshes (`modules/geo/stroke.ts`, `modules/pixi/lib/LineMesh.ts`), a line is hit by its distance
-> from the pointer, and `lineToPoly()` and `DashLine` are gone.
+> from the pointer, `lineToPoly()` and `DashLine` are gone, and a partial fill is a band of real
+> geometry with no stencil mask (`modules/geo/band.ts`, with Clipper2 for the offsetting).
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -319,6 +320,9 @@ into as they go, and the scene moves it onto the frame after the layer's pass (`
   the layer and its features count as they work, and the scene collects the counts (above).
 
 ## 4. Partial fills without a stencil mask
+
+*(Built Nov 23, as option B below with Clipper2: section 15, step 5. This section is the reasoning
+from before, and "the mask" is what there was.)*
 
 **Why it's a mask.** The code came from iD, which drew in SVG and cut the middle out of each area with
 a clip path. Pixi used to be unable to hit-test a line, so Rapid builds the inside band as a stroke,
@@ -2059,7 +2063,7 @@ label) and against the table above, and can ship on its own.
 ## 15. Where this could go
 
 Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
-It's a direction and an order of work. **Steps 1 to 4 of the order are built and measured** (the
+It's a direction and an order of work. **Steps 1 to 5 of the order are built and measured** (the
 "What was built" parts below); the rest isn't built, and none of that is measured except where
 another section is named.
 
@@ -2393,9 +2397,12 @@ same. The renderers `webgl1` and `webgpu` draw them too (one view of each).
 
 **What changed that someone might notice:**
 
-- **With `renderer=canvas`, lines and outlines aren't drawn.** Pixi's canvas renderer has no mesh
-  pipe (the partial fills already fell back to full fills there). The option stays as it is
-  (Bryan, Nov 22): it was an experiment, nobody relies on it, and meshes on canvas are Pixi's to add.
+- **With `renderer=canvas`, the map is blank.** Pixi's canvas renderer has no mesh pipe, and it
+  doesn't skip a mesh: the first frame that updates one throws (`validateRenderable` of
+  `undefined`), and so does every frame after it. I reported this as "lines and outlines aren't
+  drawn" at first, from a screenshot of the last frame that had worked; step 5 found the rest.
+  The option stays as it is (Bryan, Nov 22, on the first report): it was an experiment, nobody
+  relies on it, and meshes on canvas are Pixi's to add.
 - **Dashed lines have joins and caps now,** the ones their style asks for: round joins by
   default, and butt caps in all but a few of the dashed styles. A cap is at the end of the line,
   not of each dash.
@@ -2500,6 +2507,100 @@ of a polygon's label path. Two e2e tests: a click 5 pixels beside a road selects
 its halo that far out, and a shift-drag draws the lasso and selects what's inside. Twenty ways
 of breaking the new code were each caught by a test.
 
+### What was built (Nov 23: step 5)
+
+**The trial that was asked for first: Clipper2, or code of our own.** The data is every partial
+fill in the three views: 334 in Seattle (5,776 nodes), 124 in Staten Island (20,442) and 167 in
+Užice (30,484). Shrinking each by 32 pixels, the costly part, outside the browser (Bun, the best
+of five runs, with mitered corners):
+
+| Library | Seattle | Staten Island | Užice | Gzipped | |
+|---|---|---|---|---|---|
+| `clipper2-ts` 2.0.1-19 | 6.4 ms | 46 ms | 74 ms | 18 KB | A TypeScript port that follows Clipper2. **Chosen** |
+| `clipper2-wasm` 0.4.0 | 3.3 ms | 19 ms | 29 ms | 96 KB | Needs `'wasm-unsafe-eval'` in our CSP, and starts asynchronously |
+| `clipper-lib` 6.4.2 (Clipper 1) | 7.9 ms | 49 ms | 83 ms | 26 KB | Last released in 2019 |
+| `clipper2-js` 1.2.4 | 9.5 ms | 291 ms | 243 ms | 19 KB | Another answer than the others (8,700 points where they have 1,127) |
+
+- **It's right.** For each fill, 40 random points: in the band if and only if inside the area
+  and within 32 pixels of its edge, and in no two triangles. Of 25,000 points, 4 disagree, at
+  the tolerance of an arc.
+- **Code of our own isn't worth writing.** The cleanup is a sweep over all the edges, which is
+  what Clipper is, and 18 KB buys the years of corner cases behind it. What it costs in garbage
+  is 1 to 9 MB for all the fills of a view (a zoom allocates 400 MB there).
+- **Most partial fills have no middle.** 241 of Seattle's 334, 84 of Staten Island's 124 and 140
+  of Užice's 167 are narrower than 64 pixels everywhere: the band is the whole area. Each had a
+  stencil mask all the same. And most of Clipper's time went to finding that out (12 ms for a
+  relation of 2,375 nodes): the fills that do have a middle take 12, 16 and 18 ms in all, from
+  the rings to the triangles (in V8, mitered; round corners add a third).
+- **What masks cost now is draw calls, not time.** With every area filled whole, which is the
+  most that removing masks can save, DRAW is 0.1 to 0.4 ms less and the draw calls 45 to 77%
+  fewer. Step 3 had already taken the lines out of the frame's cost.
+
+**`geomAreaBand(rings, width)`** in `modules/geo/band.ts` is the band as polygons: the area
+without its middle, where the middle is the area shrunk by the width (`inflatePaths`, cleaned up
+by Clipper). It returns `null` when there's no middle.
+
+- **The area is the outer ring minus its holes,** whichever way the rings go around and wherever
+  the holes are. A forest in Užice has a "hole" as large as its outer ring and mostly outside it;
+  taken as given, the band was the whole view.
+- **Its inside edge is round** around a corner that points into the area: the band is everything
+  within the width. I tried miter and bevel: they're 30% cheaper, and they look blocky where a
+  wood's edge wiggles.
+- **A polygon's `inradius`** (`GeometryPart`: how far its pole of inaccessibility is from its
+  edge) says whether it has a middle without asking Clipper. `polylabel` finds the pole to within
+  1 unit, once per polygon; Clipper is asked when the band is narrower than that radius plus 1.
+
+**`PixiFeaturePolygon` draws the band with its fill:** the band's polygons, each with its holes
+cut out, in the `Graphics` that drew the whole polygon before. The mask, its `Mesh`, and the
+`Graphics` it was built from are gone, and so is our call to Pixi's `buildContextBatches`.
+
+- **The band is kept** while the polygon and the width are the same (a hover or a new style
+  draws again without either changing). A zoom works it out again.
+- **A click hits the band,** as it hit the mask: Pixi's `Graphics` knows its holes.
+- **One `cut()` for all of a polygon's holes.** A second `cut()` also cuts the fill before it
+  (Pixi looks back two instructions), which a band in several pieces has.
+
+**Measured** (`bun run measure` on the tapes, step 4 → step 5, and with every area filled whole
+for comparison):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 1,619 → 385 (376) | 684 → 279 (263) | 1,197 → 672 (663) |
+| Stencil mask instructions | 1,336 → 0 | 496 → 0 | 668 → 0 |
+| Triangles | 156,454 → 132,621 | 444,207 → 345,600 | 1,484,476 → 1,333,339 |
+| Graphics outside a batch | 1 → 6 | 28 → 36 | 66 → 71 |
+| DRAW | 1.4 → 1.3 ms | 0.9 → 0.7 ms | 2.0 → 1.8 ms |
+| GPU | 6.2 → 4.9 ms | 6.2 → 6.2 ms | 23.9 → 19.7 ms |
+| Every feature redrawn after a zoom | 150 → 149 ms | 182 → 167 ms | 717 → 683 ms |
+
+- **The offsetting doesn't show in a zoom.** It replaces Pixi's stroke for the mask, and it runs
+  for a sixth to a third of the fills.
+- **Sixteen zooms in Užice** (one run, the whole scene): 7.3 → 6.9 GB allocated, of which
+  `geomAreaBand()` is 217 MB (the masks' `buildLine` was 226 MB, and is gone). The heap after a
+  load is 1,519 → 1,511 MB, and 1,525 → 1,512 MB after thirty-two zooms. (The trace of
+  collections came back empty for this run, so there's no count of those.)
+- **A hit test costs what it did** (0.27 ms in Seattle, 7.4 in Užice). The feature that's hit
+  changed at 8 of 4,800 grid points in Seattle and 11 in Užice. The ones I looked at were hits
+  on a mask's stray triangles, 35 to 51 units inside an area whose band is 11 wide, and the
+  forest above, which is hit along its edge now.
+- **The bundle** is 68 KB larger minified (5.07 → 5.14 MB), 18 KB gzipped.
+- **Screenshots:** 0.1 to 0.7% of the pixels differ from step 4, at the inside edges of bands
+  (round now, without the spikes a beveled stroke left) and at that forest.
+
+**What changed that someone might notice:**
+
+- **A band's inside edge is smooth.**
+- **An area with rings that OSM got wrong** is filled as its outer ring minus its holes.
+- **Nothing else:** an area with no middle looks as it did under its mask.
+
+**Tests:** `test/unit/geo/band.test.js` (squares, holes near the edge and in the middle, a hole
+that sticks out, and seeded random areas checked point by point against the definition: 2,000
+with `BAND_SEEDS`), the `inradius` in `GeometryPart.test.js`, partial fills in
+`PixiFeaturePolygon.test.js`, and an e2e test that no area fill mode leaves a stencil mask, a
+band that fills its middle, or an area with a middle that's filled whole. The e2e test of
+pixijs#12437 moved from the mask to a `LineMesh` (it fails with `'auto'` batching, as it should).
+Sixteen ways of breaking the new code were each caught by a test.
+
 ### Order of work
 
 Each step is measured on the tapes of Seattle, Staten Island and Užice (`bun run measure --tape`),
@@ -2524,11 +2625,10 @@ and compared by screenshot with the build before it.
 4. **Hit areas by distance, and the halo and label path from the outline. Done (Nov 22).**
    `lineToPoly()` and its dependence on Pixi's `buildLine` are gone, and `DashLine` with them
    (above). The outline has no cleanup yet: that's the next step's.
-5. **Partial-fill bands instead of stencil masks** (section 4). It starts with the cleanup that
-   step 4's outline doesn't have: an offset ring that crosses itself where an area is narrow or
-   curves tightly (Clipper2 first, measured, as decided below). The masks are 707 of Seattle's 771
-   draw calls, and the mask's `Mesh` is where pixijs#12437 and #12388 bit. Bands depend on the
-   zoom, so they're built per whole zoom level or over frames, as now.
+5. **Partial-fill bands instead of stencil masks** (section 4). **Done (Nov 23),** with Clipper2
+   for the offsetting and its cleanup (above). The masks were most of the draw calls, and the
+   mask's `Mesh` was where pixijs#12437 and #12388 bit. Bands depend on the zoom, and are built
+   again over the frames after one, as the masks were.
 6. **The static tier, for lines first.** A mesh per tile and class with our own shader, ranges, and
    the editing tier for what's touched. Needs hit-testing through the spatial index first. The
    check against a pass (`osmSceneState()`) has to learn to read ranges.
@@ -2548,6 +2648,9 @@ settles how typed arrays reach Pixi before the hard geometry starts.
 - **Strokes first, then bands.** Strokes are simpler, and a band is a stroke with an offset.
 - **Try Clipper2 for the band's offsetting,** and measure its size and time before deciding
   between it and code of our own. Conflation's buffers (`backlog.md`) want the same answer.
+  *The trial's outcome (Nov 23, step 5): `clipper2-ts`, 18 KB gzipped. Bryan agreed (Nov 23):
+  it works well on our data. `clipper2-wasm` is worth keeping in mind, but not at the cost of
+  relaxing the CSP now.*
 - **Round joins and caps start at 10 slices for a half circle,** more only if they look jagged.
   The lines are thin, and a vertex marker often covers the join anyway.
 
@@ -2564,8 +2667,23 @@ settles how typed arrays reach Pixi before the hard geometry starts.
   breaking batches. Not measured.
 - **A halo that doesn't cross itself.** It's the outline as built (step 4), loops and all: fine
   around most features, tangled around a tight curve or a staircase's arcs at z16, as it was
-  before. Step 5's cleanup would fix it, if it's cheap enough for a halo that's drawn again on
-  every frame of a drag.
+  before. Clipper would clean it (step 5 has it now): under 0.1 ms for a way of a few dozen
+  nodes, 12 to 18 ms for a relation of 2,400, on every frame of a drag. If halos and the label
+  path both moved to it, `geomStrokeOutline()` would have no caller left.
+- **A band that doesn't depend on the zoom.** The band is worked out again at every zoom, because
+  its width is in pixels. Inside one face of an area's straight skeleton, the distance to the
+  edge is the distance to one line, which a triangle's corners interpolate exactly. So a mesh of
+  those faces with the distance at each vertex, built once, could be cut at any width by a
+  shader (or by clipping each face on the CPU). That's for the static tier, and it needs a
+  straight skeleton that survives OSM's polygons.
+- **A fill mesh of our own.** The fill is still a `Graphics`: Pixi triangulates every area again
+  at every zoom (`buildContextBatches` is 590 MB of the 6.9 GB that sixteen zooms allocate, 350
+  of it `triangulateWithHoles`), and draws the ones over 200 vertices outside a batch (71
+  graphics in Užice).
+  An area filled whole has the same triangles at every zoom: a `Mesh` built once, like
+  `LineMesh`, would only need its pattern's scale changed. It's also step 8's first part.
+- **The `inradius` is good to 1 unit,** which is 8 pixels at zoom 19. Clipper is asked in that
+  margin, so nothing is drawn wrong; a finer `polylabel` would ask it less often.
 - **A pointer move costs 8 ms in Užice, and the hit areas aren't why.** Pixi's hit test walks
   every interactive container (107,000 features there) and asks each for its box (step 4's
   numbers). Finding features through the spatial index is step 6's first part, and what
@@ -2579,8 +2697,6 @@ settles how typed arrays reach Pixi before the hard geometry starts.
   distance. An index into the line's own coordinates would take it to 16 to 20, for the CPU's
   sums; a shader wants the point in each vertex. Step 3's heap numbers say it isn't urgent: the
   heap fell 159 MB with the vertex as it is, and the objects cost more than the arrays.
-- **Offsets.** A band is a stroke with an offset, and the mesh has none: a vertex would need the
-  direction its corner moves in as well. Left for step 5, where the cleanup decides the shape.
 - **How many meshes a tile needs.** One per class and tile keeps today's draw order
   ([`scene.md`](scene.md)), and 580 render groups already cost 1 to 2 ms a frame. Color and width
   as vertex attributes would let classes share a mesh where their order allows.

@@ -115,8 +115,17 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `'no-batch'`). In `'auto'` mode Pixi batches a mesh up to 100 vertices, and a mesh that crosses
   that line in a frame where its render group is rebuilt crashes Pixi on a later frame (Rapid#1636,
   pixijs#12437).
-  The polygon masks are always batched (`PixiFeaturePolygon._setMaskGeometry()`), and so is every
-  `LineMesh`.
+  Every `LineMesh` is always batched. (The masks that partial fills had were where this was found.)
+- **A partial fill is geometry, not a mask.** `PixiFeaturePolygon` fills the band along the inside
+  of the edge (`geomAreaBand()` in `modules/geo/band.ts`, which uses Clipper2), with the same
+  `Graphics` that fills a whole polygon, and a click hits what's filled. Don't give a fill a
+  `mask`: a stencil mask is four instructions and a break in the batch for every area, and they
+  were three quarters of Seattle's draw calls. A polygon with no middle that far from its edge
+  is filled whole; its `GeometryPart`'s `inradius` says so before Clipper is asked
+  (`_bandFor()`, which also keeps the band while the polygon and the zoom are the same).
+- **One `cut()` for all the holes of a fill.** Add every hole's `poly()`, then cut once. Pixi's
+  `cut()` looks back two instructions: a second one also cuts the fill before, which matters as
+  soon as a `Graphics` has two fills (a band in several pieces).
 - **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
 - **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
   minimap, `autoStart: false`, the renderer choice from the url).
