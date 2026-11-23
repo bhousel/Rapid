@@ -38,8 +38,16 @@ Still to do:
 ## Rendering: what's next
 `pixi-8.23` (PR #10) and `label-avoids` (PR #11) are merged (`completed.md`); the plans and measurements
 are in [`design/graphics-system.md`](../design/graphics-system.md). What's left is under "Pixi rendering
-follow-ups" in `backlog.md`. Waiting on Pixi: pixijs#12437 (our partial-fill masks are always batched
-until it's fixed; `PixiFeaturePolygon._setMaskGeometry()`).
+follow-ups" in `backlog.md`.
+
+**Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
+order of work and Bryan's decisions). Done: the stroke mesh (`modules/geo/stroke.ts`, with seeded
+tests), and a comparison with Pixi's `buildLine` on the tapes' ways. Next is step 3: draw casings and
+strokes from it in `PixiFeatureLine`, with vertex counts in frame stats first, then screenshots and
+`bun run measure` on the three tapes.
+
+Waiting on Pixi: pixijs#12437 (our partial-fill masks are always batched until it's fixed;
+`PixiFeaturePolygon._setMaskGeometry()`).
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first

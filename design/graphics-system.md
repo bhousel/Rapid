@@ -11,7 +11,9 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > fewer passes (section 12), less garbage (section 13) and label placement (section 14). Section 11
 > compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
 > without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
-> rendering follow-ups". The plan is in section 7.
+> rendering follow-ups". The plan is in section 7. Section 15 is where the renderer could go from
+> here (two tiers, a line builder of our own) and the order of work; its stroke mesh is built
+> (`modules/geo/stroke.ts`, on `linebuilder_refactor`) and nothing draws with it yet.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -533,7 +535,7 @@ Each step is measured with frame stats on the same set of places.
 6. **The line builder,** as plain geometry with unit tests (a band never leaves its area, never
    overlaps itself, holes, slivers, short segments). Then, one at a time and measured: partial-fill
    bands instead of masks; hit areas, halos and label boxes instead of `lineToPoly`; dashes as one
-   stroke per line.
+   stroke per line. Section 15 has this step in more detail, and suggests another order.
 7. **Casings and strokes in grouped batches** with Pixi's `RenderLayer` ([`scene.md`](scene.md) section 4,
    [`profiling.md`](profiling.md)), measured after the masks are gone, since the masks break batches
    today anyway.
@@ -2047,3 +2049,300 @@ label) and against the table above, and can ship on its own.
   labels at Seattle too, where there's room for them: the number placed should not drop.
 - **Rules that apply:** `modules/pixi/AGENTS.md` (find features by `container.__feature__`,
   not by depth; destroy what's replaced; no object per feature in a loop over all of them).
+
+## 15. Where this could go
+
+Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
+**Nothing in this section is built, and none of it is measured** except where another section is
+named. It's a direction and an order of work, to review before the line builder is started.
+
+**The short answer: keep the frame, change the unit of work.** APP, CULL and DRAW, the scheduler,
+the deadline, and drawing only when something changed all hold up (Unreal's render thread and
+Bevy's extract step are the same stages on other threads). The part of Performer we haven't built
+is its load management: lowering the level of detail when a frame runs over. That's the filter in
+[`filter-system.md`](filter-system.md) section 6.
+
+What has dated is one JavaScript object and one Pixi object for every feature. Most of what's left
+in sections 12 and 13 is the price of those objects on the main thread: 1.7 GB alive, a collection
+of 340 to 400 ms every 15 s of zooming, Pixi's line builder making a quarter of a zoom's garbage,
+212 ms of DRAW to build 7,000 new features.
+
+### Words used here
+
+- **Builder:** plain code that turns a line's coordinates into typed arrays. No Pixi in it, so it
+  can run in a unit test or a worker.
+- **Stroke mesh:** the triangles that draw a line (a casing, a stroke, an area's outline).
+- **Outline:** the ring around a line at a distance from it, or inside an area at a distance from
+  its edge. The partial-fill band, a halo and a label's path inside an area are made from outlines.
+- **Static tier:** the features nobody is touching, which is nearly all of them.
+- **Editing tier:** the features that are selected, hovered, drawn or dragged. A handful.
+- **Range:** the part of a tile's buffers that holds one feature's vertices.
+
+### What the other map renderers do, checked (Nov 22)
+
+For years people have suggested moving iD, and then Rapid, onto Mapbox GL or MapLibre. The attempts
+failed on making geometry editable. Bryan's recollection of why was checked against the source of
+MapLibre GL JS 6.19, Mapbox GL JS 3.37, mapbox-gl-draw, Placemark, terra-draw and deck.gl's editable
+layers, and against what their authors wrote. Read, not run: every number below is quoted from an
+issue or a pull request.
+
+**How a GeoJSON source reaches the GPU** (both libraries):
+
+1. The data goes to a worker. Mapbox still sends it as a `JSON.stringify` of the whole source
+   (200 ms for 200 lines of 4,500 coordinates each, maplibre-gl-js#106). MapLibre stopped in 5.13
+   (Nov 2025) and walks and clones the objects instead, which is still in proportion to the data.
+2. The worker cuts it into tiles (geojson-vt), encodes each tile, and builds each tile's vertex
+   arrays: lines are tessellated and polygons triangulated there.
+3. The arrays are transferred back without a copy, and uploaded when the tile is next drawn.
+
+Vertices are 16-bit integers on a grid of 8,192 units that belongs to the tile. A line's width is
+applied in the vertex shader, so a zoom inside one zoom level needs no new vertices; crossing a
+whole level means new tiles from the worker. The only path that doesn't go through the worker is a
+custom layer, where the application brings its own buffers and shaders.
+
+**What a change costs:**
+
+| | The unit that's sent | What's built again |
+|---|---|---|
+| `setData()`, both libraries | The whole source | Every tile of the source in view |
+| MapLibre `updateData()` (3.0, 2022) | A whole feature | Until 5.11 every tile; until 5.20 the whole index |
+| ..since 5.20 (Mar 2026) | A whole feature | Every tile in view inside the feature's box, old and new |
+| Mapbox `updateData()` with `dynamic: true` (3.4) | Whole features | The tiles the features touch, from an index without simplification |
+| `setFeatureState()` | Nothing (main thread) | That feature's range of the paint arrays; the buffer is uploaded again |
+
+- **The smallest change is a whole feature.** Move one vertex of a forest or a river, and every tile
+  in view that its box covers is cut, encoded and tessellated again, in the worker, and shown a
+  frame or more later. That's as Bryan remembered it, for exactly the features OSM is full of.
+- **MapLibre has improved a lot for small features among many.** Moving one point among 100,000
+  took 500 to 700 ms on 5.17; on 5.20 a user reported it 20 times faster than 5.7 at zoom 10
+  (maplibre-gl-js#4364). No number is published for dragging a vertex of a large polygon; the
+  benchmarks are all points.
+- **Feature state can't change geometry,** nor dashes, patterns, caps or joins: only color, opacity,
+  width, gap width, offset and blur.
+
+**What the editors built on them do:**
+
+- **mapbox-gl-draw** keeps two sources: "hot" for the features that changed since the last frame,
+  "cold" for the rest. Each frame of a drag is a `setData()` on hot with the whole dragged feature
+  and a point for each of its vertices and midpoints. Cold is set again in full whenever a feature
+  moves between the two, which its maintainers named as the main cost (mapbox-gl-draw#329, #332).
+  Still open: under 10 frames a second while dragging on a 4K screen (#1132), and trouble with
+  lines of thousands of vertices (#1383).
+- **Placemark** does the same: the selected feature in an `ephemeral` source, its handles in
+  another, everything else in a third. deck.gl was only ever used for the vertex dots and the
+  lasso, and was removed in Aug 2026. Its `docs/performance.md` lists as the first bottleneck:
+  "Updating MapLibre GL JS with new data. Specifically: sending new values across the postMessage
+  boundary, and generating new tiles in geojson-vt." Tom MacWright also tried cutting tiles on the
+  main thread (`@placemarkio/fast-source`: "trades off smoothness for latency"; it needed a custom
+  build of the library). He didn't consider it solved: "Products end up either sacrificing some
+  data-scalability (like Placemark) or sacrificing some edibility"
+  ([2024](https://macwright.com/2024/01/09/scalable-editable-geo)).
+- **terra-draw** sets all the features of a geometry type again, once a frame.
+- **deck.gl's editable layers** build on the main thread, and a change of data builds every
+  feature's buffers again unless the application arranges otherwise.
+- **Felt** draws the base map with MapLibre and what the user edits in a layer of its own, in
+  Canvas 2D, drawn from scratch on every frame.
+
+**What that says:**
+
+- **Nobody who edits through a tiled source has made large features fast.** Everyone arrives at the
+  split between a few hot features and many cold ones. The split is right. What it's built on
+  isn't, for an editor.
+- **The GPU buffers and the worker aren't the problem.** Three things about how they're used are:
+  1. *Features are cut into tiles,* so a change has to find and redo each piece.
+  2. *The worker is the only way to the screen,* so even one small feature waits for a round trip.
+  3. *Moving a feature between cold and hot rebuilds cold,* since a source is the unit.
+- **Rapid's renderer doesn't have these three, and shouldn't acquire them.** A feature is drawn
+  whole, in one tile's container (or `large`), and what changed is drawn again in the same frame.
+  That's why editing works here. What Rapid lacks is the other half: cheap drawing for the features
+  nobody is touching.
+
+### The design this points to
+
+Two tiers and one builder. It's hot and cold with the three problems above left out.
+
+- **Features stay whole.** A tile is where a feature is kept and culled, not something it's cut
+  by. A river is one run of vertices in one tile's buffers, or in `large`.
+- **One builder, run in two places.** For the editing tier it runs on the main thread, in the frame
+  of the change, as drawing does today. For the static tier it runs where there's time: in the
+  scheduler's batches first, and in a worker if measurements ask for it. Typed arrays cross to and
+  from a worker without a copy. It's the same code, so the two tiers look the same.
+- **The static tier is a few meshes per tile,** not a display object per feature: the stroke meshes
+  of a tile's lines of one class in one pair of buffers, each feature with its range. Widths are in
+  screen pixels and applied in the vertex shader, so a zoom changes a number and builds nothing.
+  (Today a zoom draws every feature again, because widths are in world units.)
+- **The editing tier is what we have now:** a display object per feature, built again whenever it
+  changes. A drag changes the ways that share the dragged node, usually one to four.
+- **Moving a feature between tiers touches only its range.** To take it out of the static tier,
+  its range is hidden (its indices are zeroed, and that part of the buffer is uploaded). To put it
+  back, the range is written again in place if it has as many vertices as before, as after a move.
+  If it has more, it goes at the end of the tile's buffers, and the tile is packed again when
+  there's time. No tile is rebuilt because one feature was touched.
+- **Approximate while it moves, exact when it rests.** What's costly to build exactly (a partial
+  fill's band, a large area's triangles) can be drawn roughly during a drag and built properly
+  when it stops. The frame's deadline already works this way for features that are waiting.
+- **Hover and selection are drawn in the editing tier.** They're a handful of features, so they
+  don't need per-feature state in a shader.
+- **The pointer finds features through the spatial index** (`editor.waySegments()`, and the
+  distance from the pointer to a segment), since a static feature has no display object to hit.
+  That's in `backlog.md` already, and the static tier can't be built before it.
+- **Pixi stays** for what it's good at: the WebGL state, textures and the atlas, sprites, text,
+  the UI overlays, and the editing tier. A `Mesh` with our own shader is drawn on its own, which is
+  what we want for a tile's mesh: Užice's 61,000 features were 2,056 draw calls and 7 ms of GPU
+  (section 6), so draw calls aren't what to save.
+
+**Not part of it:** a rewrite in Rust (the garbage is the problem, not JavaScript's speed, and
+typed arrays fix it in either language; WebAssembly is for single hot routines such as offsetting,
+when a profile asks), WebGPU (the cost is building geometry, not drawing it), and MapLibre as the
+renderer (above).
+
+### The line builder
+
+It has two products, from one walk along the line:
+
+- **A stroke mesh that doesn't know its width.** Each vertex is a point on the centerline, a
+  direction to push it out along (longer at a miter), and its distance along the line. The
+  position on screen is `point + direction × half the width`. So one mesh serves every zoom and
+  every width. At first that sum is done on the CPU, into a `MeshGeometry` that Pixi batches: a
+  zoom rewrites the positions in place, with no new arrays. Later the same arrays go to a shader
+  that does the sum. The distance along the line is the texture coordinate for dashes
+  (section 5): one stroke per line, with joins, and patterns of four values.
+- **An outline at a distance,** as rings. A halo needs it for a selected feature, a label for its
+  path inside an area (`PixiLayerLabels`, 12 px in), and the partial-fill band for every area
+  (section 4, option B). The band is the hard one: where an area is narrow or its segments short,
+  the offset ring folds over itself and has to be cleaned up.
+
+A hit area needs neither: whether the pointer is within a distance of a line is a sum over its
+segments, with no polygon. `BufferHitArea` can do that without the builder.
+
+It's plain geometry, so it goes in `modules/geo/`, with unit tests (two points, repeated points,
+a turn of 180°, a closed ring, a sliver, segments shorter than the width) and a run over seeded
+random lines, as `graph_model.test.js` does for `Graph`.
+
+### What was built (Nov 22: step 2, and step 1 outside the browser)
+
+`modules/geo/stroke.ts`, on the `linebuilder_refactor` branch. Nothing draws with it yet.
+
+- **`geomStrokeMesh(coords, options)`** builds the mesh: butt, square and round caps; bevel, miter
+  and round joins; open lines and rings. It writes into scratch arrays and copies the result
+  out, so a line costs three typed arrays and nothing else.
+- **`geomStrokePositions(mesh, halfWidth, out)`** and **`geomStrokeUVs(mesh, halfWidth, perUnit,
+  out)`** work out where the vertices are, and their texture coordinates, for a width. Both write
+  into an array they're given.
+- **A vertex is 7 numbers:** its point on the line, its direction away from it, the distance along
+  the line and how much further along the vertex is (so a dash pattern runs straight along each
+  edge of a segment, and isn't sheared at a corner), and its side.
+- **A round join or cap is 10 slices for a half circle,** in proportion to the turn (`roundSlices`).
+- **A corner that turns less than about 16° is a miter on both sides,** whatever join was asked
+  for: 2 vertices that both segments share. The difference from a round join is under 1% of the
+  half width. Traced curves are mostly such corners.
+- **The inside of a sharper corner is the one thing that depends on the width.** While the line
+  is narrow enough, both segments end where their inside edges cross, and nothing is covered
+  twice. When that crossing would be past the end of the shorter segment (Pixi's rule too), each
+  segment keeps its square end and they overlap. The triangles are the same in both cases: three
+  vertices have a second place to be, and the half width from which to use it (`fallbacks`).
+  A shader can make the same choice with a `step()`.
+
+**Tests** (`test/unit/geo/stroke.test.js`): the cases by hand, and three checks over seeded random
+lines, 200 by default (`STROKE_SEEDS=5000` passes too). They test against the definition, not
+against Pixi: a round stroke covers every point within half a width of the line, nothing further
+away, and on a line that doesn't come near itself, every point once. Ten deliberate mistakes in the
+builder were each caught.
+
+**Against Pixi's `buildLine`,** in Bun, on every way of the three tapes (lines, and the outlines
+of areas), each as one stroke 5 px wide. Median of 5 runs. This is the line builder alone, not
+the rest of what Pixi does to draw a `Graphics`.
+
+Round caps and joins (the style defaults):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Ways, and their nodes | 5,700, 35,844 | 20,491, 169,706 | 50,252, 415,059 |
+| Pixi at z14: vertices a node, ms | 45.9, 16 | 33.7, 50 | 37.2, 143 |
+| ..z16 | 25.8, 10 | 19.9, 33 | 21.7, 95 |
+| ..z18 | 15.7, 7 | 13.0, 25 | 14.0, 69 |
+| ..z20 | 10.7, 6 | 9.6, 18 | 10.1, 53 |
+| `geomStrokeMesh`, once for every zoom | 7.1, 4 | 6.2, 15 | 6.3, 35 |
+| ..positions for a new zoom, ms | 0.4 | 2 | 6 |
+| ..the meshes | 10 MB | 42 MB | 101 MB |
+
+- **Pixi makes 20 to 26 vertices for each node at z16, and 34 to 46 at z14,** and makes them again
+  at every zoom. The mesh has 6 or 7, once: a zoom in Užice is 6 ms of sums where it was 95 ms of
+  building, and no new arrays.
+- **It's the round joins and caps.** With butt caps and miter joins Pixi makes 2.9 to 4.2 vertices
+  a node at z16 and the mesh 3.6 to 4.3, in about the same time.
+- **Most inside corners overlap at z16 and below, at this width:** 46% in Seattle, 75% at Staten
+  Island, 67% in Užice (10%, 7% and 37% at z18). OSM's corners have short segments: a turn of 90° in
+  a line 5 px wide needs 2.5 world units of each, about 4 m. It only shows on a translucent line,
+  and Pixi's rule gives the same.
+- **Not measured yet:** what Pixi builds in the app (which features, at which widths, casings
+  included). That count goes into frame stats with step 3, where it's compared in the browser.
+
+### Order of work
+
+Each step is measured on the tapes of Seattle, Staten Island and Užice (`bun run measure --tape`),
+and compared by screenshot with the build before it.
+
+1. **Count what Pixi builds now.** Vertices per layer in frame stats (section 2 asked for it), and
+   for a zoom in each place: vertices, bytes allocated, and time in `buildLine`. This is what the
+   builder is judged against. *Done outside the browser (above); the count in frame stats is still
+   to do, with step 3.*
+2. **The builder's stroke mesh. Done (Nov 22).** In `modules/geo/`, with its tests. Round joins and caps get a
+   fixed number of slices, not one that grows with the width in world units (section 2: a cap
+   gets 25 to 95 slices where a handful would look the same).
+3. **Casings and strokes drawn from it,** one at a time: `PixiFeatureLine.updateGraphic()`, then
+   the outlines of areas. Each is a `Mesh` with a fixed `batchMode` (pixijs#12437) and the dash
+   texture we have. A zoom rewrites positions and builds nothing. `lib/DashLine.ts` goes when the
+   halo no longer needs it.
+   *Measured by:* bytes allocated over sixteen zooms in Užice (13.7 GB now; `buildContextBatches`
+   was 6 GB of it in section 13 and nothing has reduced it), how often a major collection comes,
+   the heap after a load, DRAW.
+   *Stop if:* a `Mesh` and its geometry per line hold more than the `Graphics` they replace. Then
+   keep `Graphics` for now, and bring step 6 forward.
+4. **Hit areas by distance, and the halo and label path from the outline.** `lineToPoly()` and its
+   dependence on Pixi's `buildLine` go.
+5. **Partial-fill bands instead of stencil masks** (section 4). The masks are 707 of Seattle's 771
+   draw calls, and the mask's `Mesh` is where pixijs#12437 and #12388 bit. Bands depend on the
+   zoom, so they're built per whole zoom level or over frames, as now.
+6. **The static tier, for lines first.** A mesh per tile and class with our own shader, ranges, and
+   the editing tier for what's touched. Needs hit-testing through the spatial index first. The
+   check against a pass (`osmSceneState()`) has to learn to read ranges.
+   *Measured by:* the heap (the OSM layer's features are about 520 MB of it), what a zoom
+   allocates, a pan's frames, and a drag of one vertex of the largest line and area in each place.
+7. **Building in a worker,** when the numbers say main-thread building is what's left: a tile that
+   arrives, and the first draw after a load.
+8. **Polygons and points in the static tier.** A point is two or three `Container`s today, and
+   a `Container` is 0.7 KB before it draws anything (section 13).
+
+Steps 2 to 5 are section 7's step 6, in more detail and in a different order: strokes before
+bands, because the stroke mesh is the simpler product and the larger share of the garbage, and it
+settles how typed arrays reach Pixi before the hard geometry starts.
+
+### Decided (Bryan, Nov 22)
+
+- **Strokes first, then bands.** Strokes are simpler, and a band is a stroke with an offset.
+- **Try Clipper2 for the band's offsetting,** and measure its size and time before deciding
+  between it and code of our own. Conflation's buffers (`backlog.md`) want the same answer.
+- **Round joins and caps start at 10 slices for a half circle,** more only if they look jagged.
+  The lines are thin, and a vertex marker often covers the join anyway.
+
+### Open questions
+
+- **One stroke mesh for a casing and its stroke?** They follow the same line with different widths,
+  so one set of arrays could draw both, when they have the same cap and join.
+- **A halo as two thin offset strokes,** not an outline? It needs no cleanup, but an open line's
+  halo wouldn't close around its ends. A visual call.
+- **Translucent strokes.** A stroke mesh overlaps itself where a line is wider than a segment is
+  long: most corners at z16 (above). An opaque line doesn't show it, and every OSM stroke and
+  casing in `rapid_style.json5` is opaque. The lines of other layers aren't all (0.7 in some), and
+  a layer's own opacity applies to each triangle. To look at with step 3, next to Pixi's.
+- **A smaller vertex.** 28 bytes, and every vertex at a corner repeats the corner's point and
+  distance. An index into the line's own coordinates would take it to 16 to 20, for the CPU's
+  sums; a shader wants the point in each vertex. Wait for step 3's heap numbers.
+- **Offsets.** A band is a stroke with an offset, and the mesh has none: a vertex would need the
+  direction its corner moves in as well. Left for step 5, where the cleanup decides the shape.
+- **How many meshes a tile needs.** One per class and tile keeps today's draw order
+  ([`scene.md`](scene.md)), and 580 render groups already cost 1 to 2 ms a frame. Color and width
+  as vertex attributes would let classes share a mesh where their order allows.
+- **Where a worker gets coordinates from.** Packed by the main thread and transferred, or built
+  where the OSM data is parsed.

@@ -39,8 +39,9 @@ said otherwise. Biggest or most wanted first.
   an `Extent` each on a `Geometry` and its part; (3) Pixi's `syncShader` polyfill allocates on every
   draw call (5%, upstream); (4) a tile label string per feature drawn (4%); (5) whether the scheduler's
   long tail after a load leaves V8 idle time to collect in.
-- **A line builder of our own** (sections 4 and 7; Bryan: "I really want this"). Partial-fill bands
-  without stencil masks, hit areas, halos, dashes, and a quarter of a zoom's garbage.
+- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Partial-fill bands
+  without stencil masks, hit areas, halos, dashes, and a quarter of a zoom's garbage. Section 15 has
+  the order of work, for review.
 - **Features keep a full copy of their style, and matching makes two** (Bryan: "this could be better").
   `styleMatch()` returns a copy, and `feature.style =` merges it with the defaults into another: 14% of
   the APP time of making features. `styleMatch()` once returned the base style by reference and

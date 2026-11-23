@@ -15,6 +15,7 @@ Note: The code here should probably be moved into either `/util` or into [`@rapi
 |------|-------------|
 | `geom.ts` | Line layout, coverage boxes, and self-intersection tests |
 | `ortho.ts` | Orthogonalization utilities (squaring corners) |
+| `stroke.ts` | The triangles that draw a line, built once for any width (see [`design/graphics-system.md`](../../design/graphics-system.md) section 15) |
 | `index.ts` | Barrel export file |
 
 ## Common Functions
@@ -25,6 +26,10 @@ The `geom.ts` file includes:
 - `geoMetersToWorld` - Convert a distance in meters to world units at a given latitude (used for conflation buffer radii)
 - `geomLineSegments` - Break a line into evenly-spaced positions that share a heading (used to place oneway arrows and sided markers)
 - `geoHasSelfIntersections` - Test whether a way being dragged or drawn intersects itself
+
+The `stroke.ts` file includes:
+- `geomStrokeMesh` - Build a line's triangles, with caps and joins. Each vertex is a point on the line and a direction away from it, so the mesh doesn't depend on the line's width
+- `geomStrokePositions`, `geomStrokeUVs` - Work out the vertices' positions and texture coordinates for a width, into an array that can be reused
 
 The `ortho.ts` file includes utilities for:
 - Detecting corner angles
