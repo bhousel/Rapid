@@ -32,16 +32,17 @@ frame pacing, the frame's deadline, the pass, garbage, labels). Numbers below ar
 said otherwise. Biggest or most wanted first.
 
 - **Garbage collection is the longest stall left** (section 13). A major collection is 420 to 480 ms of
-  the main thread, every 12 s of zooming. Left, by size: (1) Pixi's line builder is a quarter of what a
-  zoom allocates, most of it `round` joins and caps (try `bevel`/`butt` for thin lines, a visual call;
-  or our own line builder); (2) the 1.7 GB alive: a full copy of the style per feature (51 MB, below),
+  the main thread, every 12 s of zooming. Left, by size: (1) Pixi's line builder was a quarter of what a
+  zoom allocates: done on `linebuilder_refactor` (section 15, step 3: a zoom allocates half of what it
+  did; what `buildLine` still makes is the partial-fill masks and the halos); (2) the 1.7 GB alive: a full copy of the style per feature (51 MB, below),
   a way's coordinates kept three times as arrays of pairs (`Float64Array`s would take a quarter), and
   an `Extent` each on a `Geometry` and its part; (3) Pixi's `syncShader` polyfill allocates on every
   draw call (5%, upstream); (4) a tile label string per feature drawn (4%); (5) whether the scheduler's
   long tail after a load leaves V8 idle time to collect in.
-- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Partial-fill bands
-  without stencil masks, hit areas, halos, dashes, and a quarter of a zoom's garbage. Section 15 has
-  the order of work, for review.
+- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Section 15 has
+  the order of work. Done on `linebuilder_refactor`: the stroke mesh, and lines and area outlines
+  drawn from it (steps 1 to 3). Left: hit areas, halos and the label path (step 4), partial-fill
+  bands without stencil masks (step 5), the static tier (step 6).
 - **Features keep a full copy of their style, and matching makes two** (Bryan: "this could be better").
   `styleMatch()` returns a copy, and `feature.style =` merges it with the defaults into another: 14% of
   the APP time of making features. `styleMatch()` once returned the base style by reference and

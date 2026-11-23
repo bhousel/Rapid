@@ -89,13 +89,52 @@ describe('PixiFeaturePolygon', () => {
     assert.strictEqual(feature.container.children.length, 0);
   });
 
-  it('destroys the strokes it replaces when it is drawn again', () => {
+  it('keeps a ring\'s outline through a zoom, and moves the vertices it has', () => {
     drawAt(17);
-    const before = feature.strokes.children[0];
-    drawAt(17.5);
-    assert.isTrue(before.destroyed);
+    const outline = feature.strokes.children[0];
+    const strokeMesh = outline.strokeMesh;
+    const positions = outline.geometry.positions;
+    const box = () => {
+      let min = Infinity, max = -Infinity;
+      for (let i = 0; i < positions.length; i += 2) { min = Math.min(min, positions[i]); max = Math.max(max, positions[i]); }
+      return max - min;
+    };
+    assert.isTrue(strokeMesh.closed);
+    assert.strictEqual(strokeMesh.cap, 'butt');
+    assert.strictEqual(strokeMesh.join, 'miter');
+    assert.strictEqual(outline.tint, 0xff0000);
+    const wide = box();   // the square, and a line 2 px wide around it
+
+    drawAt(18);
     assert.strictEqual(feature.strokes.children.length, 1);
-    assert.notStrictEqual(feature.strokes.children[0], before);
+    assert.strictEqual(feature.strokes.children[0], outline);
+    assert.isFalse(outline.destroyed);
+    assert.strictEqual(outline.strokeMesh, strokeMesh);
+    assert.strictEqual(outline.geometry.positions, positions, 'the same array');
+    assert.closeTo(wide - box(), 2 * (1 / 2 - 1 / 4), 1e-4, 'half as wide in world units');
+  });
+
+  it('builds new outlines when the polygon changes, and destroys the ones of rings that are gone', () => {
+    const context = feature.context;
+    const withHole = new Rapid.GeometryPart(context);
+    withHole.setData({ type: 'Polygon', coordinates: [
+      SQUARE.coordinates[0],
+      [[0.0001, 0.0001], [0.0001, 0.0004], [0.0004, 0.0004], [0.0004, 0.0001], [0.0001, 0.0001]]
+    ] });
+    feature.geometry = withHole;
+    drawAt(17);
+    assert.deepEqual(feature.strokes.children.map(child => child.label), ['stroke0', 'stroke1']);
+    const [outer, hole] = feature.strokes.children;
+    const strokeMesh = outer.strokeMesh;
+
+    const square = new Rapid.GeometryPart(context);
+    square.setData(SQUARE);
+    feature.geometry = square;
+    drawAt(17);
+    assert.strictEqual(feature.strokes.children.length, 1);
+    assert.strictEqual(feature.strokes.children[0], outer);
+    assert.notStrictEqual(outer.strokeMesh, strokeMesh);
+    assert.isTrue(hole.destroyed);
   });
 
   it('works out the hit buffer only when the pointer comes near', () => {

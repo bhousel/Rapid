@@ -48,6 +48,12 @@ export interface StrokeMesh {
   fallbacks: Float32Array;
   /** The length of the line (of the ring, if it's closed) */
   length: number;
+  /** Whether it was built as a ring (a line asked to be closed that has too few points isn't) */
+  closed: boolean;
+  /** The cap it was built with */
+  cap: StrokeCap;
+  /** The join it was built with */
+  join: StrokeJoin;
 }
 
 /** How many numbers a vertex takes in `StrokeMesh.vertices` */
@@ -371,6 +377,39 @@ function addJoin(
 
   // The line turns towards one side (the inside), and the other side (the outside) has a gap to fill.
   const o = (cross > 0) ? -1 : 1;   // the outside: 1 if it's the left
+
+  // A miter: both segments run on to where their edges cross, the outside ones at the tip and the
+  // inside ones at the inside miter, so two vertices on each side are the whole corner. (Two, not
+  // one, because each segment counts its own distance along the line to get there.) When the line
+  // is too wide for the inside miter (below), the inside vertices move back to their segments'
+  // square ends, and the triangle between them and the tip fills what that opens.
+  if (join === 'miter' && dot > REVERSE_DOT && (1 + dot) * miterLimit * miterLimit >= 2) {   // the miter is 1 / cos(half the turn) long
+    const k = 1 / (1 + dot);
+    const mx = o * (anx + bnx) * k;
+    const my = o * (any + bny) * k;
+    const tan = Math.sqrt((1 - dot) * k);
+    const limit = INSIDE_SHARE * Math.min(_line[prev * LINE_SIZE + 4], _line[next * LINE_SIZE + 4]) / tan;
+    const tipPrev = addVertex(x, y, mx, my, distPrev, tan, o);
+    const tipNext = addVertex(x, y, mx, my, distNext, -tan, o);
+    const insidePrev = addVertex(x, y, -mx, -my, distPrev, -tan, -o);
+    const insideNext = addVertex(x, y, -mx, -my, distNext, tan, -o);
+    addFallback(insidePrev, limit, -o * anx, -o * any, 0, -o);
+    addFallback(insideNext, limit, -o * bnx, -o * bny, 0, -o);
+    addTriangle(tipNext, insidePrev, insideNext);
+    if (o === 1) {
+      _endL = tipPrev;
+      _endR = insidePrev;
+      _startL = tipNext;
+      _startR = insideNext;
+    } else {
+      _endL = insidePrev;
+      _endR = tipPrev;
+      _startL = insideNext;
+      _startR = tipNext;
+    }
+    return;
+  }
+
   const outerPrev = addVertex(x, y, o * anx, o * any, distPrev, 0, o);
   const outerNext = addVertex(x, y, o * bnx, o * bny, distNext, 0, o);
 
@@ -405,13 +444,7 @@ function addJoin(
     const angle = -o * Math.atan2(Math.abs(cross), dot);   // from `outerPrev` around to `outerNext`
     addFan(x, y, distNext, 0, 0, outerPrev, outerNext, o * anx, o * any, angle, slices, center);
 
-  } else if (join === 'miter' && dot > REVERSE_DOT && (1 + dot) * miterLimit * miterLimit >= 2) {   // the miter is 1 / cos(half the turn) long
-    const k = 1 / (1 + dot);
-    const tip = addVertex(x, y, o * (anx + bnx) * k, o * (any + bny) * k, distNext, 0, o);
-    addTriangle(center, outerPrev, tip);
-    addTriangle(center, tip, outerNext);
-
-  } else {   // bevel
+  } else {   // a bevel, or a miter that's too long
     addTriangle(center, outerPrev, outerNext);
   }
 
@@ -461,7 +494,10 @@ export function geomStrokeMesh(coords: ArrayLike<number>, options: Partial<Strok
   const numPoints = _numPoints;
   const closed = _closed;
   if (numPoints < 2) {
-    return { vertexCount: 0, vertices: EMPTY_FLOATS, indices: EMPTY_INDICES, fallbacks: EMPTY_FLOATS, length: 0 };
+    return {
+      vertexCount: 0, vertices: EMPTY_FLOATS, indices: EMPTY_INDICES, fallbacks: EMPTY_FLOATS, length: 0,
+      closed: false, cap: cap, join: join
+    };
   }
 
   _numVerts = 0;
@@ -507,7 +543,10 @@ export function geomStrokeMesh(coords: ArrayLike<number>, options: Partial<Strok
     vertices: _verts.slice(0, _numVerts * STROKE_VERTEX_SIZE),
     indices: (_numVerts <= 0x10000) ? new Uint16Array(_indices.subarray(0, _numIndices)) : _indices.slice(0, _numIndices),
     fallbacks: _numFallbacks ? _fallbacks.slice(0, _numFallbacks * STROKE_FALLBACK_SIZE) : EMPTY_FLOATS,
-    length: length
+    length: length,
+    closed: closed,
+    cap: cap,
+    join: join
   };
 }
 

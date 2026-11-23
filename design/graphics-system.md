@@ -12,8 +12,9 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
 > without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
 > rendering follow-ups". The plan is in section 7. Section 15 is where the renderer could go from
-> here (two tiers, a line builder of our own) and the order of work; its stroke mesh is built
-> (`modules/geo/stroke.ts`, on `linebuilder_refactor`) and nothing draws with it yet.
+> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 3 are built on
+> `linebuilder_refactor`: lines and the outlines of areas are drawn from stroke meshes
+> (`modules/geo/stroke.ts`, `modules/pixi/lib/LineMesh.ts`).
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -2221,11 +2222,12 @@ random lines, as `graph_model.test.js` does for `Graph`.
 
 ### What was built (Nov 22: step 2, and step 1 outside the browser)
 
-`modules/geo/stroke.ts`, on the `linebuilder_refactor` branch. Nothing draws with it yet.
+`modules/geo/stroke.ts`, on the `linebuilder_refactor` branch. (Step 3, below, draws with it.)
 
 - **`geomStrokeMesh(coords, options)`** builds the mesh: butt, square and round caps; bevel, miter
   and round joins; open lines and rings. It writes into scratch arrays and copies the result
-  out, so a line costs three typed arrays and nothing else.
+  out, so a line costs three typed arrays and nothing else. The mesh says how it was built
+  (`cap`, `join`, `closed`), so whoever holds one can tell whether it's still the one it needs.
 - **`geomStrokePositions(mesh, halfWidth, out)`** and **`geomStrokeUVs(mesh, halfWidth, perUnit,
   out)`** work out where the vertices are, and their texture coordinates, for a width. Both write
   into an array they're given.
@@ -2242,6 +2244,10 @@ random lines, as `graph_model.test.js` does for `Graph`.
   segment keeps its square end and they overlap. The triangles are the same in both cases: three
   vertices have a second place to be, and the half width from which to use it (`fallbacks`).
   A shader can make the same choice with a `step()`.
+- **A miter is two vertices on each side** (added with step 3): the segments run on to the tip
+  outside and to the inside miter inside, as Pixi's do. Two and not one, because each segment
+  counts its own distance to get there, for dashes. One triangle fills what opens when the inside
+  vertices move back. It was six vertices at first, half again what Pixi makes for a building.
 
 **Tests** (`test/unit/geo/stroke.test.js`): the cases by hand, and three checks over seeded random
 lines, 200 by default (`STROKE_SEEDS=5000` passes too). They test against the definition, not
@@ -2270,13 +2276,124 @@ Round caps and joins (the style defaults):
   at every zoom. The mesh has 6 or 7, once: a zoom in Užice is 6 ms of sums where it was 95 ms of
   building, and no new arrays.
 - **It's the round joins and caps.** With butt caps and miter joins Pixi makes 2.9 to 4.2 vertices
-  a node at z16 and the mesh 3.6 to 4.3, in about the same time.
+  a node at z16 and the mesh 2.8 to 3.0, in about the same time.
 - **Most inside corners overlap at z16 and below, at this width:** 46% in Seattle, 75% at Staten
   Island, 67% in Užice (10%, 7% and 37% at z18). OSM's corners have short segments: a turn of 90° in
   a line 5 px wide needs 2.5 world units of each, about 4 m. It only shows on a translucent line,
   and Pixi's rule gives the same.
-- **Not measured yet:** what Pixi builds in the app (which features, at which widths, casings
-  included). That count goes into frame stats with step 3, where it's compared in the browser.
+- What Pixi built in the app (which features, at which widths, casings included) is counted
+  below, with step 3.
+
+### What was built (Nov 22: step 3, and the rest of step 1)
+
+A line's casing and stroke, and each ring of an area's outline, is a **`LineMesh`**
+(`modules/pixi/lib/LineMesh.ts`): a Pixi `Mesh` that draws a stroke mesh at a width.
+
+- **`setStroke(strokeMesh, halfWidth, dashTexture, dashLength)` does only what changed.** A new
+  stroke mesh gets a new array of positions. A new width (every zoom, in world units) is worked
+  out in the array the mesh has, and Pixi is told that the buffer changed. Nothing is built.
+- **A feature builds a stroke mesh when its line, cap or join changes,** and not for a zoom, a
+  hover or a restyle (`PixiFeatureLine._drawPart()`). It knows the line is the same by its
+  `GeometryPart`: data is immutable, so a line that changed is another part.
+- **A casing and its stroke share one stroke mesh** when they have the same cap and join (the
+  style defaults do): one set of triangles and indices, two arrays of positions.
+- **A line that ends where it starts is built as a ring.** It gets a join there, where it had two
+  caps on top of each other, and its dashes run on around.
+- **Always batched** (`batchMode = 'batch'`, set once). A `Graphics` is batched only under 200
+  vertices, so long lines were each a draw call with a shader switch.
+- **Dashes are a texture that repeats along the line** (`PixiTextures.getDashTexture()`): one
+  repeat of the pattern, 1 texel high, 4 texels to the pixel, white where the line is. The color
+  and opacity come from the mesh. `DashLine` drew each segment as a stroke of its own with a
+  texture matrix, so a dashed line had no joins; now it has the joins its style asks for.
+- **A line that isn't dashed has no texture coordinates of its own.** They'd all be zero (one
+  texel of `Texture.WHITE`), so such lines share one array of zeros.
+- **Frame stats count triangles** (`draw.triangles`, the `tris` column of `bun run measure`):
+  everything in Pixi's instruction lists, from the sizes of its batches.
+
+**What the lines of a view are made of** (casings and strokes of the OSM layer after a load;
+Pixi's count is read from what it built for each `Graphics`):
+
+| | Seattle z17.5 | Staten Island z16.5 | Užice z16 | Užice z18 |
+|---|---|---|---|---|
+| Lines shown, and their nodes | 2,020, 7,863 | 1,837, 23,210 | 21,370, 104,835 | 6,550, 34,022 |
+| Casing vertices, before and after | 171,656 → 58,727 | 325,438 → 106,571 | 1,711,664 → 481,759 | 375,400 → 147,892 |
+| Stroke vertices | 67,136 → 32,183 | 224,056 → 95,545 | 606,574 → 464,060 | 163,618 → 133,141 |
+| ..both, for each node | 30.4 → 11.6 | 23.7 → 8.7 | 22.1 → 9.0 | 15.8 → 8.3 |
+| Lines drawn outside a batch | 48 → 0 | 490 → 0 | 1,197 → 0 | 182 → 0 |
+| Outline vertices (areas drawn in full) | 19,974 → 28,289 | 84,706 → 102,850 | 261,574 → 285,094 | 168,854 → 189,541 |
+| Outlines drawn outside a batch | 1 → 0 | 94 → 0 | 371 → 0 | 142 → 0 |
+
+Casings are where Pixi's round joins cost most. Strokes fall less, because many are dashed, and a
+dashed stroke was already butt-ended segments. Outlines (butt caps, miter joins) have about a
+tenth more vertices than Pixi's: the mesh has two vertices on each side of a corner where Pixi
+has one, for the dashes.
+
+**Sixteen zooms in Užice** (the script of section 13; one run of each build):
+
+| | `Graphics` | Lines as meshes | ..and outlines |
+|---|---|---|---|
+| Allocated | 13.3 GB | 7.2 GB | 6.6 GB |
+| ..by Pixi building lines and polygons (`buildContextBatches`) | 5.3 GB | 1.1 GB | 0.6 GB |
+| Frames over 120 ms | 5, up to 442 ms | 7, up to 145 ms | 4, up to 130 ms |
+| Minor collections (in sixteen more, traced) | 483, 1.8 s | 237, 0.75 s | 204, 0.62 s |
+| Major collections (the same) | 3 | 3 | 6 |
+| Heap after a load, collected | 1,628 MB | 1,470 MB | 1,469 MB |
+| ..after sixteen zooms | 1,745 MB | 1,554 MB | 1,476 MB |
+| ..after sixteen more | 1,798 MB | 1,629 MB | 1,478 MB |
+
+- **A zoom allocates half of what it did,** and the heap no longer grows over zooms: nothing is
+  replaced, so there's nothing for Pixi to keep until its collector comes around.
+- **The stop condition wasn't met.** A `Mesh` and its geometry per line hold less than the
+  `Graphics` they replace: 159 MB less after a load in Užice. What Pixi built in DRAW for every
+  `Graphics` (its vertices as arrays of numbers, 8 bytes each) is gone, and the stroke meshes and
+  positions that replace it are typed arrays, half as many vertices.
+- **The long frames that are left are the frames of a zoom itself,** 125 to 130 ms each (65 of APP
+  and 60 of DRAW), as before. In the traced run of the old build, three of the six long frames
+  had 105 to 186 ms of the collector's work in them; the four of the last build had 2 to 4 ms.
+  That build had six major collections where the others had three, none of them in a long frame,
+  and I don't know why there were more. It's one run of each, and collections don't come on a
+  schedule: the amounts allocated are the numbers to trust.
+- **A `LineMesh` is 1.9 KB before it has a line** (the `Mesh`, its geometry and three buffers;
+  71 MB for 38,000 of them in Užice). That's the cost per object that step 6 removes.
+
+**`bun run measure`** on the three tapes (`--fresh`, 9 frames a mode, boundaries hidden):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Redraw: APP, DRAW (ms) | 11.9, 2.1 → 9.2, 1.6 | 32.4, 3.0 → 24.5, 0.9 | 141.8, 6.8 → 117.2, 1.8 |
+| ..draw calls | 1,687 → 1,619 | 1,434 → 684 | 3,437 → 1,197 |
+| ..shader switches | 64 → 2 | 652 → 56 | 2,086 → 132 |
+| ..triangles | 192,939 → 156,454 | 563,141 → 444,187 | 1,819,394 → 1,484,476 |
+| A pan's frame: DRAW | 2.1 → 1.9 | 4.3 → 1.2 | 7.2 → 1.9 |
+| After a zoom: the first frame's DRAW | 21.2 → 8.3 | 5.8 → 4.3 | 7.2 → 2.5 |
+| ..until every feature is drawn again | 217 → 151 ms | 259 → 184 ms | 1,304 → 720 ms |
+
+- **DRAW is a third of what it was in the dense places.** The masks are most of what's left to
+  draw one at a time (step 5): Seattle has 1,336 mask instructions, and 1,619 draw calls.
+- **GPU time didn't clearly change:** 22 ms in Užice with either build when it's measured alone.
+- **A pan's APP in Užice is the labels layer** (5 to 9 ms in the frames after the cull box moves,
+  in both builds). It read 1.1 ms in the run before and 6.1 after, because of where the run was
+  in its queue, not because of the lines.
+
+**Screenshots** of Seattle, Staten Island and Užice (z16 and z18), and of a tunnel and a closed
+line at z19.5: 0.15 to 1.1% of the pixels differ from the build before. Where I looked (the
+parts that differ most), it's the dashes: they start at another phase and their ends are sharper.
+Round joins at 10 slices, translucent strokes (tunnels are drawn at 0.5) and corners look the
+same. The renderers `webgl1` and `webgpu` draw them too (one view of each).
+
+**What changed that someone might notice:**
+
+- **With `renderer=canvas`, lines and outlines aren't drawn.** Pixi's canvas renderer has no mesh
+  pipe (the partial fills already fell back to full fills there). The option stays as it is
+  (Bryan, Nov 22): it was an experiment, nobody relies on it, and meshes on canvas are Pixi's to add.
+- **Dashed lines have joins and caps now,** the ones their style asks for: round joins by
+  default, and butt caps in all but a few of the dashed styles. A cap is at the end of the line,
+  not of each dash.
+- **A frame can switch shaders zero times** (the e2e test of the WebGL counters expected at least one).
+
+**Tests:** `test/dom/pixi/LineMesh.test.js`, more in `PixiFeatureLine.test.js` and
+`PixiFeaturePolygon.test.js`, and an e2e test that zooms the real app and checks that every line
+and outline is batched, kept its stroke mesh and its array, and moved.
 
 ### Order of work
 
@@ -2285,15 +2402,16 @@ and compared by screenshot with the build before it.
 
 1. **Count what Pixi builds now.** Vertices per layer in frame stats (section 2 asked for it), and
    for a zoom in each place: vertices, bytes allocated, and time in `buildLine`. This is what the
-   builder is judged against. *Done outside the browser (above); the count in frame stats is still
-   to do, with step 3.*
+   builder is judged against. **Done (Nov 22):** outside the browser and in the app (above).
+   Frame stats count triangles for everything; vertices per layer weren't worth a walk on every
+   frame.
 2. **The builder's stroke mesh. Done (Nov 22).** In `modules/geo/`, with its tests. Round joins and caps get a
    fixed number of slices, not one that grows with the width in world units (section 2: a cap
    gets 25 to 95 slices where a handful would look the same).
-3. **Casings and strokes drawn from it,** one at a time: `PixiFeatureLine.updateGraphic()`, then
-   the outlines of areas. Each is a `Mesh` with a fixed `batchMode` (pixijs#12437) and the dash
-   texture we have. A zoom rewrites positions and builds nothing. `lib/DashLine.ts` goes when the
-   halo no longer needs it.
+3. **Casings and strokes drawn from it. Done (Nov 22),** and the outlines of areas (above). Each
+   is a `Mesh` with a fixed `batchMode` (pixijs#12437) and a dash texture of its own kind. A zoom
+   rewrites positions and builds nothing. `lib/DashLine.ts` goes when the halos and the map UI no
+   longer need it.
    *Measured by:* bytes allocated over sixteen zooms in Užice (13.7 GB now; `buildContextBatches`
    was 6 GB of it in section 13 and nothing has reduced it), how often a major collection comes,
    the heap after a load, DRAW.
@@ -2328,17 +2446,25 @@ settles how typed arrays reach Pixi before the hard geometry starts.
 
 ### Open questions
 
-- **One stroke mesh for a casing and its stroke?** They follow the same line with different widths,
-  so one set of arrays could draw both, when they have the same cap and join.
+- **One `Mesh` for a casing and its stroke?** They share a stroke mesh already (step 3). One
+  `Mesh` for both would halve the objects (1.9 KB each), but it has one tint: the two colors
+  would have to come from a texture or a vertex attribute. That's step 6's shader.
+- **The frame of a zoom is still 125 ms in Užice,** half of it DRAW. Not looked at yet: every
+  mesh's vertices are copied into Pixi's batch again (24 bytes a vertex), and the features move
+  to other tiles when a whole zoom level is crossed.
+- **One texture for every dash pattern.** Each pattern is a texture of its own, as before, and a
+  batch holds 16 textures. A row for each pattern in one texture would keep dashed lines from
+  breaking batches. Not measured.
 - **A halo as two thin offset strokes,** not an outline? It needs no cleanup, but an open line's
   halo wouldn't close around its ends. A visual call.
 - **Translucent strokes.** A stroke mesh overlaps itself where a line is wider than a segment is
-  long: most corners at z16 (above). An opaque line doesn't show it, and every OSM stroke and
-  casing in `rapid_style.json5` is opaque. The lines of other layers aren't all (0.7 in some), and
-  a layer's own opacity applies to each triangle. To look at with step 3, next to Pixi's.
+  long: most corners at z16 (above). An opaque line doesn't show it. Tunnels are drawn at 0.5
+  (`StyleSystem`), and some other layers' lines at 0.7. Looked at with step 3: Seattle's tunnels
+  look the same as with Pixi's builder, which overlaps there too. Not looked at: the data layers.
 - **A smaller vertex.** 28 bytes, and every vertex at a corner repeats the corner's point and
   distance. An index into the line's own coordinates would take it to 16 to 20, for the CPU's
-  sums; a shader wants the point in each vertex. Wait for step 3's heap numbers.
+  sums; a shader wants the point in each vertex. Step 3's heap numbers say it isn't urgent: the
+  heap fell 159 MB with the vertex as it is, and the objects cost more than the arrays.
 - **Offsets.** A band is a stroke with an offset, and the mesh has none: a vertex would need the
   direction its corner moves in as well. Left for step 5, where the cleanup decides the shape.
 - **How many meshes a tile needs.** One per class and tile keeps today's draw order

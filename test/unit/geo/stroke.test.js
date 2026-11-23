@@ -43,7 +43,8 @@ function distanceToLine(px, py, coords, closed) {
   return best;
 }
 
-// How many of a mesh's triangles cover a point.
+// How many of a mesh's triangles cover a point. (A triangle with no area covers nothing: a miter
+// corner has one, until the line is too wide for its inside miter.)
 function coverage(px, py, positions, indices) {
   let count = 0;
   for (let i = 0; i < indices.length; i += 3) {
@@ -53,6 +54,7 @@ function coverage(px, py, positions, indices) {
     const by = positions[indices[i + 1] * 2 + 1];
     const cx = positions[indices[i + 2] * 2];
     const cy = positions[indices[i + 2] * 2 + 1];
+    if ((bx - ax) * (cy - ay) === (cx - ax) * (by - ay)) continue;
     const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
     const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
     const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
@@ -269,6 +271,32 @@ describe('geomStrokeMesh', () => {
       assert.equal(coverage(10.9, -0.9, positions, mesh.indices), 1, 'the tip');
     });
 
+    it('makes a miter of two vertices on each side', () => {
+      const mesh = Rapid.geomStrokeMesh(corner, { join: 'miter' });
+      assertWellFormed(mesh, 'miter');
+      assert.equal(mesh.vertexCount, 2 + 4 + 2);
+      assert.equal(mesh.indices.length / 3, 2 + 2 + 1);
+      assert.equal(mesh.fallbacks.length / F, 2);
+    });
+
+    it('fills a miter whose line is too wide for the inside of its corner', () => {
+      // A half width of 12 at segments of 10: each segment keeps its square end on the inside,
+      // and the stroke is the two rectangles, with the corner filled out to the tip.
+      const mesh = Rapid.geomStrokeMesh(corner, { join: 'miter' });
+      const positions = Rapid.geomStrokePositions(mesh, 12);
+      assert.deepEqual(boxOf(positions), [-2, -12, 22, 12]);
+      for (let x = -1.9; x < 22; x += 0.71) {
+        for (let y = -11.9; y < 12; y += 0.73) {
+          const inFirst = (x >= 0 && x <= 10 && y >= -12 && y <= 12);
+          const inSecond = (x >= -2 && x <= 22 && y >= 0 && y <= 10);
+          const inCorner = (x >= 10 && x <= 22 && y >= -12 && y <= 0);
+          if (inFirst || inSecond || inCorner) {
+            assert.ok(coverage(x, y, positions, mesh.indices) >= 1, `${x},${y} isn't covered`);
+          }
+        }
+      }
+    });
+
     it('draws a miter that is too long as a bevel', () => {
       //  a ------ b
       //  c -----´       a turn of 163°: the miter would be 6.9 half widths long
@@ -360,6 +388,22 @@ describe('geomStrokeMesh', () => {
       const ring = Rapid.geomStrokeMesh([0, 0, 10, 0], { closed: true });
       assert.equal(ring.vertexCount, 4);
       assert.equal(ring.length, 10);
+      assert.equal(ring.closed, false);
+    });
+
+    it('says how it was built', () => {
+      const ring = Rapid.geomStrokeMesh([0, 0, 10, 0, 10, 10, 0, 10], { closed: true, join: 'round', cap: 'square' });
+      assert.equal(ring.closed, true);
+      assert.equal(ring.cap, 'square');
+      assert.equal(ring.join, 'round');
+
+      const line = Rapid.geomStrokeMesh([0, 0, 10, 0]);
+      assert.equal(line.closed, false);
+      assert.equal(line.cap, 'butt');
+      assert.equal(line.join, 'miter');
+
+      const nothing = Rapid.geomStrokeMesh([], { cap: 'round' });
+      assert.equal(nothing.cap, 'round');
     });
   });
 
@@ -396,6 +440,27 @@ describe('geomStrokeMesh', () => {
       }
       closeTo(min, -0.1);
       closeTo(max, 2.1);
+    });
+
+    it('gives a miter\'s vertices each segment\'s own distance along the line', () => {
+      const mesh = Rapid.geomStrokeMesh([0, 0, 10, 0, 10, 10], { join: 'miter' });
+      const positions = Rapid.geomStrokePositions(mesh, 1);
+      const uvs = Rapid.geomStrokeUVs(mesh, 1, 0.1);   // a pattern 10 long
+
+      // On the first segment's triangles `u` is x / 10, out to the tip at x = 11.
+      // On the second's it's (10 + y) / 10, from the tip at y = -1.
+      let max = -Infinity;
+      let min = Infinity;
+      for (let k = 0; k < 6; k++) {
+        const first = mesh.indices[mesh.indices.length - 12 + k];
+        closeTo(uvs[first * 2], positions[first * 2] / 10, `vertex ${first} of the first segment:`);
+        max = Math.max(max, uvs[first * 2]);
+        const second = mesh.indices[mesh.indices.length - 6 + k];
+        closeTo(uvs[second * 2], (10 + positions[second * 2 + 1]) / 10, `vertex ${second} of the second segment:`);
+        min = Math.min(min, uvs[second * 2]);
+      }
+      closeTo(max, 1.1);
+      closeTo(min, 0.9);
     });
 
     it('starts a ring at 0 and ends it at its length', () => {

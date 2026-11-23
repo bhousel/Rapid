@@ -3,10 +3,13 @@ import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
 import { BufferHitArea } from './lib/BufferHitArea.ts';
+import { LineMesh } from './lib/LineMesh.ts';
+import { geomStrokeMesh } from '../geo/index.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -22,7 +25,7 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  * Properties available:
  * - `lowRes`     - `PIXI.Sprite` for a replacement graphic to display at low resolution
  * - `fill`       - `PIXI.Graphic` for the fill Graphics (below)
- * - `strokes`    - `PIXI.Container` for the stroke Graphics (above)
+ * - `strokes`    - `PIXI.Container` for the outlines (above): a `LineMesh` for each ring
  * - `mask`       - `PIXI.Mesh` for the mask (applied to fill)
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
@@ -36,7 +39,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public mask: PIXI.Mesh | null;
   /** Source graphics for generating mask geometry */
   public maskSource: PIXI.Graphics | null;
-  /** Container for stroke graphics */
+  /** Container for the outlines: a `LineMesh` for each ring */
   public strokes: PIXI.Container | null;
   /** Debug surrounding rectangle graphics (optional) */
   public debugSurround?: PIXI.Graphics | null;
@@ -45,6 +48,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   protected _hitBuffer: BufferHitArea | null;
   /** Whether `fill` and `mask` hold geometry from the last time they were drawn */
   protected _hasFill: boolean;
+  /** The polygon that the stroke meshes of the outlines were built from */
+  protected _meshPart: GeometryPart | null;
 
 
   /**
@@ -56,6 +61,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     this._hitBuffer = null;
     this._hasFill = false;
+    this._meshPart = null;
 
     // The Pixi objects are made when a level of detail first needs them (see `update`): of
     // 36,000 polygons around a view of Užice at z16, 1,900 are drawn in full, 12,000 as a
@@ -108,6 +114,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     this._hitBuffer = null;
+    this._meshPart = null;
 
     super.destroy();
   }
@@ -356,6 +363,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this.strokes?.destroy({ children: true });
     this.strokes = null;
     this._hasFill = false;
+    this._meshPart = null;
   }
 
 
@@ -398,23 +406,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // STROKES
-    // (Destroyed, not only removed: Pixi keeps what it built for a `Graphics` until it's
-    // destroyed, or until its own collector finds it unused a minute later.)
-    for (const stroke of strokes.removeChildren()) {
-      stroke.destroy();
-    }
+    // Each ring's outline is a `LineMesh`, drawn from a stroke mesh that's built once for the
+    // ring, for any width: a zoom only moves the vertices it has. Those are only good while the
+    // polygon is the same: one that changed is a different part.
     if (strokes.visible) {
       strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
       const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
-      const strokeStyle: StrokeStyleWithDash = {
-        alpha: 1,
-        alignment: 0.5,   // middle of line
-        color: color,
-        width: lineWidth * localScale,
-        cap: 'butt',
-        join: 'miter'
-      };
+      const isSameShape = (this._meshPart === this._geom);
       const bufferStyle: PIXI.StrokeStyle = {
         alpha: 1,
         alignment: 0.5,   // middle of line
@@ -424,34 +423,41 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         join: 'bevel'
       };
 
+      let dashTexture: PIXI.Texture | null = null;
+      let dashLength = 0;
+      if (dash?.length) {
+        dashTexture = this.gfx.textureManager!.getDashTexture(dash);
+        for (const part of dash) {
+          dashLength += part * localScale;
+        }
+      }
+
+      while (strokes.children.length > flat.length) {   // a ring fewer than before
+        strokes.children[strokes.children.length - 1].destroy();
+      }
+
       for (let i = 0; i < flat.length; i++) {
         const ring = flat[i];
-        const stroke = new PIXI.Graphics();
-
-        if (dash) {
-          const dashOptions: StrokeStyleWithDash = {
-            ...strokeStyle,
-            width: lineWidth,
-            dash: dash,
-            scale: localScale
-          };
-          const dl = new DashLine(this.gfx, stroke, dashOptions);
-          dl.poly(ring);
-        } else {
-          stroke.poly(ring).stroke(strokeStyle);
+        let outline = strokes.children[i] as LineMesh | undefined;
+        if (!outline) {
+          outline = new LineMesh();
+          outline.label = `stroke${i}`;
+          outline.sortableChildren = false;
+          strokes.addChild(outline);
         }
+
+        const strokeMesh = (isSameShape && outline.strokeMesh) || geomStrokeMesh(ring, { closed: true, cap: 'butt', join: 'miter' });
+        outline.tint = color;
+        outline.setStroke(strokeMesh, lineWidth * localScale / 2, dashTexture, dashLength);
 
         // (Worked out when the pointer comes near, or for a halo: see `BufferHitArea`)
         const hitBuffer = new BufferHitArea(ring, bufferStyle, local.extent);
         if (i === 0) {
           this._hitBuffer = hitBuffer;  // save outer buffer for the hover halo.
         }
-
-        stroke.hitArea = hitBuffer;
-        stroke.label = `stroke${i}`;
-        stroke.sortableChildren = false;
-        strokes.addChild(stroke);
+        outline.hitArea = hitBuffer;
       }
+      this._meshPart = this._geom;
     }
 
     // FILL

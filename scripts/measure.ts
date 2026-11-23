@@ -246,6 +246,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
       gl: last.draw.gl,
       instructions: last.draw.instructions,
       batchTextures: last.draw.batchTextures,
+      triangles: last.draw.triangles,
       unbatched: last.draw.unbatched.length,
       unbatchedTop: last.draw.unbatched.slice(0, 5),
       layers
@@ -298,7 +299,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
 const results = [];
 const cols = [
   ['place', 14], ['load', 6], ['visible', 8],
-  ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6],
+  ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6], ['tris', 8],
   ['| pan APP', 10], ['DRAW', 6], ['GPU', 6],
   ['| cull APP', 11], ['DRAW', 6], ['of', 5],
   ['| glide fps', 11], ['long', 5], ['pass', 6],
@@ -334,7 +335,7 @@ for (const place of places) {
     console.log(row([
       place.id, `${(r.loadMs / 1000).toFixed(1)}s${r.loaded ? '' : '!'}`, visible,
       r.redraw.appMs, r.redraw.drawMs, r.redraw.gpuMs, r.redraw.gl?.draws,
-      r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched,
+      r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched, r.redraw.triangles,
       r.pan.kept.appMs, r.pan.kept.drawMs, r.pan.kept.gpuMs,
       r.pan.pass.appMs, r.pan.pass.drawMs, `${r.pan.pass.frames}/${r.pan.frames}`,
       r.glide.fps, r.glide.longFrames, r.glide.passMs,
@@ -349,7 +350,8 @@ for (const place of places) {
 
 console.log('\nTimes in ms. The first group is a frame where nothing changed. load ends with ! if the data was');
 console.log('still loading after a minute. visible = features shown, also those in the padding around the view.');
-console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch.');
+console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch,');
+console.log('tris = triangles in everything Pixi has to draw.');
 console.log('pan = pan frames where the OSM layer kept its features as they were (also while a pass was held');
 console.log('back). cull = pan frames where the view left the cull box, and the layer followed it to a new one');
 console.log('(or did its whole pass); of = how many. glide = the view moving on every animation frame for');

@@ -24,8 +24,17 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
   counter-scale to stay screen-sized. The skill's screen-pixel examples need converting. See
   "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
-- **Dashed lines use Rapid's `lib/DashLine.ts`** (texture-based, works with plain `Graphics`). Pixi's
-  `DashLineShader` needs `SmoothGraphics`, and a context with it is never batched.
+- **A line's casing and stroke, and an area's outlines, are `LineMesh`es** (`lib/LineMesh.ts`), not
+  `Graphics`. Their triangles come from `geomStrokeMesh()` (`modules/geo/stroke.ts`), which builds
+  them once for any width. Build a stroke mesh only when the line, its cap or its join changes
+  (the feature's `GeometryPart` is a different object then), and call `setStroke()` for anything
+  else: for a new width it moves the vertices it has. Don't go back to `graphics.stroke()` for
+  them: Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms
+  in Užice allocated. Dashes are `PixiTextures.getDashTexture()`, color and opacity are the
+  mesh's `tint` and `alpha`. See section 15 of `design/graphics-system.md`.
+- **`lib/DashLine.ts` is for what's still a `Graphics`:** the halos and the map UI (texture-based,
+  works with plain `Graphics`). Pixi's `DashLineShader` needs `SmoothGraphics`, and a context with
+  it is never batched.
 - **Render groups go through `PixiScene.worldContainer()`.** The skill says to put a panning world in
   `new Container({ isRenderGroup: true })`. Ours is in z16 world coordinates, which are too big for the
   32-bit floats a render group keeps its vertices in: shapes come out distorted, more so when zoomed
@@ -100,7 +109,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `'no-batch'`). In `'auto'` mode Pixi batches a mesh up to 100 vertices, and a mesh that crosses
   that line in a frame where its render group is rebuilt crashes Pixi on a later frame (Rapid#1636,
   pixijs#12437).
-  The polygon masks are always batched (`PixiFeaturePolygon._setMaskGeometry()`).
+  The polygon masks are always batched (`PixiFeaturePolygon._setMaskGeometry()`), and so is every
+  `LineMesh`.
 - **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
 - **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
   minimap, `autoStart: false`, the renderer choice from the url).

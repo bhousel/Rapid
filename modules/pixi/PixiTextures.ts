@@ -24,6 +24,9 @@ interface TextureData {
 /** DashLine texture cache */
 type DashTextureCache = Record<string, PIXI.Texture>;
 
+// How many texels a dash texture has for each pixel of its pattern.
+const DASH_TEXELS = 4;
+
 
 /**
  * PixiTextures does the work of managing the textures.
@@ -51,6 +54,8 @@ export class PixiTextures {
   protected _svgIcons: Map<TextureID, SVGSymbolElement | null>;
   /** Cached textures used by the DashLine plugin, keyed by dash pattern string */
   protected _dashTextureCache: DashTextureCache;
+  /** The dash patterns of `getDashTexture()`, keyed by dash pattern string */
+  protected _dashTextures: Map<string, PIXI.Texture>;
 
 
   /**
@@ -78,6 +83,7 @@ export class PixiTextures {
 
     // DashLine plugin needs its own cache - we could eventually put these in an atlas.
     this._dashTextureCache = {};
+    this._dashTextures = new Map<string, PIXI.Texture>();
 
     // Prepare a "bundle" to load the pattern textures
     const assets = this.context.systems.assets!;
@@ -144,6 +150,7 @@ export class PixiTextures {
     this._textureData.clear();
     this._svgIcons.clear();
     this._dashTextureCache = {};
+    this._dashTextures.clear();
 
     this._cacheGraphics();
 
@@ -174,6 +181,48 @@ export class PixiTextures {
         this.loaded = true;
       })
       .catch(e => console.error(e));  // eslint-disable-line no-console
+  }
+
+
+  /**
+   * Returns the texture of a dash pattern, for a `LineMesh`: one repeat of the pattern, white where
+   * the line is drawn and clear in the gaps. It repeats along `u`, and it's the same all the way
+   * across `v`, so one texture draws the pattern at any width, color and opacity.
+   * (Not for `DashLine`, which keeps textures of its own.)
+   * @param dash - The pattern, as alternating lengths of dash and gap in pixels, e.g. `[10, 5]`
+   * @return The texture, or `null` if the pattern has no length or there's no canvas to draw it on
+   */
+  public getDashTexture(dash: number[]): PIXI.Texture | null {
+    const key = dash.toString();
+    const cached = this._dashTextures.get(key);
+    if (cached) return cached;
+
+    let length = 0;
+    for (const part of dash) {
+      length += part;
+    }
+    if (!(length > 0)) return null;
+
+    // The width is a power of 2, as WebGL 1 needs for a texture that repeats, with the pattern
+    // stretched over all of it.
+    const canvas = document.createElement('canvas');
+    canvas.width = PIXI.nextPow2(Math.ceil(length * DASH_TEXELS));
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const scale = canvas.width / length;
+    ctx.fillStyle = 'white';
+    let x = 0;
+    for (let i = 0; i < dash.length; i += 2) {
+      ctx.fillRect(x * scale, 0, dash[i] * scale, 1);
+      x += dash[i] + (dash[i + 1] ?? 0);
+    }
+
+    const source = new PIXI.CanvasSource({ resource: canvas, addressMode: 'repeat', scaleMode: 'linear' });
+    const texture = new PIXI.Texture({ source: source, label: `dash-${key}` });
+    this._dashTextures.set(key, texture);
+    return texture;
   }
 
 

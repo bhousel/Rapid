@@ -38,6 +38,7 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
   expect(frame.draw.rebuiltGroups).toBeLessThanOrEqual(frame.draw.renderGroups);
   expect(frame.draw.instructions.batch).toBeGreaterThan(0);
   expect(Object.keys(frame.draw.batchTextures).length).toBeGreaterThan(0);
+  expect(frame.draw.triangles).toBeGreaterThan(100);    // counted from the batches' sizes
   for (const graphic of frame.draw.unbatched) {
     expect(graphic.reason).not.toBe('unknown');   // we found its GPU context
     expect(graphic.floats).toBeGreaterThan(0);
@@ -255,6 +256,95 @@ test('after a zoom, draws the features again over the following frames, with the
   // What the features are didn't change, so their styles weren't worked out again
   // (a few new features may appear at the new zoom)
   expect(zoomed.styleMatches).toBeLessThan(zoomed.features / 4);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
+// A line's casing and stroke, and each ring of an area's outline, is a mesh drawn from a stroke mesh
+// that's built once, for any width (see `design/graphics-system.md`, section 15). A zoom changes the
+// width in world units, so it moves the vertices the meshes have, and builds nothing.
+test('draws lines and outlines as batched meshes, and keeps their vertices through a zoom', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+
+    // The meshes of the lines and outlines that are drawn
+    const collect = () => {
+      const found = { lines: [], outlines: [] };
+      for (const feature of layer.features.values()) {
+        if (!feature.visible || feature.dirty) continue;
+        const isLine = ('stroke' in feature);
+        const meshes = isLine ? [feature.casing, feature.stroke] : (feature.strokes?.children ?? []);
+        for (const mesh of meshes) {
+          if (mesh?.strokeMesh?.vertexCount) found[isLine ? 'lines' : 'outlines'].push(mesh);
+        }
+      }
+      return found;
+    };
+
+    const before = collect();
+    const all = [...before.lines, ...before.outlines];
+    const was = new Map();
+    for (const mesh of all) {
+      was.set(mesh, { strokeMesh: mesh.strokeMesh, positions: mesh.geometry.positions, first: Array.from(mesh.geometry.positions.subarray(0, 4)) });
+    }
+    const dashed = all.filter(mesh => mesh.geometry.uvs.length === mesh.geometry.positions.length && mesh.geometry.uvs.some(n => n !== 0));
+
+    const startID = gfx.lastRenderFrame.id;
+    map.zoom(map.zoom() + 0.5);
+    while (!gfx.renderFrames.some(frame => frame.id > startID && frame.dirtyScene)) {
+      await nextFrame();
+    }
+    while (gfx.pending) {
+      await nextFrame();
+    }
+
+    const after = collect();
+    let kept = 0;
+    let rebuilt = 0;
+    let moved = 0;
+    for (const mesh of [...after.lines, ...after.outlines]) {
+      const old = was.get(mesh);
+      if (!old) continue;   // (a casing or an outline that this zoom is the first to show)
+      if (mesh.strokeMesh === old.strokeMesh && mesh.geometry.positions === old.positions) {
+        kept++;
+      } else {
+        rebuilt++;
+      }
+      if (old.first.some((n, i) => n !== mesh.geometry.positions[i])) moved++;
+    }
+
+    return {
+      lines: before.lines.length,
+      outlines: before.outlines.length,
+      notBatched: all.filter(mesh => !mesh.batched).length,
+      dashed: dashed.length,
+      dashedRepeat: dashed.filter(mesh => mesh.texture.source.addressMode === 'repeat').length,
+      kept: kept,
+      rebuilt: rebuilt,
+      moved: moved,
+      graphicsDrawnAlone: gfx.lastRenderFrame.draw.unbatched.filter(graphic => /\/(casing|stroke\d*)$/.test(graphic.label)).length
+    };
+  });
+
+  expect(result.lines).toBeGreaterThan(20);
+  expect(result.outlines).toBeGreaterThan(5);
+  expect(result.notBatched).toBe(0);
+  expect(result.graphicsDrawnAlone).toBe(0);
+  // Dashes are a texture that repeats along the line
+  expect(result.dashed).toBeGreaterThan(0);
+  expect(result.dashedRepeat).toBe(result.dashed);
+  // The zoom built no stroke mesh and no array: every mesh has the ones it had, with other numbers in them
+  expect(result.kept).toBeGreaterThan(20);
+  expect(result.rebuilt).toBe(0);
+  expect(result.moved).toBe(result.kept);
 
   await waitForIdle(page);
   expect(consoleErrors).toEqual([]);
@@ -792,7 +882,11 @@ test('counts WebGL calls while detailed stats are on', async ({ page, consoleErr
 
   const gl = await page.evaluate(() => rapidContext.systems.gfx.lastRenderFrame.draw.gl);
   expect(gl.draws).toBeGreaterThan(0);
-  expect(gl.programs).toBeGreaterThan(0);
+  // (A frame can switch shaders zero times: lines are batched meshes now, so on this small map
+  // everything is drawn with the batch shader, which the frame before left bound.)
+  expect(gl.programs).toBeGreaterThanOrEqual(0);
+  expect(gl.textureBinds).toBeGreaterThanOrEqual(0);
+  expect(gl.bufferUploads).toBeGreaterThanOrEqual(0);
 
   // Turning them off removes the counters
   const hasCounters = await page.evaluate(() => {

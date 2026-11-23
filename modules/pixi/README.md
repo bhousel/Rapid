@@ -67,7 +67,8 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 
 | File | Description |
 |------|-------------|
-| `DashLine.ts` | Dashed line rendering |
+| `LineMesh.ts` | Draws a line's casing or stroke from its stroke mesh |
+| `DashLine.ts` | Dashed line rendering (halos, area outlines) |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
 | `RenderStats.ts` | Frame stats from Pixi's instructions, WebGL call counts, GPU timing |

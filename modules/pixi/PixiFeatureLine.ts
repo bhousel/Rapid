@@ -3,12 +3,16 @@ import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
 import { BufferHitArea } from './lib/BufferHitArea.ts';
-import { geomLineSegments } from '../geo/index.ts';
+import { LineMesh } from './lib/LineMesh.ts';
+import { geomLineSegments, geomStrokeMesh } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
+import type { LineStyleProps } from '../lib/Style.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
+import type { StrokeMesh } from '../geo/stroke.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 
@@ -22,20 +26,27 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 /**
  * This class renders a Line feature.
  *
+ * The casing and the stroke are drawn from a stroke mesh (`geomStrokeMesh()`), which has the
+ * line's triangles for any width. It's built when the line or its cap or join changes; a zoom
+ * only works out where the vertices are for the new width (see `LineMesh`, and
+ * `design/graphics-system.md` section 15).
+ *
  * Properties available:
- * - `casing`     - `PIXI.Graphic` for the casing (below), or `null` while there's none to draw
- * - `stroke`     - `PIXI.Graphic` for the stroke (above)
+ * - `casing`     - `LineMesh` for the casing (below), or `null` while there's none to draw
+ * - `stroke`     - `LineMesh` for the stroke (above)
  * -  (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
 
-  /** PIXI.Graphics for the casing (below), or null while there's none to draw (see `update`) */
-  public casing: PIXI.Graphics | null;
-  /** PIXI.Graphics for the stroke (above) */
-  public stroke: PIXI.Graphics | null;
+  /** The mesh that draws the casing (below), or null while there's none to draw (see `update`) */
+  public casing: LineMesh | null;
+  /** The mesh that draws the stroke (above) */
+  public stroke: LineMesh | null;
 
   /** Buffer polygon data for hit testing and halo */
   protected _hitBuffer: BufferHitArea | null;
+  /** The line that the stroke meshes of the casing and the stroke were built from */
+  protected _meshPart: GeometryPart | null;
 
 
   /**
@@ -46,10 +57,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     super(layer, featureID);
 
     this._hitBuffer = null;
+    this._meshPart = null;
 
     this.casing = null;   // add later only if needed (see `update`)
 
-    const stroke = new PIXI.Graphics();
+    const stroke = new LineMesh();
     stroke.label = 'stroke';
     stroke.eventMode = 'none';
     stroke.sortableChildren = false;
@@ -74,6 +86,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     this._hitBuffer = null;
+    this._meshPart = null;
 
     super.destroy();
   }
@@ -121,16 +134,15 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     container.position.set(origin[0], origin[1]);
 
     this.visible = true;
-    this.stroke!.renderable = true;
 
-    // The casing is drawn from zoom 16, if the style has one that can be seen. Its `Graphics`
+    // The casing is drawn from zoom 16, if the style has one that can be seen. Its mesh
     // exists only then: the lines of the photo and data layers have none, nor has any line
     // below zoom 16.
     const casingStyle = style.casing;
     const showCasing = (styleZoom >= 16) && !!casingStyle && casingStyle.opacity !== 0;
     this.lod = (styleZoom < 16) ? 1 : 2;
     if (showCasing && !this.casing) {
-      const casing = new PIXI.Graphics();
+      const casing = new LineMesh();
       casing.label = 'casing';
       casing.eventMode = 'none';
       casing.sortableChildren = false;
@@ -235,14 +247,19 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       container.hitArea = null;
     }
 
-    if (this.casing) {
-      this.updateGraphic('casing', this.casing, points, styleZoom, viewZoom, isWireframe);
+    // The casing and the stroke. They keep the stroke mesh they were last drawn from, and share
+    // one when they have the same cap and join. Those are only good while the line is the same:
+    // a line that changed is a different part.
+    const casing = this.casing;
+    const stroke = this.stroke!;
+    const isSameLine = (this._meshPart === this._geom);
+    const oldCasing = isSameLine ? (casing?.strokeMesh ?? null) : null;
+    const oldStroke = isSameLine ? stroke.strokeMesh : null;
+    if (casing) {
+      this._drawPart(casing, style.casing, 3, flat[0], oldCasing, oldStroke, styleZoom, localScale, isWireframe);
     }
-    if (this.stroke!.renderable) {
-      this.updateGraphic('stroke', this.stroke!, points, styleZoom, viewZoom, isWireframe);
-    } else {
-      this.stroke!.clear();
-    }
+    this._drawPart(stroke, style.stroke, 2, flat[0], oldStroke, casing?.strokeMesh ?? null, styleZoom, localScale, isWireframe);
+    this._meshPart = this._geom;
 
     this._geomDirty = false;
     this._styleDirty = false;
@@ -253,31 +270,39 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Draws a world-coordinate line graphic.
-   * Points are in container-local space (z16 world coords minus the feature's
-   * world origin) — i.e. `GeometryPart.local.coords`. They can be drawn directly
-   * without further translation.
-   * Stroke widths are expressed in world local units: `px × 2^(WORLD_ZOOM - viewZoom)`.
-   * @param which - Style part to draw ('casing' or 'stroke')
-   * @param graphic - PIXI graphics object to update
-   * @param points - Local coordinate points (origin-relative, from `local.coords`)
+   * Draws the casing or the stroke.
+   * The line's coordinates are in container-local space (z16 world coords minus the feature's
+   * world origin), i.e. `GeometryPart.local.flat`, and its width is in the same units:
+   * `px × 2^(WORLD_ZOOM - viewZoom)`.
+   * @param mesh - The mesh to draw it with (`this.casing` or `this.stroke`)
+   * @param partStyle - The style of the part (`style.casing` or `style.stroke`)
+   * @param minWidth - The narrowest the part is drawn, in pixels
+   * @param coords - The line's points as `[x, y, x, y, …]`
+   * @param own - The stroke mesh that this part was last drawn from, if it's still this line's
+   * @param other - The stroke mesh of the other part, if it's this line's
    * @param styleZoom - Effective zoom, used for styling
-   * @param viewZoom - Viewport zoom, used for scaling
+   * @param scale - How many units of the line's coordinates a pixel is
    * @param isWireframe - Whether wireframe mode is active
    */
-  public updateGraphic(
-    which: 'casing' | 'stroke',
-    graphic: PIXI.Graphics,
-    points: Vec2[],
+  protected _drawPart(
+    mesh: LineMesh,
+    partStyle: LineStyleProps,
+    minWidth: number,
+    coords: number[],
+    own: StrokeMesh | null,
+    other: StrokeMesh | null,
     styleZoom: number,
-    viewZoom: number,
+    scale: number,
     isWireframe: boolean
   ): void {
-    const style = this._style;
-    const partStyle = style[which];
-    if (!partStyle) return;
+    const textureManager = this.gfx.textureManager!;
 
-    const minwidth = which === 'casing' ? 3 : 2;
+    if (!partStyle || partStyle.opacity === 0) {   // nothing to see
+      mesh.visible = false;
+      mesh.clear();
+      return;
+    }
+
     let width = partStyle.width || 3;
 
     // Narrow at lower zooms
@@ -286,59 +311,44 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     } else if (styleZoom < 17) {
       width -= 2;
     }
-    if (width < minwidth) {
-      width = minwidth;
+    if (width < minWidth) {
+      width = minWidth;
     }
 
     if (isWireframe) {
       width = 1;
     }
 
-    // Convert screen pixel values to world units
-    const scale = 2 ** (WORLD_ZOOM - viewZoom);
-
-    let g: PIXI.Graphics | DashLine = graphic.clear();
-    if (partStyle?.opacity === 0) return;  // remove completely
-
-    const strokeStyle: StrokeStyleWithDash = {
-      color: partStyle.color,
-      width: width * scale,
-      alpha: partStyle.opacity ?? 1.0,
-      join: partStyle.join,
-      cap:  partStyle.cap,
-      dash: undefined as number[] | undefined
-    };
-
-    if (partStyle.dash) {
-      // DashLine handles the scale conversion internally for dash sizes and width,
-      // so pass unscaled values + the `scale` option (single source of truth).
-      const dashOptions: StrokeStyleWithDash = {
-        ...strokeStyle,
-        width: width,
-        dash: partStyle.dash,
-        scale: scale
-      };
-      g = new DashLine(this.gfx, graphic, dashOptions);
-      drawLine(points, g);
+    // The triangles, for any width. Use the ones we have if they're for this cap and join.
+    const cap = partStyle.cap ?? 'butt';
+    const join = partStyle.join ?? 'miter';
+    let strokeMesh: StrokeMesh;
+    if (own?.cap === cap && own.join === join) {
+      strokeMesh = own;
+    } else if (other?.cap === cap && other.join === join) {
+      strokeMesh = other;
     } else {
-      drawLine(points, g as PIXI.Graphics);
-      (g as PIXI.Graphics).stroke(strokeStyle);
+      // A line that ends where it starts is a ring: it gets a join there, not two caps.
+      const last = coords.length - 2;
+      const closed = (last >= 6 && coords[0] === coords[last] && coords[1] === coords[last + 1]);
+      strokeMesh = geomStrokeMesh(coords, { cap: cap, join: join, closed: closed });
     }
 
-    /**
-     *
-     * @param points
-     * @param graphics
-     */
-    function drawLine(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
-      points.forEach(([x, y], i) => {
-        if (i === 0) {
-          graphics.moveTo(x, y);
-        } else {
-          graphics.lineTo(x, y);
-        }
-      });
+    // Dashes are a texture that repeats along the line.
+    const dash = partStyle.dash;
+    let dashTexture: PIXI.Texture | null = null;
+    let dashLength = 0;
+    if (dash?.length) {
+      dashTexture = textureManager.getDashTexture(dash);
+      for (const part of dash) {
+        dashLength += part * scale;
+      }
     }
+
+    mesh.visible = true;
+    mesh.tint = partStyle.color ?? 0xffffff;
+    mesh.alpha = partStyle.opacity ?? 1;
+    mesh.setStroke(strokeMesh, width * scale / 2, dashTexture, dashLength);
   }
 
 
