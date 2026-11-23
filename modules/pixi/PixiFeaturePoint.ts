@@ -451,8 +451,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     if (this.props.isCircular) {
       this.container.hitArea = new PIXI.Circle(0, 0, rect.width / 2);
+      this.hitReach = (rect.width / 2) * this._screenScale;
     } else {
       this.container.hitArea = rect;
+      // (To the far corner: the marker stays upright when the map is turned.)
+      const reachX = Math.max(-rect.x, rect.x + rect.width);
+      const reachY = Math.max(-rect.y, rect.y + rect.height);
+      this.hitReach = Math.hypot(reachX, reachY) * this._screenScale;
     }
   }
 

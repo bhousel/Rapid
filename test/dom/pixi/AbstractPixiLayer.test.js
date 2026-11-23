@@ -256,6 +256,20 @@ describe('AbstractPixiLayer', () => {
         assert.strictEqual(layer.numWaiting, 0);
       });
 
+      it('remembers the furthest that a feature it drew can be hit from its geometry, until it\'s reset', () => {
+        const pin = addDirtyFeature('pin', 10, { hitReach: 28 });
+        const line = addDirtyFeature('line', 20, { hitReach: 7.5 });
+        assert.strictEqual(layer._hitReach, 0);
+
+        runPass(makeTimedFrame(true), [line]);
+        assert.strictEqual(layer._hitReach, 7.5);
+        runPass(makeTimedFrame(true), [line, pin]);
+        assert.strictEqual(layer._hitReach, 28);
+
+        layer.reset();
+        assert.strictEqual(layer._hitReach, 0);
+      });
+
       it('puts a dirty feature in view off when the frame is out of time, and draws it in a later frame', () => {
         const a = addDirtyFeature('a', 10);
         runPass(makeTimedFrame(false, { contentChanged: true }), [a]);

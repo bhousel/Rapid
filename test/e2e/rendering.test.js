@@ -262,10 +262,12 @@ test('after a zoom, draws the features again over the following frames, with the
 });
 
 
-// A line's casing and stroke, and each ring of an area's outline, is a mesh drawn from a stroke mesh
-// that's built once, for any width (see `design/graphics-system.md`, section 15). A zoom changes the
-// width in world units, so it moves the vertices the meshes have, and builds nothing.
-test('draws lines and outlines as batched meshes, and keeps their vertices through a zoom', async ({ page, consoleErrors }) => {
+// A line's casing and stroke, and each ring of an area's outline, are drawn from a stroke mesh
+// that's built once, for any width (see `design/graphics-system.md`, section 15).
+// - The lines are in batches (`LineBatch`): a line is a run of vertices in its batch's buffers, and
+//   the batch's shader works out its width. A zoom changes four numbers, and nothing in a batch.
+// - An outline is a `LineMesh`. A zoom moves the vertices it has, and builds nothing.
+test('draws lines in batches that a zoom leaves alone, and outlines as meshes that keep their vertices', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -275,27 +277,66 @@ test('draws lines and outlines as batched meshes, and keeps their vertices throu
     const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
     const layer = gfx.scene.layers.get('osm');
 
-    // The meshes of the lines and outlines that are drawn
+    // The lines that are drawn, and the meshes of the outlines that are
     const collect = () => {
       const found = { lines: [], outlines: [] };
       for (const feature of layer.features.values()) {
         if (!feature.visible || feature.dirty) continue;
-        const isLine = ('stroke' in feature);
-        const meshes = isLine ? [feature.casing, feature.stroke] : (feature.strokes?.children ?? []);
-        for (const mesh of meshes) {
-          if (mesh?.strokeMesh?.vertexCount) found[isLine ? 'lines' : 'outlines'].push(mesh);
+        if (feature.type === 'LineString') {
+          found.lines.push(feature);
+        } else {
+          for (const mesh of feature.strokes?.children ?? []) {
+            if (mesh?.strokeMesh?.vertexCount) found.outlines.push(mesh);
+          }
+        }
+      }
+      return found;
+    };
+
+    // What a batch holds: its arrays, and a sum of everything in them except the lines' opacity.
+    // (A hidden line has an opacity of 0 in its vertices, and that's all that changes when it's hidden.)
+    const batches = () => {
+      const found = new Map();
+      for (const byKey of layer._lineBatches.values()) {
+        for (const batch of byKey.values()) {
+          let sum = 0;
+          let hiddenVertices = 0;
+          for (const n of batch._floats) {
+            if (Math.abs(n) < 1e30) sum += n;    // (not the "never" of a vertex with no second place: nothing adds up next to it)
+          }
+          batch._bytes.forEach((n, i) => {
+            if (i % 8 !== 3) {
+              sum += n;
+            } else if (n === 0 && i < batch.vertexUse[0] * 8) {
+              hiddenVertices++;
+            }
+          });
+          found.set(batch, {
+            floats: batch._floats, sum: sum, hiddenVertices: hiddenVertices,
+            indexCount: batch.geometry.indexCount, renderable: batch.renderable
+          });
         }
       }
       return found;
     };
 
     const before = collect();
-    const all = [...before.lines, ...before.outlines];
+    const batchesBefore = batches();
+    const meshInstructions = gfx.lastRenderFrame.draw.instructions.mesh ?? 0;
+    const uniforms = [...batchesBefore.keys()][0].shader.resources.lineUniforms.uniforms;
+    const pixelBefore = uniforms.uPixel;
+    const itemsBefore = new Map(before.lines.map(feature => [feature, [feature.casingItem, feature.strokeItem, feature.strokeItem?.first]]));
     const was = new Map();
-    for (const mesh of all) {
+    for (const mesh of before.outlines) {
       was.set(mesh, { strokeMesh: mesh.strokeMesh, positions: mesh.geometry.positions, first: Array.from(mesh.geometry.positions.subarray(0, 4)) });
     }
-    const dashed = all.filter(mesh => mesh.geometry.uvs.length === mesh.geometry.positions.length && mesh.geometry.uvs.some(n => n !== 0));
+
+    // Dashed lines: the pattern is in the last four bytes of each vertex
+    const dashed = before.lines.filter(feature => {
+      const item = feature.strokeItem;
+      const bytes = item?.batch?._bytes;
+      return bytes && bytes[item.first * 8 + 4] > 0;
+    });
 
     const startID = gfx.lastRenderFrame.id;
     map.zoom(map.zoom() + 0.5);
@@ -307,12 +348,29 @@ test('draws lines and outlines as batched meshes, and keeps their vertices throu
     }
 
     const after = collect();
+    const batchesAfter = batches();
+    // (A zoom in makes the cull box smaller, and a line that's outside it now is hidden: its
+    // vertices and its triangles stay where they are, with an opacity of 0.)
+    let batchesChanged = 0;
+    let moreHidden = 0;
+    for (const [batch, old] of batchesBefore) {
+      const now = batchesAfter.get(batch);
+      if (!now || now.floats !== old.floats || now.sum !== old.sum || now.indexCount !== old.indexCount) batchesChanged++;
+      if (now) moreHidden += now.hiddenVertices - old.hiddenVertices;
+    }
+    let linesChanged = 0;
+    for (const feature of after.lines) {
+      const old = itemsBefore.get(feature);
+      if (!old) continue;
+      if (feature.casingItem !== old[0] || feature.strokeItem !== old[1] || feature.strokeItem?.first !== old[2]) linesChanged++;
+    }
+
     let kept = 0;
     let rebuilt = 0;
     let moved = 0;
-    for (const mesh of [...after.lines, ...after.outlines]) {
+    for (const mesh of after.outlines) {
       const old = was.get(mesh);
-      if (!old) continue;   // (a casing or an outline that this zoom is the first to show)
+      if (!old) continue;   // (an outline that this zoom is the first to show)
       if (mesh.strokeMesh === old.strokeMesh && mesh.geometry.positions === old.positions) {
         kept++;
       } else {
@@ -323,10 +381,20 @@ test('draws lines and outlines as batched meshes, and keeps their vertices throu
 
     return {
       lines: before.lines.length,
-      outlines: before.outlines.length,
-      notBatched: all.filter(mesh => !mesh.batched).length,
+      linesWithMeshes: before.lines.filter(feature => feature.stroke || feature.casing).length,
+      linesNotInBatch: before.lines.filter(feature => !feature.strokeItem?.batch).length,
+      linesWithCasing: before.lines.filter(feature => feature.casingItem).length,
       dashed: dashed.length,
-      dashedRepeat: dashed.filter(mesh => mesh.texture.source.addressMode === 'repeat').length,
+      batches: batchesBefore.size,
+      batchesDrawn: [...batchesBefore.values()].filter(batch => batch.renderable && batch.indexCount > 0).length,
+      batchesChanged: batchesChanged,
+      moreHidden: moreHidden,
+      linesHidden: before.lines.filter(feature => !feature.visible).length,
+      linesChanged: linesChanged,
+      pixel: [pixelBefore, uniforms.uPixel],
+      meshInstructions: meshInstructions,
+      outlines: before.outlines.length,
+      outlinesNotBatched: before.outlines.filter(mesh => !mesh.batched).length,
       kept: kept,
       rebuilt: rebuilt,
       moved: moved,
@@ -334,15 +402,27 @@ test('draws lines and outlines as batched meshes, and keeps their vertices throu
     };
   });
 
+  // Every line is in a batch, and has no mesh of its own
   expect(result.lines).toBeGreaterThan(20);
-  expect(result.outlines).toBeGreaterThan(5);
-  expect(result.notBatched).toBe(0);
-  expect(result.graphicsDrawnAlone).toBe(0);
-  // Dashes are a texture that repeats along the line
+  expect(result.linesWithMeshes).toBe(0);
+  expect(result.linesNotInBatch).toBe(0);
+  expect(result.linesWithCasing).toBeGreaterThan(20);
   expect(result.dashed).toBeGreaterThan(0);
-  expect(result.dashedRepeat).toBe(result.dashed);
-  // The zoom built no stroke mesh and no array: every mesh has the ones it had, with other numbers in them
-  expect(result.kept).toBeGreaterThan(20);
+  expect(result.batches).toBeGreaterThan(0);
+  expect(result.batches).toBeLessThan(result.lines / 2);
+  expect(result.batchesDrawn).toBeGreaterThan(0);
+  expect(result.meshInstructions).toBeGreaterThanOrEqual(result.batchesDrawn);
+  // The zoom changed what a pixel is, and nothing in any batch
+  expect(result.pixel[1]).toBeCloseTo(result.pixel[0] / Math.SQRT2, 6);
+  expect(result.batchesChanged).toBe(0);
+  expect(result.linesChanged).toBe(0);
+  expect(result.moreHidden > 0).toBe(result.linesHidden > 0);
+
+  // The outlines: the zoom built no stroke mesh and no array, every mesh has the ones it had, with other numbers in them
+  expect(result.outlines).toBeGreaterThan(5);
+  expect(result.outlinesNotBatched).toBe(0);
+  expect(result.graphicsDrawnAlone).toBe(0);
+  expect(result.kept).toBeGreaterThan(5);
   expect(result.rebuilt).toBe(0);
   expect(result.moved).toBe(result.kept);
 
@@ -839,8 +919,9 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 // batched. A mesh that crosses that line in a frame where its tile's render group is rebuilt made
 // Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`), until
 // something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
-// always batched, so crossing the line changes nothing.
-test('keeps drawing a line whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
+// always batched, so crossing the line changes nothing. (An area's outline is one; the OSM
+// layer's lines are in a `LineBatch`, which has a shader of its own and is never batched.)
+test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -862,10 +943,10 @@ test('keeps drawing a line whose mesh crosses 100 vertices in a frame its tile i
     };
 
     const layer = scene.layers.get('osm');
-    const feature = [...layer.features.values()].find(feature => feature.visible && feature.stroke?.strokeMesh?.vertexCount);
+    const feature = [...layer.features.values()].find(feature => feature.visible && feature.strokes?.children[0]?.strokeMesh?.vertexCount);
     if (!feature) return { found: false };
 
-    const mesh = feature.stroke;
+    const mesh = feature.strokes.children[0];
     const tile = feature.container.parent;
     const large = zigzag(60);
     const small = zigzag(10);
@@ -895,7 +976,7 @@ test('keeps drawing a line whose mesh crosses 100 vertices in a frame its tile i
 
     tile.removeChild(child);
     child.destroy();
-    feature._meshPart = null;   // draw its real line again
+    feature._meshPart = null;   // draw its real outline again
     feature.dirty = true;
     gfx.immediateRedraw();
     return { found: true, vertices: [large.vertexCount, small.vertexCount], batched: batched };

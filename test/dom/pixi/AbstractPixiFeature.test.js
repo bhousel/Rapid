@@ -1,3 +1,4 @@
+import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
 import { AbstractPixiFeature } from '../../../modules/pixi/AbstractPixiFeature.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 
@@ -17,6 +18,39 @@ describe('AbstractPixiFeature', () => {
     const context = new Rapid.MockContext();
     const scene = { context: context, gfx: {}, addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
     layer = new AbstractPixiLayer(scene);
+  });
+
+
+  describe('hitTest', () => {
+    // Nothing is rendered here, so a feature's coordinates are the stage's.
+    function hittable() {
+      const feature = makeFeature();
+      feature.container.hitArea = { contains: (x, y) => x >= 0 && x <= 10 && y >= 0 && y <= 10 };
+      return feature;
+    }
+
+    it('hits inside the feature\'s hit area, and not outside it', () => {
+      const feature = hittable();
+      assert.isTrue(feature.hitTest({ x: 5, y: 5 }));
+      assert.isFalse(feature.hitTest({ x: 15, y: 5 }));
+    });
+
+    it('never hits a feature that\'s hidden, or not allowed to be interactive', () => {
+      const feature = hittable();
+      feature.visible = false;
+      assert.isFalse(feature.hitTest({ x: 5, y: 5 }));
+
+      feature.visible = true;
+      feature.allowInteraction = false;    // as a node is while it's dragged
+      assert.isFalse(feature.hitTest({ x: 5, y: 5 }));
+
+      feature.allowInteraction = true;
+      assert.isTrue(feature.hitTest({ x: 5, y: 5 }));
+    });
+
+    it('doesn\'t hit a feature that has no hit area and draws nothing', () => {
+      assert.isFalse(makeFeature().hitTest({ x: 5, y: 5 }));
+    });
   });
 
 

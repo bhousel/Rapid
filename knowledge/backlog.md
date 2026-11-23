@@ -114,9 +114,11 @@ said otherwise. Biggest or most wanted first.
 - **Profiling pass** ([`design/profiling.md`](../design/profiling.md)): baselines for heap, GPU resources,
   the worker heap and listeners, and a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and
   reports what grows.
-- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 3): reordering spatial IDs (lift
-  OSM while drawing, or a layer-order UI); hit-testing by geometry instead of Pixi, so snapping doesn't
-  depend on stroke width and z-order.
+- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 4): reordering spatial IDs (lift
+  OSM while drawing, or a layer-order UI); snapping by distance instead of by what's drawn on top, so
+  it doesn't depend on stroke width and z-order (the OSM layer's features are found through the
+  spatial index since Nov 23, with the answer Pixi gave); the other layers' features through an
+  index too (`scene.setHitTester()`), which a dataset of buildings would need.
 - **Text rasterization without `Pixi.Text`**: canvas2D on the main thread first, or an `OffscreenCanvas`
   worker, fed to `PixiTextures.allocate('text', …)`; avoids nested `renderer.generateTexture()` and
   `readPixels`. A worker needs the same fonts (`FontFace` and a transferable `ArrayBuffer`).

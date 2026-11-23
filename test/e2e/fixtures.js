@@ -143,7 +143,9 @@ export async function waitForIdle(page) {
 /**
  * Describes what the OSM layer shows: for each visible feature, the container it's in, its
  * classes, whether it's been drawn (not dirty), whether it's bound to the entity as it is now,
- * and where it is. Two of these are equal if a mapper would see the same features the same way.
+ * and where it is. For a line, which batch draws it, and whether its casing and stroke are shown
+ * there (a line has no meshes of its own, see `LineBatch`).
+ * Two of these are equal if a mapper would see the same features the same way.
  *
  * Use it to check work the layer does without its whole pass (a hover, an edit, a change of
  * mode): take one, ask for a full pass (`gfx.immediateRedraw()`), wait, and take another. They
@@ -161,9 +163,13 @@ export async function osmSceneState(page) {
       const entity = feature.data?.id && graph.hasEntity(feature.data.id);
       const bound = entity ? (feature.data === entity) : 'not an entity';
       const position = feature.container.position;
+      // A line is drawn in a batch: which one, and whether its casing and stroke are shown there
+      const item = part => (part ? (part.visible ? 'shown' : 'hidden') : 'none');
+      const batched = (feature.type === 'LineString') ?
+        `${feature.strokeItem?.batch?.label ?? 'no batch'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}` : '';
       results.push([
         feature.id, feature.container.parent?.label, [...feature.classes].sort().join(','),
-        feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`
+        feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`, batched
       ].join(' | '));
     }
     return results.sort();

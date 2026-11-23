@@ -45,7 +45,9 @@ export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Contain
         indices += (instruction as PIXI.Batch).size;
 
       } else if (pipeID === 'mesh' && instruction instanceof PIXI.Mesh) {
-        indices += instruction.geometry?.indices?.length ?? 0;
+        // (What's drawn of the index buffer: a `LineBatch` has room in it for more.)
+        const geometry = instruction.geometry;
+        indices += geometry?.indexCount || (geometry?.indexBuffer?.data.length ?? 0);
 
       } else if (pipeID === 'graphics' && instruction instanceof PIXI.Graphics) {
         const context = instruction.context;

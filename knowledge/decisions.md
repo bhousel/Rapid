@@ -66,6 +66,43 @@ Most partial fills have no middle at that width and are filled whole, which a po
 says before Clipper is asked. Bryan asked for the trial, and agreed to `clipper2-ts` (Nov 23). Keep
 `clipper2-wasm` in mind for later; he doesn't want to relax the CSP for it now.
 
+## The OSM layer finds its own features under the pointer (Nov 2026)
+Pixi's hit test asks every interactive container in the scene on every pointer event: 8 ms in
+Užice. Chosen: the layer asks the editor's spatial index which entities are near the pointer, then
+each of their features whether it's hit, by Pixi's own rules for one container (`containerHit()`),
+and takes the one drawn on top (`drawOrder()`). The scene compares that with Pixi's answer for
+everything else (`PixiScene.hitTest()`), and `PixiEvents` puts the feature on the event. So the
+feature that's found is the one Pixi found (checked at 86,400 points), in 0.07 ms.
+Rejected:
+- **A hit test with rules of its own** (the nearest line, vertices before lines): it changes what
+  a click selects and what a drawn line snaps to. That's the redesign of hover and snapping in
+  `design/scene.md` section 4, not a performance change.
+- **A hit area on each tile container,** so Pixi's walk skips the tiles away from the pointer:
+  a few lines, but a feature without display objects (the static tier) has nothing for Pixi to walk.
+- **Remembering the answer per event on the scene:** Pixi reuses its event objects, so the event
+  isn't a key. `PixiEvents` asks once and puts the answer on the event it passes on.
+- **A fixed reach around the pointer** (a pin is 28 pixels tall): styles can make markers and
+  casings any size. Each feature says how far it can be hit from its geometry (`hitReach`).
+
+## The OSM layer's lines are drawn in batches, with a shader of our own (Nov 2026)
+Section 15 of `design/graphics-system.md`, step 6. A `LineBatch` is one `Mesh` for the casings and
+strokes of the lines of a level, road class and zoom 14 tile; the shader places each vertex for the
+line's width in pixels at the current zoom. Choices someone might undo:
+- **How a line is drawn is in each of its vertices** (width, least width, color, opacity, dashes:
+  16 of a vertex's 56 bytes), so one draw call serves any mix of styles and dashes need no
+  texture. A style table in a texture would make vertices smaller; not measured.
+- **A casing and its stroke are two runs of vertices,** not one drawn twice, and the order in a
+  batch is casing, stroke, next line's casing: the picture is what it was. Every casing of a
+  level before every stroke (as iD draws) would be a different picture at junctions. Bryan's call.
+- **Batch tiles don't depend on the view's zoom** (zoom 14), unlike the tile containers, so a
+  zoom moves no line between batches. The order between two lines of one class that overlap is
+  now by batch tile and then way ID, at every zoom; it used to change with the zoom's tiles.
+- **No editing tier yet.** Section 15 has the touched features drawn by display objects of their
+  own. Here every line is in a batch, and one that changes is written again where it was. The
+  drag measured in step 6 says whether that's enough.
+- **Dashes the vertex can't hold** (more than four numbers, fractions, over 255 pixels) fall back
+  to `LineMesh`es with a dash texture. None of Rapid's styles has one.
+
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
 Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.

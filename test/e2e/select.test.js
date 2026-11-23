@@ -281,3 +281,73 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
 
   expect(consoleErrors).toEqual([]);
 });
+
+
+// The OSM layer finds its own features under the pointer, through the editor's spatial index
+// (`PixiLayerOsm.hitTest`), and Pixi's hit test leaves the layer's containers out. Pixi's would
+// ask every feature in the scene. Both must find the same feature everywhere.
+test('finds the feature under the pointer through the spatial index, as Pixi\'s hit test over every feature would', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // What's under each point of a grid over the map, both ways
+  const compare = () => page.evaluate(() => {
+    const gfx = rapidContext.systems.gfx;
+    const scene = gfx.scene;
+    const osm = scene.layers.get('osm');
+    const boundary = gfx.pixi.renderer.events.rootBoundary;
+    boundary.rootTarget = gfx.pixi.stage;
+    const rect = gfx.surface.getBoundingClientRect();
+
+    const featureOf = container => {
+      for (let c = container; c; c = c.parent) {
+        if (c.__feature__) return c.__feature__.id;
+      }
+      return null;
+    };
+
+    const points = [];
+    for (let j = 0; j < 30; j++) {
+      for (let i = 0; i < 40; i++) {
+        points.push({ x: (i + 0.5) * rect.width / 40, y: (j + 0.5) * rect.height / 30 });
+      }
+    }
+
+    const skipped = scene.getSpatialContainer('basemap', 'osm').eventMode;
+    const found = points.map(point => scene.hitTest(point, boundary.hitTest(point.x, point.y))?.id ?? null);
+
+    scene.setHitTester('osm', null);    // Pixi tests the OSM layer's features too
+    const pixiFound = points.map(point => featureOf(boundary.hitTest(point.x, point.y)));
+    scene.setHitTester('osm', osm);
+
+    const kinds = new Set(found.filter(Boolean).map(id => osm.features.get(id)?.type));
+    return {
+      skipped: skipped,
+      differences: found.flatMap((id, i) => (id === pixiFound[i]) ? [] : [{ at: points[i], found: id, pixiFound: pixiFound[i] }]),
+      numFound: found.filter(Boolean).length,
+      kinds: [...kinds].sort()
+    };
+  });
+
+  const browsing = await compare();
+  expect(browsing.skipped).toBe('none');
+  expect(browsing.differences).toEqual([]);
+  expect(browsing.numFound).toBeGreaterThan(300);                        // of 1,200 points
+  expect(browsing.kinds).toEqual(['LineString', 'Point', 'Polygon']);    // all three kinds were under some point
+
+  // With a road selected, its vertices and midpoints are drawn above everything, where Pixi finds them
+  const roadID = await page.evaluate(() => {
+    const editor = rapidContext.systems.editor;
+    const way = editor.intersects().find(entity => entity.type === 'way' && entity.tags.name === 'East Bennett Street');
+    rapidContext.enter('select', { selection: [way.dataID] });
+    return way.id;
+  });
+  await expect.poll(() => page.evaluate(() => rapidContext.selectedIDs())).toEqual([roadID]);
+  await waitForIdle(page);
+
+  const selected = await compare();
+  expect(selected.differences).toEqual([]);
+  expect(selected.numFound).toBeGreaterThan(300);
+  expect(consoleErrors).toEqual([]);
+});

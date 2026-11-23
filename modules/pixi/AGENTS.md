@@ -24,14 +24,25 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
   counter-scale to stay screen-sized. The skill's screen-pixel examples need converting. See
   "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
-- **A line's casing and stroke, and an area's outlines, are `LineMesh`es** (`lib/LineMesh.ts`), not
-  `Graphics`. Their triangles come from `geomStrokeMesh()` (`modules/geo/stroke.ts`), which builds
-  them once for any width. Build a stroke mesh only when the line, its cap or its join changes
-  (the feature's `GeometryPart` is a different object then), and call `setStroke()` for anything
-  else: for a new width it moves the vertices it has. Don't go back to `graphics.stroke()` for
-  them: Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms
-  in Užice allocated. Dashes are `PixiTextures.getDashTexture()`, color and opacity are the
-  mesh's `tint` and `alpha`. See section 15 of `design/graphics-system.md`.
+- **A line's casing and stroke, and an area's outlines, are drawn from stroke meshes**
+  (`geomStrokeMesh()` in `modules/geo/stroke.ts`, built once for any width), not by `Graphics`.
+  Build a stroke mesh only when the line, its cap or its join changes (the feature's
+  `GeometryPart` is a different object then). Don't go back to `graphics.stroke()` for them:
+  Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms in
+  Užice allocated. See section 15 of `design/graphics-system.md`.
+  - **The OSM layer's lines are in batches** (`lib/LineBatch.ts`): one `Mesh` with our own shader
+    for the lines of a level, road class and zoom 14 tile. The layer gives each line feature its
+    batch (`feature.batch`, from `_lineBatch()`), and the feature's casing and stroke are items
+    in it: it has no mesh of its own. The shader works out widths, the narrowing below zoom 17,
+    the casing's absence below 16, wireframe and dashes from four numbers the layer sets on
+    every frame (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep
+    whatever depends on the zoom out of the vertices.
+  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): an area's outlines, halos, the
+    lasso, and the lines of layers that give no batch. Call `setStroke()` for a new width: it
+    moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
+    are the mesh's `tint` and `alpha`.
+  - **A line feature may have no `stroke` or `casing` mesh** (`null` while a batch draws it).
+    To know what's drawn, read `strokeItem` and `casingItem`.
 - **Halos and the lasso are `LineMesh`es too,** drawn with `drawHalo()` and `drawRings()`
   (`helpers.ts`) into a container that keeps its meshes from one call to the next. A halo's rings
   are the outline of its feature at the distance a click reaches (`geomStrokeOutline()`). There's
@@ -52,6 +63,21 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   subtrees can be hit (`interactiveSpatialIDs`, see [`design/scene.md`](../../design/scene.md)).
   Don't add pointer listeners to features, and don't listen for `globalpointermove`: with
   `globalMove` on, every pointer move visits every interactive object in the scene.
+- **The feature under the pointer is `scene.hitTest()`'s answer, not `e.target`.** Pixi's hit
+  test doesn't look at the OSM layer's features: the layer finds them through the editor's
+  spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in Užice where Pixi's
+  walk took 8). `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
+  `AbstractBehavior._getEventData()` reads it. Rules that follow:
+  - A feature is hit where its container says: its `hitArea`, or what it draws
+    (`AbstractPixiFeature.hitTest()`, `containerHit()` in `helpers.ts`). `eventMode: 'none'` and
+    `allowInteraction = false` still take a feature or a part of one out.
+  - **A feature that can be hit outside the box of its geometry sets `hitReach`**, in pixels,
+    when it draws (a pin above its point, a line beside itself). The layer asks the index that
+    far around the pointer, so a feature with too small a reach isn't found at its edges.
+  - A feature's data has to be in the index under its own ID (`_dataHasFeature`). What isn't
+    (the midpoints) goes in a container that Pixi tests, such as the map UI's `selected`.
+  - After changing any of this, run the comparison in `test/e2e/select.test.js`: both ways of
+    finding the feature must agree at every point.
 - **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
   for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
   that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in

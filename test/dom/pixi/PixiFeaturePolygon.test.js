@@ -267,6 +267,15 @@ describe('PixiFeaturePolygon', () => {
       assert.isFalse(hitArea.contains(x, y - 3.1));
       assert.isFalse(hitArea.contains(0, 0), 'the middle of the square');
       assert.isFalse(hitArea.contains(1e6, 1e6));
+      assert.strictEqual(feature.hitReach, 6);    // ..which is this many pixels from the ring
+    });
+
+    it('reaches to the corners of the lowRes sprite, which can be outside the polygon\'s box', () => {
+      drawAt(15);
+      assert.strictEqual(feature.lod, 1);
+      const [width, height] = feature.geometry.local.surround.dimensions;   // in the ring's coordinates: 2 to a pixel
+      assert.closeTo(feature.hitReach, Math.hypot(width, height) / 2 / 2, 1e-9);
+      assert.isAbove(feature.hitReach, 0);
     });
 
     it('is kept through a zoom, with the distance of the new zoom', () => {

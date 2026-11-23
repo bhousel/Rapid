@@ -41,19 +41,30 @@ are in [`design/graphics-system.md`](../design/graphics-system.md). What's left 
 follow-ups" in `backlog.md`.
 
 **Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
-order of work, Bryan's decisions and the measurements). Done: steps 1 to 5.
+order of work, Bryan's decisions and the measurements). Done: steps 1 to 5, and two parts of 6.
 - The stroke mesh (`modules/geo/stroke.ts`); lines' casings and strokes, areas' outlines, halos and
   the lasso drawn from it (`modules/pixi/lib/LineMesh.ts`). A zoom in Užice allocates half of what
   it did.
 - A line hit by its distance from the pointer (`LineHitArea`); `lineToPoly()` and `DashLine` gone.
 - Partial fills as bands of real geometry (`modules/geo/band.ts`, with `clipper2-ts`): no stencil
   masks, 44 to 76% fewer draw calls in the three places, no more time on a zoom.
+- Step 6, two parts (not committed yet, Nov 23):
+  - The OSM layer finds its features under the pointer through the spatial index
+    (`PixiLayerOsm.hitTest()`, `PixiScene.hitTest()`): a pointer event in Užice is 0.07 ms of
+    hit test where Pixi's walk took 8, and finds the same feature.
+  - Its lines are drawn in batches (`modules/pixi/lib/LineBatch.ts`, a `Mesh` with our own shader
+    per level, road class and zoom 14 tile). A zoom changes nothing in a batch. A quarter
+    fewer draw calls and 70 MB less heap in Užice, and no time saved; a drag costs what it
+    did, so there's no editing tier.
 
-Next is step 6: the static tier, for lines first, which needs hit-testing through the spatial index
-first (a pointer move in Užice is 7 ms of Pixi's hit test now). Before it, maybe: a fill mesh of our
-own, since a `Graphics` fill is triangulated again at every zoom ("Open questions" in the doc).
-Also open there: the frame of a zoom itself is still 125 ms in Užice. `renderer=canvas` is blank
-since the lines became meshes, and stays that way (`quirks.md`).
+Next, the rest of step 6: line features without a `Container` (the hit area on the feature, the
+oneway arrows in the batch), so that Pixi stops walking 21,000 empty containers in Užice and a
+zoom skips the lines altogether. Lines are 1.5% of a zoom's work now; the rest is Pixi's render
+groups, polygons, points and labels (the profile is in the doc). A fill mesh of our own (step 8's
+first part) may be worth more than finishing the lines: a `Graphics` fill is triangulated again
+at every zoom. For Bryan: whether every casing of a level should be drawn before every stroke
+("Open questions"). `renderer=canvas` is blank since the lines became meshes, and stays that way
+(`quirks.md`).
 
 Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
 

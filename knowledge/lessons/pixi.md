@@ -38,3 +38,21 @@ How Pixi behaves, and what that means for Rapid.
   also needed a mask that Pixi had never batched: one batched once keeps a stale place in an old
   batch and is written there instead of throwing (the e2e test, which is about a `LineMesh` now
   that the masks are gone, calls `mesh.unload()` first).
+- **A container's bounds are what its children draw.** When a feature stops drawing in its own
+  container, everything that asked the container for its size gets nothing. The OSM layer's lines
+  moved into batches (`LineBatch`, Nov 2026), and `PixiLayerLabels` skipped every line as "too
+  small": it read `feature.container.getBounds()`. No test looked for street names. It showed as
+  a label that turned up in the freed room in a test about hovering, and as names missing from
+  one of two screenshots. Before moving drawing out of a container, grep for `getBounds`.
+- **Something handed out before it's used can be cleaned up as unused.** A line feature gets its
+  batch in the layer's pass and may be drawn some frames later (the frame's deadline). The pass
+  ended by destroying batches with no lines in them, which that one still was. Count who holds a
+  thing (`LineBatch.users`), not only what's in it.
+- **Pixi's events mixin isn't on `Container` until a renderer is made.** In a DOM test,
+  `interactiveChildren` is `undefined` and nothing below a container is "interactive", so code
+  that follows Pixi's hit-test rules behaves differently than in the app. `import 'pixi.js/events'`
+  in the test.
+- **A `Mesh` with a shader of its own: bring its buffers up to date in `onRender`.** Pixi calls
+  it once before each render. `buffer.update(size, offset)` remembers one range, the last one
+  given, so collect what changed and call it once there. And `geometry.indexCount = 0` means "the
+  whole index buffer": a mesh with nothing to draw has to be `renderable = false`.

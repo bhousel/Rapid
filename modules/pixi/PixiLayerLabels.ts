@@ -789,17 +789,28 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!localCoords || localCoords.length < 2) continue;   // no points
       if (!feature.container.visible || !feature.container.renderable) continue; // not visible
 
-      const fBounds = feature.container.getBounds().rectangle;
-      if (fBounds.width < 40 && fBounds.height < 40) continue;    // too small
-
       // Project line vertices from feature-local space to label space
       // (= global screen minus labelOffset).
       const labelCoords: Vec2[] = new Array(localCoords.length);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
       for (let i = 0; i < localCoords.length; i++) {
         const p = localCoords[i];
         feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
         labelCoords[i] = [temp.x - labelOffset.x, temp.y - labelOffset.y];
+        if (temp.x < minX) minX = temp.x;
+        if (temp.x > maxX) maxX = temp.x;
+        if (temp.y < minY) minY = temp.y;
+        if (temp.y > maxY) maxY = temp.y;
       }
+
+      // How much room the line takes on screen: its points, and its width around them.
+      // (Not the bounds of its container: a line that's drawn in a batch has nothing in it.
+      // A line is hit 5 pixels beyond its casing, see `PixiFeatureLine`.)
+      const lineWidth = Math.max(0, 2 * feature.hitReach - 10);
+      if ((maxX - minX + lineWidth) < 40 && (maxY - minY + lineWidth) < 40) continue;    // too small
 
       const measurement = this.measureLabel(feature.label, 'normal');
       this._didPlace = false;

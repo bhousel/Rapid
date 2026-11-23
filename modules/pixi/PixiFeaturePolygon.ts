@@ -239,6 +239,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       lowRes.scale.set(srWidth / 10, srHeight / 10);   // the sprites are 10px x 10px
       lowRes.rotation = local.surround.angle;
       lowRes.tint = color;
+      // (The surrounding rectangle is turned, so its corners can be outside the polygon's own box.)
+      this.hitReach = Math.hypot(srWidth, srHeight) / 2 / localScale;
 
     } else {
       this.lod = 2;
@@ -383,6 +385,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
       const isSameShape = (this._meshPart === this._geom);
       const hitWidth = (lineWidth + HIT_PADDING) * localScale / 2;   // how far from an outline a hit can be
+      this.hitReach = (lineWidth + HIT_PADDING) / 2;
 
       let dashTexture: PIXI.Texture | null = null;
       let dashLength = 0;

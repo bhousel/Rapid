@@ -181,6 +181,46 @@ describe('PixiLayerLabels', () => {
     });
   });
 
+  // A line's label runs along it, if the line takes enough room on screen. That's worked out
+  // from the line's points and width: a line that's drawn in a batch has an empty container.
+  describe('labelLines', () => {
+    // A stand-in for a line feature along x, `length` pixels long, hit `hitReach` pixels from its geometry
+    function lineOf(id, length, hitReach) {
+      return {
+        id: id, type: 'LineString', label: 'Main Street', hitReach: hitReach,
+        geometry: { local: { coords: [[100, 100], [100 + length, 100]] } },
+        container: new PIXI.Container()    // nothing in it
+      };
+    }
+
+    let placed;
+    beforeEach(() => {
+      placed = [];
+      layer.measureLabel = () => MEASURE;
+      layer.placeRopeLabel = feature => placed.push(feature.id);
+    });
+
+    it('labels a line that\'s 40 pixels long or more, and not a shorter one', () => {
+      layer.labelLines([lineOf('long', 40, 0), lineOf('short', 39, 0)]);
+      assert.deepEqual(placed, ['long']);
+    });
+
+    it('counts the line\'s width: a line is hit 5 pixels beyond its casing', () => {
+      layer.labelLines([lineOf('wide', 34, 8), lineOf('narrow', 34, 6)]);    // casings of 6 and 2 pixels
+      assert.deepEqual(placed, ['wide']);
+    });
+
+    it('doesn\'t label a hidden line, or one without a label', () => {
+      const hidden = lineOf('hidden', 100, 0);
+      hidden.container.visible = false;
+      const unnamed = lineOf('unnamed', 100, 0);
+      unnamed.label = null;
+      layer.labelLines([hidden, unnamed]);
+      assert.deepEqual(placed, []);
+    });
+  });
+
+
   describe('labelPolygons', () => {
     // A stand-in for a polygon feature: a rectangle `width` by `height`, drawn with its corner at [100, 100] of label space
     function polygonOf(id, width, height) {

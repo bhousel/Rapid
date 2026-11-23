@@ -2,7 +2,8 @@
 
 **Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
 mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines and points split by
-tile, Nov 19). Section 4 is ideas with nothing built.
+tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
+batches (Nov 23). Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -13,6 +14,8 @@ tile, Nov 19). Section 4 is ideas with nothing built.
   over everything.
 - **Hit-testing.** Pixi tests the tree top-down and stops at the first container with
   `eventMode: 'static'`. A container with `eventMode: 'none'` is skipped along with its whole subtree.
+  (The OSM layer's features are found through the spatial index instead, with the same answer:
+  "Who finds the feature under the pointer", below.)
   Whatever draws on top takes the pointer, which is right for selecting and wrong for drawing: a muted
   "already mapped" Rapid line lies exactly on the OSM sidewalk it matched, so a line started on that
   sidewalk ended up as a loose node (pre.4 release check, Nov 2026). Photo markers and QA items over
@@ -35,6 +38,8 @@ origin
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area)
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
+│  │        ├ batch/<class>/…      a `LineBatch` per road class and zoom 14 tile (or `large`): the
+│  │        │                      casings and strokes of that class's lines, just below its containers
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
 │  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
@@ -110,6 +115,34 @@ halo on a Rapid line while drawing, and a cheaper hit test in those modes.
 
 Not changed: the `'drawing'` class still turns off the drawing way's own hit area (Rapid#648), and
 `DragBehavior` still turns off the dragged node's.
+
+### Who finds the feature under the pointer (Nov 23)
+
+Pixi's hit test asks every interactive container in the scene, on every pointer event: 8 ms among
+Užice's 107,000 features, whatever is under the pointer. A layer that keeps its data in a spatial
+index can ask the few features near the pointer instead, so a layer can take its spatial ID's hit
+testing from Pixi:
+
+- **The layer says so:** `scene.setHitTester('osm', layer)`. The scene then gives that spatial
+  ID's containers `eventMode: 'none'` whatever the mode, and Pixi's walk skips them.
+- **`PixiEvents` asks the scene for the feature on every pointer event** (`scene.hitTest()`), and
+  puts it on the event (`_feature`). `AbstractBehavior._getEventData()` reads it from there; the
+  behaviors and modes are unchanged.
+- **The scene takes whichever is drawn on top:** the feature that Pixi's own target belongs to, or
+  the one a layer found (`drawOrder()` in `helpers.ts` compares their places in the tree). A layer
+  whose spatial ID the mode keeps from the pointer isn't asked.
+- **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
+  within reach of the pointer (the furthest any feature drawn so far can be hit from its
+  geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
+  feature answers by the rules Pixi has for one container (`containerHit()`): its hit area, or
+  what it draws. So the answer is the one Pixi gave.
+- **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
+  spatial container: Pixi still finds those.
+
+Checked on a grid of 4,800 points, in Seattle and Užice, in nine states each (two zooms in and
+out, rotated, wireframe, full fill, a way selected): the same feature as Pixi's hit test over
+the whole scene at all 86,400 points. `test/e2e/select.test.js` checks it on the test data.
+The numbers are in `design/graphics-system.md` section 15 (step 6).
 
 ## 3. Render groups
 
@@ -305,11 +338,14 @@ What it changed (dev build, from tapes; DRAW in ms):
   default: with the datasets non-interactive, the OSM line under a muted already-mapped line is
   reachable anyway, and that muted line staying visible is the point of the setting. Reordering is a
   visual preference, which is where a layer-order UI would belong.
-- **Batching casings and strokes.** Each `PixiFeatureLine` renders its casing then its stroke, so a
-  dense view draws casing, stroke, casing, stroke, one pair per line. Pixi's `RenderLayer` (8.6+) can
-  render all casings of a level then all strokes while they stay children of the feature container
-  (hit-testing unchanged). See `design/profiling.md`.
-- **Hit-testing by geometry** (the spatial index instead of Pixi) would make snapping independent of
-  stroke width and z-order altogether, and would make "don't snap to the segment next to the active
-  node" (commented out in `HoverBehavior`/`DrawBehavior`) easy. A redesign of hover and snapping;
-  noted as the direction, not planned.
+- **All casings of a level, then all strokes.** The OSM layer's lines are drawn in batches now
+  (`LineBatch`, `design/graphics-system.md` section 15), in the order they had: a line's casing,
+  then its stroke, then the next line's. So where two roads meet, one's casing still crosses the
+  other's stroke. Drawing every casing of a level before every stroke (as iD does) would be a
+  change of order in the batches, and of how junctions look: not decided.
+- **Snapping by geometry.** The OSM layer's features are found through the spatial index now
+  (section 2), but each still answers with its drawn hit area, so the answer is what Pixi gave.
+  Choosing by distance instead (the nearest line, a vertex before a line) would make snapping
+  independent of stroke width and z-order, and would make "don't snap to the segment next to the
+  active node" (commented out in `HoverBehavior`/`DrawBehavior`) easy. A redesign of hover and
+  snapping; noted as the direction, not planned.

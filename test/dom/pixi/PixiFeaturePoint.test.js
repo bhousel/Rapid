@@ -139,6 +139,11 @@ describe('PixiFeaturePoint', () => {
       draw({ marker: { image: 'pin' } });
       const rect = feature.container.hitArea;
       assert.instanceOf(rect, PIXI.Rectangle);
+      // The furthest the point can be hit from where it is, in pixels: the rectangle's far corner.
+      // (The marker is drawn at its own size here, so the rectangle's units are pixels.)
+      const corner = Math.hypot(Math.max(-rect.left, rect.right), Math.max(-rect.top, rect.bottom));
+      assert.closeTo(feature.hitReach, corner, 1e-9);
+      assert.isAtLeast(feature.hitReach, 14);
 
       const halo = feature.halo;
       assert.strictEqual(halo.parent, haloParent);
@@ -160,6 +165,7 @@ describe('PixiFeaturePoint', () => {
       draw({ marker: { image: 'smallCircle' } });
       const circle = feature.container.hitArea;
       assert.instanceOf(circle, PIXI.Circle);
+      assert.closeTo(feature.hitReach, circle.radius, 1e-9);    // in pixels
 
       const [min, max] = reachOf(feature.halo.children[0], circle.x, circle.y);
       assert.isAbove(min, circle.radius - 1.05);    // (the corners of a ring of 20 points go a little past its width)

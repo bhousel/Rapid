@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { containerHit } from './helpers.ts';
 import { utilDeepMerge } from '../util/deep_merge.ts';
 import { styleDefaults } from '../lib/Style.ts';
 
@@ -66,6 +67,12 @@ export class AbstractPixiFeature {
   /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
   public halo: PIXI.Container | null;
   /**
+   * How far outside the box of its geometry the Feature can be hit, in pixels: a line a few
+   * pixels from it, a pin above its point. A subclass sets it when it draws. A layer that finds
+   * its features through a spatial index looks this far around the pointer (`PixiLayerOsm.hitTest`).
+   */
+  public hitReach: number;
+  /**
    * Whether labels keep clear of this Feature. Its layer sets this: pins and vertices are
    * avoided, photo and QA markers aren't. (See `updateAvoid`.)
    */
@@ -126,6 +133,7 @@ export class AbstractPixiFeature {
 
     this.lod = 2;   // full detail
     this.halo = null;
+    this.hitReach = 0;
     this.labelAvoid = false;
     this._avoidCells = null;
     this._avoidGeneration = 0;
@@ -206,6 +214,18 @@ export class AbstractPixiFeature {
    * @abstract
    */
   public updateHalo(viewport: Viewport): void {
+  }
+
+
+  /**
+   * Whether the pointer is over this Feature: over its hit area if it has one, otherwise over
+   * what it draws. A Feature that's hidden, or not allowed to be interactive, is never hit.
+   * (A Feature that's waiting to be drawn again answers for where it was last drawn.)
+   * @param point - The pointer's place in the stage's coordinates (a pointer event's `global`)
+   * @return `true` if the pointer hits it
+   */
+  public hitTest(point: PIXI.PointData): boolean {
+    return containerHit(this.container, point);
   }
 
 

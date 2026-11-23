@@ -11,6 +11,90 @@ const HALO_ALPHA = 0.9;
 const HALO_WIDTH = 2;
 const HALO_DASH = [6, 3];
 
+/** Where a point is in a container's own coordinates, while `containerHit()` works */
+const _local = new PIXI.Point();
+
+
+/**
+ * Whether a point is over a container, by the rules Pixi's own hit test has for one subtree
+ * (`EventBoundary.hitTestRecursive`): a `hitArea` decides where it has one, otherwise the
+ * children do, and then what the container draws (`containsPoint`). Nothing with
+ * `eventMode: 'none'` or hidden is hit.
+ *
+ * Pixi's hit test starts at the stage and asks every interactive container in the scene. This
+ * asks one, for a caller that already knows which few could be under the pointer (see
+ * `PixiScene.hitTest`). The container's ancestors aren't looked at.
+ * @param container - The container to test
+ * @param point - The point, in the stage's coordinates (a pointer event's `global`)
+ * @param interactive - Whether an ancestor made everything below it interactive (leave it out)
+ * @return `true` if the pointer would hit the container or something in it
+ */
+export function containerHit(container: PIXI.Container, point: PIXI.PointData, interactive: boolean = false): boolean {
+  const eventMode = container.eventMode;
+  if (!container.visible || !container.renderable || !container.measurable || eventMode === 'none') return false;
+  if (eventMode === 'passive' && !container.interactiveChildren) return false;
+
+  const hitArea = container.hitArea;
+  if (hitArea) {
+    container.worldTransform.applyInverse(point, _local);
+    if (!hitArea.contains(_local.x, _local.y)) return false;
+  }
+
+  const isInteractive = interactive || eventMode === 'static' || eventMode === 'dynamic';
+  if (container.interactiveChildren) {
+    const children = container.children;
+    for (let i = children.length - 1; i >= 0; i--) {
+      if (containerHit(children[i], point, isInteractive)) return true;
+    }
+  }
+
+  if (!isInteractive) return false;
+  if (hitArea) return true;
+
+  if (container instanceof PIXI.ViewContainer) {   // something that draws: a sprite, a graphics, a mesh
+    container.worldTransform.applyInverse(point, _local);
+    return container.containsPoint(_local);
+  }
+  return false;
+}
+
+
+/**
+ * Says which of two containers in the same scene is drawn later, and so is on top where they
+ * overlap. It's the order of a walk through the tree: a container's children are kept in the
+ * order they're drawn in (Pixi sorts them by `zIndex` when it renders).
+ * @param a - A container
+ * @param b - Another
+ * @return A positive number if `a` is drawn after `b`, a negative one if before, and 0 if they're
+ *   the same container or aren't in the same tree
+ */
+export function drawOrder(a: PIXI.Container, b: PIXI.Container): number {
+  if (a === b) return 0;
+
+  let depthA = 0;
+  let depthB = 0;
+  for (let c = a.parent; c; c = c.parent) depthA++;
+  for (let c = b.parent; c; c = c.parent) depthB++;
+
+  // Bring the deeper one up to the other's depth. If that arrives at the other, one is inside
+  // the other: a container is drawn before what's in it.
+  let ca: PIXI.Container = a;
+  let cb: PIXI.Container = b;
+  for (; depthA > depthB; depthA--) ca = ca.parent!;
+  for (; depthB > depthA; depthB--) cb = cb.parent!;
+  if (ca === cb) return (ca === a) ? -1 : 1;
+
+  // Then up together, to the two children of the same parent.
+  while (ca.parent !== cb.parent) {
+    if (!ca.parent || !cb.parent) return 0;
+    ca = ca.parent;
+    cb = cb.parent;
+  }
+  const parent = ca.parent;
+  if (!parent) return 0;
+  return parent.children.indexOf(ca) - parent.children.indexOf(cb);
+}
+
 
 /**
  * Draws rings as lines, each a `LineMesh` child of a container. The children are made as rings

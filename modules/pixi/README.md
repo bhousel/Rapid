@@ -15,11 +15,11 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 
 | File | Description |
 |------|-------------|
-| `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph |
-| `PixiEvents.ts` | Binds pointer/keyboard/wheel events once and re-dispatches them to other code |
+| `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph; finds the feature under the pointer (`hitTest()`) |
+| `PixiEvents.ts` | Binds pointer/keyboard/wheel events once and re-dispatches them to other code, with the feature under the pointer on each pointer event |
 | `PixiTextures.ts` | Texture atlas management and sprite generation |
 | `RenderFrame.ts` | One frame of the map, with the stats gathered while it's made (see `design/graphics-system.md`) |
-| `helpers.ts` | Shared rendering helper functions |
+| `helpers.ts` | Shared rendering helper functions: halos and rings, whether a point hits a container, which of two containers is drawn on top |
 | `index.ts` | Barrel export file |
 
 ### Base Classes
@@ -67,7 +67,8 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 
 | File | Description |
 |------|-------------|
-| `LineMesh.ts` | Draws a line's casing or stroke, an area's outline, a halo or the lasso from a stroke mesh |
+| `LineMesh.ts` | Draws one line from a stroke mesh: an area's outline, a halo, the lasso, a line of a layer that doesn't batch its lines |
+| `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes |
 | `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |

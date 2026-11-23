@@ -28,3 +28,14 @@ How to measure frames, memory and garbage without fooling yourself. See also `de
   affected: noise (0.3 to 0.7 ms of DRAW). Two rounds of A B C A B C with `--runs 15` showed only
   Seattle moving (261 of 300 masks affected), by about 1 ms, every time. Count what the change
   touches at each place (a snippet over the scene) before reading a difference.
+- **Two runs of `bun run measure` may not have had the same layers on.** The debug Chrome keeps
+  what was last set (layers, filters, area fill), and the script measures with that. Step 5's
+  table was taken with the labels layer off, and the next step's first run with it on: 20 more
+  draw calls and a few ms of APP that had nothing to do with the change. The first lines of the
+  output say which layers and filters were on: read them before comparing. Better, compare in
+  one build, alternating: `--setup snippet.js` runs in the page before each place, to switch
+  what's compared (`layer.batchLines = false; layer.reset();`) and to set what's shown.
+- **A checksum of a typed array has to leave out its huge values.** A sum over a batch's floats
+  included a "never" of 3e38 in most vertices, and nothing else that changed could move it: the
+  test passed whatever happened to the array.
+

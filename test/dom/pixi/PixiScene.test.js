@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
 import { PixiLayerKeepRight } from '../../../modules/pixi/PixiLayerKeepRight.ts';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
@@ -79,12 +80,16 @@ describe('PixiScene', () => {
         })),
         _spatialContainers: new Map(),
         _interactiveSpatialIDs: null,
+        _hitTesters: new Map(),
+        _hitWorld: new PIXI.Point(),
         _anchor: [0, 0],
         _worldContainers: new Set(),
-        layers: new Map()
+        layers: new Map(),
+        gfx: { origin: new PIXI.Container() }
       };
       const names = [
         'getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged',
+        '_eventMode', 'setHitTester', 'hitTest',
         'worldContainer', 'worldContainersIn', 'destroyWorldContainer', 'setAnchor'
       ];
       for (const name of names) {
@@ -151,6 +156,105 @@ describe('PixiScene', () => {
       assert.strictEqual(told, 1);
       assert.strictEqual(pointsNotes.eventMode, 'passive');
     });
+
+    // A layer that keeps its data in a spatial index finds its own features under the pointer,
+    // and Pixi's hit test (which asks every container in the scene) leaves its containers out.
+    describe('hit testing', () => {
+      // A stand-in feature with a container in the scene
+      function featureIn(parent, id) {
+        const container = new PIXI.Container();
+        const feature = { id: id, container: container };
+        container.__feature__ = feature;
+        parent.addChild(container);
+        return feature;
+      }
+
+      it('keeps Pixi out of the containers of a spatial ID whose layer finds its own features', () => {
+        const before = scene.getSpatialContainer('basemap', 'osm');
+        const rapid = scene.getSpatialContainer('basemap', 'fbRoads');
+        assert.strictEqual(before.eventMode, 'passive');
+
+        scene.setHitTester('osm', { hitTest: () => null });
+        const after = scene.getSpatialContainer('points', 'osm');   // made afterwards
+        assert.strictEqual(before.eventMode, 'none');
+        assert.strictEqual(after.eventMode, 'none');
+        assert.strictEqual(rapid.eventMode, 'passive');
+
+        scene._modeChanged({ interactiveSpatialIDs: new Set(['osm']) });   // whatever the mode says
+        assert.strictEqual(before.eventMode, 'none');
+        scene._modeChanged(null);
+        assert.strictEqual(before.eventMode, 'none');
+
+        scene.setHitTester('osm', null);   // back to Pixi
+        assert.strictEqual(before.eventMode, 'passive');
+        assert.strictEqual(after.eventMode, 'passive');
+      });
+
+      it('returns the feature that Pixi\'s target belongs to when no layer finds its own', () => {
+        const feature = featureIn(scene.getSpatialContainer('basemap', 'fbRoads'), 'a');
+        const child = new PIXI.Container();
+        feature.container.addChild(child);
+        assert.strictEqual(scene.hitTest({ x: 1, y: 2 }, child), feature);
+        assert.strictEqual(scene.hitTest({ x: 1, y: 2 }, feature.container), feature);
+        assert.isNull(scene.hitTest({ x: 1, y: 2 }, scene.groups.get('basemap')));   // no feature there
+        assert.isNull(scene.hitTest({ x: 1, y: 2 }, null));
+        assert.isNull(scene.hitTest({ x: 1, y: 2 }));
+      });
+
+      it('asks the layer, with the point on the stage and in the world', () => {
+        const feature = featureIn(scene.getSpatialContainer('basemap', 'osm'), 'w1');
+        const asked = [];
+        scene.setHitTester('osm', { hitTest: (point, world) => { asked.push([point.x, point.y, world.x, world.y]); return feature; } });
+
+        // `origin` is at 100,50 and draws the world at twice its size
+        const origin = scene.gfx.origin;
+        const stage = new PIXI.Container({ isRenderGroup: true });
+        stage.addChild(origin);
+        origin.position.set(100, 50);
+        origin.scale.set(2);
+        origin.updateLocalTransform();
+        origin.relativeGroupTransform.copyFrom(origin.localTransform);   // as a render would
+
+        assert.strictEqual(scene.hitTest({ x: 120, y: 60 }), feature);
+        assert.deepEqual(asked, [[120, 60, 10, 5]]);
+      });
+
+      it('takes whichever is drawn on top: the layer\'s feature, or Pixi\'s', () => {
+        const line = featureIn(scene.getSpatialContainer('basemap', 'osm'), 'w1');
+        const rapidLine = featureIn(scene.getSpatialContainer('basemap', 'fbRoads'), 'fbRoads:w-1');
+        const point = featureIn(scene.getSpatialContainer('points', 'osm'), 'n1');
+        scene.groups.get('basemap').sortChildren();
+
+        // the groups are children of `origin`, basemap under points
+        const origin = scene.gfx.origin;
+        origin.addChild(scene.groups.get('basemap'), scene.groups.get('points'));
+
+        let found = line;
+        scene.setHitTester('osm', { hitTest: () => found });
+        assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, null), line);                   // nothing else there
+        assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), rapidLine);   // Rapid's data is above OSM's lines
+
+        found = point;
+        assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), point);   // ..and below OSM's points
+
+        found = null;
+        assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), rapidLine);
+        assert.isNull(scene.hitTest({ x: 0, y: 0 }, null));
+      });
+
+      it('doesn\'t ask a layer whose data the mode keeps from the pointer', () => {
+        let asked = 0;
+        scene.setHitTester('fbRoads', { hitTest: () => { asked++; return null; } });
+        scene._modeChanged({ interactiveSpatialIDs: new Set(['osm']) });
+        assert.isNull(scene.hitTest({ x: 0, y: 0 }, null));
+        assert.strictEqual(asked, 0);
+
+        scene._modeChanged({ interactiveSpatialIDs: null });
+        scene.hitTest({ x: 0, y: 0 }, null);
+        assert.strictEqual(asked, 1);
+      });
+    });
+
 
     it('releases a spatial ID\'s containers from every group, and forgets them', () => {
       const basemapRapid = scene.getSpatialContainer('basemap', 'fbRoads');

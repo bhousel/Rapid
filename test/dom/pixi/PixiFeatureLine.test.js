@@ -1,10 +1,12 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
+import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
 import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
 
 
 // A line always has a stroke. Its casing is drawn from zoom 16, if the style has one that can
-// be seen, and the mesh for it exists only then.
+// be seen, and the mesh for it exists only then. A line that its layer gave a batch has no
+// meshes: its casing and stroke are drawn there, with the other lines.
 describe('PixiFeatureLine', () => {
   let feature, effectiveZoom, context, haloParent;
   const dashTexture = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 16, height: 1 }) });
@@ -36,9 +38,13 @@ describe('PixiFeatureLine', () => {
     feature.geometry = part;
   });
 
-  it('makes no casing until it is drawn', () => {
+  it('makes no meshes until it is drawn', () => {
     assert.isNull(feature.casing);
+    assert.isNull(feature.stroke);
+
+    drawAt(17, { casing: { opacity: 0 }, stroke: { width: 3, color: 0xffffff } });
     assert.isOk(feature.stroke);
+    assert.deepEqual(feature.container.children.map(child => child.label), ['stroke']);
   });
 
   it('makes the casing from zoom 16, below the stroke', () => {
@@ -192,6 +198,207 @@ describe('PixiFeatureLine', () => {
 
   // The line's first segment runs along x from its first point, and nothing else is near that point.
   // The casing is 5 pixels wide, and a hit is good 5 pixels around it: 7.5 pixels from the line.
+  // A layer that draws many lines gives each a `LineBatch`. The line's casing and stroke are
+  // runs of vertices in the batch then, and a zoom changes nothing in it.
+  describe('in a batch', () => {
+    const style = { casing: { width: 5, color: 0x444444 }, stroke: { width: 3, color: 0xffffff } };
+    let batch, calls;
+
+    // Counts what the feature asks of the batch
+    function watch(target) {
+      ['add', 'remove', 'setStroke', 'setStyle'].forEach(name => {
+        const original = target[name].bind(target);
+        target[name] = (...args) => {
+          calls.push(name);
+          return original(...args);
+        };
+      });
+    }
+
+    beforeEach(() => {
+      batch = new LineBatch();
+      batch.position.set(8388608, 8388608);    // the world's middle, where the line is
+      calls = [];
+      watch(batch);
+      feature.batch = batch;
+    });
+    afterEach(() => {
+      if (!batch.destroyed) batch.destroy();
+    });
+
+    it('draws the casing and the stroke there, the stroke after the casing, and has no meshes', () => {
+      feature.container.zIndex = 4.25;
+      drawAt(17, style);
+      assert.isNull(feature.casing);
+      assert.isNull(feature.stroke);
+      assert.lengthOf(feature.container.children, 0);
+      assert.strictEqual(batch.size, 2);
+      assert.deepEqual(calls, ['add', 'add']);
+
+      const { casingItem, strokeItem } = feature;
+      assert.strictEqual(casingItem.batch, batch);
+      assert.strictEqual(strokeItem.batch, batch);
+      assert.strictEqual(casingItem.order, 4.25);
+      assert.isAbove(strokeItem.order, 4.25);
+      assert.isBelow(strokeItem.order, 4.25 + 1e-6);
+      assert.strictEqual(casingItem.indices, strokeItem.indices, 'one stroke mesh for both');
+
+      // widths in pixels, as the style has them: the batch's shader narrows them at lower zooms
+      const widthOf = item => Array.from(batch._floats.subarray(item.first * 12 + 10, item.first * 12 + 12));
+      assert.deepEqual(widthOf(casingItem), [5, -3]);
+      assert.deepEqual(widthOf(strokeItem), [3, 2]);
+    });
+
+    it('writes its vertices near the batch\'s origin', () => {
+      drawAt(17, style);
+      const item = feature.strokeItem;
+      const [x, y] = feature.geometry.world.origin;
+      const local = feature.geometry.local.flat[0];
+      assert.closeTo(batch._floats[item.first * 12], local[0] + x - 8388608, 1e-3);
+      assert.closeTo(batch._floats[item.first * 12 + 1], local[1] + y - 8388608, 1e-3);
+      assert.isBelow(Math.abs(batch._floats[item.first * 12]), 100);
+    });
+
+    it('does nothing to the batch for a zoom, also across the zooms where widths and casings change', () => {
+      drawAt(17, style);
+      calls = [];
+      for (const zoom of [18, 16.5, 15, 19]) {
+        feature.dirtyTransform();
+        effectiveZoom = zoom;
+        feature.update(viewportAt(zoom));
+      }
+      assert.deepEqual(calls, []);
+      assert.strictEqual(batch.size, 2, 'the casing stays in the batch below zoom 16, where the shader leaves it out');
+      assert.isFalse(feature.dirty);
+    });
+
+    it('writes a line that changed where it was', () => {
+      drawAt(17, style);
+      const { casingItem, strokeItem } = feature;
+      const first = strokeItem.first;
+      calls = [];
+
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.002]] });    // its last point moved
+      feature.geometry = part;
+      drawAt(17);
+      assert.strictEqual(feature.casingItem, casingItem);
+      assert.strictEqual(feature.strokeItem, strokeItem);
+      assert.strictEqual(strokeItem.first, first);
+      assert.deepEqual(calls, ['setStroke', 'setStyle', 'setStroke', 'setStyle']);
+      assert.strictEqual(batch.size, 2);
+    });
+
+    it('builds a stroke mesh for each part when their caps differ, and again when a cap changes', () => {
+      drawAt(17, { casing: { width: 5, cap: 'butt' }, stroke: { width: 3, cap: 'round' } });
+      assert.notStrictEqual(feature.casingItem.indices, feature.strokeItem.indices);
+
+      const before = feature.strokeItem.indices;
+      calls = [];
+      drawAt(17, { casing: { width: 5, cap: 'butt' }, stroke: { width: 3, cap: 'square' } });
+      assert.notStrictEqual(feature.strokeItem.indices, before);
+      assert.deepEqual(calls, ['setStyle', 'setStroke', 'setStyle'], 'only the stroke is built again');
+    });
+
+    it('takes the casing out when the style has none anymore, and leaves out a stroke that can\'t be seen', () => {
+      drawAt(17, style);
+      drawAt(17, { casing: { opacity: 0 }, stroke: { width: 3 } });
+      assert.isNull(feature.casingItem);
+      assert.isOk(feature.strokeItem);
+      assert.strictEqual(batch.size, 1);
+
+      drawAt(17, { casing: { width: 5 }, stroke: { width: 3, opacity: 0 } });
+      assert.isOk(feature.casingItem);
+      assert.isNull(feature.strokeItem);
+      assert.strictEqual(batch.size, 1);
+    });
+
+    it('is hidden and shown in the batch with the feature', () => {
+      drawAt(17, style);
+      feature.visible = false;
+      assert.isFalse(feature.casingItem.visible);
+      assert.isFalse(feature.strokeItem.visible);
+      batch.flush();
+      assert.isFalse(batch.renderable);
+
+      feature.visible = true;
+      assert.isTrue(feature.strokeItem.visible);
+      batch.flush();
+      assert.isTrue(batch.renderable);
+    });
+
+    it('moves to another batch when the layer gives it one', () => {
+      drawAt(17, style);
+      const other = new LineBatch();
+      feature.batch = other;
+      drawAt(17);
+      assert.strictEqual(batch.size, 0);
+      assert.strictEqual(other.size, 2);
+      assert.strictEqual(feature.strokeItem.batch, other);
+      other.destroy();
+    });
+
+    it('draws with meshes of its own again without a batch, or with dashes that a batch can\'t draw', () => {
+      drawAt(17, style);
+      feature.batch = null;
+      drawAt(17);
+      assert.strictEqual(batch.size, 0);
+      assert.isNull(feature.strokeItem);
+      assert.isOk(feature.casing);
+      assert.isOk(feature.stroke);
+      assert.deepEqual(feature.container.children.map(child => child.label), ['casing', 'stroke']);
+
+      feature.batch = batch;
+      drawAt(17);
+      assert.strictEqual(batch.size, 2);
+      assert.isNull(feature.stroke);
+      assert.lengthOf(feature.container.children, 0);
+
+      drawAt(17, { stroke: { width: 3, dash: [1, 2, 3, 4, 5, 6] } });
+      assert.strictEqual(batch.size, 0);
+      assert.isOk(feature.stroke);
+    });
+
+    it('leaves the batch when it\'s destroyed', () => {
+      drawAt(17, style);
+      feature.destroy();
+      assert.strictEqual(batch.size, 0);
+      assert.strictEqual(batch.users, 0);
+    });
+
+    it('tells the batch that it will draw in it, from when the layer gives it the batch', () => {
+      assert.strictEqual(batch.users, 1);    // not drawn yet: the batch is empty, and has to be kept
+      assert.strictEqual(batch.size, 0);
+
+      const other = new LineBatch();
+      feature.batch = other;
+      assert.strictEqual(batch.users, 0);
+      assert.strictEqual(other.users, 1);
+      feature.batch = other;
+      assert.strictEqual(other.users, 1);
+      feature.batch = null;
+      assert.strictEqual(other.users, 0);
+      other.destroy();
+    });
+
+    it('draws with meshes of its own if its batch was destroyed', () => {
+      batch.destroy();
+      drawAt(17, style);
+      assert.isOk(feature.stroke);
+      assert.isNull(feature.strokeItem);
+    });
+
+    it('is still hit, and gets its halo, as without a batch', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const [x, y] = feature.geometry.local.flat[0];
+      assert.isTrue(feature.container.hitArea.contains(x + 1, y + 3.5));
+      assert.strictEqual(feature.hitReach, 7.5);
+      assert.isOk(feature.halo);
+    });
+  });
+
+
   describe('the hit area', () => {
     const style = { casing: { width: 5 }, stroke: { width: 3 } };
 
@@ -206,6 +413,7 @@ describe('PixiFeatureLine', () => {
       assert.isFalse(hitArea.contains(x + 1, y + 4), 'too far beside it');
       assert.isFalse(hitArea.contains(x - 4, y), 'too far past its end');
       assert.isFalse(hitArea.contains(1e6, 1e6));
+      assert.strictEqual(feature.hitReach, 7.5);    // ..which is this many pixels from the line
     });
 
     it('is kept through a zoom, with the distance of the new zoom', () => {
@@ -240,6 +448,7 @@ describe('PixiFeatureLine', () => {
       feature.setClass('drawing');
       drawAt(17, style);
       assert.isNull(feature.container.hitArea);
+      assert.strictEqual(feature.hitReach, 0);
     });
   });
 
