@@ -182,22 +182,44 @@ describe('PixiLayerLabels', () => {
   });
 
   // A line's label runs along it, if the line takes enough room on screen. That's worked out
-  // from the line's points and width: a line that's drawn in a batch has an empty container.
+  // from the line's points and width, and from where `origin` puts the world on screen: a line
+  // that's drawn in a batch has nothing in its container, and the container isn't in the scene.
   describe('labelLines', () => {
-    // A stand-in for a line feature along x, `length` pixels long, hit `hitReach` pixels from its geometry
-    function lineOf(id, length, hitReach) {
+    // A stand-in for a line feature along x, `length` world units long, starting at [1100, 2100]
+    // in the world, hit `hitReach` pixels from its geometry, of the given road class
+    function lineOf(id, length, hitReach, roadClass = 0) {
+      const container = new PIXI.Container();    // nothing in it, and it has no parent
+      container.position.set(1000, 2000);
+      container.zIndex = roadClass + 0.5;
       return {
         id: id, type: 'LineString', label: 'Main Street', hitReach: hitReach,
         geometry: { local: { coords: [[100, 100], [100 + length, 100]] } },
-        container: new PIXI.Container()    // nothing in it
+        container: container
       };
     }
 
-    let placed;
+    let placed, coords;
     beforeEach(() => {
       placed = [];
+      coords = new Map();
+      layer.gfx.origin = new PIXI.Container();    // world units are pixels
       layer.measureLabel = () => MEASURE;
-      layer.placeRopeLabel = feature => placed.push(feature.id);
+      layer.placeRopeLabel = (feature, measurement, labelCoords) => {
+        placed.push(feature.id);
+        coords.set(feature.id, labelCoords);
+      };
+    });
+
+    it('puts the label along where the line is on screen, wherever its container is', () => {
+      layer.gfx.origin.position.set(-1000, -2000);
+      layer.gfx.origin.scale.set(2);
+      layer.labelLines([lineOf('line', 50, 0)]);
+      assert.deepEqual(coords.get('line'), [[1200, 2200], [1300, 2200]]);    // (world - 500, -1000) × 2
+    });
+
+    it('labels the lines of the more important roads first', () => {
+      layer.labelLines([lineOf('footway', 50, 0, -20), lineOf('motorway', 50, 0, 0), lineOf('residential', 50, 0, -9)]);
+      assert.deepEqual(placed, ['motorway', 'residential', 'footway']);
     });
 
     it('labels a line that\'s 40 pixels long or more, and not a shorter one', () => {

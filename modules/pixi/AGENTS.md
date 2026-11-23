@@ -30,13 +30,24 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `GeometryPart` is a different object then). Don't go back to `graphics.stroke()` for them:
   Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms in
   Užice allocated. See section 15 of `design/graphics-system.md`.
-  - **The OSM layer's lines are in batches** (`lib/LineBatch.ts`): one `Mesh` with our own shader
-    for the lines of a level, road class and zoom 14 tile. The layer gives each line feature its
-    batch (`feature.batch`, from `_lineBatch()`), and the feature's casing and stroke are items
-    in it: it has no mesh of its own. The shader works out widths, the narrowing below zoom 17,
-    the casing's absence below 16, wireframe and dashes from four numbers the layer sets on
-    every frame (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep
-    whatever depends on the zoom out of the vertices.
+  - **The OSM layer's lines are in batches** (`lib/LineBatch.ts`, a `Mesh` with our own shader):
+    two for each level, one for every casing and one for every stroke, drawn in that order.
+    The layer gives each line feature its two (`feature.casingBatch` and `feature.batch`, from
+    `_lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
+    its own. The shader works out widths, the narrowing below zoom 17, the casing's absence
+    below 16, wireframe and dashes from four numbers the layer sets on every frame
+    (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
+    on the zoom out of the vertices. Don't split the batches (by road class, by tile) without
+    counting the draw calls: fewer is the point, and the order of the classes is in the batch.
+  - **A line that its batches draw isn't in the scene.** Its container has no parent, so don't
+    reach for `feature.container.parent`, `getBounds()`, `toGlobal()` or `worldTransform` on a
+    line: use its geometry, its container's `position` (the line's place in the world) and
+    `gfx.origin` (the world's place on screen). Where a feature is drawn among the others is
+    `feature.sceneContainer` and `sceneOrder` (`featureOrder()` in `helpers.ts`).
+  - **A line is in the scene only when it draws something itself** (`drawsInContainer()`):
+    oneway arrows, or the whole line while it's hovered or highlighted, because a glow is a
+    filter on the container and needs the line drawn in it. Anything new that a line draws in
+    its own container has to be said there, or it's drawn nowhere.
   - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): an area's outlines, halos, the
     lasso, and the lines of layers that give no batch. Call `setStroke()` for a new width: it
     moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
@@ -68,16 +79,21 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in Užice where Pixi's
   walk took 8). `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
   `AbstractBehavior._getEventData()` reads it. Rules that follow:
-  - A feature is hit where its container says: its `hitArea`, or what it draws
+  - A point or an area is hit where its container says: its `hitArea`, or what it draws
     (`AbstractPixiFeature.hitTest()`, `containerHit()` in `helpers.ts`). `eventMode: 'none'` and
-    `allowInteraction = false` still take a feature or a part of one out.
+    `allowInteraction = false` still take a feature or a part of one out. A line is hit by its
+    distance from the pointer, in world coordinates (`PixiFeatureLine.hitTest()`).
   - **A feature that can be hit outside the box of its geometry sets `hitReach`**, in pixels,
     when it draws (a pin above its point, a line beside itself). The layer asks the index that
     far around the pointer, so a feature with too small a reach isn't found at its edges.
   - A feature's data has to be in the index under its own ID (`_dataHasFeature`). What isn't
     (the midpoints) goes in a container that Pixi tests, such as the map UI's `selected`.
-  - After changing any of this, run the comparison in `test/e2e/select.test.js`: both ways of
-    finding the feature must agree at every point.
+  - After changing any of this, run the comparison in `test/e2e/select.test.js`: the index
+    must find what asking every feature does, at every point.
+- **Look at what a change does to a hovered, a selected and a dragged feature,** in a
+  screenshot. Moving lines into batches took the glow off every hovered line, and every test
+  passed: the tests looked at classes, and the glow is a filter on a container that had nothing
+  left in it.
 - **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
   for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
   that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in

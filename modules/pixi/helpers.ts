@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import { geomStrokeMesh } from '../geo/index.ts';
 import { LineMesh } from './lib/LineMesh.ts';
 
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { PixiTextures } from './PixiTextures.ts';
 
 
@@ -178,4 +179,20 @@ export function getDebugBBox(
   sprite.alpha = alpha ?? 0.65;
   if (label) sprite.label = label;
   return sprite;
+}
+
+
+/**
+ * Says which of two features is drawn later, and so is on top where they overlap: by where
+ * each is drawn in the scene (`sceneContainer`, see `drawOrder`), and for two that the same
+ * mesh draws (lines in one batch), by their order in it.
+ * @param a - A feature
+ * @param b - Another
+ * @return A positive number if `a` is drawn after `b`, a negative one if before, and 0 if it can't be said
+ */
+export function featureOrder(a: AbstractPixiFeature, b: AbstractPixiFeature): number {
+  const containerA = a.sceneContainer;
+  const containerB = b.sceneContainer;
+  if (containerA !== containerB) return drawOrder(containerA, containerB);
+  return a.sceneOrder - b.sceneOrder;
 }

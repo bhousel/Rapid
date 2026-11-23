@@ -72,7 +72,8 @@ Užice. Chosen: the layer asks the editor's spatial index which entities are nea
 each of their features whether it's hit, by Pixi's own rules for one container (`containerHit()`),
 and takes the one drawn on top (`drawOrder()`). The scene compares that with Pixi's answer for
 everything else (`PixiScene.hitTest()`), and `PixiEvents` puts the feature on the event. So the
-feature that's found is the one Pixi found (checked at 86,400 points), in 0.07 ms.
+feature that's found is the one Pixi found (checked at 86,400 points), in 0.07 ms. (Lines answer
+by their distance from the pointer since they left the scene; the rest as before.)
 Rejected:
 - **A hit test with rules of its own** (the nearest line, vertices before lines): it changes what
   a click selects and what a drawn line snaps to. That's the redesign of hover and snapping in
@@ -85,21 +86,26 @@ Rejected:
   casings any size. Each feature says how far it can be hit from its geometry (`hitReach`).
 
 ## The OSM layer's lines are drawn in batches, with a shader of our own (Nov 2026)
-Section 15 of `design/graphics-system.md`, step 6. A `LineBatch` is one `Mesh` for the casings and
-strokes of the lines of a level, road class and zoom 14 tile; the shader places each vertex for the
-line's width in pixels at the current zoom. Choices someone might undo:
+Section 15 of `design/graphics-system.md`, step 6. A `LineBatch` is one `Mesh` whose shader places
+each vertex for the line's width in pixels at the current zoom. Choices someone might undo:
+- **Two batches for each level: every casing, then every stroke** (Bryan, Nov 23). Where roads
+  meet, neither's casing crosses the other's stroke; he judged the few pixels of difference
+  unnoticeable or better. In a batch the order is road class, then way ID.
+- **No tiles and no road classes among the batches.** The first cut had a batch per level, class
+  and zoom 14 tile (83 in Užice); it's 16 now. Bryan: draw calls count whatever the M4's
+  timings say, since many users have weaker hardware. The price is a large index buffer built
+  again when a line joins or leaves (81 ms of the 5 s that making all of Užice takes), and a
+  batch whose place in the world has to follow the view (`moveOrigin()`), since nothing else
+  keeps its 32-bit floats small.
 - **How a line is drawn is in each of its vertices** (width, least width, color, opacity, dashes:
   16 of a vertex's 56 bytes), so one draw call serves any mix of styles and dashes need no
   texture. A style table in a texture would make vertices smaller; not measured.
-- **A casing and its stroke are two runs of vertices,** not one drawn twice, and the order in a
-  batch is casing, stroke, next line's casing: the picture is what it was. Every casing of a
-  level before every stroke (as iD draws) would be a different picture at junctions. Bryan's call.
-- **Batch tiles don't depend on the view's zoom** (zoom 14), unlike the tile containers, so a
-  zoom moves no line between batches. The order between two lines of one class that overlap is
-  now by batch tile and then way ID, at every zoom; it used to change with the zoom's tiles.
-- **No editing tier yet.** Section 15 has the touched features drawn by display objects of their
-  own. Here every line is in a batch, and one that changes is written again where it was. The
-  drag measured in step 6 says whether that's enough.
+- **A line that its batches draw isn't in the scene,** though its feature keeps a `Container`
+  (position, `zIndex`, visibility). Taking the container out of `AbstractPixiFeature` is a
+  larger change, and being out of the scene is what Pixi's cost came from.
+- **The editing tier is a hovered or highlighted line only:** its glow is a filter on its
+  container, so it draws itself there meanwhile. A dragged or selected line stays in its
+  batches: a drag measured the same either way.
 - **Dashes the vertex can't hold** (more than four numbers, fractions, over 255 pixels) fall back
   to `LineMesh`es with a dash texture. None of Rapid's styles has one.
 

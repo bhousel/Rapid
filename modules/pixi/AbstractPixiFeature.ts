@@ -222,10 +222,32 @@ export class AbstractPixiFeature {
    * what it draws. A Feature that's hidden, or not allowed to be interactive, is never hit.
    * (A Feature that's waiting to be drawn again answers for where it was last drawn.)
    * @param point - The pointer's place in the stage's coordinates (a pointer event's `global`)
+   * @param _world - The same place in world coordinates, for a subclass that tests without Pixi
    * @return `true` if the pointer hits it
    */
-  public hitTest(point: PIXI.PointData): boolean {
+  public hitTest(point: PIXI.PointData, _world: PIXI.PointData): boolean {
     return containerHit(this.container, point);
+  }
+
+
+  /**
+   * The container in the scene that says where this Feature is drawn among the others: the one
+   * drawn later is on top, and is what the pointer hits (`featureOrder()` in `helpers.ts`).
+   * It's the Feature's own container, unless something else draws the Feature.
+   * @return The container
+   */
+  public get sceneContainer(): PIXI.Container {
+    return this.container;
+  }
+
+
+  /**
+   * Where this Feature is drawn among the others with the same `sceneContainer`, if that draws
+   * several (higher is on top).
+   * @return A number to order by
+   */
+  public get sceneOrder(): number {
+    return 0;
   }
 
 

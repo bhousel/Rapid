@@ -262,6 +262,33 @@ describe('LineBatch', () => {
     assert.strictEqual(more.first, 10 * zigzag.vertexCount);
   });
 
+  it('moves its origin, and keeps every line where it is in the world', () => {
+    batch.position.set(1000, 2000);
+    const a = batch.add(corner, 10, 20, STYLE);
+    const b = batch.add(straight, -5, 0, STYLE);
+    batch.flush();
+    const worldOf = (item, i) => [floatsOf(item, i)[0] + batch.position.x, floatsOf(item, i)[1] + batch.position.y];
+    const before = [worldOf(a, 0), worldOf(a, 3), worldOf(b, 1)];
+    const offsets = floatsOf(a, 3).slice(2);
+
+    const sent = [];
+    batch._floatBuffer.update = (size, offset) => sent.push([size, offset]);
+    batch.moveOrigin(1500, 1800);
+    batch.flush();
+
+    assert.deepEqual([batch.position.x, batch.position.y], [1500, 1800]);
+    assert.deepEqual([worldOf(a, 0), worldOf(a, 3), worldOf(b, 1)], before);
+    assert.strictEqual(floatsOf(a)[0], corner.vertices[0] + 10 - 500);
+    assert.deepEqual(floatsOf(a, 3).slice(2), offsets, 'nothing else in a vertex changes');
+    assert.deepEqual(sent, [[(corner.vertexCount + straight.vertexCount) * FLOATS * 4, 0]], 'all of the vertices go to the GPU again');
+
+    // a line added afterwards is written relative to the new place by its caller; one moved to where it is changes nothing
+    sent.length = 0;
+    batch.moveOrigin(1500, 1800);
+    batch.flush();
+    assert.deepEqual(sent, []);
+  });
+
   it('says which dashes it can draw', () => {
     assert.isTrue(LineBatch.canDraw(null));
     assert.isTrue(LineBatch.canDraw(undefined));

@@ -163,7 +163,7 @@ describe('PixiScene', () => {
       // A stand-in feature with a container in the scene
       function featureIn(parent, id) {
         const container = new PIXI.Container();
-        const feature = { id: id, container: container };
+        const feature = { id: id, container: container, sceneContainer: container, sceneOrder: 0 };
         container.__feature__ = feature;
         parent.addChild(container);
         return feature;
@@ -240,6 +240,20 @@ describe('PixiScene', () => {
         found = null;
         assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), rapidLine);
         assert.isNull(scene.hitTest({ x: 0, y: 0 }, null));
+      });
+
+      it('goes by where a feature is drawn, which needn\'t be its own container', () => {
+        // A line that a batch draws: its container isn't in the scene, the batch is
+        const batch = new PIXI.Container();
+        scene.getSpatialContainer('basemap', 'osm').addChild(batch);
+        const line = { id: 'w1', container: new PIXI.Container(), sceneContainer: batch, sceneOrder: 0 };
+        const rapidLine = featureIn(scene.getSpatialContainer('basemap', 'fbRoads'), 'fbRoads:w-1');
+        scene.groups.get('basemap').sortChildren();
+        scene.gfx.origin.addChild(scene.groups.get('basemap'));
+
+        scene.setHitTester('osm', { hitTest: () => line });
+        assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, null), line);
+        assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), rapidLine);
       });
 
       it('doesn\'t ask a layer whose data the mode keeps from the pointer', () => {

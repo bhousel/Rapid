@@ -291,7 +291,8 @@ function lineShader(): PIXI.Shader {
  * a byte per vertex, and builds nothing.
  *
  * The batch's coordinates are the lines' own, plus what `add()` is told each line is offset by.
- * Keep them small (put the batch near its lines): the buffers hold 32-bit floats.
+ * Keep them small (put the batch near its lines, and `moveOrigin()` when the view has gone far
+ * from there): the buffers hold 32-bit floats.
  *
  * What changed is sent to the GPU when the batch is next rendered, once, however many lines changed.
  *
@@ -577,6 +578,33 @@ export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
       bytes[p] = alpha;
     }
     this._markBytesDirty(item);
+  }
+
+
+  /**
+   * Moves the place that the batch's coordinates start at, and the batch with it, so that every
+   * line stays where it is in the world. The buffers hold 32-bit floats, which are only fine
+   * enough near that place: move it when the view is far from it (and before adding lines,
+   * which are written relative to it).
+   * @param x - The new place in the world, where the batch's own `position` goes
+   * @param y - The same, for y
+   */
+  public moveOrigin(x: number, y: number): void {
+    const dx = this.position.x - x;
+    const dy = this.position.y - y;
+    this.position.set(x, y);
+    if (!dx && !dy) return;
+
+    const floats = this._floats;
+    const end = this._end * FLOATS;
+    for (let o = 0; o < end; o += FLOATS) {
+      floats[o] += dx;
+      floats[o + 1] += dy;
+    }
+    if (this._end > 0) {
+      this._dirtyFirst = 0;
+      this._dirtyEnd = this._end;
+    }
   }
 
 

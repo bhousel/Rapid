@@ -56,3 +56,15 @@ How Pixi behaves, and what that means for Rapid.
   it once before each render. `buffer.update(size, offset)` remembers one range, the last one
   given, so collect what changed and call it once there. And `geometry.indexCount = 0` means "the
   whole index buffer": a mesh with nothing to draw has to be `renderable = false`.
+- **A filter on a container shows what's drawn in that container, and nothing else.** A hovered
+  line's glow is a `GlowFilter` on its feature's container. When the lines moved into batches
+  the container was empty, the glow was gone, and it was committed that way: every test passed,
+  because the tests for hovering looked at classes and vertices. After moving what a feature
+  draws, look at it hovered, selected and dragged in a screenshot, and give the test something
+  about the picture to check (here: the line has meshes in its container while it glows).
+- **Fewer, larger batches were cheaper than they looked.** One batch for all the lines of a
+  level (18,882 in Užice) sounded like a lot to rebuild when a line joins: building its index
+  buffer again is a loop over typed arrays, 81 ms in all while 107,000 features were made.
+  What does cost is whatever makes it rebuild often: hiding a line used to, on every frame the
+  cull box moved (7 ms of DRAW), until hiding became a byte per vertex.
+

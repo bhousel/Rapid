@@ -6,7 +6,7 @@ import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { drawOrder } from './helpers.ts';
+import { featureOrder } from './helpers.ts';
 import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
@@ -45,20 +45,22 @@ const LINE_TILE_ZOOM = 0;
 const POINT_TILE_ZOOM = 0;
 
 /**
- * The casings and strokes of lines are drawn in batches (see `_lineBatch`), one for the lines of
- * a level and road class whose centers are in one map tile of this zoom, whatever the view's
- * zoom is: a batch holds its lines' vertices, and a zoom shouldn't move them between batches.
- * At 14 a tile is 1,024 pixels wide at zoom 16, so a view has a handful of them.
+ * The casings and strokes of lines are drawn in batches (see `_lineBatch`): for each level, one
+ * for every casing and one for every stroke. In a level's container the casings are drawn first,
+ * then the strokes, and both before the containers of the road classes, which hold what a
+ * line's feature draws itself (oneway arrows, a hovered line). Road classes go from -20 to 0
+ * (`getzIndex`).
  */
-const BATCH_TILE_ZOOM = 14;
+const CASING_BATCH = -2000;
+const STROKE_BATCH = -1000;
 
 /**
- * A batch is drawn just before the containers of its road class, which hold what the lines'
- * features still draw themselves (oneway arrows), and after everything of the class below.
- * (Those containers have their class as `zIndex`, plus a `tileOrder` of 1e-6 or more.)
+ * A batch's vertices are 32-bit floats, relative to a place in the world near its lines. The
+ * layer moves that place to the view's center when it's so far from it that a float could be
+ * off by this much of a pixel at the view's zoom (see `_moveBatchOrigins`). At zoom 16 that's
+ * 260,000 pixels away, at zoom 19 a 32,000 world units, at zoom 22 4,000.
  */
-const BATCH_BELOW = 5e-7;
-const BATCH_TILE_STEP = 4e-7;
+const BATCH_PRECISION = 1 / 32;
 
 /** Highway type z-index stacking order (motorway on top, footway on bottom) */
 const HIGHWAYSTACK: Record<string, number> = {
@@ -96,6 +98,12 @@ interface RelatedIDs {
    * for a hover, which would push labels around under the pointer.
    */
   handleIDs: Set<EntityID>;
+}
+
+/** The batches that draw the lines of one level (see `PixiLayerOsm._lineBatch`) */
+interface LineBatchPair {
+  casings: LineBatch | null;
+  strokes: LineBatch | null;
 }
 
 /** The kinds of OSM data the layer draws, as it sorts them in `OsmData` */
@@ -316,8 +324,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /** The containers that features are split into, by parent and label (see `_tileContainer`) */
   protected _tileContainers: Map<PIXI.Container, Map<string, PIXI.Container>>;
-  /** The batches that lines are drawn in, by the container of their level and then by road class and tile (see `_lineBatch`) */
-  protected _lineBatches: Map<PIXI.Container, Map<string, LineBatch>>;
+  /** The batches that lines are drawn in, by the container of their level: one for the casings, one for the strokes (see `_lineBatch`) */
+  protected _lineBatches: Map<PIXI.Container, LineBatchPair>;
   /** collection of calculated midpoints */
   protected _midpoints: Map<DataID, Midpoint>;
   /** Entities in view that the last pass saw, whose features aren't made yet (see `_waitToMake`) */
@@ -369,7 +377,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.batchLines = true;
 
     this._tileContainers = new Map<PIXI.Container, Map<string, PIXI.Container>>();
-    this._lineBatches = new Map<PIXI.Container, Map<string, LineBatch>>();
+    this._lineBatches = new Map<PIXI.Container, LineBatchPair>();
     this._midpoints = new Map<DataID, Midpoint>();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
@@ -455,13 +463,29 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * The batches that draw the lines' casings and strokes (see `_lineBatch`)
+   * @return The batches, in no particular order
+   * @readonly
+   */
+  public get lineBatches(): LineBatch[] {
+    const batches: LineBatch[] = [];
+    for (const pair of this._lineBatches.values()) {
+      if (pair.casings) batches.push(pair.casings);
+      if (pair.strokes) batches.push(pair.strokes);
+    }
+    return batches;
+  }
+
+
+  /**
    * Finds the feature under the pointer, the one drawn on top if there are several.
    *
    * The scene asks this in place of Pixi's hit test (`PixiScene.setHitTester`), which walks every
    * feature: 7 ms for each pointer event among Užice's 107,000. Here the editor's spatial index
    * says which entities are near the pointer, and only their features are asked.
-   * Each feature answers as it would have to Pixi (`AbstractPixiFeature.hitTest`), and the
-   * winner is the one that Pixi would have found first.
+   * Each feature answers for itself (`AbstractPixiFeature.hitTest`: a point or an area as it
+   * would have to Pixi, a line by its distance from the pointer), and the winner is the one
+   * that's drawn on top (`featureOrder`).
    *
    * (The vertices and midpoints of what's selected are in the map UI's container, above
    * everything, and Pixi still finds those.)
@@ -489,8 +513,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       for (const featureID of featureIDs) {
         const feature = this.features.get(featureID);
-        if (!feature?.hitTest(point)) continue;
-        if (!best || drawOrder(feature.container, best.container) > 0) {
+        if (!feature?.hitTest(point, world)) continue;
+        if (!best || featureOrder(feature, best) > 0) {
           best = feature;
         }
       }
@@ -539,6 +563,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       wireframe: !!map?.wireframeMode,
       casing: styleZoom >= 16
     });
+    this._moveBatchOrigins(viewport);
 
     const showsVertices = styleZoom >= MIN_VERTEX_ZOOM;
 
@@ -1984,15 +2009,17 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-    for (const [parent, byKey] of this._lineBatches) {
-      for (const [key, batch] of byKey) {
-        // (Not one that a feature is waiting to be drawn in: it's empty until then.)
-        if (!batch.size && !batch.users) {
-          batch.destroy();
-          byKey.delete(key);
-        }
+    for (const [parent, pair] of this._lineBatches) {
+      // (Not a batch that a feature is waiting to be drawn in: it's empty until then.)
+      if (pair.casings && !pair.casings.size && !pair.casings.users) {
+        pair.casings.destroy();
+        pair.casings = null;
       }
-      if (!byKey.size) {
+      if (pair.strokes && !pair.strokes.size && !pair.strokes.users) {
+        pair.strokes.destroy();
+        pair.strokes = null;
+      }
+      if (!pair.casings && !pair.strokes) {
         this._lineBatches.delete(parent);
       }
     }
@@ -2000,46 +2027,66 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Returns the batch that draws a line's casing and stroke, under its level's container.
-   * A batch is one mesh and one draw call for all of its lines (see `LineBatch`): the lines of
-   * one road class whose centers are in one map tile of zoom `BATCH_TILE_ZOOM`. A line bigger
-   * than such a tile goes in its class's `large` batch.
+   * Returns the batch that draws the casings, or the strokes, of a level's lines, making it if
+   * there's none. A batch is one mesh and one draw call for all of its lines (see `LineBatch`).
    *
-   * The order is what the lines' containers gave it (see `_lineTileContainer`): by road class,
-   * then `large` before the tiles, the tiles by row and column, and in a batch by the way's ID.
+   * A level's casings are all drawn before its strokes, so where two roads meet, neither's
+   * casing crosses the other's stroke. In a batch the lines are in the order of their
+   * feature's `zIndex`: by road class, then by the way's ID.
    * @param levelContainer - The container of the line's level (`way.layer()`)
-   * @param zIndex - The line's road class (a whole number, see `getzIndex`)
-   * @param part - The line's geometry
-   * @return The batch to draw the line in
+   * @param isCasing - Whether the batch is for the casings, not the strokes
+   * @param part - The geometry of the line that the batch is wanted for
+   * @return The batch to draw the line's casing or stroke in
    */
-  protected _lineBatch(levelContainer: PIXI.Container, zIndex: number, part: GeometryPart): LineBatch {
-    let byKey = this._lineBatches.get(levelContainer);
-    if (!byKey) {
-      byKey = new Map<string, LineBatch>();
-      this._lineBatches.set(levelContainer, byKey);
+  protected _lineBatch(levelContainer: PIXI.Container, isCasing: boolean, part: GeometryPart): LineBatch {
+    let pair = this._lineBatches.get(levelContainer);
+    if (!pair) {
+      pair = { casings: null, strokes: null };
+      this._lineBatches.set(levelContainer, pair);
     }
 
-    const world = part.world!;
-    const tile = this._tileOf(world.extent, BATCH_TILE_ZOOM);
-    const key = tile ? `${zIndex}/${tile[0]},${tile[1]}` : `${zIndex}/large`;
-    let batch = byKey.get(key);
+    let batch = isCasing ? pair.casings : pair.strokes;
     if (!batch || batch.destroyed) {
       batch = new LineBatch();
-      batch.label = `batch/${key}`;
-      batch.zIndex = zIndex - BATCH_BELOW + (tile ? BATCH_TILE_STEP * tileOrder(tile) : 0);
+      batch.label = isCasing ? 'casings' : 'strokes';
+      batch.zIndex = isCasing ? CASING_BATCH : STROKE_BATCH;
 
-      // The batch's coordinates start near its lines: at the tile's center, or at the first
-      // of the large lines. (Its buffers hold 32-bit floats, which world coordinates don't fit in.)
-      if (tile) {
-        const tileSize = 256 * (2 ** (WORLD_ZOOM - BATCH_TILE_ZOOM));
-        batch.position.set((tile[0] + 0.5) * tileSize, (tile[1] + 0.5) * tileSize);
-      } else {
-        batch.position.set(world.origin![0], world.origin![1]);
-      }
+      // The batch's coordinates start near its lines: at the first of them. (Its buffers hold
+      // 32-bit floats, which world coordinates don't fit in. See `_moveBatchOrigins`.)
+      const origin = part.world!.origin!;
+      batch.position.set(origin[0], origin[1]);
       levelContainer.addChild(batch);
-      byKey.set(key, batch);
+      if (isCasing) {
+        pair.casings = batch;
+      } else {
+        pair.strokes = batch;
+      }
     }
     return batch;
+  }
+
+
+  /**
+   * Keeps the batches' coordinates fine enough for the view's zoom. A batch's vertices are
+   * 32-bit floats relative to its place in the world, which is where its first line was. When
+   * the view is far from there (after a long pan), and zoomed in enough for it to show, the
+   * batch's place moves to the view's center, and its vertices with it.
+   * @param viewport - The viewport that's being drawn
+   */
+  protected _moveBatchOrigins(viewport: Viewport): void {
+    if (!this._lineBatches.size) return;
+
+    // How far from its place a batch's floats are still good to a part of a pixel, at this zoom
+    const reach = BATCH_PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
+    const [x, y] = viewport.screenToWorld(viewport.center());
+
+    const isFar = (batch: LineBatch | null): batch is LineBatch => {
+      return !!batch && !batch.destroyed && (Math.abs(batch.position.x - x) > reach || Math.abs(batch.position.y - y) > reach);
+    };
+    for (const pair of this._lineBatches.values()) {
+      if (isFar(pair.casings)) pair.casings.moveOrigin(Math.round(x), Math.round(y));
+      if (isFar(pair.strokes)) pair.strokes.moveOrigin(Math.round(x), Math.round(y));
+    }
   }
 
 
@@ -2102,14 +2149,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
-          // A new shape, level or road class, or a new zoom (and its tiles), may put it in another container
-          this._setTile(feature, this._lineTileContainer(levelContainer, zindex, part, tileZoom));
-
-          // ..and in another batch, though not for a new zoom: a batch's tile doesn't depend on it.
+          // Its level's batches. (A new level puts it in others.)
           if (!this.batchLines) {
             feature.batch = null;
-          } else if (!feature.batch || feature.batch.destroyed || !feature.onlyTransformDirty) {
-            feature.batch = this._lineBatch(levelContainer, zindex, part);
+            feature.casingBatch = null;
+          } else if (feature.batch?.parent !== levelContainer || feature.casingBatch?.parent !== levelContainer) {
+            feature.batch = this._lineBatch(levelContainer, false, part);
+            feature.casingBatch = this._lineBatch(levelContainer, true, part);
           }
         }
 
@@ -2156,6 +2202,18 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           feature.style = style;
           feature.label = l10n.displayName(way.tags);
+        }
+
+        // A line that draws something itself (oneway arrows, a hover's glow, or the whole line
+        // if it has no batches) is in the container of its road class and tile. One that's
+        // drawn by its batches alone isn't in the scene: Pixi has nothing to do for it then.
+        // (A new shape, level, road class or zoom may put it in another container.)
+        if (feature.dirty) {
+          if (feature.drawsInContainer()) {
+            this._setTile(feature, this._lineTileContainer(levelContainer, zindex, part, tileZoom));
+          } else if (feature.container.parent) {
+            feature.parentContainer = null;
+          }
         }
 
         this.updateFeature(feature, frame, viewport);

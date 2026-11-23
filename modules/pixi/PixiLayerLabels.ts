@@ -758,22 +758,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @return `false` if it stopped before the end of the list
    */
   public labelLines(features: PixiFeatureLine[], stop?: () => boolean): boolean {
-    /**
-     * Priority sort the labels according to what level their feature has been rendered on.
-     * This is hacky, but we can sort the line labels by their parent container label (name).
-     * It might be a level container with a name like "1", "-1", or just a name like "lines"
-     * If `parseInt` fails, just sort the label above everything.
-     * @param feature
-     */
-    function level(feature: PixiFeatureLine): number {
-      const parentLabel = feature.container.parent?.label;
-      const lvl = parseInt(parentLabel || '999', 10);
-      return isNaN(lvl) ? 999 : lvl;
-    }
+    const origin = this.gfx.origin;
+    if (!origin) return true;
 
-    features.sort((a, b) => level(b) - level(a));
+    // The lines of the more important roads get their labels first: a line's `zIndex` is its
+    // road class, and a part of 1 that puts the lines of a class in order.
+    // (Not by anything about the line's container: a line that's drawn in a batch isn't in the scene.)
+    features.sort((a, b) => Math.floor(b.container.zIndex) - Math.floor(a.container.zIndex));
 
     const temp = new PIXI.Point();
+    const world = new PIXI.Point();
     const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
@@ -796,9 +790,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       let minY = Infinity;
       let maxX = -Infinity;
       let maxY = -Infinity;
+      // (The line's coordinates start at its container's position in the world, and `origin`
+      // puts the world on screen. The container itself may not be in the scene.)
+      const position = feature.container.position;
       for (let i = 0; i < localCoords.length; i++) {
         const p = localCoords[i];
-        feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
+        world.set(p[0] + position.x, p[1] + position.y);
+        origin.toGlobal(world, temp);
         labelCoords[i] = [temp.x - labelOffset.x, temp.y - labelOffset.y];
         if (temp.x < minX) minX = temp.x;
         if (temp.x > maxX) maxX = temp.x;

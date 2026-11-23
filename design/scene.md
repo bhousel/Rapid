@@ -3,7 +3,8 @@
 **Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
 mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines and points split by
 tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
-batches (Nov 23). Section 4 is ideas with nothing built.
+two batches a level, every casing and then every stroke; a line that its batches draw isn't in
+the scene (Nov 23). Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -38,10 +39,12 @@ origin
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area)
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
-│  │        ├ batch/<class>/…      a `LineBatch` per road class and zoom 14 tile (or `large`): the
-│  │        │                      casings and strokes of that class's lines, just below its containers
+│  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
+│  │        ├ strokes              a `LineBatch`: every stroke, above every casing
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
-│  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile
+│  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile.
+│  │                               Only the lines that draw something themselves are in these
+│  │                               (oneway arrows, a hovered line): the rest aren't in the scene
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
 │  │  ├ polygons         the order they first draw (so external data is above OSM, and a dataset's
 │  │  └ lines            polygons are above OSM lines, as before)
@@ -134,14 +137,20 @@ testing from Pixi:
 - **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
   within reach of the pointer (the furthest any feature drawn so far can be hit from its
   geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
-  feature answers by the rules Pixi has for one container (`containerHit()`): its hit area, or
-  what it draws. So the answer is the one Pixi gave.
+  point or an area answers by the rules Pixi has for one container (`containerHit()`): its hit
+  area, or what it draws. A line answers by its distance from the pointer in world coordinates,
+  with nothing of Pixi's: a line that its batches draw isn't in the scene.
+- **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
+  what draws each (`sceneContainer`: a feature's own container, or a line's strokes' batch), and
+  in one batch by the line's order there.
 - **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
   spatial container: Pixi still finds those.
 
 Checked on a grid of 4,800 points, in Seattle and Užice, in nine states each (two zooms in and
-out, rotated, wireframe, full fill, a way selected): the same feature as Pixi's hit test over
-the whole scene at all 86,400 points. `test/e2e/select.test.js` checks it on the test data.
+out, rotated, wireframe, full fill, a way selected), while every line was still in the scene:
+the same feature as Pixi's hit test over the whole scene at all 86,400 points. Since the lines
+left the scene, Pixi can't be asked about them: `test/e2e/select.test.js` checks the index
+against asking every feature of the layer, and against Pixi for points and areas.
 The numbers are in `design/graphics-system.md` section 15 (step 6).
 
 ## 3. Render groups
@@ -338,11 +347,6 @@ What it changed (dev build, from tapes; DRAW in ms):
   default: with the datasets non-interactive, the OSM line under a muted already-mapped line is
   reachable anyway, and that muted line staying visible is the point of the setting. Reordering is a
   visual preference, which is where a layer-order UI would belong.
-- **All casings of a level, then all strokes.** The OSM layer's lines are drawn in batches now
-  (`LineBatch`, `design/graphics-system.md` section 15), in the order they had: a line's casing,
-  then its stroke, then the next line's. So where two roads meet, one's casing still crosses the
-  other's stroke. Drawing every casing of a level before every stroke (as iD does) would be a
-  change of order in the batches, and of how junctions look: not decided.
 - **Snapping by geometry.** The OSM layer's features are found through the spatial index now
   (section 2), but each still answers with its drawn hit area, so the answer is what Pixi gave.
   Choosing by distance instead (the nearest line, a vertex before a line) would make snapping

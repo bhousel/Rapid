@@ -240,11 +240,22 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
     const gfx = rapidContext.systems.gfx;
     const layer = gfx.scene.layers.get('osm');
     const shown = [...layer.features.values()].filter(feature => feature.visible);
+    // (A line that its batches draw isn't in the scene: it has no parent.)
+    const parentOf = feature => feature.container.parent?.label ?? 'not in the scene';
+    const line = layer.features.get(`osm-${wayID}-0`);
     return {
       hovered: shown.filter(feature => feature.classes.has('hover')).map(feature => feature.data.id),
-      verticesOnTop: shown.filter(feature => feature.container.parent.label === 'selected').length,
+      verticesOnTop: shown.filter(feature => parentOf(feature) === 'selected').length,
       dirty: shown.filter(feature => feature.dirty).length,
-      shown: shown.map(feature => `${feature.id} in ${feature.container.parent.label} ${[...feature.classes]}`).sort()
+      shown: shown.map(feature => `${feature.id} in ${parentOf(feature)} ${[...feature.classes]}`).sort(),
+      // The line's glow is a filter on its container, so the line is drawn there while it glows
+      // (by meshes of its own, in the scene), and by its batches the rest of the time.
+      line: {
+        glows: (line.container.filters?.length ?? 0) > 0,
+        drawsItself: !!line.stroke?.strokeMesh?.vertexCount,
+        inScene: !!line.container.parent,
+        shownInBatch: !!line.strokeItem?.visible
+      }
     };
   }, road.id);
 
@@ -252,6 +263,7 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   expect(hovered.hovered).toEqual([road.id]);
   expect(hovered.verticesOnTop).toBe(road.nodes);
   expect(hovered.dirty).toBe(0);
+  expect(hovered.line).toEqual({ glows: true, drawsItself: true, inScene: true, shownInBatch: false });
 
   const frames = await page.evaluate(() => globalThis.__frames);
   expect(frames.length).toBeGreaterThan(0);
@@ -270,6 +282,7 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   expect(after.hovered).not.toContain(road.id);
   expect(after.dirty).toBe(0);
   expect(after.shown).not.toEqual(hovered.shown);
+  expect(after.line).toEqual({ glows: false, drawsItself: false, inScene: false, shownInBatch: true });
 
   await page.evaluate(() => rapidContext.systems.gfx.immediateRedraw());
   await waitForIdle(page);
@@ -285,13 +298,14 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
 
 // The OSM layer finds its own features under the pointer, through the editor's spatial index
 // (`PixiLayerOsm.hitTest`), and Pixi's hit test leaves the layer's containers out. Pixi's would
-// ask every feature in the scene. Both must find the same feature everywhere.
-test('finds the feature under the pointer through the spatial index, as Pixi\'s hit test over every feature would', async ({ page, consoleErrors }) => {
+// ask every feature in the scene, and a line that's drawn in a batch isn't even in the scene.
+// The index must find what asking every feature would, and for points and areas, what Pixi would.
+test('finds the feature under the pointer through the spatial index, as asking every feature would', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
 
-  // What's under each point of a grid over the map, both ways
+  // What's under each point of a grid over the map, each way
   const compare = () => page.evaluate(() => {
     const gfx = rapidContext.systems.gfx;
     const scene = gfx.scene;
@@ -302,9 +316,28 @@ test('finds the feature under the pointer through the spatial index, as Pixi\'s 
 
     const featureOf = container => {
       for (let c = container; c; c = c.parent) {
-        if (c.__feature__) return c.__feature__.id;
+        if (c.__feature__) return c.__feature__;
       }
       return null;
+    };
+
+    // Where something is drawn: its place among its parent's children, from the stage down.
+    // (A feature is drawn by its own container, or a line by its batch, in its order there.)
+    const placeOf = feature => {
+      const path = [];
+      for (let c = feature.sceneContainer; c.parent; c = c.parent) {
+        path.unshift(c.parent.children.indexOf(c));
+      }
+      path.push(feature.sceneOrder);
+      return path;
+    };
+    const isLater = (a, b) => {
+      for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        if (a[i] === undefined) return false;
+        if (b[i] === undefined) return true;
+        if (a[i] !== b[i]) return a[i] > b[i];
+      }
+      return false;
     };
 
     const points = [];
@@ -315,26 +348,51 @@ test('finds the feature under the pointer through the spatial index, as Pixi\'s 
     }
 
     const skipped = scene.getSpatialContainer('basemap', 'osm').eventMode;
-    const found = points.map(point => scene.hitTest(point, boundary.hitTest(point.x, point.y))?.id ?? null);
+    const found = points.map(point => scene.hitTest(point, boundary.hitTest(point.x, point.y)));
 
-    scene.setHitTester('osm', null);    // Pixi tests the OSM layer's features too
+    // Asking every feature of the layer, and taking the one that's drawn last
+    const features = [...osm.features.values()].filter(feature => feature.visible);
+    const places = new Map(features.map(feature => [feature, placeOf(feature)]));
+    const asked = points.map(point => {
+      const world = gfx.origin.worldTransform.applyInverse(point);
+      let best = null;
+      for (const feature of features) {
+        if (!feature.hitTest(point, world)) continue;
+        if (!best || isLater(places.get(feature), places.get(best))) best = feature;
+      }
+      return best;
+    });
+
+    // Pixi, over the features that are in the scene (all but the lines that batches draw)
+    scene.setHitTester('osm', null);
     const pixiFound = points.map(point => featureOf(boundary.hitTest(point.x, point.y)));
     scene.setHitTester('osm', osm);
 
-    const kinds = new Set(found.filter(Boolean).map(id => osm.features.get(id)?.type));
+    const lines = features.filter(feature => feature.type === 'LineString');
     return {
       skipped: skipped,
-      differences: found.flatMap((id, i) => (id === pixiFound[i]) ? [] : [{ at: points[i], found: id, pixiFound: pixiFound[i] }]),
+      differences: found.flatMap((feature, i) => (feature === asked[i]) ? [] : [{ at: points[i], found: feature?.id, asked: asked[i]?.id }]),
+      // Where no line is under the pointer, Pixi finds the same point or area
+      pixiDifferences: found.flatMap((feature, i) => {
+        if (feature?.type === 'LineString' || pixiFound[i]?.type === 'LineString' || feature === pixiFound[i]) return [];
+        return [{ at: points[i], found: feature?.id, pixiFound: pixiFound[i]?.id }];
+      }),
       numFound: found.filter(Boolean).length,
-      kinds: [...kinds].sort()
+      kinds: [...new Set(found.filter(Boolean).map(feature => feature.type))].sort(),
+      linesFound: new Set(found.filter(feature => feature?.type === 'LineString')).size,
+      linesNotInScene: lines.filter(feature => !feature.container.parent).length,
+      linesFoundNotInScene: new Set(found.filter(feature => feature?.type === 'LineString' && !feature.container.parent)).size
     };
   });
 
   const browsing = await compare();
   expect(browsing.skipped).toBe('none');
   expect(browsing.differences).toEqual([]);
+  expect(browsing.pixiDifferences).toEqual([]);
   expect(browsing.numFound).toBeGreaterThan(300);                        // of 1,200 points
   expect(browsing.kinds).toEqual(['LineString', 'Point', 'Polygon']);    // all three kinds were under some point
+  expect(browsing.linesNotInScene).toBeGreaterThan(10);
+  expect(browsing.linesFoundNotInScene).toBeGreaterThan(10);            // lines are found without being in the scene
 
   // With a road selected, its vertices and midpoints are drawn above everything, where Pixi finds them
   const roadID = await page.evaluate(() => {

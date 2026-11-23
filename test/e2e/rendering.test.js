@@ -264,8 +264,9 @@ test('after a zoom, draws the features again over the following frames, with the
 
 // A line's casing and stroke, and each ring of an area's outline, are drawn from a stroke mesh
 // that's built once, for any width (see `design/graphics-system.md`, section 15).
-// - The lines are in batches (`LineBatch`): a line is a run of vertices in its batch's buffers, and
-//   the batch's shader works out its width. A zoom changes four numbers, and nothing in a batch.
+// - The lines are in batches (`LineBatch`), one for the casings and one for the strokes of each
+//   level: a line is a run of vertices in its batches' buffers, and the shader works out its
+//   width. A zoom changes four numbers, and nothing in a batch. The line's feature isn't in the scene.
 // - An outline is a `LineMesh`. A zoom moves the vertices it has, and builds nothing.
 test('draws lines in batches that a zoom leaves alone, and outlines as meshes that keep their vertices', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
@@ -297,25 +298,23 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
     // (A hidden line has an opacity of 0 in its vertices, and that's all that changes when it's hidden.)
     const batches = () => {
       const found = new Map();
-      for (const byKey of layer._lineBatches.values()) {
-        for (const batch of byKey.values()) {
-          let sum = 0;
-          let hiddenVertices = 0;
-          for (const n of batch._floats) {
-            if (Math.abs(n) < 1e30) sum += n;    // (not the "never" of a vertex with no second place: nothing adds up next to it)
-          }
-          batch._bytes.forEach((n, i) => {
-            if (i % 8 !== 3) {
-              sum += n;
-            } else if (n === 0 && i < batch.vertexUse[0] * 8) {
-              hiddenVertices++;
-            }
-          });
-          found.set(batch, {
-            floats: batch._floats, sum: sum, hiddenVertices: hiddenVertices,
-            indexCount: batch.geometry.indexCount, renderable: batch.renderable
-          });
+      for (const batch of layer.lineBatches) {
+        let sum = 0;
+        let hiddenVertices = 0;
+        for (const n of batch._floats) {
+          if (Math.abs(n) < 1e30) sum += n;    // (not the "never" of a vertex with no second place: nothing adds up next to it)
         }
+        batch._bytes.forEach((n, i) => {
+          if (i % 8 !== 3) {
+            sum += n;
+          } else if (n === 0 && i < batch.vertexUse[0] * 8) {
+            hiddenVertices++;
+          }
+        });
+        found.set(batch, {
+          floats: batch._floats, sum: sum, hiddenVertices: hiddenVertices,
+          indexCount: batch.geometry.indexCount, renderable: batch.renderable
+        });
       }
       return found;
     };
@@ -386,6 +385,10 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
       linesWithCasing: before.lines.filter(feature => feature.casingItem).length,
       dashed: dashed.length,
       batches: batchesBefore.size,
+      levels: new Set([...batchesBefore.keys()].map(batch => batch.parent)).size,
+      // A line that its batches draw isn't in the scene, unless it draws something itself (oneway arrows)
+      linesInScene: before.lines.filter(feature => feature.container.parent).length,
+      linesDrawingThemselves: before.lines.filter(feature => feature.container.children.length > 0).length,
       batchesDrawn: [...batchesBefore.values()].filter(batch => batch.renderable && batch.indexCount > 0).length,
       batchesChanged: batchesChanged,
       moreHidden: moreHidden,
@@ -408,10 +411,12 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
   expect(result.linesNotInBatch).toBe(0);
   expect(result.linesWithCasing).toBeGreaterThan(20);
   expect(result.dashed).toBeGreaterThan(0);
-  expect(result.batches).toBeGreaterThan(0);
-  expect(result.batches).toBeLessThan(result.lines / 2);
-  expect(result.batchesDrawn).toBeGreaterThan(0);
-  expect(result.meshInstructions).toBeGreaterThanOrEqual(result.batchesDrawn);
+  // ..one for the casings and one for the strokes of each level
+  expect(result.batches).toBeGreaterThan(1);
+  expect(result.batches).toBe(2 * result.levels);
+  expect(result.batchesDrawn).toBe(result.batches);
+  expect(result.meshInstructions).toBe(result.batchesDrawn);
+  expect(result.linesInScene).toBe(result.linesDrawingThemselves);
   // The zoom changed what a pixel is, and nothing in any batch
   expect(result.pixel[1]).toBeCloseTo(result.pixel[0] / Math.SQRT2, 6);
   expect(result.batchesChanged).toBe(0);
@@ -709,9 +714,11 @@ test('makes features over several frames when there are many to make, and ends u
 });
 
 
-// Lines and points are split into containers by map tile, each with its own render group, so that
-// a change to one feature makes Pixi rebuild a small group. The order they're drawn in stays.
-test('keeps lines in the order of their road class, and points from north to south, across tile containers', async ({ page, consoleErrors }) => {
+// Points are split into containers by map tile, each with its own render group, so that a change
+// to one feature makes Pixi rebuild a small group; so are the lines that draw something themselves
+// (oneway arrows). The other lines are in their level's two batches: every casing, then every
+// stroke, each in the order of the road classes. The order they're drawn in stays.
+test('keeps lines in the order of their road class, casings under strokes, and points from north to south', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -724,7 +731,25 @@ test('keeps lines in the order of their road class, and points from north to sou
     // A feature's container is in its tile's container, which is in that container's render group.
     const groupOf = feature => feature.container.parent.parent;
     const lines = visible.filter(feature => feature.type === 'LineString');
+    const linesInScene = lines.filter(feature => feature.container.parent);
     const points = visible.filter(feature => feature.type === 'Point' && feature.container.parent.label !== 'selected');
+
+    // In a level's container: the casings' batch, the strokes' batch, then the road classes' containers.
+    let levelsOutOfOrder = 0;
+    for (const level of layer.lineContainer.children) {
+      const labels = level.children[0].children.map(child => child.label);
+      const casings = labels.indexOf('casings');
+      const strokes = labels.indexOf('strokes');
+      const others = labels.findIndex(label => label !== 'casings' && label !== 'strokes');
+      if (strokes === -1 || (casings !== -1 && casings > strokes) || (others !== -1 && others < strokes)) levelsOutOfOrder++;
+    }
+
+    // In a batch: by road class, then by the way's ID, which is the feature's `zIndex`.
+    let batchesOutOfOrder = 0;
+    for (const batch of layer.lineBatches) {
+      const orders = batch._items.map(item => item.order);
+      if (orders.some((order, i) => i > 0 && order < orders[i - 1])) batchesOutOfOrder++;
+    }
 
     // In draw order, the lines' containers go from the lowest road class to the highest.
     let outOfOrder = 0;
@@ -743,10 +768,16 @@ test('keeps lines in the order of their road class, and points from north to sou
 
     return {
       lines: lines.length,
+      linesInScene: linesInScene.length,
       lineGroups: lineGroups.size,
-      // every line is in a container of its own road class (the whole part of its `zIndex`)
-      linesInAnotherClass: lines.filter(feature => Math.floor(groupOf(feature).zIndex) !== Math.floor(feature.container.zIndex)).length,
-      linesInRenderGroups: lines.filter(feature => groupOf(feature).isRenderGroup).length,
+      // every line in the scene is in a container of its own road class (the whole part of its `zIndex`)
+      linesInAnotherClass: linesInScene.filter(feature => Math.floor(groupOf(feature).zIndex) !== Math.floor(feature.container.zIndex)).length,
+      linesInRenderGroups: linesInScene.filter(feature => groupOf(feature).isRenderGroup).length,
+      // ..and every line has its place in its batches by its `zIndex`
+      linesOrderedOtherwise: lines.filter(feature => feature.strokeItem?.order !== feature.container.zIndex).length,
+      roadClasses: new Set(lines.map(feature => Math.floor(feature.container.zIndex))).size,
+      levelsOutOfOrder: levelsOutOfOrder,
+      batchesOutOfOrder: batchesOutOfOrder,
       points: points.length,
       pointGroups: pointGroups.length,
       pointsInRenderGroups: points.filter(feature => groupOf(feature).isRenderGroup).length,
@@ -756,8 +787,13 @@ test('keeps lines in the order of their road class, and points from north to sou
 
   expect(result.lines).toBeGreaterThan(10);
   expect(result.lineGroups).toBeGreaterThan(1);
-  expect(result.linesInRenderGroups).toBe(result.lines);
+  expect(result.linesInScene).toBeLessThan(result.lines);
+  expect(result.linesInRenderGroups).toBe(result.linesInScene);
   expect(result.linesInAnotherClass).toBe(0);
+  expect(result.roadClasses).toBeGreaterThan(2);
+  expect(result.linesOrderedOtherwise).toBe(0);
+  expect(result.levelsOutOfOrder).toBe(0);
+  expect(result.batchesOutOfOrder).toBe(0);
   expect(result.points).toBeGreaterThan(10);
   expect(result.pointGroups).toBeGreaterThan(0);
   expect(result.pointsInRenderGroups).toBe(result.points);

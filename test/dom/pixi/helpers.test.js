@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode` and `interactiveChildren`, as a renderer does in the app
 import { LineMesh } from '../../../modules/pixi/lib/LineMesh.ts';
-import { containerHit, drawHalo, drawOrder, drawRings } from '../../../modules/pixi/helpers.ts';
+import { containerHit, drawHalo, drawOrder, drawRings, featureOrder } from '../../../modules/pixi/helpers.ts';
 
 
 describe('pixi helpers', () => {
@@ -207,6 +207,26 @@ describe('pixi helpers', () => {
     it('returns 0 for a container and itself, and for two that aren\'t in one tree', () => {
       assert.strictEqual(drawOrder(a1, a1), 0);
       assert.strictEqual(drawOrder(a1, new PIXI.Container()), 0);
+    });
+
+    // A feature is drawn by its own container, or by a mesh that draws several (lines in a batch)
+    describe('featureOrder', () => {
+      const feature = (sceneContainer, sceneOrder = 0) => ({ sceneContainer: sceneContainer, sceneOrder: sceneOrder });
+
+      it('puts features in the order of where they\'re drawn in the scene', () => {
+        assert.isAbove(featureOrder(feature(b11), feature(a2)), 0);
+        assert.isBelow(featureOrder(feature(a1), feature(a2)), 0);
+      });
+
+      it('puts two features that one mesh draws in their order there', () => {
+        assert.isAbove(featureOrder(feature(a1, 5.5), feature(a1, 5.25)), 0);
+        assert.isBelow(featureOrder(feature(a1, -3), feature(a1, 2)), 0);
+        assert.strictEqual(featureOrder(feature(a1, 2), feature(a1, 2)), 0);
+      });
+
+      it('goes by the scene first, whatever the orders are', () => {
+        assert.isAbove(featureOrder(feature(a2, 0), feature(a1, 100)), 0);
+      });
     });
   });
 });

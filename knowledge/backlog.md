@@ -77,7 +77,9 @@ said otherwise. Biggest or most wanted first.
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
   `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, batch sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another
-  machine (Bryan will try other hardware).
+  machine (Bryan will try other hardware). The same run should say what draw calls cost there:
+  on the M4 they cost next to nothing, and Bryan counts every one saved as a win for weaker
+  devices (Nov 23).
 - **Budget frames by the display's refresh, and show the misses** (Bryan, Nov 20). The gaps between
   animation frame timestamps give the refresh interval and the missed refreshes. `SchedulerSystem`
   could set a frame's budget so APP plus the expected DRAW ends just before a refresh, and the

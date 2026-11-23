@@ -27,9 +27,6 @@ const SIDED_SPACING = 30;
 const MIN_CASING_WIDTH = 3;
 const MIN_STROKE_WIDTH = 2;
 
-// In a batch, a line's stroke is drawn this much later than its casing. (Less than what's
-// between two lines: their order is their container's `zIndex`, which the layer sets.)
-const STROKE_ORDER = 1e-7;
 
 
 /**
@@ -68,16 +65,22 @@ function batchStyle(partStyle: LineStyleProps, minWidth: number, isCasing: boole
  * The casing and the stroke are drawn from a stroke mesh (`geomStrokeMesh()`), which has the
  * line's triangles for any width. It's built when the line or its cap or join changes.
  *
- * A layer that draws many lines gives the feature a `LineBatch` (`batch`): the casing and the
- * stroke are then two runs of vertices in the batch's buffers, drawn with every other line of
- * the batch, and the feature has no mesh of its own. A zoom changes nothing in a batch.
- * Without a batch, each is a `LineMesh`, and a zoom works out where its vertices are for the
- * new width. (See `design/graphics-system.md` section 15.)
+ * A layer that draws many lines gives the feature two `LineBatch`es, one for its casing and one
+ * for its stroke (the layer draws every casing of a level, then every stroke). Each is then a
+ * run of vertices in its batch's buffers, drawn with the other lines there, and the feature has
+ * no mesh of its own and nothing in its container: it needn't be in the scene at all
+ * (`drawsInContainer()`). A zoom changes nothing in a batch.
+ *
+ * Without batches, the casing and the stroke are each a `LineMesh` in the feature's container,
+ * and a zoom works out where its vertices are for the new width. A line that's hovered or
+ * highlighted is drawn that way too, while it is: its glow is a filter on the container.
+ * (See `design/graphics-system.md` section 15.)
  *
  * Properties available:
- * - `batch`      - `LineBatch` that draws the casing and the stroke, if the layer gave it one
- * - `casing`     - `LineMesh` for the casing (below), or `null` while there's none to draw
- * - `stroke`     - `LineMesh` for the stroke (above), or `null` while a batch draws it
+ * - `batch`       - `LineBatch` that draws the stroke, if the layer gave it one
+ * - `casingBatch` - `LineBatch` that draws the casing, if the layer gave it one
+ * - `casing`      - `LineMesh` for the casing (below), or `null` while there's none to draw
+ * - `stroke`      - `LineMesh` for the stroke (above), or `null` while a batch draws it
  * -  (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
@@ -91,8 +94,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   protected _hitArea: LineHitArea | null;
   /** The line that the stroke meshes of the casing and the stroke were built from */
   protected _meshPart: GeometryPart | null;
-  /** The batch that the layer gave this feature to draw in (see `batch`) */
+  /** The batch that the layer gave this feature to draw its stroke in (see `batch`) */
   protected _batch: LineBatch | null;
+  /** The batch that the layer gave this feature to draw its casing in (see `casingBatch`) */
+  protected _casingBatch: LineBatch | null;
+  /** The line that the casing and the stroke in the batches were built from */
+  protected _batchPart: GeometryPart | null;
   /** The casing in a batch, if a batch draws it */
   protected _casingItem: LineBatchItem | null;
   /** The stroke in a batch, if a batch draws it */
@@ -118,6 +125,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._strokeShape = '';
 
     this._batch = null;
+    this._casingBatch = null;
+    this._batchPart = null;
     this.casing = null;   // the meshes are made in `update()`, if no batch draws the line
     this.stroke = null;
   }
@@ -131,17 +140,19 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._dropMeshes();
     this._dropItems();
     this.batch = null;
+    this.casingBatch = null;
 
     this._hitArea = null;
     this._meshPart = null;
+    this._batchPart = null;
 
     super.destroy();
   }
 
 
   /**
-   * The batch to draw the casing and the stroke in, with the other lines of the layer, or
-   * `null` to draw the line with meshes of its own. The layer sets it before `update()`, and
+   * The batch to draw the stroke in, with the other lines of the layer, or `null` to draw the
+   * line with meshes of its own. The layer sets it before `update()`, with `casingBatch`, and
    * positions the batch near the line. The feature may be drawn some frames later, so the
    * batch counts the features it was given to (`LineBatch.users`).
    * @return The batch, or `null`
@@ -150,13 +161,101 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     return this._batch;
   }
   /**
-   * @param val - The batch to draw in from the next `update()`, or `null` for none
+   * @param val - The batch to draw the stroke in from the next `update()`, or `null` for none
    */
   public set batch(val: LineBatch | null) {
     if (val === this._batch) return;
     if (this._batch) this._batch.users--;
     if (val) val.users++;
     this._batch = val;
+  }
+
+
+  /**
+   * The batch to draw the casing in (see `batch`). The layer draws its casing batches before
+   * its stroke batches, so every casing of a level is under every stroke of it.
+   * @return The batch, or `null`
+   */
+  public get casingBatch(): LineBatch | null {
+    return this._casingBatch;
+  }
+  /**
+   * @param val - The batch to draw the casing in from the next `update()`, or `null` for none
+   */
+  public set casingBatch(val: LineBatch | null) {
+    if (val === this._casingBatch) return;
+    if (this._casingBatch) this._casingBatch.users--;
+    if (val) val.users++;
+    this._casingBatch = val;
+  }
+
+
+  /**
+   * Whether this line draws something in its own container, and so has to be in the scene (the
+   * layer asks before `update()`, to know whether to give it a place there).
+   * A line whose casing and stroke are in batches draws nothing itself, unless:
+   * - it's hovered or highlighted: the glow is a filter on the container, so the line is drawn
+   *   there, by meshes of its own, while it is
+   * - it has markers along it (oneway arrows), which are sprites in the container. (They're
+   *   drawn from zoom 16. The line stays in the scene below that, so that a zoom across 16
+   *   doesn't move every oneway road in and out of it.)
+   * @return `true` if its container has to be in the scene
+   */
+  public drawsInContainer(): boolean {
+    if (!this._batchesFor()) return true;
+    if (this._classes.has('hover') || this._classes.has('highlight')) return true;
+    const style = this._style;
+    return !!(style.lineMarker.image || style.sidedMarker.image);
+  }
+
+
+  /**
+   * Whether the pointer is over this line: within a few pixels of it. This needs nothing of
+   * Pixi's, so it's the same whether the line's container is in the scene or not.
+   * @param _point - The pointer's place in the stage's coordinates
+   * @param world - The same place in world coordinates
+   * @return `true` if the pointer hits it
+   */
+  public override hitTest(_point: PIXI.PointData, world: PIXI.PointData): boolean {
+    const hitArea = this._hitArea;
+    if (!hitArea || !this.visible || !this._allowInteraction) return false;
+    const position = this.container.position;    // the line's coordinates start here, in the world's
+    return hitArea.contains(world.x - position.x, world.y - position.y);
+  }
+
+
+  /**
+   * The mesh in the scene that draws this line's stroke, if a batch does: where the line is
+   * drawn among the others is where that batch is, and the line's `sceneOrder` in it.
+   * @return The batch, or this feature's own container
+   */
+  public override get sceneContainer(): PIXI.Container {
+    const item = this._strokeItem ?? this._casingItem;
+    return (item?.batch && item.visible) ? item.batch : this.container;
+  }
+
+
+  /**
+   * Where this line is drawn among the others that its batch draws.
+   * @return The order of its stroke in the batch (0 if no batch draws it)
+   */
+  public override get sceneOrder(): number {
+    const item = this._strokeItem ?? this._casingItem;
+    return (item?.batch && item.visible) ? item.order : 0;
+  }
+
+
+  /**
+   * The batches that draw this line's casing and stroke, if the layer gave it both and they
+   * can draw its dashes.
+   * @return `true` if batches draw this line
+   */
+  protected _batchesFor(): boolean {
+    const style = this._style;
+    const batch = this._batch;
+    const casingBatch = this._casingBatch;
+    if (!batch || batch.destroyed || !casingBatch || casingBatch.destroyed) return false;
+    return LineBatch.canDraw(style.stroke?.dash) && LineBatch.canDraw(style.casing?.dash);
   }
 
 
@@ -168,13 +267,15 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     return super.visible;
   }
   /**
-   * A line that a batch draws is shown and hidden there too.
+   * A line that a batch draws is shown and hidden there too. (Not shown there while the line
+   * draws itself: see `drawsInContainer`.)
    * @param val - `true` to show the feature, `false` to hide it
    */
   public override set visible(val: boolean) {
     super.visible = val;
-    this._casingItem?.batch?.setVisible(this._casingItem, val);
-    this._strokeItem?.batch?.setVisible(this._strokeItem, val);
+    const inBatch = val && !this.stroke;
+    this._casingItem?.batch?.setVisible(this._casingItem, inBatch);
+    this._strokeItem?.batch?.setVisible(this._strokeItem, inBatch);
   }
 
 
@@ -217,6 +318,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._casingItem = null;
     this._strokeItem?.batch?.remove(this._strokeItem);
     this._strokeItem = null;
+    this._batchPart = null;
   }
 
 
@@ -362,17 +464,26 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     // otherwise as meshes of this feature's own.
     const casingStyle = style.casing;
     const hasCasing = !!casingStyle && casingStyle.opacity !== 0;
-    const batch = (this.batch && !this.batch.destroyed && LineBatch.canDraw(style.stroke?.dash) && (!hasCasing || LineBatch.canDraw(casingStyle.dash))) ? this.batch : null;
+    const isBatched = this._batchesFor();
+    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
 
-    if (batch) {
+    if (isBatched && !hasGlow) {
       this._dropMeshes();
-      this._drawBatched(batch, flat[0], origin, hasCasing);
+      this._drawBatched(this._batch!, this._casingBatch!, flat[0], origin, hasCasing);
+      this._batchPart = this._geom;
 
     } else {
-      this._dropItems();
+      // Meshes of this feature's own, in its container. A line that's only here for its glow
+      // keeps its place in the batches, hidden, until the glow is gone.
+      if (isBatched) {
+        if (this._casingItem) this._casingItem.batch?.setVisible(this._casingItem, false);
+        if (this._strokeItem) this._strokeItem.batch?.setVisible(this._strokeItem, false);
+      } else {
+        this._dropItems();
+      }
       this._drawMeshes(flat[0], hasCasing, styleZoom, localScale, isWireframe);
+      this._meshPart = this._geom;
     }
-    this._meshPart = this._geom;
 
     this._geomDirty = false;
     this._styleDirty = false;
@@ -435,32 +546,31 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Draws the casing and the stroke in a batch: each is a run of vertices there, written when
-   * the line or its cap or join changes. The batch's shader works out their width at every zoom,
-   * so a zoom alone changes nothing here.
-   * @param batch - The batch
+   * Draws the casing and the stroke in their batches: each is a run of vertices there, written
+   * when the line or its cap or join changes. The batches' shader works out their width at
+   * every zoom, so a zoom alone changes nothing here.
+   * @param batch - The batch for the stroke
+   * @param casingBatch - The batch for the casing
    * @param coords - The line's points as `[x, y, x, y, …]`, in container-local space
    * @param origin - Where those coordinates start, in the world's
    * @param hasCasing - Whether the style has a casing that can be seen
    */
-  protected _drawBatched(batch: LineBatch, coords: number[], origin: Vec2, hasCasing: boolean): void {
+  protected _drawBatched(batch: LineBatch, casingBatch: LineBatch, coords: number[], origin: Vec2, hasCasing: boolean): void {
     const style = this._style;
     const strokeStyle = style.stroke;
     const hasStroke = !!strokeStyle && strokeStyle.opacity !== 0;
-    const isSameLine = (this._meshPart === this._geom);
+    const isSameLine = (this._batchPart === this._geom);
 
-    // Only the zoom or the rotation changed, and the batch has the line as it is: nothing to do.
+    // Only the zoom or the rotation changed, and the batches have the line as it is: nothing to do.
     // (This runs for every line after a zoom, so it makes no objects.)
     if (isSameLine && this.onlyTransformDirty &&
-      (hasCasing ? this._casingItem?.batch === batch : !this._casingItem) &&
-      (hasStroke ? this._strokeItem?.batch === batch : !this._strokeItem)
+      (hasCasing ? (this._casingItem?.batch === casingBatch && this._casingItem.visible) : !this._casingItem) &&
+      (hasStroke ? (this._strokeItem?.batch === batch && this._strokeItem.visible) : !this._strokeItem)
     ) {
       return;
     }
 
     const order = this.container.zIndex;
-    const dx = origin[0] - batch.position.x;
-    const dy = origin[1] - batch.position.y;
     const isRestyled = this._styleDirty;
     const closed = isRing(coords);   // a line that ends where it starts gets a join there, not two caps
 
@@ -475,20 +585,22 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       const shape = `${cap}/${join}`;
       const lineStyle = batchStyle(casingStyle, MIN_CASING_WIDTH, true);
       const item = this._casingItem;
+      const dx = origin[0] - casingBatch.position.x;
+      const dy = origin[1] - casingBatch.position.y;
 
-      if (item?.batch === batch && isSameLine && this._casingShape === shape) {
-        if (isRestyled) batch.setStyle(item, lineStyle);
-        batch.setOrder(item, order);
+      if (item?.batch === casingBatch && isSameLine && this._casingShape === shape) {
+        if (isRestyled) casingBatch.setStyle(item, lineStyle);
+        casingBatch.setOrder(item, order);
       } else {
         built = geomStrokeMesh(coords, { cap: cap, join: join, closed: closed });
         builtShape = shape;
-        if (item?.batch === batch) {
-          batch.setStroke(item, built, dx, dy);
-          batch.setStyle(item, lineStyle);
-          batch.setOrder(item, order);
+        if (item?.batch === casingBatch) {
+          casingBatch.setStroke(item, built, dx, dy);
+          casingBatch.setStyle(item, lineStyle);
+          casingBatch.setOrder(item, order);
         } else {
           item?.batch?.remove(item);
-          this._casingItem = batch.add(built, dx, dy, lineStyle, order);
+          this._casingItem = casingBatch.add(built, dx, dy, lineStyle, order);
         }
         this._casingShape = shape;
       }
@@ -503,10 +615,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       const shape = `${cap}/${join}`;
       const lineStyle = batchStyle(strokeStyle, MIN_STROKE_WIDTH, false);
       const item = this._strokeItem;
+      const dx = origin[0] - batch.position.x;
+      const dy = origin[1] - batch.position.y;
 
       if (item?.batch === batch && isSameLine && this._strokeShape === shape) {
         if (isRestyled) batch.setStyle(item, lineStyle);
-        batch.setOrder(item, order + STROKE_ORDER);
+        batch.setOrder(item, order);
       } else {
         if (builtShape !== shape) {
           built = geomStrokeMesh(coords, { cap: cap, join: join, closed: closed });
@@ -514,10 +628,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         if (item?.batch === batch) {
           batch.setStroke(item, built!, dx, dy);
           batch.setStyle(item, lineStyle);
-          batch.setOrder(item, order + STROKE_ORDER);
+          batch.setOrder(item, order);
         } else {
           item?.batch?.remove(item);
-          this._strokeItem = batch.add(built!, dx, dy, lineStyle, order + STROKE_ORDER);
+          this._strokeItem = batch.add(built!, dx, dy, lineStyle, order);
         }
         this._strokeShape = shape;
       }
@@ -526,8 +640,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this._strokeItem = null;
     }
 
-    // (A line that was hidden while it changed is shown again: `update()` made it visible before this.)
-    if (this._casingItem) batch.setVisible(this._casingItem, true);
+    // (A line that was hidden, or drew itself, is shown again: `update()` made it visible before this.)
+    if (this._casingItem) casingBatch.setVisible(this._casingItem, true);
     if (this._strokeItem) batch.setVisible(this._strokeItem, true);
   }
 

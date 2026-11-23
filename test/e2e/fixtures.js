@@ -143,8 +143,8 @@ export async function waitForIdle(page) {
 /**
  * Describes what the OSM layer shows: for each visible feature, the container it's in, its
  * classes, whether it's been drawn (not dirty), whether it's bound to the entity as it is now,
- * and where it is. For a line, which batch draws it, and whether its casing and stroke are shown
- * there (a line has no meshes of its own, see `LineBatch`).
+ * and where it is. For a line, which level's batches draw it, and whether its casing and stroke
+ * are shown there (see `LineBatch`). A line that its batches draw isn't in the scene itself.
  * Two of these are equal if a mapper would see the same features the same way.
  *
  * Use it to check work the layer does without its whole pass (a hover, an edit, a change of
@@ -163,12 +163,13 @@ export async function osmSceneState(page) {
       const entity = feature.data?.id && graph.hasEntity(feature.data.id);
       const bound = entity ? (feature.data === entity) : 'not an entity';
       const position = feature.container.position;
-      // A line is drawn in a batch: which one, and whether its casing and stroke are shown there
+      // A line is drawn in batches: in which level's, and whether its casing and stroke are shown
+      // there. Its own container is in the scene only while it draws something itself.
       const item = part => (part ? (part.visible ? 'shown' : 'hidden') : 'none');
       const batched = (feature.type === 'LineString') ?
-        `${feature.strokeItem?.batch?.label ?? 'no batch'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}` : '';
+        `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}` : '';
       results.push([
-        feature.id, feature.container.parent?.label, [...feature.classes].sort().join(','),
+        feature.id, feature.container.parent?.label ?? 'not in the scene', [...feature.classes].sort().join(','),
         feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`, batched
       ].join(' | '));
     }

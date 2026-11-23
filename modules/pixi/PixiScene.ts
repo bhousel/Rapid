@@ -19,7 +19,7 @@ import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
 import { AvoidGrid } from './lib/AvoidGrid.ts';
-import { drawOrder } from './helpers.ts';
+import { featureOrder } from './helpers.ts';
 import { Extent, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
@@ -545,7 +545,7 @@ export class PixiScene extends EventEmitter {
     for (const [spatialID, layer] of this._hitTesters) {
       if (!this._isInteractive(spatialID)) continue;
       const hit = layer.hitTest(point, world);
-      if (hit && (!best || drawOrder(hit.container, best.container) > 0)) {
+      if (hit && (!best || featureOrder(hit, best) > 0)) {
         best = hit;
       }
     }

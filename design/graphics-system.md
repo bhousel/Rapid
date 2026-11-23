@@ -18,7 +18,8 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > from the pointer, `lineToPoly()` and `DashLine` are gone, and a partial fill is a band of real
 > geometry with no stencil mask (`modules/geo/band.ts`, with Clipper2 for the offsetting). Of step
 > 6: the OSM layer finds its features under the pointer through the spatial index, and draws its
-> lines in batches with a shader of our own (`modules/pixi/lib/LineBatch.ts`).
+> lines in two batches per level with a shader of our own (`modules/pixi/lib/LineBatch.ts`): every
+> casing, then every stroke. A line that its batches draw isn't in Pixi's scene.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -2065,9 +2066,9 @@ label) and against the table above, and can ship on its own.
 ## 15. Where this could go
 
 Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
-It's a direction and an order of work. **Steps 1 to 5 of the order are built and measured, and
-the first two parts of step 6** (the "What was built" parts below); the rest isn't built, and
-none of that is measured except where another section is named.
+It's a direction and an order of work. **Steps 1 to 6 of the order are built and measured** (the
+"What was built" parts below); the rest isn't built, and none of that is measured except where
+another section is named.
 
 **The short answer: keep the frame, change the unit of work.** APP, CULL and DRAW, the scheduler,
 the deadline, and drawing only when something changed all hold up (Unreal's render thread and
@@ -2730,17 +2731,8 @@ build, labels on, alternating, two runs of each):
   first run of this step with it on. `--setup` runs a snippet in the page before each place, to
   set what's shown and to compare two ways of drawing in one build.
 
-**What's left of step 6:**
-
-- **Lines without a container.** A line feature still has a `Container` (0.7 KB, and a place
-  in its tile's render group, which Pixi walks whenever anything in the tile changes), for its
-  hit area and for the oneway arrows. With hit-testing through the index it needs neither: the
-  hit area can belong to the feature, and the arrows to the batch (they're the same sprite
-  along a line). That's most of what the heap and Pixi's collecting have to gain here.
-- **A line that's skipped on a zoom.** Nothing in a batch changes, but each line's `update()`
-  still runs, for its hit area's width and its arrows.
-- **The check against a pass** (`osmSceneState()`) reads which batch a line is in, and whether
-  its casing and stroke are shown there.
+**What was left of step 6** is the next part: lines without a place in the scene, and Bryan's
+answer about casings and strokes.
 
 **Tests:** `test/dom/pixi/LineBatch.test.js` (vertices, styles, order, hiding, a changed line in
 place and at the end, packing, growing), batches in `PixiFeatureLine.test.js` and
@@ -2749,6 +2741,123 @@ place and at the end, packing, growing), batches in `PixiFeatureLine.test.js` an
 `PixiLayerLabels.test.js`, and e2e tests that both ways of finding the feature under the pointer
 agree at 1,200 points, and that a zoom changes nothing in a batch. Seventy ways of breaking the new
 code were each caught by a test.
+
+### What was built (Nov 23: step 6, the rest)
+
+**A regression first: the first two parts took the glow off a hovered line.** A hover's glow is
+a filter on the feature's container, and a line in a batch had nothing in its container. It went
+out in the commit of the first two parts (`6860f8d1d`), where the e2e test for hovering looked
+at classes and vertices, and nothing looked at the picture. It's fixed here (below), and that
+test now checks that a hovered line is drawn in its container with the filter on.
+
+**Decided (Bryan, Nov 23):**
+
+- **Every casing of a level in one pass, then every stroke.** "At the junctions it will look
+  very slightly different, but it will be like a few pixels that nobody would notice, or might
+  actually look better than what we do currently, and often covered up by a vertex marker."
+- **Draw calls count, whatever this machine's timings say.** The measurements are from an M4,
+  which hides what a draw call costs. "Many of our users will be on worse hardware (maybe even
+  mobile devices), and every reduction in draw calls makes Rapid perform better for them."
+  Numbers from other devices are on the backlog, and don't block this.
+
+**Two batches for each level.** One `LineBatch` for every casing of the level, and one for
+every stroke, drawn in that order (`PixiLayerOsm._lineBatch()`). In each, the lines are in the
+order of their road class and then their way's ID, as the classes' containers were.
+
+- **Roads join without a casing between them:** neither's casing crosses the other's stroke.
+- **16 batches draw Seattle's 2,021 lines and Užice's 21,370** (8 levels each), where the first
+  two parts had 42 and 83, and a mesh for each casing and stroke before that. A batch has no
+  tile and no road class: how a line is drawn is in its vertices.
+- **A batch's place in the world follows the view.** Its vertices are 32-bit floats relative
+  to that place, which is where its first line was. When the view is so far from it that a
+  float could be off by 1/32 of a pixel at the view's zoom (260,000 pixels at zoom 16, 4,000
+  world units at zoom 22), the layer moves the place to the view's center, and the batch
+  shifts its vertices (`LineBatch.moveOrigin()`, `_moveBatchOrigins()`).
+- **The largest batch is all 18,882 lines of Užice's level 0.** Its index buffer is built again
+  when a line joins or leaves it (not when one is hidden, shown or changed). Making all of
+  Užice's 107,000 features again takes 5.1 to 5.4 s with batches and 5.2 to 5.6 with a mesh per
+  line, and building index buffers is 81 ms of it.
+
+**A line that its batches draw isn't in the scene.** Its feature still has a `Container`, for
+its position and its `zIndex`, but the container has no parent: Pixi doesn't collect it, give
+it a transform or move it to another tile's container after a zoom. The layer asks the feature
+before it draws (`drawsInContainer()`), and puts it in its road class's tile container only if
+it will draw something there:
+
+- **A hovered or highlighted line draws itself,** with meshes of its own under the glow's
+  filter, and hides in its batches meanwhile (a byte per vertex). This is section 15's editing
+  tier, for the one case that needs it.
+- **A line with oneway arrows or sided markers** has those sprites in its container: 296 of
+  Seattle's lines, 2,259 of Užice's.
+- **A line with dashes that a batch can't draw,** and any line of a layer that gives no batches.
+
+What that needed:
+
+- **A line's hit test has nothing of Pixi's in it** (`PixiFeatureLine.hitTest()`): the pointer's
+  place in the world, less the line's position, against its `LineHitArea`.
+- **Which feature is on top is asked of the feature** (`sceneContainer`, `sceneOrder`,
+  `featureOrder()` in `helpers.ts`): the place in the scene of what draws it, which for a line
+  is its strokes' batch, and its order in that. The pointer still gets what's drawn on top.
+- **A line's label is placed from the line's points and the world's place on screen,** not
+  through the line's container. The more important roads still get their labels first; that
+  came from the label of the line's parent container, and is the feature's `zIndex` now.
+
+**The pointer, again.** Bryan remembered a ticker in Pixi for hit testing. It's there
+(`EventsTicker`, on `Ticker.system`), it's called on every animation frame, and it does nothing
+for us: it sends a pointer move again for objects that move under a still pointer, which only
+`eventMode: 'dynamic'` asks for, and we have none. `Ticker.system` runs anyway, for Pixi's own
+scheduler. What Pixi still does for a pointer move is make its event and test the other
+layers' features: 0.01 ms of the 0.09 that a move costs in Užice, where our hit test is 0.07
+(a third of that is the points' own hit areas, still asked by Pixi's rules). Nothing there is
+worth turning off.
+
+**Measured** (the three places from their tapes; a mesh for each casing and stroke → two
+batches a level, in the same build, labels on, alternating, two runs of each):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 385 → 270 | 279 → 211 | 672 → 428 |
+| ..of them for the lines' casings and strokes | 16 | 7 | 16 |
+| Render groups | 412 → 287 | 246 → 179 | 580 → 347 |
+| DRAW, nothing changed | 1.4, 1.4 → 1.3, 1.0 ms | 0.8, 0.8 → 0.6, 0.7 ms | 1.7, 1.7 → 1.3, 1.3 ms |
+| DRAW, a pan frame | 1.5, 1.7 → 1.9, 1.5 ms | 1.3, 1.3 → 1.0, 1.0 ms | 2.3, 2.0 → 1.9, 1.6 ms |
+| A frame that moves the cull box, APP + DRAW | 18.9, 20.5 → 19.4, 18.0 ms | 17.3, 18.3 → 15.1, 16.1 ms | 28.6, 26.6 → 27.1, 25.6 ms |
+| GPU | 5.0, 4.9 → 4.9, 5.0 ms | 6.3, 6.3 → 6.7, 6.0 ms | 20.4, 19.8 → 19.1, 20.1 ms |
+| Every feature redrawn after a zoom | 145, 134 → 151, 134 ms | 183, 188 → 182, 184 ms | 765, 733 → 685, 667 ms |
+
+- **A quarter to a third fewer draw calls** than a mesh for each casing and stroke (which Pixi
+  batched where it could), and 0.2 to 0.4 ms less DRAW on a frame. The other differences are
+  inside what two runs differ by, on this machine.
+- **A drag:** moving a middle vertex of the line with the most nodes on each of 60 frames is
+  0.8 ms of APP and 1.1 of DRAW in Seattle (92 nodes; 0.8 and 1.5 with meshes), and 2.7 and 1.8
+  in Užice (886 nodes; 2.2 and 1.9): the line is written into two batches there, half a
+  millisecond more than moving the vertices of two meshes.
+- **The heap after a load in Užice is 1,447 MB** (1,511 with step 5's build), and 1,458 after
+  thirty-two zooms (1,512). Sixteen zooms allocate 6.3 GB (6.9), with three major collections
+  in 34 s (96 ms in all).
+
+**What changed that someone might notice:** the junctions, and the glow that's back.
+
+**What's left for lines:**
+
+- **Oneway arrows in the batch.** They're why one line in ten is still in the scene, and they're
+  built again at every zoom. An arrow is the same sprite every 35 pixels along a line, which
+  the stroke's shader could draw from the distance along the line.
+- **The `Container` itself** (0.7 KB a line, in the heap and nowhere else): a line needs a
+  position and an order, not a display object. `AbstractPixiFeature` assumes one.
+- **A line's `update()` still runs after a zoom,** to give its hit area the new width.
+  `renderLines()` and everything under it is 1% of a zoom's work in Užice (80 ms of the 6,850
+  that eight zooms' frames took; polygons, points, vertices, labels and Pixi's render groups
+  are the rest, as in the first part's profile).
+
+**Tests:** two batches, a glowing line, `drawsInContainer()`, `hitTest()` and where a line is
+drawn in `PixiFeatureLine.test.js`; the batches of a level, their order and their moving origin
+in `PixiLayerOsm.test.js`; `moveOrigin()` in `LineBatch.test.js`; `featureOrder()` in
+`helpers.test.js`; line labels without a container in `PixiLayerLabels.test.js`. The e2e tests:
+a hovered line glows in its own container and goes back to its batches; the scene's hit test
+finds what asking every feature would, lines that aren't in the scene among them (Pixi can't
+be asked about those anymore); casings are under strokes and lines in the order of their road
+class. Ninety-nine ways of breaking the new code were each caught by a test.
 
 ### Order of work
 
@@ -2783,9 +2892,9 @@ and compared by screenshot with the build before it.
    check against a pass (`osmSceneState()`) has to learn to read ranges.
    *Measured by:* the heap (the OSM layer's features are about 520 MB of it), what a zoom
    allocates, a pan's frames, and a drag of one vertex of the largest line and area in each place.
-   **Partly done (Nov 23):** the hit test, and lines in batches (above). No editing tier: a
-   dragged line is written again in its batch, at the cost it had. Left: lines without a
-   container, which is where the heap is.
+   **Done (Nov 23):** the hit test, lines in two batches a level, and no place in the scene
+   for a line that its batches draw (above). The editing tier is a hovered line and nothing
+   else: a dragged line is written again in its batches, at the cost it had.
 7. **Building in a worker,** when the numbers say main-thread building is what's left: a tile that
    arrives, and the first draw after a load.
 8. **Polygons and points in the static tier.** A point is two or three `Container`s today, and
@@ -2805,14 +2914,12 @@ settles how typed arrays reach Pixi before the hard geometry starts.
   relaxing the CSP now.*
 - **Round joins and caps start at 10 slices for a half circle,** more only if they look jagged.
   The lines are thin, and a vertex marker often covers the join anyway.
+- **Every casing of a level before every stroke** (Nov 23, built in step 6), and **fewer draw
+  calls are a result in themselves** (Nov 23: the test machine is an M4, and many users have
+  less). Both are quoted in "What was built (Nov 23: step 6, the rest)".
 
 ### Open questions
 
-- **Every casing of a level before every stroke?** In a batch (step 6) the order is still a
-  line's casing, its stroke, the next line's casing: where two roads meet, one's casing crosses
-  the other's stroke. iD draws all the casings of a level and then all the strokes, which joins
-  roads cleanly. In a batch that's a change of `order`, and a casing and its stroke could then
-  share their vertices. It changes how every junction looks, so it's Bryan's to decide.
 - **The frame of a zoom is still 125 ms in Užice,** half of it DRAW. Not looked at yet: every
   mesh's vertices are copied into Pixi's batch again (24 bytes a vertex), and the features move
   to other tiles when a whole zoom level is crossed.
@@ -2854,14 +2961,13 @@ settles how typed arrays reach Pixi before the hard geometry starts.
   repeats the corner's point and distance. An index into the line's own coordinates would take it to 16 to 20, for the CPU's
   sums; a shader wants the point in each vertex. Step 3's heap numbers say it isn't urgent: the
   heap fell 159 MB with the vertex as it is, and the objects cost more than the arrays.
-- **How many batches.** One per level, road class and zoom 14 tile (step 6): 83 in Užice, 42 in
-  Seattle. That keeps the draw order ([`scene.md`](scene.md)). Color and width are in the
-  vertices, so the classes of a tile could share a batch, ordered by class inside it: fewer
-  draw calls, and a tile's lines drawn before the next tile's whatever their class. Not tried.
-  A batch's index buffer is built again whenever a line joins or leaves it: with larger batches
-  that's more to build each time data arrives.
+- **A casing and its stroke could share their vertices.** They're in two batches (step 6), each
+  with its own copy of the line's triangles, 56 bytes a vertex. One buffer of the triangles and
+  two of how they're drawn (16 bytes a vertex each) would be a third less memory. A line
+  without a casing would then cost the casings' batch its vertices for nothing: 27% of Užice's
+  lines.
 - **`syncShader` for each batch.** Pixi sets every uniform again for each mesh with a shader of
-  its own (80 MB of garbage over sixteen zooms in Užice, from its `unsafe-eval` polyfill).
-  Fewer batches would make less of it; so would asking Pixi why.
+  its own (its `unsafe-eval` polyfill makes garbage doing it: 80 MB over sixteen zooms in Užice
+  with 83 batches; there are 16 now).
 - **Where a worker gets coordinates from.** Packed by the main thread and transferred, or built
   where the OSM data is parsed.

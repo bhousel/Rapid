@@ -11,7 +11,7 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 | File | Description |
 |------|-------------|
 | `LineMesh.ts` | A Pixi `Mesh` that draws a line from its stroke mesh (`geomStrokeMesh()` in `modules/geo/`): a new width moves the vertices it has. The outlines of areas, halos, the lasso, and the lines of layers that don't batch theirs |
-| `LineBatch.ts` | A Pixi `Mesh` with a shader of its own that draws many lines in one draw call: each line is a run of vertices in its buffers, and the shader works out the widths, so a zoom changes nothing in it. The OSM layer's casings and strokes |
+| `LineBatch.ts` | A Pixi `Mesh` with a shader of its own that draws many lines in one draw call: each line is a run of vertices in its buffers, and the shader works out the widths, so a zoom changes nothing in it. The OSM layer has two for each level: its casings, and its strokes |
 | `AtlasAllocator.ts` | Manages texture atlas allocation, plus the `AtlasSource` texture source and its GPU upload handlers |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
 | `AvoidGrid.ts` | A grid over label space that counts what covers each cell: what labels must avoid, and the labels placed (no Pixi in it; `PixiScene` owns one) |
@@ -27,10 +27,12 @@ Halos and the lasso are drawn with `drawHalo()` and `drawRings()` in [`../helper
 
 ## LineBatch
 
-The OSM layer draws its lines in batches: one for the lines of a level and road class in one map tile (`PixiLayerOsm._lineBatch()`). A line's casing and its stroke are each an item in the batch, a run of vertices copied from the stroke mesh. Each vertex has the point on the line, how far it is from that point for a half width of 1, and how the line is drawn (width in pixels, color, opacity, dashes). The shader puts the vertex where the width at the current zoom says, and makes the dashes from the distance along the line. `LineBatch.setView()` gives every batch the view's four numbers; a zoom changes nothing else.
+The OSM layer draws its lines in batches: for each level, one for every casing and one for every stroke, so that every casing is under every stroke (`PixiLayerOsm._lineBatch()`). A line's casing and its stroke are each an item in their batch, a run of vertices copied from the stroke mesh, in the order of the line's road class and ID. Each vertex has the point on the line, how far it is from that point for a half width of 1, and how the line is drawn (width in pixels, color, opacity, dashes). The shader puts the vertex where the width at the current zoom says, and makes the dashes from the distance along the line. `LineBatch.setView()` gives every batch the view's four numbers; a zoom changes nothing else.
 
 - `add()` returns the item; `setStroke()`, `setStyle()`, `setOrder()`, `setVisible()` and `remove()` take it.
 - A line that changed with as many vertices as before is written where it was (a dragged vertex). Otherwise it goes at the end, and the batch packs itself when half of it is unused.
+- A hidden line keeps its vertices and its triangles, with an opacity of 0 that the shader draws nothing for. The index buffer is built again only when a line joins or leaves the batch, or changes its order.
+- The vertices are 32-bit floats relative to the batch's `position`. `moveOrigin()` moves that place and keeps the lines where they are; the layer calls it when the view has gone far from it.
 - What changed is sent to the GPU once, when Pixi is about to render the batch (`onRender`).
 - The shader is in GLSL and in WGSL, in the file. A batch can draw dashes of two or four whole numbers of pixels up to 255 (`canDraw()`); a line with another pattern gets `LineMesh`es.
 

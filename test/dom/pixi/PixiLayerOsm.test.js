@@ -51,7 +51,14 @@ describe('PixiLayerOsm', () => {
     function addFeature(featureID, dataID, isHit) {
       const container = new PIXI.Container();
       stage.addChild(container);
-      const feature = { id: featureID, container: container, asked: 0, hitTest: () => { feature.asked++; return isHit; } };
+      const feature = {
+        id: featureID, container: container, sceneContainer: container, sceneOrder: 0, asked: 0, world: null,
+        hitTest: (point, world) => {
+          feature.asked++;
+          feature.world = world;
+          return isHit;
+        }
+      };
       layer.features.set(featureID, feature);
       layer.bindData(featureID, dataID);
       layer._numVisible++;
@@ -89,8 +96,9 @@ describe('PixiLayerOsm', () => {
       const far = addFeature('osm-w2-0', 'w2', true);
       nearby = ['w1', 'n5'];    // n5 is a vertex with no feature
 
-      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: 0 }), near);
+      assert.strictEqual(layer.hitTest({ x: 3, y: 4 }, { x: 30, y: 40 }), near);
       assert.strictEqual(near.asked, 1);
+      assert.deepEqual(near.world, { x: 30, y: 40 }, 'with the pointer\'s place in the world');
       assert.strictEqual(far.asked, 0);
     });
 
@@ -106,6 +114,19 @@ describe('PixiLayerOsm', () => {
 
       stage.addChild(area.container);   // now the area is drawn last
       assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: 0 }), area);
+    });
+
+    it('puts two lines that one batch draws in their order in it', () => {
+      const batch = new PIXI.Container();
+      stage.addChild(batch);
+      const under = addFeature('osm-w1-0', 'w1', true);
+      const over = addFeature('osm-w2-0', 'w2', true);
+      Object.assign(under, { sceneContainer: batch, sceneOrder: -9.75 });
+      Object.assign(over, { sceneContainer: batch, sceneOrder: -9.25 });
+      nearby = ['w2', 'w1'];
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: 0 }), over);
+      nearby = ['w1', 'w2'];
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: 0 }), over);
     });
 
     it('returns null when nothing near the pointer is hit, and doesn\'t ask the index when nothing is shown', () => {
@@ -290,76 +311,110 @@ describe('PixiLayerOsm', () => {
       assert.strictEqual(residentialLong.label, '-9/large');   // below the tiles of its class, above the class below
     });
 
-    // The casings and strokes of lines are drawn in batches (`LineBatch`): one for a road class
-    // and a map tile of zoom 14, which is 1,024 world units wide, whatever the view's zoom.
+    // The casings and strokes of lines are drawn in batches (`LineBatch`): for each level, one
+    // for every casing and one for every stroke.
     describe('line batches', () => {
       const lineAt = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max), origin: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2] } });
+      const stroke = Rapid.geomStrokeMesh([0, 0, 10, 0]);
+      const style = { width: 3, minWidth: 2, color: 0xffffff, alpha: 1 };
 
-      it('puts lines of one road class whose centers are in the same zoom 14 tile in one batch, in the level\'s container', () => {
-        const a = layer._lineBatch(level, -9, lineAt([10, 10], [20, 20]));
-        const b = layer._lineBatch(level, -9, lineAt([900, 100], [950, 140]));    // four of the lines' own tiles away
-        const otherTile = layer._lineBatch(level, -9, lineAt([1030, 10], [1040, 20]));
-        const otherClass = layer._lineBatch(level, -8, lineAt([10, 10], [20, 20]));
-        const otherLevel = layer._lineBatch(new PIXI.Container(), -9, lineAt([10, 10], [20, 20]));
-        assert.strictEqual(a, b);
-        assert.notStrictEqual(a, otherTile);
-        assert.notStrictEqual(a, otherClass);
-        assert.notStrictEqual(a, otherLevel);
-        assert.strictEqual(a.label, 'batch/-9/0,0');
-        assert.strictEqual(a.parent, level);
+      it('has one batch for a level\'s casings and one for its strokes, in the level\'s container', () => {
+        const strokes = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
+        const casings = layer._lineBatch(level, true, lineAt([10, 10], [20, 20]));
+        const otherLevel = layer._lineBatch(new PIXI.Container(), false, lineAt([10, 10], [20, 20]));
+        assert.strictEqual(layer._lineBatch(level, false, lineAt([90000, 100], [90050, 140])), strokes);    // wherever the line is
+        assert.strictEqual(layer._lineBatch(level, true, lineAt([90000, 100], [90050, 140])), casings);
+        assert.notStrictEqual(strokes, casings);
+        assert.notStrictEqual(strokes, otherLevel);
+        assert.strictEqual(strokes.label, 'strokes');
+        assert.strictEqual(casings.label, 'casings');
+        assert.strictEqual(strokes.parent, level);
+        assert.strictEqual(casings.parent, level);
       });
 
-      it('starts a batch\'s coordinates near its lines: the middle of its tile, or the first of the large lines', () => {
-        const inTile = layer._lineBatch(level, -9, lineAt([1030, 2050], [1040, 2060]));
-        assert.deepEqual([inTile.position.x, inTile.position.y], [1536, 2560]);
-
-        const large = layer._lineBatch(level, -9, lineAt([5000, 5000], [7000, 5100]));
-        const alsoLarge = layer._lineBatch(level, -9, lineAt([100, 100], [1200, 200]));
-        assert.strictEqual(large, alsoLarge);
-        assert.strictEqual(large.label, 'batch/-9/large');
-        assert.deepEqual([large.position.x, large.position.y], [6000, 5050]);
+      it('starts a batch\'s coordinates at the first line it\'s wanted for', () => {
+        const batch = layer._lineBatch(level, false, lineAt([5000, 5000], [7000, 5100]));
+        layer._lineBatch(level, false, lineAt([100, 100], [1200, 200]));
+        assert.deepEqual([batch.position.x, batch.position.y], [6000, 5050]);
       });
 
-      it('draws a class\'s batches below its containers and above everything of the class below, the large one first', () => {
-        const footwayTile = layer._lineTileContainer(level, -20, part([900, 900], [910, 910]), 16).parent.zIndex;
-        const below = layer._lineTileContainer(level, -10, part([65000, 65000], [65010, 65010]), 16).parent.zIndex;   // the last tile there is
-        const large = layer._lineBatch(level, -9, lineAt([0, 0], [3000, 20])).zIndex;
-        const first = layer._lineBatch(level, -9, lineAt([10, 10], [20, 20])).zIndex;
-        const second = layer._lineBatch(level, -9, lineAt([1030, 10], [1040, 20])).zIndex;
-        const ownLarge = layer._lineTileContainer(level, -9, part([0, 0], [600, 20]), 16).parent.zIndex;
-        const ownTile = layer._lineTileContainer(level, -9, part([10, 10], [20, 20]), 16).parent.zIndex;
-
-        const order = [footwayTile, below, large, first, second, ownLarge, ownTile];
+      it('draws every casing of a level before every stroke, and both before what the lines\' features draw themselves', () => {
+        const order = [
+          layer._lineBatch(level, true, lineAt([10, 10], [20, 20])).zIndex,
+          layer._lineBatch(level, false, lineAt([10, 10], [20, 20])).zIndex,
+          layer._lineTileContainer(level, -20, part([10, 10], [20, 20]), 16).parent.zIndex,    // a hovered footway, a oneway's arrows
+          layer._lineTileContainer(level, 0, part([10, 10], [20, 20]), 16).parent.zIndex
+        ];
         assert.deepEqual(order, order.slice().sort((a, b) => a - b));
         assert.strictEqual(new Set(order).size, order.length);
       });
 
       it('destroys a batch that has no lines and no feature waiting to draw in it', () => {
-        const stroke = Rapid.geomStrokeMesh([0, 0, 10, 0]);
-        const style = { width: 3, minWidth: 2, color: 0xffffff, alpha: 1 };
-
-        const used = layer._lineBatch(level, -9, lineAt([10, 10], [20, 20]));
+        const other = new PIXI.Container();
+        const third = new PIXI.Container();
+        const used = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
         used.add(stroke, 0, 0, style);
-        const waitedFor = layer._lineBatch(level, -8, lineAt([10, 10], [20, 20]));
-        waitedFor.users = 1;    // a feature got it, and isn't drawn yet
-        const empty = layer._lineBatch(level, -7, lineAt([10, 10], [20, 20]));
+        const empty = layer._lineBatch(level, true, lineAt([10, 10], [20, 20]));
+        const waitedFor = layer._lineBatch(other, false, lineAt([10, 10], [20, 20]));
+        const alsoWaitedFor = layer._lineBatch(other, true, lineAt([10, 10], [20, 20]));
+        waitedFor.users = 1;    // a feature got them, and isn't drawn yet
+        alsoWaitedFor.users = 1;
+        const alsoEmpty = layer._lineBatch(third, false, lineAt([10, 10], [20, 20]));
 
         layer._removeEmptyContainers();
         assert.isFalse(used.destroyed);
         assert.isFalse(waitedFor.destroyed);
+        assert.isFalse(alsoWaitedFor.destroyed);
         assert.isTrue(empty.destroyed);
-        assert.strictEqual(layer._lineBatch(level, -9, lineAt([10, 10], [20, 20])), used);
-        const again = layer._lineBatch(level, -7, lineAt([10, 10], [20, 20]));
+        assert.isTrue(alsoEmpty.destroyed);
+        assert.isFalse(layer._lineBatches.has(third), 'a level with no batches left is forgotten');
+        assert.strictEqual(layer._lineBatch(level, false, lineAt([10, 10], [20, 20])), used);
+        const again = layer._lineBatch(level, true, lineAt([10, 10], [20, 20]));
         assert.notStrictEqual(again, empty);    // a new one
         assert.isFalse(again.destroyed);
       });
 
       it('makes another batch in place of one that was destroyed with its container', () => {
-        const batch = layer._lineBatch(level, -9, lineAt([10, 10], [20, 20]));
+        const batch = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
         batch.destroy();
-        const next = layer._lineBatch(level, -9, lineAt([10, 10], [20, 20]));
+        const next = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
         assert.notStrictEqual(next, batch);
         assert.isFalse(next.destroyed);
+      });
+
+      // A batch's vertices are 32-bit floats, relative to its place in the world.
+      describe('_moveBatchOrigins', () => {
+        // A viewport centered on a world coordinate, at a zoom
+        const viewportAt = (x, y, zoom) => ({ transform: { zoom: zoom }, center: () => [0, 0], screenToWorld: () => [x, y] });
+
+        it('leaves a batch where it is while the view is near enough for its zoom', () => {
+          const batch = layer._lineBatch(level, false, lineAt([990, 990], [1010, 1010]));
+          batch.add(stroke, 5, 5, style);
+          layer._moveBatchOrigins(viewportAt(1000 + 200000, 1000, 16));    // 200,000 pixels away at zoom 16
+          assert.deepEqual([batch.position.x, batch.position.y], [1000, 1000]);
+          layer._moveBatchOrigins(viewportAt(1000 + 30000, 1000, 19));     // 240,000 pixels away at zoom 19
+          assert.deepEqual([batch.position.x, batch.position.y], [1000, 1000]);
+        });
+
+        it('moves a batch to the view\'s center when it\'s too far for its zoom, with its lines where they were', () => {
+          const strokes = layer._lineBatch(level, false, lineAt([990, 990], [1010, 1010]));
+          const casings = layer._lineBatch(level, true, lineAt([990, 990], [1010, 1010]));
+          const item = strokes.add(stroke, 5, 5, style);
+          const xBefore = strokes._floats[item.first * 12];
+
+          layer._moveBatchOrigins(viewportAt(1000 + 40000.4, 1000, 19));    // 320,000 pixels away
+          assert.deepEqual([strokes.position.x, strokes.position.y], [41000, 1000]);
+          assert.deepEqual([casings.position.x, casings.position.y], [41000, 1000]);
+          assert.strictEqual(strokes._floats[item.first * 12] + strokes.position.x, xBefore + 1000);
+        });
+
+        it('moves it sooner when zoomed in further', () => {
+          const batch = layer._lineBatch(level, false, lineAt([990, 990], [1010, 1010]));
+          layer._moveBatchOrigins(viewportAt(1000, 1000 + 5000, 19));
+          assert.strictEqual(batch.position.y, 1000);
+          layer._moveBatchOrigins(viewportAt(1000, 1000 + 5000, 22));
+          assert.strictEqual(batch.position.y, 6000);
+        });
       });
     });
 
