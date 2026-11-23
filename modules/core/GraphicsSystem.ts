@@ -51,6 +51,9 @@ const STILL_AFTER_MS = 150;
 /** How many recent frames to keep stats for (see `renderFrames`) */
 const RENDER_FRAME_HISTORY = 120;
 
+/** How often Pixi's own scheduler gets a turn (ms). It looks every 30 s or so for GPU resources to free. */
+const PIXI_TICK_MS = 1000;
+
 /**
  * The layers the user turns on and off.  Which of these are shown is saved in settings (in this
  * browser), and a link's `layers=` overrides that until the layers change.
@@ -175,6 +178,8 @@ export class GraphicsSystem extends AbstractSystem {
   protected _glCounter: GLCallCounter | null;
   /** Measures GPU time while detailed stats are on (WebGL 2 with the timer query extension) */
   protected _glTimer: GLTimer<RenderFrame> | null;
+  /** When Pixi's system ticker last got a turn (`performance.now()`) */
+  protected _pixiTickTime: number;
 
 
   /**
@@ -238,6 +243,7 @@ export class GraphicsSystem extends AbstractSystem {
     this._appFrame = null;
     this._glCounter = null;
     this._glTimer = null;
+    this._pixiTickTime = 0;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -248,10 +254,15 @@ export class GraphicsSystem extends AbstractSystem {
     // Schedule an immediate redraw whenever this system is resumed.
     this.on('resumed', () => { this.immediateRedraw(); });
 
-    // Ensure Pixi's shared ticker doesn't run its own rAF loop.
+    // Ensure Pixi's tickers don't run rAF loops of their own.
     // (Rapid's `SchedulerSystem` owns the game loop instead.)
+    // The shared ticker is for things we don't use (animated sprites). The system ticker runs
+    // Pixi's own scheduler, which frees GPU resources that went unused: `_tick()` gives it a
+    // turn once a second. (It also ran Pixi's events ticker, see `_afterPixiInit()`.)
     PIXI.Ticker.shared.autoStart = false;
     PIXI.Ticker.shared.stop();
+    PIXI.Ticker.system.autoStart = false;
+    PIXI.Ticker.system.stop();
 
     Object.assign(PIXI.BitmapFontManager.defaultOptions, {
       chars: PIXI.BitmapFontManager.ASCII,
@@ -478,6 +489,14 @@ export class GraphicsSystem extends AbstractSystem {
     if (!this._started || this._paused) return;
 
     // console.log('FPS=' + (1000 / deltaMS).toFixed(1));
+
+    // Give Pixi's own scheduler its turn (see the constructor): it's what frees the GPU
+    // resources that nothing has drawn for a while, and it checks the clock itself.
+    const now = window.performance.now();
+    if (now - this._pixiTickTime >= PIXI_TICK_MS) {
+      this._pixiTickTime = now;
+      PIXI.Ticker.system.update(now);
+    }
 
     // Collect any GPU times that have arrived for earlier frames.
     if (this._glTimer) {
@@ -1339,6 +1358,12 @@ export class GraphicsSystem extends AbstractSystem {
     stage.addChild(origin);
     this.origin = origin;
 
+
+    // Pixi's events ticker sends a pointer move again, a few times a second, for objects that
+    // move under a pointer that's still. Only `eventMode: 'dynamic'` asks for that, and nothing
+    // of ours has it, so it was a call on every animation frame that did nothing.
+    // (Whatever is under the pointer is found on each pointer event: `PixiScene.hitTest()`.)
+    PIXI.EventsTicker.removeTickerListener();
 
     // The Pixi Application comes with its own ticker that just calls `render()`,
     // and we don't want to ever use it.  Disable it.

@@ -827,7 +827,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @return `false` if it stopped before the end of the list
    */
   public labelPolygons(features: PixiFeaturePolygon[], stop?: () => boolean): boolean {
+    const origin = this.gfx.origin;
+    if (!origin) return true;
+
     const temp = new PIXI.Point();
+    const world = new PIXI.Point();
     const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
@@ -843,20 +847,31 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!outer || outer.length < 3) continue;  // no outer ring
       if (!feature.container.visible || !feature.container.renderable) continue;  // not visible
 
-      const fBounds = feature.container.getBounds().rectangle;
-      if (fBounds.width < 600 && fBounds.height < 600) continue;  // too small
-
-      const measurement = this.measureLabel(feature.label, 'italic');
-
       // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
       // as a flat array, which is what `geomStrokeOutline` expects.
+      // (The polygon's coordinates start at its container's position in the world, and `origin`
+      // puts the world on screen. The container itself may not be in the scene: a polygon
+      // that's drawn in batches has nothing in it.)
+      const position = feature.container.position;
       const flatOuter: number[] = new Array(outer.length * 2);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
       for (let i = 0; i < outer.length; i++) {
         const p = outer[i];
-        feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
+        world.set(p[0] + position.x, p[1] + position.y);
+        origin.toGlobal(world, temp);
         flatOuter[i * 2]     = temp.x - labelOffset.x;
         flatOuter[i * 2 + 1] = temp.y - labelOffset.y;
+        if (temp.x < minX) minX = temp.x;
+        if (temp.x > maxX) maxX = temp.x;
+        if (temp.y < minY) minY = temp.y;
+        if (temp.y > maxY) maxY = temp.y;
       }
+      if ((maxX - minX) < 600 && (maxY - minY) < 600) continue;  // too small
+
+      const measurement = this.measureLabel(feature.label, 'italic');
 
       // The label runs along the inside of the ring, 12 pixels in.
       const inner = geomStrokeOutline(flatOuter, POLYGON_LABEL_INSET, { closed: true, join: 'bevel' }).inner;

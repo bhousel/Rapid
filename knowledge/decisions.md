@@ -109,6 +109,26 @@ each vertex for the line's width in pixels at the current zoom. Choices someone 
 - **Dashes the vertex can't hold** (more than four numbers, fractions, over 255 pixels) fall back
   to `LineMesh`es with a dash texture. None of Rapid's styles has one.
 
+## Areas are drawn in two batches: fills, then outlines (Nov 2026)
+Step 8 of section 15, the first part. Choices someone might undo:
+- **Every outline is over every fill** (as iD draws areas). Before, a small area's fill covered
+  the outline of the larger one it's in. Not shown to Bryan yet when it was built (Nov 23).
+- **Triangles from Pixi's `earcut`** (`PIXI.earcut`, which Pixi exports), not a dependency of our
+  own. It keeps `triangulate()` in `modules/pixi/`; if fills are ever built in a worker or
+  tested without Pixi, `earcut` becomes a direct dependency (it's in the bundle already).
+- **Patterns in one atlas texture, tiled by the shader,** so one draw call draws fills with any
+  mix of patterns. A texture array would need WebGL 2; a batch per pattern would lose the
+  order between areas. Each cell has a border of the texels that wrap around, for smoothing.
+- **No low-resolution sprite for a small area.** A batch draws its real shape at no extra cost
+  per object; Užice at zoom 16 has 26% more triangles for it, in 2 draw calls where there were 295.
+- **A hovered area draws only its outlines itself,** for the glow. Drawing its fill there too
+  would lift it over everything inside the area.
+- **Pixi's tickers are off** (Bryan, Nov 23: he wants such things gone from flame charts). The
+  events ticker's listener is removed; the system ticker is stopped and gets a turn once a
+  second from `GraphicsSystem._tick()`, for Pixi's own scheduler (which frees unused GPU
+  resources). If something of ours ever needs `eventMode: 'dynamic'`, the events ticker is what
+  made that work.
+
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
 Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.

@@ -244,22 +244,23 @@ describe('PixiLayerLabels', () => {
 
 
   describe('labelPolygons', () => {
-    // A stand-in for a polygon feature: a rectangle `width` by `height`, drawn with its corner at [100, 100] of label space
+    // A stand-in for a polygon feature: a rectangle `width` by `height`, with its corner at
+    // [100, 100] of the world, which is also where it is in label space here. Its container
+    // has nothing in it and isn't in the scene, as when batches draw the polygon.
     function polygonOf(id, width, height) {
+      const container = new PIXI.Container();
+      container.position.set(100, 100);
       return {
         id: id, type: 'Polygon', label: 'Park', style: {},
         geometry: { local: { outer: [[0, 0], [width, 0], [width, height], [0, height], [0, 0]] } },
-        container: {
-          visible: true, renderable: true,
-          getBounds: () => new PIXI.Bounds(100, 100, 100 + width, 100 + height),
-          toGlobal: (p, out) => { out.x = p.x + 100; out.y = p.y + 100; return out; }
-        }
+        container: container
       };
     }
 
     let paths;
     beforeEach(() => {
       paths = [];
+      layer.gfx.origin = new PIXI.Container();    // world units are pixels
       layer.measureLabel = () => MEASURE;
       layer.placeRopeLabel = (feature, measurement, coords) => { paths.push(coords); layer._didPlace = true; };
     });

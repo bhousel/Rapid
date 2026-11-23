@@ -1,6 +1,8 @@
 import * as PIXI from 'pixi.js';
 import { STROKE_FALLBACK_SIZE, STROKE_VERTEX_SIZE } from '../../geo/index.ts';
+import { VertexBatch } from './VertexBatch.ts';
 
+import type { BatchItem, BatchLayout } from './VertexBatch.ts';
 import type { StrokeMesh } from '../../geo/stroke.ts';
 
 
@@ -21,25 +23,10 @@ export interface LineBatchStyle {
 }
 
 /**
- * One line in a batch. `LineBatch.add()` returns it, and the caller keeps it to change the line
- * or take it out. Its properties are the batch's to change.
+ * One line in a batch (a casing or a stroke). `LineBatch.add()` returns it, and the caller keeps
+ * it to change the line or take it out.
  */
-export interface LineBatchItem {
-  /** The batch it's in, or `null` once it was removed */
-  batch: LineBatch | null;
-  /** Its first vertex in the batch's buffers */
-  first: number;
-  /** How many vertices it has there */
-  count: number;
-  /** Its triangles, as indices of its own vertices (the stroke mesh's array, which isn't changed) */
-  indices: Uint16Array | Uint32Array;
-  /** Where it's drawn among the others: a line with a higher number is drawn over one with a lower */
-  order: number;
-  /** Whether it's drawn */
-  visible: boolean;
-  /** Its opacity as it's in the vertices when it's drawn, from 1 to 255 (a hidden line has 0 there) */
-  alpha: number;
-}
+export type LineBatchItem = BatchItem;
 
 /** What the view says about how the lines of every batch are drawn (see `LineBatch.setView`) */
 export interface LineBatchView {
@@ -64,22 +51,24 @@ export interface LineBatchView {
 //           4 - 7   aDash      the dash pattern, in pixels
 const FLOATS = 12;
 const BYTES = 8;
-const FLOAT_STRIDE = FLOATS * 4;
+
+const LAYOUT: BatchLayout = {
+  floats: FLOATS,
+  bytes: BYTES,
+  alphaByte: 3,
+  attributes: {
+    aPosition: { buffer: 'floats', format: 'float32x2', offset: 0 },
+    aOffset: { buffer: 'floats', format: 'float32x2', offset: 8 },
+    aAlong: { buffer: 'floats', format: 'float32x2', offset: 16 },
+    aFallback: { buffer: 'floats', format: 'float32x4', offset: 24 },
+    aWidth: { buffer: 'floats', format: 'float32x2', offset: 40 },
+    aColor: { buffer: 'bytes', format: 'unorm8x4', offset: 0 },
+    aDash: { buffer: 'bytes', format: 'unorm8x4', offset: 4 }
+  }
+};
 
 /** The half width from which a vertex that has no second place uses it: never */
 const NO_LIMIT = 3e38;
-
-/** How many vertices a batch has room for when it's made */
-const MIN_CAPACITY = 256;
-
-/** The part of a batch's vertices that can go unused before it's packed again */
-const MAX_WASTE = 0.5;
-
-/**
- * How much larger the buffers get when they're full. (Doubling left a third of Užice's 80 MB of
- * batches unused after a load.)
- */
-const GROWTH = 1.5;
 
 
 const VERTEX_GLSL = `
@@ -243,7 +232,6 @@ fn mainFrag(
 // Every batch draws with the same shader, and the same numbers about the view.
 let _shader: PIXI.Shader | null = null;
 let _uniforms: PIXI.UniformGroup | null = null;
-const _state = PIXI.State.for2d();
 
 /**
  * Returns the uniforms that say how the lines of every batch are drawn for the current view.
@@ -277,128 +265,23 @@ function lineShader(): PIXI.Shader {
 
 
 /**
- * A `LineBatch` draws many lines as one mesh, in one draw call: the casings and strokes of the
- * lines of one tile and road class, for example. Each line is a run of vertices in the batch's
- * buffers, copied from its stroke mesh (see `geomStrokeMesh()`), with how it's drawn (its width
- * in pixels, color, opacity and dashes) in every vertex.
+ * A `LineBatch` draws many lines as one mesh, in one draw call: every casing of a level's lines,
+ * for example, or every stroke. Each line is a run of vertices in the batch's buffers, copied
+ * from its stroke mesh (see `geomStrokeMesh()`), with how it's drawn (its width in pixels,
+ * color, opacity and dashes) in every vertex.
  *
  * The shader puts each vertex where the line's width at the current zoom says, so a zoom changes
- * four numbers (`LineBatch.setView()`) and nothing in any batch. A line that changes is written
- * again where it was, if it has as many vertices as before; otherwise at the end, and the batch
- * packs itself when half of it is unused. The lines are drawn in the order of their `order`.
- * A hidden line stays where it is, with an opacity of 0 in its vertices, which the shader takes
- * as "draw nothing": hiding and showing lines (as a pan does at the edge of what's drawn) writes
- * a byte per vertex, and builds nothing.
- *
- * The batch's coordinates are the lines' own, plus what `add()` is told each line is offset by.
- * Keep them small (put the batch near its lines, and `moveOrigin()` when the view has gone far
- * from there): the buffers hold 32-bit floats.
- *
- * What changed is sent to the GPU when the batch is next rendered, once, however many lines changed.
+ * four numbers (`LineBatch.setView()`) and nothing in any batch. What the batch does with its
+ * buffers (a line that changes, hiding, order, the place its coordinates start at) is
+ * `VertexBatch`'s.
  *
  * See `design/graphics-system.md` section 15.
  */
-export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
-
-  /**
-   * How many features were given this batch to draw in (`PixiFeatureLine.batch`). A feature may
-   * be drawn some frames after it gets its batch, so a batch with no lines in it yet can still
-   * be one that's about to get some: its owner destroys it only when this is 0 too.
-   */
-  public users: number;
-
-  /**
-   * The lines in the batch, in the order they're drawn once `_sortDirty` is `false`, and the
-   * ones that were removed since the index buffer was last built (their `batch` is `null`)
-   */
-  protected _items: LineBatchItem[];
-  /** How many of `_items` were removed */
-  protected _removed: number;
-  /** How many of the batch's lines are visible */
-  protected _numVisible: number;
-  /** The vertices' floats (see the layout above) */
-  protected _floats: Float32Array;
-  /** The vertices' bytes */
-  protected _bytes: Uint8Array;
-  /** The lines' triangles, in drawing order, as indices of the batch's vertices */
-  protected _indices: Uint32Array;
-  /** How many vertices the buffers have room for */
-  protected _capacity: number;
-  /** One past the last vertex in use */
-  protected _end: number;
-  /** How many of the vertices before `_end` belong to no line anymore */
-  protected _wasted: number;
-  /** Whether `_items` needs sorting */
-  protected _sortDirty: boolean;
-  /** Whether the index buffer needs building again */
-  protected _indexDirty: boolean;
-  /** The first vertex whose floats changed since the buffers were sent to the GPU, `Infinity` if none did */
-  protected _dirtyFirst: number;
-  /** One past the last vertex whose floats changed since then */
-  protected _dirtyEnd: number;
-  /** The first vertex whose bytes changed since then, `Infinity` if none did */
-  protected _dirtyBytesFirst: number;
-  /** One past the last vertex whose bytes changed since then */
-  protected _dirtyBytesEnd: number;
-  /** Whether the buffers were replaced by larger ones since then */
-  protected _resized: boolean;
-  protected _floatBuffer: PIXI.Buffer;
-  protected _byteBuffer: PIXI.Buffer;
-  protected _indexBuffer: PIXI.Buffer;
-
+export class LineBatch extends VertexBatch {
 
   /** Makes a batch with no lines in it. It draws nothing until one is added. */
   public constructor() {
-    const floats = new Float32Array(MIN_CAPACITY * FLOATS);
-    const bytes = new Uint8Array(MIN_CAPACITY * BYTES);
-    const indices = new Uint32Array(MIN_CAPACITY * 3);
-
-    const usage = PIXI.BufferUsage.VERTEX | PIXI.BufferUsage.COPY_DST;
-    const floatBuffer = new PIXI.Buffer({ data: floats, usage: usage, label: 'line-batch-floats' });
-    const byteBuffer = new PIXI.Buffer({ data: bytes, usage: usage, label: 'line-batch-bytes' });
-    const indexBuffer = new PIXI.Buffer({ data: indices, usage: PIXI.BufferUsage.INDEX | PIXI.BufferUsage.COPY_DST, label: 'line-batch-indices' });
-
-    const geometry = new PIXI.Geometry({
-      attributes: {
-        aPosition: { buffer: floatBuffer, format: 'float32x2', stride: FLOAT_STRIDE, offset: 0 },
-        aOffset: { buffer: floatBuffer, format: 'float32x2', stride: FLOAT_STRIDE, offset: 8 },
-        aAlong: { buffer: floatBuffer, format: 'float32x2', stride: FLOAT_STRIDE, offset: 16 },
-        aFallback: { buffer: floatBuffer, format: 'float32x4', stride: FLOAT_STRIDE, offset: 24 },
-        aWidth: { buffer: floatBuffer, format: 'float32x2', stride: FLOAT_STRIDE, offset: 40 },
-        aColor: { buffer: byteBuffer, format: 'unorm8x4', stride: BYTES, offset: 0 },
-        aDash: { buffer: byteBuffer, format: 'unorm8x4', stride: BYTES, offset: 4 }
-      },
-      indexBuffer: indexBuffer
-    });
-
-    super({ geometry: geometry, shader: lineShader(), state: _state });
-
-    this.users = 0;
-    this._items = [];
-    this._removed = 0;
-    this._numVisible = 0;
-    this._floats = floats;
-    this._bytes = bytes;
-    this._indices = indices;
-    this._capacity = MIN_CAPACITY;
-    this._end = 0;
-    this._wasted = 0;
-    this._sortDirty = false;
-    this._indexDirty = false;
-    this._dirtyFirst = Infinity;
-    this._dirtyEnd = 0;
-    this._dirtyBytesFirst = Infinity;
-    this._dirtyBytesEnd = 0;
-    this._resized = false;
-    this._floatBuffer = floatBuffer;
-    this._byteBuffer = byteBuffer;
-    this._indexBuffer = indexBuffer;
-
-    this.eventMode = 'none';
-    this.renderable = false;   // nothing to draw yet
-
-    // Pixi calls this before it renders, on every frame the batch is in the scene.
-    this.onRender = () => this.flush();
+    super(LAYOUT, lineShader());
   }
 
 
@@ -434,43 +317,6 @@ export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
 
 
   /**
-   * Destroys the batch and its buffers. (A `Mesh` doesn't destroy its geometry, and Pixi keeps
-   * what it built for one until it's destroyed.) The lines that were in it are in no batch then.
-   * @param options - Pixi's options for destroying a display object
-   */
-  public override destroy(options?: PIXI.DestroyOptions): void {
-    const geometry = this.geometry;
-    this.onRender = null!;
-    super.destroy(options);
-    geometry?.destroy(true);
-
-    for (const item of this._items) {
-      item.batch = null;
-    }
-    this._items = [];
-    this._removed = 0;
-  }
-
-
-  /**
-   * How many lines are in the batch
-   * @return The number of lines
-   */
-  public get size(): number {
-    return this._items.length - this._removed;
-  }
-
-
-  /**
-   * How many vertices the batch's lines have, and how many its buffers have room for
-   * @return `[used, capacity]`
-   */
-  public get vertexUse(): [number, number] {
-    return [this._end - this._wasted, this._capacity];
-  }
-
-
-  /**
    * Adds a line to the batch.
    * @param stroke - The line's stroke mesh. Its vertices are copied; its `indices` are kept, and must not change.
    * @param dx - Where the line's coordinates start, in the batch's
@@ -480,33 +326,10 @@ export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
    * @return The line in the batch, to change or remove it with
    */
   public add(stroke: StrokeMesh, dx: number, dy: number, style: LineBatchStyle, order: number = 0): LineBatchItem {
-    const item: LineBatchItem = { batch: this, first: 0, count: 0, indices: stroke.indices, order: order, visible: true, alpha: 255 };
-    this._place(item, stroke.vertexCount);
+    const item = this._addItem(stroke.vertexCount, stroke.indices, order);
     this._writeStroke(item, stroke, dx, dy);
     this._writeStyle(item, style);
-    this._items.push(item);
-    this._numVisible++;
-    this._sortDirty = true;
-    this._indexDirty = true;
     return item;
-  }
-
-
-  /**
-   * Takes a line out of the batch. The item can't be used again.
-   * @param item - The line
-   */
-  public remove(item: LineBatchItem): void {
-    if (item.batch !== this) return;
-
-    // (It leaves the list when the index buffer is next built: looking for it now would make
-    // taking every line out of a large batch slow.)
-    this._removed++;
-    if (item.visible) this._numVisible--;
-    this._wasted += item.count;
-    item.batch = null;
-    item.count = 0;
-    this._indexDirty = true;
   }
 
 
@@ -521,17 +344,10 @@ export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
   public setStroke(item: LineBatchItem, stroke: StrokeMesh, dx: number, dy: number): void {
     if (item.batch !== this) return;
 
-    if (stroke.vertexCount !== item.count) {
-      // The style goes along: it's the same in all of a line's vertices.
-      const from = item.first;
-      const style = (item.count > 0) ? this._readStyle(from, item.alpha) : null;
-      this._wasted += item.count;
-      this._place(item, stroke.vertexCount);
-      if (style) this._writeStyle(item, style);
-    }
-    if (item.indices !== stroke.indices) {
-      item.indices = stroke.indices;
-      this._indexDirty = true;
+    // The style goes along if the line moves: it's the same in all of a line's vertices.
+    const style = (item.count > 0 && item.count !== stroke.vertexCount) ? this._readStyle(item.first, item.alpha) : null;
+    if (this._resizeItem(item, stroke.vertexCount, stroke.indices) && style) {
+      this._writeStyle(item, style);
     }
     this._writeStroke(item, stroke, dx, dy);
   }
@@ -545,157 +361,6 @@ export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
   public setStyle(item: LineBatchItem, style: LineBatchStyle): void {
     if (item.batch !== this) return;
     this._writeStyle(item, style);
-  }
-
-
-  /**
-   * Changes where a line is drawn among the others.
-   * @param item - The line
-   * @param order - Higher is on top
-   */
-  public setOrder(item: LineBatchItem, order: number): void {
-    if (item.batch !== this || item.order === order) return;
-    item.order = order;
-    this._sortDirty = true;
-    this._indexDirty = true;
-  }
-
-
-  /**
-   * Shows or hides a line of the batch. A hidden line keeps its vertices and its place among
-   * the triangles: its opacity there is 0, which the shader draws nothing for.
-   * @param item - The line
-   * @param visible - Whether it's drawn
-   */
-  public setVisible(item: LineBatchItem, visible: boolean): void {
-    if (item.batch !== this || item.visible === visible) return;
-    item.visible = visible;
-    this._numVisible += visible ? 1 : -1;
-
-    const bytes = this._bytes;
-    const alpha = visible ? item.alpha : 0;
-    for (let i = 0, p = item.first * BYTES + 3; i < item.count; i++, p += BYTES) {
-      bytes[p] = alpha;
-    }
-    this._markBytesDirty(item);
-  }
-
-
-  /**
-   * Moves the place that the batch's coordinates start at, and the batch with it, so that every
-   * line stays where it is in the world. The buffers hold 32-bit floats, which are only fine
-   * enough near that place: move it when the view is far from it (and before adding lines,
-   * which are written relative to it).
-   * @param x - The new place in the world, where the batch's own `position` goes
-   * @param y - The same, for y
-   */
-  public moveOrigin(x: number, y: number): void {
-    const dx = this.position.x - x;
-    const dy = this.position.y - y;
-    this.position.set(x, y);
-    if (!dx && !dy) return;
-
-    const floats = this._floats;
-    const end = this._end * FLOATS;
-    for (let o = 0; o < end; o += FLOATS) {
-      floats[o] += dx;
-      floats[o + 1] += dy;
-    }
-    if (this._end > 0) {
-      this._dirtyFirst = 0;
-      this._dirtyEnd = this._end;
-    }
-  }
-
-
-  /**
-   * Brings the buffers up to date with the lines, and marks what changed to be sent to the GPU.
-   * Pixi calls this before it renders the batch; there's no need to call it otherwise.
-   */
-  public flush(): void {
-    if (this._wasted > MIN_CAPACITY && this._wasted > this._end * MAX_WASTE) {
-      this._pack(this._capacity);
-    }
-    if (this._indexDirty) {
-      this._buildIndices();
-    }
-    // (An `indexCount` of 0 would draw the whole buffer, so a batch with nothing to draw isn't rendered.)
-    this.renderable = (this._numVisible > 0 && this.geometry.indexCount > 0);
-
-    if (this._resized) {
-      this._floatBuffer.data = this._floats;   // a larger array: Pixi makes the GPU's buffer again
-      this._byteBuffer.data = this._bytes;
-    } else {
-      if (this._dirtyEnd > this._dirtyFirst) {
-        const first = this._dirtyFirst;
-        this._floatBuffer.update((this._dirtyEnd - first) * FLOAT_STRIDE, first * FLOAT_STRIDE);
-      }
-      if (this._dirtyBytesEnd > this._dirtyBytesFirst) {
-        const first = this._dirtyBytesFirst;
-        this._byteBuffer.update((this._dirtyBytesEnd - first) * BYTES, first * BYTES);
-      }
-    }
-    this._resized = false;
-    this._dirtyFirst = Infinity;
-    this._dirtyEnd = 0;
-    this._dirtyBytesFirst = Infinity;
-    this._dirtyBytesEnd = 0;
-  }
-
-
-  /**
-   * Finds room for a line's vertices at the end of the buffers, making room if there's none:
-   * by packing the batch if enough of it is unused, otherwise with larger buffers.
-   * @param item - The line. Its `first` and `count` are set.
-   * @param count - How many vertices it needs
-   */
-  protected _place(item: LineBatchItem, count: number): void {
-    if (this._end + count > this._capacity) {
-      const needed = this._end - this._wasted + count;
-      const capacity = (needed <= this._capacity * MAX_WASTE) ? this._capacity : Math.ceil(Math.max(needed, this._capacity * GROWTH));
-      item.count = 0;    // (it has no vertices to keep while the batch is packed)
-      this._pack(capacity);
-    }
-    item.first = this._end;
-    item.count = count;
-    this._end += count;
-  }
-
-
-  /**
-   * Moves every line's vertices to the start of the buffers, one after the other, leaving
-   * nothing unused between them.
-   * @param capacity - How many vertices the buffers should have room for (new ones are made if that's not what they have)
-   */
-  protected _pack(capacity: number): void {
-    const byFirst = this._items.slice().sort((a, b) => a.first - b.first);
-    const isSameSize = (capacity === this._capacity);
-    const floats = isSameSize ? this._floats : new Float32Array(capacity * FLOATS);
-    const bytes = isSameSize ? this._bytes : new Uint8Array(capacity * BYTES);
-
-    let end = 0;
-    for (const item of byFirst) {
-      if (!item.count) continue;
-      if (!isSameSize || item.first !== end) {
-        // (Within one array this moves towards the start, which `copyWithin` and `set` both get right.)
-        floats.set(this._floats.subarray(item.first * FLOATS, (item.first + item.count) * FLOATS), end * FLOATS);
-        bytes.set(this._bytes.subarray(item.first * BYTES, (item.first + item.count) * BYTES), end * BYTES);
-        item.first = end;
-      }
-      end += item.count;
-    }
-
-    this._floats = floats;
-    this._bytes = bytes;
-    this._capacity = capacity;
-    this._end = end;
-    this._wasted = 0;
-    this._indexDirty = true;
-    this._dirtyFirst = 0;
-    this._dirtyEnd = end;
-    this._dirtyBytesFirst = 0;
-    this._dirtyBytesEnd = end;
-    if (!isSameSize) this._resized = true;
   }
 
 
@@ -800,72 +465,6 @@ export class LineBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
       dash: (dash[0] + dash[1] + dash[2] + dash[3] > 0) ? dash : null,
       isCasing: floats[o + 11] < 0
     };
-  }
-
-
-  /**
-   * Remembers that the floats of a line's vertices have to be sent to the GPU.
-   * @param item - The line
-   */
-  protected _markDirty(item: LineBatchItem): void {
-    if (item.first < this._dirtyFirst) this._dirtyFirst = item.first;
-    if (item.first + item.count > this._dirtyEnd) this._dirtyEnd = item.first + item.count;
-  }
-
-
-  /**
-   * Remembers that the bytes of a line's vertices have to be sent to the GPU.
-   * @param item - The line
-   */
-  protected _markBytesDirty(item: LineBatchItem): void {
-    if (item.first < this._dirtyBytesFirst) this._dirtyBytesFirst = item.first;
-    if (item.first + item.count > this._dirtyBytesEnd) this._dirtyBytesEnd = item.first + item.count;
-  }
-
-
-  /**
-   * Builds the index buffer: the lines' triangles, in the order they're drawn. (Those of the
-   * hidden lines too: the shader draws nothing for them, and showing one changes nothing here.)
-   */
-  protected _buildIndices(): void {
-    let items = this._items;
-    if (this._removed) {
-      items = this._items = items.filter(item => item.batch === this);
-      this._removed = 0;
-    }
-    if (this._sortDirty) {
-      items.sort((a, b) => a.order - b.order);   // (a stable sort: equal lines stay in the order they were added)
-      this._sortDirty = false;
-    }
-
-    let total = 0;
-    for (const item of items) {
-      total += item.indices.length;
-    }
-
-    let indices = this._indices;
-    if (indices.length < total) {
-      indices = this._indices = new Uint32Array(PIXI.nextPow2(total));
-    }
-
-    let k = 0;
-    for (const item of items) {
-      const own = item.indices;
-      const count = own.length;
-      const first = item.first;
-      for (let i = 0; i < count; i++) {
-        indices[k + i] = own[i] + first;
-      }
-      k += count;
-    }
-
-    this.geometry.indexCount = total;
-    if (this._indexBuffer.data !== indices) {
-      this._indexBuffer.data = indices;
-    } else if (total > 0) {
-      this._indexBuffer.update(total * 4, 0);
-    }
-    this._indexDirty = false;
   }
 
 }

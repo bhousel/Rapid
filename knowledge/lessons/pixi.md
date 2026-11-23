@@ -67,4 +67,14 @@ How Pixi behaves, and what that means for Rapid.
   buffer again is a loop over typed arrays, 81 ms in all while 107,000 features were made.
   What does cost is whatever makes it rebuild often: hiding a line used to, on every frame the
   cull box moved (7 ms of DRAW), until hiding became a byte per vertex.
+- **Pixi has three tickers, and stopping the application's leaves two.** `Ticker.shared` (animated
+  sprites) and `Ticker.system`, which ran its own `requestAnimationFrame` loop for Pixi's events
+  ticker (pointer moves sent again for `eventMode: 'dynamic'` objects) and Pixi's scheduler (which
+  frees unused GPU resources). Neither showed in our frame stats; both showed in every flame
+  chart. To see what runs: `PIXI.Ticker.system.started`, and walk `_head.next` for its listeners.
+  `GraphicsSystem` stops both and gives the system ticker a turn once a second.
+- **A batch draws what a level-of-detail sprite was there to avoid.** The `lowRes` sprite for a
+  small area existed because a `Graphics` per building was too much. In a `FillBatch` a small
+  area's own triangles cost no object and no draw call, so the special case went away. When
+  moving something into a batch, ask what its workarounds were for.
 

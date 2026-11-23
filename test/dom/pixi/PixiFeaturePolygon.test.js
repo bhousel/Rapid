@@ -1,5 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
+import { FillBatch } from '../../../modules/pixi/lib/FillBatch.ts';
+import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
 import { PixiFeaturePolygon } from '../../../modules/pixi/PixiFeaturePolygon.ts';
 
 
@@ -13,6 +15,7 @@ describe('PixiFeaturePolygon', () => {
   const SQUARE = { type: 'Polygon', coordinates: [[[0, 0], [0.0005, 0], [0.0005, 0.0005], [0, 0.0005], [0, 0]]] };
   const viewportAt = zoom => ({ transform: { zoom: zoom, rotation: 0 } });
   const dashTexture = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 16, height: 1 }) });
+  const PATTERN_TEXTURE = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 32, height: 32 }) });
 
   function drawAt(zoom) {
     feature.dirty = true;
@@ -25,7 +28,10 @@ describe('PixiFeaturePolygon', () => {
     map = { wireframeMode: false };
     context.systems.map = map;
     const gfx = {
-      textureManager: { getTexture: () => null, getPatternTexture: () => null, getDashTexture: () => dashTexture },
+      textureManager: {
+        getTexture: () => null, getDashTexture: () => dashTexture,
+        getPatternTexture: name => (name ? PATTERN_TEXTURE : null), getPatternNumber: name => (name === 'forest' ? 11 : 0)
+      },
       pixi: { renderer: { type: 0 } }
     };
     const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
@@ -352,6 +358,348 @@ describe('PixiFeaturePolygon', () => {
       assert.isTrue(ring.destroyed);
     });
   });
+
+  // A layer that draws many polygons gives each two batches: a `FillBatch` for its fill and a
+  // `LineBatch` for its outlines. The polygon has nothing of its own then, at any size.
+  describe('in batches', () => {
+    // A square 400 world units wide (400 px at zoom 16), with a hole in it
+    const BIG = { type: 'Polygon', coordinates: [
+      [[0, 0], [0.008, 0], [0.008, 0.008], [0, 0.008], [0, 0]],
+      [[0.003, 0.003], [0.005, 0.003], [0.005, 0.005], [0.003, 0.005], [0.003, 0.003]]
+    ] };
+    let fills, outlines, calls, context;
+
+    function watch(target, name) {
+      ['add', 'remove', 'setFill', 'setStroke', 'setStyle'].forEach(method => {
+        if (!target[method]) return;
+        const original = target[method].bind(target);
+        target[method] = (...args) => {
+          calls.push(`${name}.${method}`);
+          return original(...args);
+        };
+      });
+    }
+
+    function setShape(shape) {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(shape);
+      feature.geometry = part;
+    }
+
+    // A point in the world, by its place in the polygon's own coordinates
+    const worldAt = (x, y) => ({ x: feature.container.position.x + x, y: feature.container.position.y + y });
+    const STAGE = { x: 0, y: 0 };    // not looked at
+
+    beforeEach(() => {
+      context = layer.context;
+      context.viewport = { transform: { rotation: 0, zoom: 16 } };
+      fills = new FillBatch();
+      outlines = new LineBatch();
+      for (const each of [fills, outlines]) {
+        each.position.set(8388608, 8388608);    // the world's middle, where the polygon is
+      }
+      calls = [];
+      watch(fills, 'fills');
+      watch(outlines, 'outlines');
+      feature.fillBatch = fills;
+      feature.strokeBatch = outlines;
+    });
+    afterEach(() => {
+      for (const each of [fills, outlines]) {
+        if (!each.destroyed) each.destroy();
+      }
+    });
+
+    it('draws the fill in one and each ring\'s outline in the other, and has nothing of its own', () => {
+      setShape(BIG);
+      feature.container.zIndex = -160000;
+      drawAt(16);
+      assert.isNull(feature.fill);
+      assert.isNull(feature.strokes);
+      assert.isNull(feature.lowRes);
+      assert.lengthOf(feature.container.children, 0);
+      assert.deepEqual(calls, ['fills.add', 'outlines.add', 'outlines.add']);
+
+      const { fillItem, ringItems } = feature;
+      assert.strictEqual(fillItem.batch, fills);
+      assert.strictEqual(fillItem.count, 10, 'the corners are the rings\' own points');
+      assert.strictEqual(fillItem.order, -160000);
+      assert.lengthOf(ringItems, 2);
+      assert.strictEqual(ringItems[0].batch, outlines);
+      assert.strictEqual(ringItems[1].order, -160000);
+      assert.isTrue(feature.visible);
+    });
+
+    it('writes its fill near the batch\'s origin, in its color and opacity', () => {
+      feature.style = { fill: { color: 0x112233, opacity: 0.4, type: 'full' } };
+      drawAt(16);
+      const item = feature.fillItem;
+      const [x, y] = feature.geometry.world.origin;
+      const local = feature.geometry.local.flat[0];
+      assert.closeTo(fills._floats[item.first * 2], local[0] + x - 8388608, 1e-3);
+      assert.closeTo(fills._floats[item.first * 2 + 1], local[1] + y - 8388608, 1e-3);
+      assert.deepEqual(Array.from(fills._bytes.subarray(item.first * 8, item.first * 8 + 5)), [0x11, 0x22, 0x33, 102, 0]);
+
+      // the outline has the fill's color, at its own width at every zoom
+      const ring = feature.ringItems[0];
+      assert.deepEqual(Array.from(outlines._floats.subarray(ring.first * 12 + 10, ring.first * 12 + 12)), [2, 2]);
+      assert.deepEqual(Array.from(outlines._bytes.subarray(ring.first * 8, ring.first * 8 + 4)), [0x11, 0x22, 0x33, 255]);
+    });
+
+    it('draws a small polygon as it is, with no sprite in its place', () => {
+      drawAt(15);    // 13 pixels wide
+      assert.strictEqual(feature.lod, 1);
+      assert.isNull(feature.lowRes);
+      assert.isTrue(feature.fillItem.visible);
+      assert.isTrue(feature.ringItems[0].visible);
+    });
+
+    it('destroys the sprite that the polygon had before it got its batches', () => {
+      feature.fillBatch = null;
+      drawAt(15);
+      const sprite = feature.lowRes;
+      assert.isOk(sprite);
+
+      feature.fillBatch = fills;
+      drawAt(15);
+      assert.isNull(feature.lowRes);
+      assert.isTrue(sprite.destroyed);
+      assert.lengthOf(feature.container.children, 0);
+    });
+
+    it('hides a polygon that\'s too small to draw, and shows it again when it isn\'t', () => {
+      drawAt(16);
+      drawAt(12);    // under 4 pixels
+      assert.isFalse(feature.visible);
+      assert.isFalse(feature.fillItem.visible);
+      assert.isFalse(feature.ringItems[0].visible);
+      drawAt(16);
+      assert.isTrue(feature.fillItem.visible);
+      assert.isTrue(feature.ringItems[0].visible);
+    });
+
+    it('does nothing to the batches for a zoom', () => {
+      drawAt(16);
+      calls = [];
+      for (const zoom of [17, 15, 18.5]) {
+        feature.dirtyTransform();
+        feature.update(viewportAt(zoom));
+      }
+      assert.deepEqual(calls, []);
+      assert.isFalse(feature.dirty);
+    });
+
+    it('writes a polygon that changed where it was', () => {
+      drawAt(16);
+      const { fillItem } = feature;
+      const ring = feature.ringItems[0];
+      calls = [];
+      setShape({ type: 'Polygon', coordinates: [[[0, 0], [0.0006, 0], [0.0006, 0.0005], [0, 0.0005], [0, 0]]] });    // a corner moved
+      drawAt(16);
+      assert.strictEqual(feature.fillItem, fillItem);
+      assert.strictEqual(feature.ringItems[0], ring);
+      assert.deepEqual(calls, ['fills.setFill', 'fills.setStyle', 'outlines.setStroke', 'outlines.setStyle']);
+    });
+
+    it('takes the outline of a ring that\'s gone out of its batch', () => {
+      setShape(BIG);
+      drawAt(16);
+      assert.strictEqual(outlines.size, 2);
+      setShape(SQUARE);
+      drawAt(16);
+      assert.lengthOf(feature.ringItems, 1);
+      assert.strictEqual(outlines.size, 1);
+    });
+
+    it('writes a new style, and nothing else', () => {
+      drawAt(16);
+      calls = [];
+      feature.style = { fill: { color: 0x00ff00, type: 'full' } };
+      feature.update(viewportAt(16));
+      assert.deepEqual(calls, ['fills.setStyle', 'outlines.setStyle']);
+      const item = feature.fillItem;
+      assert.deepEqual(Array.from(fills._bytes.subarray(item.first * 8, item.first * 8 + 3)), [0, 255, 0]);
+    });
+
+    // The band of a partial fill is triangles in the batch too, worked out again when its width changes.
+    describe('a partial fill', () => {
+      beforeEach(() => {
+        setShape(BIG);
+        feature.style = { fill: { color: 0xff0000 } };
+        layer.context.systems.settings = { get: () => 'partial' };
+      });
+
+      it('fills the band along the edge, and a click in the middle misses it', () => {
+        drawAt(16);
+        const local = feature.geometry.local;
+        const [minX, minY] = local.extent.min;
+        assert.isOk(feature._batchBand);
+        assert.isAbove(feature.fillItem.count, 10, 'more corners than the polygon has');
+        assert.isTrue(feature.hitTest(STAGE, worldAt(minX + 20, minY + 200)), '20 pixels in from the edge');
+        assert.isFalse(feature.hitTest(STAGE, worldAt(minX + 80, minY + 200)), '80 pixels in');
+      });
+
+      it('works the band out again for another zoom, and not when the zoom is the same', () => {
+        drawAt(16);
+        calls = [];
+        feature.dirtyTransform();
+        feature.update(viewportAt(16));
+        assert.deepEqual(calls, []);
+
+        feature.dirtyTransform();
+        feature.update(viewportAt(17));
+        assert.deepEqual(calls, ['fills.setFill', 'fills.setStyle']);
+      });
+
+      it('fills the polygon whole where it has no middle, and gives it a band where it gets one', () => {
+        setShape(SQUARE);    // 26 units wide
+        drawAt(16);
+        assert.isNull(feature._batchBand);
+        assert.strictEqual(feature.fillItem.count, 5);
+        calls = [];
+        feature.dirtyTransform();
+        feature.update(viewportAt(19));    // 208 pixels wide
+        assert.isOk(feature._batchBand);
+        assert.deepEqual(calls, ['fills.setFill', 'fills.setStyle']);
+      });
+    });
+
+    it('fills with its pattern where the polygon is large enough to show one, and plain where it isn\'t', () => {
+      feature.style = { fill: { color: 0x00ff00, type: 'full', pattern: 'forest' } };
+      drawAt(16);    // 26 pixels: too small for a pattern
+      const item = feature.fillItem;
+      assert.strictEqual(fills._bytes[item.first * 8 + 4], 0);
+      calls = [];
+      feature.dirtyTransform();
+      feature.update(viewportAt(18));    // 104 pixels
+      assert.strictEqual(fills._bytes[item.first * 8 + 4], 11);
+      assert.deepEqual(calls, ['fills.setStyle']);
+    });
+
+    describe('hitTest', () => {
+      beforeEach(() => {
+        setShape(BIG);
+        drawAt(16);
+      });
+
+      it('hits inside the fill, within a few pixels of a ring, and not in a hole or far outside', () => {
+        const [minX, minY] = feature.geometry.local.extent.min;
+        assert.isTrue(feature.hitTest(STAGE, worldAt(minX + 50, minY + 50)), 'in the fill');
+        assert.isFalse(feature.hitTest(STAGE, worldAt(0, 0)), 'in the hole');
+        assert.isTrue(feature.hitTest(STAGE, worldAt(minX - 5, minY + 50)), '5 pixels outside the edge');
+        assert.isFalse(feature.hitTest(STAGE, worldAt(minX - 8, minY + 50)), '8 pixels outside');
+        assert.strictEqual(feature.hitReach, 6);
+      });
+
+      it('hits only the rings in wireframe', () => {
+        map.wireframeMode = true;
+        const [minX, minY] = feature.geometry.local.extent.min;
+        assert.isFalse(feature.hitTest(STAGE, worldAt(minX + 50, minY + 50)));
+        assert.isTrue(feature.hitTest(STAGE, worldAt(minX + 2, minY + 50)));
+      });
+
+      it('never hits a polygon that\'s hidden, not allowed to be interactive, or being drawn', () => {
+        const [minX, minY] = feature.geometry.local.extent.min;
+        const inside = worldAt(minX + 50, minY + 50);
+        feature.visible = false;
+        assert.isFalse(feature.hitTest(STAGE, inside));
+        feature.visible = true;
+        feature.allowInteraction = false;
+        assert.isFalse(feature.hitTest(STAGE, inside));
+        feature.allowInteraction = true;
+        feature.setClass('drawing');
+        assert.isFalse(feature.hitTest(STAGE, inside));
+      });
+    });
+
+    // The glow of a hovered or highlighted polygon is a filter on its container, so its
+    // outlines are drawn there while it glows. Its fill stays in the batch.
+    describe('a polygon that glows', () => {
+      it('draws its outlines itself meanwhile, and goes back to the batch after', () => {
+        drawAt(16);
+        const { fillItem } = feature;
+        const ring = feature.ringItems[0];
+        assert.isFalse(feature.drawsInContainer());
+
+        feature.setClass('hover');
+        assert.isTrue(feature.drawsInContainer());
+        feature.update(viewportAt(16));
+        assert.isOk(feature.strokes);
+        assert.isAbove(feature.strokes.children[0].strokeMesh.vertexCount, 0);
+        assert.isFalse(feature.fill.visible, 'no fill of its own');
+        assert.lengthOf(feature.container.filters, 1);
+        assert.isTrue(fillItem.visible, 'the fill stays in its batch');
+        assert.isFalse(ring.visible);
+
+        feature.unsetClass('hover');
+        feature.update(viewportAt(16));
+        assert.isNull(feature.strokes);
+        assert.isNull(feature.fill);
+        assert.isTrue(ring.visible);
+        assert.strictEqual(feature.ringItems[0], ring);
+        assert.isFalse(feature.drawsInContainer());
+      });
+
+      it('doesn\'t show its outlines in the batch when it\'s hidden and shown while it glows', () => {
+        drawAt(16);
+        feature.setClass('highlight');
+        feature.update(viewportAt(16));
+        feature.visible = false;
+        feature.visible = true;
+        assert.isFalse(feature.ringItems[0].visible);
+        assert.isTrue(feature.fillItem.visible);
+      });
+    });
+
+    it('says where it\'s drawn: its fill\'s batch and its order there, or its own container', () => {
+      feature.container.zIndex = -676;
+      assert.strictEqual(feature.sceneContainer, feature.container);    // not drawn yet
+      drawAt(16);
+      assert.strictEqual(feature.sceneContainer, fills);
+      assert.strictEqual(feature.sceneOrder, -676);
+    });
+
+    it('draws itself again without batches, or with dashes that a batch can\'t draw', () => {
+      drawAt(16);
+      feature.fillBatch = null;
+      assert.isTrue(feature.drawsInContainer());
+      drawAt(16);
+      assert.strictEqual(fills.size, 0);
+      assert.strictEqual(outlines.size, 0);
+      assert.isOk(feature.fill);
+      assert.isOk(feature.strokes);
+
+      feature.fillBatch = fills;
+      drawAt(16);
+      assert.isNull(feature.fill);
+      assert.strictEqual(fills.size, 1);
+
+      feature.style = { fill: { color: 0xff0000, type: 'full' }, stroke: { dash: [1, 2, 3, 4, 5, 6] } };
+      assert.isTrue(feature.drawsInContainer());
+      feature.update(viewportAt(16));
+      assert.strictEqual(fills.size, 0);
+      assert.isOk(feature.fill);
+    });
+
+    it('tells its batches that it will draw in them, and leaves them when it\'s destroyed', () => {
+      assert.strictEqual(fills.users, 1);
+      assert.strictEqual(outlines.users, 1);
+      drawAt(16);
+      feature.destroy();
+      assert.strictEqual(fills.size, 0);
+      assert.strictEqual(outlines.size, 0);
+      assert.strictEqual(fills.users, 0);
+      assert.strictEqual(outlines.users, 0);
+    });
+
+    it('gets its halo as without batches', () => {
+      feature.setClass('select');
+      drawAt(16);
+      assert.isOk(feature.halo);
+      assert.isAbove(feature.halo.children.length, 0);
+    });
+  });
+
 
   it('frees everything when destroyed, at any level of detail', () => {
     drawAt(17);

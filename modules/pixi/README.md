@@ -68,7 +68,9 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 | File | Description |
 |------|-------------|
 | `LineMesh.ts` | Draws one line from a stroke mesh: an area's outline, a halo, the lasso, a line of a layer that doesn't batch its lines |
-| `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes |
+| `VertexBatch.ts` | The base of the batches: many things in one draw call, each a run of vertices in its buffers |
+| `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes, and the outlines of its areas |
+| `FillBatch.ts` | Draws the fills of many areas in one draw call, with their patterns from one atlas texture |
 | `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |

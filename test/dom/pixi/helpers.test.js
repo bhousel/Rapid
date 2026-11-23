@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode` and `interactiveChildren`, as a renderer does in the app
 import { LineMesh } from '../../../modules/pixi/lib/LineMesh.ts';
-import { containerHit, drawHalo, drawOrder, drawRings, featureOrder } from '../../../modules/pixi/helpers.ts';
+import { containerHit, drawHalo, drawOrder, drawRings, featureOrder, ringsContain, triangulate } from '../../../modules/pixi/helpers.ts';
 
 
 describe('pixi helpers', () => {
@@ -227,6 +227,77 @@ describe('pixi helpers', () => {
       it('goes by the scene first, whatever the orders are', () => {
         assert.isAbove(featureOrder(feature(a2, 0), feature(a1, 100)), 0);
       });
+    });
+  });
+
+  // The triangles that fill polygons, for a `FillBatch`
+  describe('triangulate', () => {
+    // The area that triangles cover
+    function areaOf({ positions, indices }) {
+      let area = 0;
+      for (let i = 0; i < indices.length; i += 3) {
+        const [a, b, c] = [indices[i], indices[i + 1], indices[i + 2]];
+        area += Math.abs((positions[b * 2] - positions[a * 2]) * (positions[c * 2 + 1] - positions[a * 2 + 1]) -
+          (positions[c * 2] - positions[a * 2]) * (positions[b * 2 + 1] - positions[a * 2 + 1])) / 2;
+      }
+      return area;
+    }
+
+    const square = [0, 0, 10, 0, 10, 10, 0, 10, 0, 0];
+    const hole = [4, 4, 6, 4, 6, 6, 4, 6, 4, 4];
+
+    it('fills a polygon with triangles between its own points', () => {
+      const result = triangulate([{ outer: square, holes: [] }]);
+      assert.deepEqual(Array.from(result.positions), square);
+      assert.strictEqual(result.indices.length % 3, 0);
+      assert.closeTo(areaOf(result), 100, 1e-9);
+      assert.isBelow(Math.max(...result.indices), 5);
+    });
+
+    it('leaves the holes out', () => {
+      const result = triangulate([{ outer: square, holes: [hole] }]);
+      assert.lengthOf(result.positions, 20);
+      assert.closeTo(areaOf(result), 96, 1e-9);
+    });
+
+    it('fills several polygons, each with its own corners', () => {
+      const other = square.map((n, i) => (i % 2 === 0) ? n + 100 : n);
+      const result = triangulate([{ outer: square, holes: [hole] }, { outer: other, holes: [] }]);
+      assert.lengthOf(result.positions, 30);
+      assert.closeTo(areaOf(result), 196, 1e-9);
+      const second = Array.from(result.indices).filter(index => index >= 10);
+      assert.isAbove(second.length, 0);
+      assert.strictEqual(result.positions[10 * 2], 100);
+    });
+
+    it('returns no triangles for a polygon that has no area', () => {
+      const result = triangulate([{ outer: [0, 0, 10, 0, 0, 0], holes: [] }]);
+      assert.lengthOf(result.indices, 0);
+    });
+  });
+
+
+  describe('ringsContain', () => {
+    const square = [0, 0, 10, 0, 10, 10, 0, 10, 0, 0];
+    const hole = [4, 4, 6, 4, 6, 6, 4, 6, 4, 4];
+
+    it('is true inside a ring, and false outside it', () => {
+      assert.isTrue(ringsContain([square], 5, 5));
+      assert.isTrue(ringsContain([square], 0.1, 9.9));
+      assert.isFalse(ringsContain([square], 11, 5));
+      assert.isFalse(ringsContain([square], 5, -1));
+    });
+
+    it('is false in a hole, whichever way the rings go around', () => {
+      assert.isFalse(ringsContain([square, hole], 5, 5));
+      assert.isTrue(ringsContain([square, hole], 2, 2));
+      const reversed = [];
+      for (let i = hole.length - 2; i >= 0; i -= 2) reversed.push(hole[i], hole[i + 1]);
+      assert.isFalse(ringsContain([square, reversed], 5, 5));
+    });
+
+    it('is false for no rings', () => {
+      assert.isFalse(ringsContain([], 5, 5));
     });
   });
 });

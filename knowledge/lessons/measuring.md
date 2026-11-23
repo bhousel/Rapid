@@ -34,7 +34,7 @@ How to measure frames, memory and garbage without fooling yourself. See also `de
   draw calls and a few ms of APP that had nothing to do with the change. The first lines of the
   output say which layers and filters were on: read them before comparing. Better, compare in
   one build, alternating: `--setup snippet.js` runs in the page before each place, to switch
-  what's compared (`layer.batchLines = false; layer.reset();`) and to set what's shown.
+  what's compared (`layer.useBatches = false; layer.reset();`) and to set what's shown.
 - **A checksum of a typed array has to leave out its huge values.** A sum over a batch's floats
   included a "never" of 3e38 in most vertices, and nothing else that changed could move it: the
   test passed whatever happened to the array.

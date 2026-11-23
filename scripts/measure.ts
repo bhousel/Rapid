@@ -41,7 +41,7 @@ import { parseArgs, styleText } from 'node:util';
 //
 // With `--setup`, a snippet runs in the page first (as with `bun run cdp eval`: an async function
 // body, with `rapidContext` there): before each place with `--fresh`, otherwise once. Use it to
-// compare two ways of drawing in one build, e.g. `rapidContext.systems.gfx.scene.layers.get('osm').batchLines = false;`,
+// compare two ways of drawing in one build, e.g. `rapidContext.systems.gfx.scene.layers.get('osm').useBatches = false;`,
 // or to make sure of what's shown (`…scene.enableLayers('labels')`): the tab's own settings
 // (layers, filters, area fill) apply to every run that doesn't set them.
 //

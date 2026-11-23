@@ -1,15 +1,18 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { GlowFilter } from 'pixi-filters';
+import { LineBatch } from './lib/LineBatch.ts';
 import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
-import { drawHalo } from './helpers.ts';
-import { geomAreaBand, geomStrokeMesh, geomStrokeOutline } from '../geo/index.ts';
+import { drawHalo, ringsContain, triangulate } from './helpers.ts';
+import { geomAreaBand, geomStrokeContains, geomStrokeMesh, geomStrokeOutline } from '../geo/index.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { BandPolygon } from '../geo/band.ts';
+import type { FillBatch, FillBatchItem } from './lib/FillBatch.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
+import type { LineBatchItem } from './lib/LineBatch.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -26,7 +29,17 @@ const HIT_PADDING = 10;   // pixels around an outline's width that still hit it,
  * There's no stencil mask. Most polygons are too narrow to have a middle that the band leaves
  * empty, and are filled whole (see `_bandFor`, and `design/graphics-system.md` section 15).
  *
+ * A layer that draws many polygons gives the feature two batches: a `FillBatch` for its fill and
+ * a `LineBatch` for its outlines (the layer draws every fill, then every outline). The fill is
+ * then a run of triangles in its batch, worked out once, and each ring's outline a run of
+ * vertices in the other. The feature has nothing in its container, and needn't be in the scene
+ * (`drawsInContainer()`). A zoom changes nothing in a batch, unless the polygon gets or loses
+ * its middle. A hovered or highlighted polygon draws its outlines itself while it is, under
+ * the glow's filter; its fill stays in the batch.
+ *
  * Properties available:
+ * - `fillBatch`   - `FillBatch` that draws the fill, if the layer gave it one
+ * - `strokeBatch` - `LineBatch` that draws the outlines, if the layer gave it one
  * - `lowRes`     - `PIXI.Sprite` for a replacement graphic to display at low resolution
  * - `fill`       - `PIXI.Graphic` for the fill Graphics (below)
  * - `strokes`    - `PIXI.Container` for the outlines (above): a `LineMesh` for each ring
@@ -53,6 +66,20 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   protected _bandWidth: number;
   /** The polygon that the stroke meshes of the outlines were built from */
   protected _meshPart: GeometryPart | null;
+  /** The batch that the layer gave this feature to draw its fill in (see `fillBatch`) */
+  protected _fillBatch: FillBatch | null;
+  /** The batch that the layer gave this feature to draw its outlines in (see `strokeBatch`) */
+  protected _strokeBatch: LineBatch | null;
+  /** The fill in its batch, if a batch draws it */
+  protected _fillItem: FillBatchItem | null;
+  /** The outlines in their batch, one for each ring, if a batch draws them */
+  protected _ringItems: LineBatchItem[];
+  /** The polygon that the fill and the outlines in the batches were built from */
+  protected _batchPart: GeometryPart | null;
+  /** The band that the fill in the batch is (see `_bandFor`), or `null` if it's the whole polygon */
+  protected _batchBand: BandPolygon[] | null;
+  /** The pattern that the fill in the batch has (its number in the atlas), or -1 if there's no fill there */
+  protected _batchPattern: number;
 
 
   /**
@@ -67,6 +94,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._band = null;
     this._bandPart = null;
     this._bandWidth = 0;
+    this._fillBatch = null;
+    this._strokeBatch = null;
+    this._fillItem = null;
+    this._ringItems = [];
+    this._batchPart = null;
+    this._batchBand = null;
+    this._batchPattern = -1;
 
     // The Pixi objects are made when a level of detail first needs them (see `update`): of
     // 36,000 polygons around a view of Užice at z16, 1,900 are drawn in full, 12,000 as a
@@ -107,11 +141,200 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.debugSurround = null;
     }
 
+    this._dropItems();
+    this.fillBatch = null;
+    this.strokeBatch = null;
+
     this._meshPart = null;
     this._band = null;
     this._bandPart = null;
 
     super.destroy();
+  }
+
+
+  /**
+   * The batch to draw the fill in, with the other polygons of the layer, or `null` for the
+   * polygon to draw itself. The layer sets it before `update()`, with `strokeBatch`. The
+   * feature may be drawn some frames later, so a batch counts the features it was given to.
+   * @return The batch, or `null`
+   */
+  public get fillBatch(): FillBatch | null {
+    return this._fillBatch;
+  }
+  /**
+   * @param val - The batch to draw the fill in from the next `update()`, or `null` for none
+   */
+  public set fillBatch(val: FillBatch | null) {
+    if (val === this._fillBatch) return;
+    if (this._fillBatch) this._fillBatch.users--;
+    if (val) val.users++;
+    this._fillBatch = val;
+  }
+
+
+  /**
+   * The batch to draw the outlines in (see `fillBatch`). The layer draws its outlines' batch
+   * after its fills' batch, so every outline is over every fill.
+   * @return The batch, or `null`
+   */
+  public get strokeBatch(): LineBatch | null {
+    return this._strokeBatch;
+  }
+  /**
+   * @param val - The batch to draw the outlines in from the next `update()`, or `null` for none
+   */
+  public set strokeBatch(val: LineBatch | null) {
+    if (val === this._strokeBatch) return;
+    if (this._strokeBatch) this._strokeBatch.users--;
+    if (val) val.users++;
+    this._strokeBatch = val;
+  }
+
+
+  /**
+   * The fill in its batch, if a batch draws it
+   * @return The batch's item, or `null`
+   * @readonly
+   */
+  public get fillItem(): FillBatchItem | null {
+    return this._fillItem;
+  }
+
+
+  /**
+   * The outlines in their batch, one for each ring, if a batch draws them
+   * @return The batch's items
+   * @readonly
+   */
+  public get ringItems(): readonly LineBatchItem[] {
+    return this._ringItems;
+  }
+
+
+  /**
+   * Whether the Feature is currently visible
+   * @return `true` if the feature is currently visible
+   */
+  public override get visible(): boolean {
+    return super.visible;
+  }
+  /**
+   * A polygon that batches draw is shown and hidden there too. (Its outlines aren't shown
+   * there while the polygon draws them itself: see `drawsInContainer`.)
+   * @param val - `true` to show the feature, `false` to hide it
+   */
+  public override set visible(val: boolean) {
+    super.visible = val;
+    if (this._fillItem) this._fillItem.batch?.setVisible(this._fillItem, val);
+    const showRings = val && !this.strokes;
+    for (const item of this._ringItems) {
+      item.batch?.setVisible(item, showRings);
+    }
+  }
+
+
+  /**
+   * Whether batches draw this polygon: the layer gave it both, and the outlines' batch can draw
+   * its dashes.
+   * @return `true` if batches draw it
+   */
+  protected _isBatched(): boolean {
+    const fillBatch = this._fillBatch;
+    const strokeBatch = this._strokeBatch;
+    if (!fillBatch || fillBatch.destroyed || !strokeBatch || strokeBatch.destroyed) return false;
+    return LineBatch.canDraw(this._style.stroke?.dash);
+  }
+
+
+  /**
+   * Whether this polygon draws something in its own container, and so has to be in the scene
+   * (the layer asks before `update()`, to know whether to give it a place there).
+   * A polygon whose fill and outlines are in batches draws nothing itself, unless it's hovered
+   * or highlighted: the glow is a filter on the container, so the outlines are drawn there,
+   * by meshes of its own, while it is.
+   * @return `true` if its container has to be in the scene
+   */
+  public drawsInContainer(): boolean {
+    if (!this._isBatched()) return true;
+    return this._classes.has('hover') || this._classes.has('highlight');
+  }
+
+
+  /**
+   * Whether the pointer is over this polygon: within a few pixels of one of its rings, or in
+   * its fill (the band, for a partial fill; nothing, in wireframe mode). For a polygon that
+   * batches draw this needs nothing of Pixi's; one that draws itself is asked as Pixi would.
+   * @param point - The pointer's place in the stage's coordinates
+   * @param world - The same place in world coordinates
+   * @return `true` if the pointer hits it
+   */
+  public override hitTest(point: PIXI.PointData, world: PIXI.PointData): boolean {
+    if (!this._fillItem && !this._ringItems.length) return super.hitTest(point, world);
+    if (!this.visible || !this._allowInteraction || this._classes.has('drawing')) return false;
+
+    const context = this.context;
+    const map = context.systems.map;
+    const local = this._geom?.local;
+    if (!local) return false;
+
+    const position = this.container.position;    // the polygon's coordinates start here, in the world's
+    const x = world.x - position.x;
+    const y = world.y - position.y;
+    const reach = this.hitReach * (2 ** (WORLD_ZOOM - context.viewport.transform.zoom));
+    const [minX, minY] = local.extent.min;
+    const [maxX, maxY] = local.extent.max;
+    if (x < minX - reach || x > maxX + reach || y < minY - reach || y > maxY + reach) return false;
+
+    const rings = local.flat as number[][];
+    for (const ring of rings) {
+      if (geomStrokeContains(ring, reach, x, y, true)) return true;
+    }
+    if (map?.wireframeMode) return false;    // no fill to hit
+
+    const band = this._batchBand;
+    if (!band) return ringsContain(rings, x, y);
+    for (const polygon of band) {
+      if (ringsContain([polygon.outer], x, y) && !ringsContain(polygon.holes, x, y)) return true;
+    }
+    return false;
+  }
+
+
+  /**
+   * The mesh in the scene that draws this polygon's fill, if a batch does: where the polygon is
+   * drawn among the others is where that batch is, and the polygon's `sceneOrder` in it.
+   * @return The batch, or this feature's own container
+   */
+  public override get sceneContainer(): PIXI.Container {
+    const item = this._fillItem;
+    return (item?.batch && item.visible) ? item.batch : this.container;
+  }
+
+
+  /**
+   * Where this polygon is drawn among the others that its batch draws.
+   * @return The order of its fill in the batch (0 if no batch draws it)
+   */
+  public override get sceneOrder(): number {
+    const item = this._fillItem;
+    return (item?.batch && item.visible) ? item.order : 0;
+  }
+
+
+  /**
+   * Takes the fill and the outlines out of the batches that draw them, if any do.
+   */
+  protected _dropItems(): void {
+    this._fillItem?.batch?.remove(this._fillItem);
+    this._fillItem = null;
+    for (const item of this._ringItems) {
+      item.batch?.remove(item);
+    }
+    this._ringItems.length = 0;
+    this._batchPart = null;
+    this._batchBand = null;
+    this._batchPattern = -1;
   }
 
 
@@ -191,6 +414,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       texture = PIXI.Texture.WHITE;
     }
 
+    const isBatched = this._isBatched();
+    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
+
     // Cull really tiny shapes
     if (screenW < 4 && screenH < 4) {  // so tiny
       this.lod = 0;
@@ -198,8 +424,31 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this._dropLowRes();
       this._dropShapes();
 
+    // Batches draw it: the fill and the outlines as they are, at any size. (A zoom changes
+    // nothing there, unless the polygon gets or loses its middle, or its pattern.)
+    } else if (isBatched) {
+      this.lod = (screenW < 20 && screenH < 20) ? 1 : 2;
+      this.visible = true;
+      this._dropLowRes();
+      const patternNumber = (texture === PIXI.Texture.WHITE) ? 0 : textureManager.getPatternNumber(pattern);
+      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe);
+
+      // A polygon that glows draws its outlines itself meanwhile, under the glow's filter, and
+      // hides the ones in the batch. Its fill stays where it is.
+      if (hasGlow) {
+        this._needShapes();
+        this._drawShapes(viewport, texture, textureMatrix, doFullFill, true);
+      } else {
+        this._dropShapes();
+      }
+      const showRings = !hasGlow;
+      for (const item of this._ringItems) {
+        item.batch?.setVisible(item, showRings);
+      }
+
     // Very small, swap with lowRes sprite
     } else if (local.surround && (screenW < 20 && screenH < 20)) {
+      this._dropItems();
       this.lod = 1;
       this.visible = true;
       this._dropShapes();
@@ -243,15 +492,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.hitReach = Math.hypot(srWidth, srHeight) / 2 / localScale;
 
     } else {
+      this._dropItems();
       this.lod = 2;
       this.visible = true;
       this._dropLowRes();
       this._needShapes();
-    }
-
-    // Redraw the shapes. (Only the full level of detail has any.)
-    if (this.lod === 2) {
-      this._drawShapes(viewport, texture, textureMatrix, doFullFill);
+      this._drawShapes(viewport, texture, textureMatrix, doFullFill);   // (only the full level of detail has shapes)
     }
 
     // Debug surrounding rectangle
@@ -269,6 +515,92 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._styleDirty = false;
     this.updateHalo(viewport);
     this.scene.featureChanged(this);
+  }
+
+
+  /**
+   * Draws the fill and the outlines in their batches. The fill is the polygon's triangles (or
+   * its band's, for a partial fill that leaves a middle), worked out when the polygon or the
+   * band changes; each ring's outline is a stroke mesh, built when the polygon changes.
+   * After a zoom alone, this writes nothing unless the band or the pattern is another one.
+   * @param scale - How many units of the polygon's coordinates a pixel is
+   * @param doFullFill - Whether to fill the whole polygon, not only along its edge
+   * @param pattern - The pattern to fill with (its number in the atlas), 0 for none
+   * @param isWireframe - Whether wireframe mode is active
+   */
+  protected _drawBatched(scale: number, doFullFill: boolean, pattern: number, isWireframe: boolean): void {
+    const fillBatch = this._fillBatch!;
+    const strokeBatch = this._strokeBatch!;
+    const part = this._geom!;
+    const flat = part.local!.flat as number[][];
+    const style = this._style;
+    const origin = this.container.position;
+    const order = this.container.zIndex;
+    const isSame = (this._batchPart === part);
+    const isRestyled = !this.onlyTransformDirty;
+    const band = doFullFill ? null : this._bandFor(PARTIALFILLWIDTH * scale);
+    const color = style.fill?.color ?? 0xaaaaaa;
+
+    // FILL
+    const fillItem = this._fillItem;
+    const fillInBatch = (fillItem?.batch === fillBatch);
+    if (!fillItem || !fillInBatch || !isSame || band !== this._batchBand) {
+      const triangles = triangulate(band ?? [{ outer: flat[0], holes: flat.slice(1) }]);
+      const dx = origin.x - fillBatch.position.x;
+      const dy = origin.y - fillBatch.position.y;
+      const fillStyle = { color: color, alpha: style.fill?.opacity ?? 0.3, pattern: pattern };
+      if (fillItem && fillInBatch) {
+        fillBatch.setFill(fillItem, triangles.positions, triangles.indices, dx, dy);
+        fillBatch.setStyle(fillItem, fillStyle);
+        fillBatch.setOrder(fillItem, order);
+      } else {
+        fillItem?.batch?.remove(fillItem);
+        this._fillItem = fillBatch.add(triangles.positions, triangles.indices, dx, dy, fillStyle, order);
+        if (!this.visible) fillBatch.setVisible(this._fillItem, false);
+      }
+      this._batchBand = band;
+      this._batchPattern = pattern;
+
+    } else if (isRestyled || pattern !== this._batchPattern) {
+      fillBatch.setStyle(fillItem, { color: color, alpha: style.fill?.opacity ?? 0.3, pattern: pattern });
+      fillBatch.setOrder(fillItem, order);
+      this._batchPattern = pattern;
+    }
+
+    // OUTLINES
+    // (Their width isn't narrowed at lower zooms as a line's is: the least width is the width.)
+    const lineWidth = style.fill?.width || 2;
+    const ringItems = this._ringItems;
+    for (let i = 0; i < flat.length; i++) {
+      const item = ringItems[i];
+      const inBatch = (item?.batch === strokeBatch);
+      if (item && inBatch && isSame && !isRestyled) continue;    // as it is
+
+      const lineStyle = { width: lineWidth, minWidth: lineWidth, color: color, alpha: 1, dash: style.stroke?.dash ?? null };
+      if (item && inBatch && isSame) {
+        strokeBatch.setStyle(item, lineStyle);
+        strokeBatch.setOrder(item, order);
+      } else {
+        const strokeMesh = geomStrokeMesh(flat[i], { closed: true, cap: 'butt', join: 'miter' });
+        const dx = origin.x - strokeBatch.position.x;
+        const dy = origin.y - strokeBatch.position.y;
+        if (item && inBatch) {
+          strokeBatch.setStroke(item, strokeMesh, dx, dy);
+          strokeBatch.setStyle(item, lineStyle);
+          strokeBatch.setOrder(item, order);
+        } else {
+          item?.batch?.remove(item);
+          ringItems[i] = strokeBatch.add(strokeMesh, dx, dy, lineStyle, order);
+        }
+      }
+    }
+    while (ringItems.length > flat.length) {   // a ring fewer than before
+      const item = ringItems.pop()!;
+      item.batch?.remove(item);
+    }
+
+    this._batchPart = part;
+    this.hitReach = ((isWireframe ? 1 : lineWidth) + HIT_PADDING) / 2;
   }
 
 
@@ -350,8 +682,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param texture - The fill's pattern, or `PIXI.Texture.WHITE` for none
    * @param textureMatrix - How the pattern is laid out
    * @param doFullFill - Whether to fill the whole polygon, not only along its edge
+   * @param outlinesOnly - Whether to draw no fill here (a batch draws it)
    */
-  protected _drawShapes(viewport: Viewport, texture: PIXI.Texture, textureMatrix: PIXI.Matrix, doFullFill: boolean): void {
+  protected _drawShapes(viewport: Viewport, texture: PIXI.Texture, textureMatrix: PIXI.Matrix, doFullFill: boolean, outlinesOnly: boolean = false): void {
     const context = this.context;
     const map = context.systems.map;
     const isWireframe = !!map?.wireframeMode;
@@ -366,7 +699,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const fill = this.fill!;
     const strokes = this.strokes!;
 
-    fill.visible = !isWireframe;
+    fill.visible = !isWireframe && !outlinesOnly;
     strokes.visible = true;
 
     // In wireframe there's no fill: it holds no geometry then.

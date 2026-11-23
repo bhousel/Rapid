@@ -196,3 +196,88 @@ export function featureOrder(a: AbstractPixiFeature, b: AbstractPixiFeature): nu
   if (containerA !== containerB) return drawOrder(containerA, containerB);
   return a.sceneOrder - b.sceneOrder;
 }
+
+
+/** A polygon to triangulate: an outer ring and the holes in it, each as `[x, y, x, y, …]` */
+export interface RingPolygon {
+  outer: ArrayLike<number>;
+  holes: ArrayLike<number>[];
+}
+
+/** The triangles that fill some polygons: their corners, and three indices of corners for each */
+export interface Triangles {
+  positions: Float32Array;
+  indices: Uint16Array | Uint32Array;
+}
+
+
+/**
+ * Works out the triangles that fill polygons, for a `FillBatch`. (With `earcut`, which Pixi
+ * uses for its own fills and exports.) The corners are the polygons' own points, in order, so
+ * the result has as many as the rings have points.
+ * @param polygons - The polygons, each with its holes
+ * @return The triangles of all of them
+ */
+export function triangulate(polygons: RingPolygon[]): Triangles {
+  let numFloats = 0;
+  for (const polygon of polygons) {
+    numFloats += polygon.outer.length;
+    for (const hole of polygon.holes) {
+      numFloats += hole.length;
+    }
+  }
+
+  const positions = new Float32Array(numFloats);
+  const all: number[] = [];
+  let first = 0;    // the first corner of the polygon that's being worked on
+
+  for (const polygon of polygons) {
+    const coords: number[] = [];
+    const holeStarts: number[] = [];
+    const addRing = (ring: ArrayLike<number>): void => {
+      const start = coords.length;
+      for (let i = 0; i < ring.length; i++) {
+        coords[start + i] = ring[i];
+      }
+    };
+    addRing(polygon.outer);
+    for (const hole of polygon.holes) {
+      holeStarts.push(coords.length / 2);
+      addRing(hole);
+    }
+
+    positions.set(coords, first * 2);
+    for (const index of PIXI.earcut(coords, holeStarts, 2)) {
+      all.push(index + first);
+    }
+    first += coords.length / 2;
+  }
+
+  const indices = (first < 65536) ? new Uint16Array(all) : new Uint32Array(all);
+  return { positions: positions, indices: indices };
+}
+
+
+/**
+ * Whether a point is inside rings, by the even-odd rule: inside an outer ring and not in a hole
+ * of it, whichever way the rings go around.
+ * @param rings - The rings, each as `[x, y, x, y, …]`
+ * @param x - The point
+ * @param y - The point
+ * @return `true` if it's inside
+ */
+export function ringsContain(rings: ArrayLike<number>[], x: number, y: number): boolean {
+  let inside = false;
+  for (const ring of rings) {
+    const n = ring.length;
+    for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
+      const yi = ring[i + 1];
+      const yj = ring[j + 1];
+      if ((yi > y) !== (yj > y) && x < (ring[j] - ring[i]) * (y - yi) / (yj - yi) + ring[i]) {
+        inside = !inside;
+      }
+    }
+  }
+  return inside;
+}
+

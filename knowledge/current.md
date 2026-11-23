@@ -48,26 +48,27 @@ order of work, Bryan's decisions and the measurements). Done: steps 1 to 6.
 - A line hit by its distance from the pointer (`LineHitArea`); `lineToPoly()` and `DashLine` gone.
 - Partial fills as bands of real geometry (`modules/geo/band.ts`, with `clipper2-ts`): no stencil
   masks, 44 to 76% fewer draw calls in the three places, no more time on a zoom.
-- Step 6 (the first two parts are committed, `6860f8d1d`; the rest isn't yet, Nov 23):
+- Step 6 (committed, `6860f8d1d` and `9edfa2381`):
   - The OSM layer finds its features under the pointer through the spatial index
     (`PixiLayerOsm.hitTest()`, `PixiScene.hitTest()`): a pointer event in Užice is 0.07 ms of
     hit test where Pixi's walk took 8.
   - Its lines are drawn in two batches a level (`modules/pixi/lib/LineBatch.ts`, a `Mesh` with
-    our own shader): every casing, then every stroke (Bryan's decision). 16 batches in Užice.
-    A zoom changes nothing in a batch.
+    our own shader): every casing, then every stroke (Bryan's decision; he likes the look).
   - A line that its batches draw isn't in Pixi's scene. A hovered line draws itself meanwhile
     (its glow is a filter on its container), and a line with oneway arrows stays in the scene.
-  - The first two parts took the glow off hovered lines, and were committed that way. Fixed in
-    the rest; the hover e2e test checks the glow now.
+- Step 8, the first part (not committed yet, Nov 23): areas in two batches, every fill
+  (`lib/FillBatch.ts`) and then every outline. A fill's triangles are worked out once; patterns
+  come from one atlas texture. Areas aren't in the scene. **Outlines are now over every fill,
+  which Bryan hasn't seen.** Also: Pixi's events and system tickers are off (Bryan asked).
 
-Next: step 7 (building in a worker) or step 8 (polygons and points), by what a profile says.
-Lines are 1% of a zoom's work in Užice now; the rest is Pixi's render groups, polygons,
-points and labels. A fill mesh of our own (step 8's first part) is the likely next thing: a
-`Graphics` fill is triangulated again at every zoom. Small things left for lines are in the doc
-("What's left for lines": oneway arrows in the batch, the `Container` itself). Bryan (Nov 23):
-fewer draw calls are a result in themselves, since the M4 we measure on hides their cost;
-numbers from other devices are on the backlog. `renderer=canvas` is blank since the lines
-became meshes, and stays that way (`quirks.md`).
+Next, in Bryan's order (Nov 23): the rest of step 8, which is points (49,000 in Užice are
+121,000 display objects and 57 draw calls; a batch of textured quads with pixel sizes is the
+likely shape, and the labels and the avoid grid read points' containers today). Then step 9:
+oneway arrows and sided markers in the stroke shader (they're 103 of Seattle's 160 draw calls).
+Step 7 (a worker) is probably unnecessary (Bryan). Bryan (Nov 23): fewer draw calls are a result
+in themselves, since the M4 we measure on hides their cost; numbers from other devices are on
+the backlog. `renderer=canvas` is blank since the lines became meshes, and stays that way
+(`quirks.md`).
 
 Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
 

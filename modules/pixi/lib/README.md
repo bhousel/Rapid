@@ -11,7 +11,9 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 | File | Description |
 |------|-------------|
 | `LineMesh.ts` | A Pixi `Mesh` that draws a line from its stroke mesh (`geomStrokeMesh()` in `modules/geo/`): a new width moves the vertices it has. The outlines of areas, halos, the lasso, and the lines of layers that don't batch theirs |
-| `LineBatch.ts` | A Pixi `Mesh` with a shader of its own that draws many lines in one draw call: each line is a run of vertices in its buffers, and the shader works out the widths, so a zoom changes nothing in it. The OSM layer has two for each level: its casings, and its strokes |
+| `VertexBatch.ts` | The base of the batches: a Pixi `Mesh` with a shader of its own that draws many things in one draw call, each a run of vertices in its buffers. Keeps the buffers: a thing that changes in place, hiding, order, an origin that follows the view |
+| `LineBatch.ts` | A `VertexBatch` of lines: the shader works out the widths and the dashes, so a zoom changes nothing in it. The OSM layer has two for each level (its casings, and its strokes), and one for the outlines of areas |
+| `FillBatch.ts` | A `VertexBatch` of fills: each area's triangles, with its color and pattern. The shader lays the patterns out from one atlas texture. The OSM layer has one for every area's fill |
 | `AtlasAllocator.ts` | Manages texture atlas allocation, plus the `AtlasSource` texture source and its GPU upload handlers |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
 | `AvoidGrid.ts` | A grid over label space that counts what covers each cell: what labels must avoid, and the labels placed (no Pixi in it; `PixiScene` owns one) |
@@ -35,6 +37,10 @@ The OSM layer draws its lines in batches: for each level, one for every casing a
 - The vertices are 32-bit floats relative to the batch's `position`. `moveOrigin()` moves that place and keeps the lines where they are; the layer calls it when the view has gone far from it.
 - What changed is sent to the GPU once, when Pixi is about to render the batch (`onRender`).
 - The shader is in GLSL and in WGSL, in the file. A batch can draw dashes of two or four whole numbers of pixels up to 255 (`canDraw()`); a line with another pattern gets `LineMesh`es.
+
+## FillBatch
+
+The fills of the OSM layer's areas are one `FillBatch`. A fill is the corners of its triangles (`triangulate()` in [`../helpers.ts`](../helpers.ts)), with its color, opacity and pattern number in each. A partial fill's band is the same thing with other triangles. Patterns are cells of one atlas texture that `PixiTextures` draws (`FillBatch.setPatterns()`); the shader tiles them at 32 pixels on screen, upright, from the view's numbers (`FillBatch.setView()`).
 
 ## LineHitArea
 

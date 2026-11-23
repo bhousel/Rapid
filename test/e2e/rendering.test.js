@@ -267,8 +267,9 @@ test('after a zoom, draws the features again over the following frames, with the
 // - The lines are in batches (`LineBatch`), one for the casings and one for the strokes of each
 //   level: a line is a run of vertices in its batches' buffers, and the shader works out its
 //   width. A zoom changes four numbers, and nothing in a batch. The line's feature isn't in the scene.
-// - An outline is a `LineMesh`. A zoom moves the vertices it has, and builds nothing.
-test('draws lines in batches that a zoom leaves alone, and outlines as meshes that keep their vertices', async ({ page, consoleErrors }) => {
+// - Areas are in two batches too: every fill (`FillBatch`), then every outline. A zoom changes
+//   nothing in the outlines' batch, and in the fills' batch only the areas whose band changed.
+test('draws lines and areas in batches that a zoom leaves alone', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -278,17 +279,15 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
     const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
     const layer = gfx.scene.layers.get('osm');
 
-    // The lines that are drawn, and the meshes of the outlines that are
+    // The lines and the areas that are drawn
     const collect = () => {
-      const found = { lines: [], outlines: [] };
+      const found = { lines: [], polygons: [] };
       for (const feature of layer.features.values()) {
         if (!feature.visible || feature.dirty) continue;
         if (feature.type === 'LineString') {
           found.lines.push(feature);
-        } else {
-          for (const mesh of feature.strokes?.children ?? []) {
-            if (mesh?.strokeMesh?.vertexCount) found.outlines.push(mesh);
-          }
+        } else if (feature.type === 'Polygon') {
+          found.polygons.push(feature);
         }
       }
       return found;
@@ -298,7 +297,8 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
     // (A hidden line has an opacity of 0 in its vertices, and that's all that changes when it's hidden.)
     const batches = () => {
       const found = new Map();
-      for (const batch of layer.lineBatches) {
+      const outlines = layer.polygonBatches.filter(batch => batch.label === 'outlines');
+      for (const batch of [...layer.lineBatches, ...outlines]) {
         let sum = 0;
         let hiddenVertices = 0;
         for (const n of batch._floats) {
@@ -325,10 +325,8 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
     const uniforms = [...batchesBefore.keys()][0].shader.resources.lineUniforms.uniforms;
     const pixelBefore = uniforms.uPixel;
     const itemsBefore = new Map(before.lines.map(feature => [feature, [feature.casingItem, feature.strokeItem, feature.strokeItem?.first]]));
-    const was = new Map();
-    for (const mesh of before.outlines) {
-      was.set(mesh, { strokeMesh: mesh.strokeMesh, positions: mesh.geometry.positions, first: Array.from(mesh.geometry.positions.subarray(0, 4)) });
-    }
+    // Each area's fill: where it is in the fills' batch, and whether it's a band
+    const fillsBefore = new Map(before.polygons.map(feature => [feature, [feature.fillItem, feature.fillItem?.first, feature._batchBand]]));
 
     // Dashed lines: the pattern is in the last four bytes of each vertex
     const dashed = before.lines.filter(feature => {
@@ -364,18 +362,19 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
       if (feature.casingItem !== old[0] || feature.strokeItem !== old[1] || feature.strokeItem?.first !== old[2]) linesChanged++;
     }
 
-    let kept = 0;
-    let rebuilt = 0;
-    let moved = 0;
-    for (const mesh of after.outlines) {
-      const old = was.get(mesh);
-      if (!old) continue;   // (an outline that this zoom is the first to show)
-      if (mesh.strokeMesh === old.strokeMesh && mesh.geometry.positions === old.positions) {
-        kept++;
-      } else {
-        rebuilt++;
+    // A whole fill stays as it is. A band is worked out for the new zoom (its width is in pixels).
+    let fillsChanged = 0;
+    let bandsChanged = 0;
+    for (const feature of after.polygons) {
+      const old = fillsBefore.get(feature);
+      if (!old) continue;
+      const wasBand = !!old[2];
+      const isBand = !!feature._batchBand;
+      if (wasBand || isBand) {
+        if (feature._batchBand !== old[2]) bandsChanged++;
+      } else if (feature.fillItem !== old[0] || feature.fillItem.first !== old[1]) {
+        fillsChanged++;
       }
-      if (old.first.some((n, i) => n !== mesh.geometry.positions[i])) moved++;
     }
 
     return {
@@ -384,23 +383,37 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
       linesNotInBatch: before.lines.filter(feature => !feature.strokeItem?.batch).length,
       linesWithCasing: before.lines.filter(feature => feature.casingItem).length,
       dashed: dashed.length,
-      batches: batchesBefore.size,
-      levels: new Set([...batchesBefore.keys()].map(batch => batch.parent)).size,
+      batches: [...batchesBefore.keys()].filter(batch => batch.label !== 'outlines').length,
+      levels: new Set([...batchesBefore.keys()].filter(batch => batch.label !== 'outlines').map(batch => batch.parent)).size,
+      polygonBatches: layer.polygonBatches.map(batch => batch.label).sort(),
       // A line that its batches draw isn't in the scene, unless it draws something itself (oneway arrows)
       linesInScene: before.lines.filter(feature => feature.container.parent).length,
       linesDrawingThemselves: before.lines.filter(feature => feature.container.children.length > 0).length,
-      batchesDrawn: [...batchesBefore.values()].filter(batch => batch.renderable && batch.indexCount > 0).length,
+      batchesDrawn: [...batchesBefore.values()].filter(batch => batch.renderable && batch.indexCount > 0).length + 1,    // (and the fills' batch)
       batchesChanged: batchesChanged,
       moreHidden: moreHidden,
       linesHidden: before.lines.filter(feature => !feature.visible).length,
       linesChanged: linesChanged,
       pixel: [pixelBefore, uniforms.uPixel],
       meshInstructions: meshInstructions,
-      outlines: before.outlines.length,
-      outlinesNotBatched: before.outlines.filter(mesh => !mesh.batched).length,
-      kept: kept,
-      rebuilt: rebuilt,
-      moved: moved,
+      polygons: before.polygons.length,
+      polygonsInScene: before.polygons.filter(feature => feature.container.parent).length,
+      polygonsNotInBatches: before.polygons.filter(feature => !feature.fillItem?.batch || !feature.ringItems.length || feature.ringItems.some(item => !item.batch)).length,
+      polygonsWithShapes: before.polygons.filter(feature => feature.fill || feature.strokes || feature.lowRes).length,
+      bands: before.polygons.filter(feature => feature._batchBand).length,
+      // An area with a pattern has the pattern's number in its fill's vertices, if it's large enough to show one
+      patterned: before.polygons.filter(feature => feature.style.fill?.pattern).length,
+      patternsWrong: before.polygons.filter(feature => {
+        const pattern = feature.style.fill?.pattern;
+        const item = feature.fillItem;
+        if (!pattern || !item?.batch) return false;
+        const [width, height] = feature.geometry.local.extent.dimensions();
+        const isLarge = Math.min(width, height) / pixelBefore >= 32;
+        const number = item.batch._bytes[item.first * 8 + 4];
+        return number !== (isLarge ? gfx.textureManager.getPatternNumber(pattern) : 0) || (isLarge && number === 0);
+      }).map(feature => feature.id),
+      fillsChanged: fillsChanged,
+      bandsChanged: bandsChanged,
       graphicsDrawnAlone: gfx.lastRenderFrame.draw.unbatched.filter(graphic => /\/(casing|stroke\d*)$/.test(graphic.label)).length
     };
   });
@@ -414,7 +427,7 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
   // ..one for the casings and one for the strokes of each level
   expect(result.batches).toBeGreaterThan(1);
   expect(result.batches).toBe(2 * result.levels);
-  expect(result.batchesDrawn).toBe(result.batches);
+  expect(result.batchesDrawn).toBe(result.batches + 2);    // and the areas' fills and outlines
   expect(result.meshInstructions).toBe(result.batchesDrawn);
   expect(result.linesInScene).toBe(result.linesDrawingThemselves);
   // The zoom changed what a pixel is, and nothing in any batch
@@ -423,13 +436,18 @@ test('draws lines in batches that a zoom leaves alone, and outlines as meshes th
   expect(result.linesChanged).toBe(0);
   expect(result.moreHidden > 0).toBe(result.linesHidden > 0);
 
-  // The outlines: the zoom built no stroke mesh and no array, every mesh has the ones it had, with other numbers in them
-  expect(result.outlines).toBeGreaterThan(5);
-  expect(result.outlinesNotBatched).toBe(0);
+  // Every area is in the two batches of areas, with nothing of its own, and isn't in the scene
+  expect(result.polygonBatches).toEqual(['fills', 'outlines']);
+  expect(result.polygons).toBeGreaterThan(20);
+  expect(result.polygonsInScene).toBe(0);
+  expect(result.polygonsNotInBatches).toBe(0);
+  expect(result.polygonsWithShapes).toBe(0);
   expect(result.graphicsDrawnAlone).toBe(0);
-  expect(result.kept).toBeGreaterThan(5);
-  expect(result.rebuilt).toBe(0);
-  expect(result.moved).toBe(result.kept);
+  expect(result.patternsWrong).toEqual([]);
+  // The zoom left the whole fills as they were, and worked the bands out again
+  expect(result.fillsChanged).toBe(0);
+  expect(result.bands).toBeGreaterThan(0);
+  expect(result.bandsChanged).toBeGreaterThan(0);
 
   await waitForIdle(page);
   expect(consoleErrors).toEqual([]);
@@ -868,9 +886,9 @@ test('draws a point again when its icon arrives, without another pass', async ({
 
 
 // A partial fill fills a band along the inside of an area's edge. The band is geometry
-// (`geomAreaBand()`) that the area's own fill draws, so there's no stencil mask, in any area
-// fill mode. (A mask was a mesh of its own, and where pixijs#12437 and #12388 bit: Rapid#1636.)
-// An area with no middle 32 pixels from its edge is filled whole.
+// (`geomAreaBand()`): triangles in the layer's batch of fills, like a whole fill's. So there's
+// no stencil mask, in any area fill mode. (A mask was a mesh of its own, and where pixijs#12437
+// and #12388 bit: Rapid#1636.) An area with no middle 32 pixels from its edge is filled whole.
 test('draws partial fills as bands along the edge, with no stencil mask in any area fill mode', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -884,23 +902,27 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 
     const state = () => {
       const found = { filled: 0, banded: 0, whole: 0, masked: 0, wrong: [] };
+      const fills = layer.polygonBatches.find(batch => batch.label === 'fills');
+      const drawsFills = !!fills && fills.shader.resources.fillUniforms.uniforms.uWireframe === 0;
+
       for (const feature of layer.features.values()) {
-        const fill = feature.fill;
-        if (!fill || !feature.visible) continue;    // not a polygon drawn in full
-        if (fill.mask) found.masked++;
-        if (!fill.visible) continue;
+        if (feature.type !== 'Polygon' || !feature.visible || !feature.fillItem) continue;    // not a polygon that's drawn
+        if (feature.fill?.mask) found.masked++;
+        if (!feature.fillItem.visible) found.wrong.push(`${feature.id}: shown, with its fill hidden`);
+        if (!drawsFills) {    // wireframe: the shader draws no fill, and a click hits none
+          const [px, py] = feature.geometry.local.poi;
+          const at = { x: feature.container.position.x + px, y: feature.container.position.y + py };
+          if (feature.geometry.local.inradius > 2 * bandWidth && feature.hitTest({ x: 0, y: 0 }, at)) found.wrong.push(`${feature.id}: hit in its middle in wireframe`);
+          continue;
+        }
         found.filled++;
 
-        // A band has more rings cut out of it than the polygon has holes, or is in several pieces.
+        // A click in the polygon's middle (the point furthest from its edge) hits a whole fill, and not a band.
         const local = feature.geometry.local;
-        const context = fill.context;
-        let cuts = 0;
-        for (const instruction of context.instructions) {
-          cuts += instruction.data.hole?.shapePath.shapePrimitives.length ?? 0;
-        }
-        const isBand = (context.instructions.length > 1 || cuts > local.flat.length - 1);
-        const [x, y] = local.poi;    // the point furthest from the polygon's edge
-        const hitsMiddle = context.containsPoint({ x: x, y: y });
+        const [x, y] = local.poi;
+        const world = { x: feature.container.position.x + x, y: feature.container.position.y + y };
+        const isBand = !!feature._batchBand;
+        const hitsMiddle = feature.hitTest({ x: 0, y: 0 }, world);
         if (isBand) {
           found.banded++;
           // (The polygon's `inradius` may be 1 short of the truth.)
@@ -955,8 +977,10 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 // batched. A mesh that crosses that line in a frame where its tile's render group is rebuilt made
 // Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`), until
 // something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
-// always batched, so crossing the line changes nothing. (An area's outline is one; the OSM
-// layer's lines are in a `LineBatch`, which has a shader of its own and is never batched.)
+// always batched, so crossing the line changes nothing. (Halos, the lasso, a hovered feature and
+// the lines of the other layers are `LineMesh`es. The OSM layer's lines and outlines are in
+// `LineBatch`es, which have a shader of their own and are never batched by Pixi: the test
+// turns those off to get an outline's `LineMesh` in a tile.)
 test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -978,7 +1002,15 @@ test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its ti
       return Rapid.geomStrokeMesh(coords);
     };
 
+    // (With batches off, an area's outline is a `LineMesh` in its feature's container, in its tile.)
     const layer = scene.layers.get('osm');
+    layer.useBatches = false;
+    layer.reset();
+    gfx.immediateRedraw();
+    await drawFrame();
+    while (gfx.pending) {
+      await nextFrame();
+    }
     const feature = [...layer.features.values()].find(feature => feature.visible && feature.strokes?.children[0]?.strokeMesh?.vertexCount);
     if (!feature) return { found: false };
 

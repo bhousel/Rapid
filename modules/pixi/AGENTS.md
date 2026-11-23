@@ -12,7 +12,9 @@ better than memory does, and it matches the installed version.
 
 The skill is written for a typical Pixi app. Rapid departs from that on purpose in a few places. Where the
 skill and Rapid disagree, follow Rapid, and don't "fix" these:
-- **No Pixi ticker.** `GraphicsSystem` destroys the `Application` ticker; `SchedulerSystem` runs the frame
+- **No Pixi ticker.** `GraphicsSystem` destroys the `Application` ticker and stops Pixi's shared and
+  system tickers (it gives the system ticker a turn once a second, for Pixi's own scheduler, and
+  removes Pixi's events ticker); `SchedulerSystem` runs the frame
   loop, and Rapid renders only when something changed. Don't add `app.ticker` callbacks or call
   `app.render()` from a layer or feature: mark it dirty and let the next frame draw it.
 - **Nothing renders inside `render()`.** `renderer.generateTexture()` calls `renderer.render()`, which
@@ -39,15 +41,27 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
     on the zoom out of the vertices. Don't split the batches (by road class, by tile) without
     counting the draw calls: fewer is the point, and the order of the classes is in the batch.
-  - **A line that its batches draw isn't in the scene.** Its container has no parent, so don't
-    reach for `feature.container.parent`, `getBounds()`, `toGlobal()` or `worldTransform` on a
-    line: use its geometry, its container's `position` (the line's place in the world) and
-    `gfx.origin` (the world's place on screen). Where a feature is drawn among the others is
-    `feature.sceneContainer` and `sceneOrder` (`featureOrder()` in `helpers.ts`).
-  - **A line is in the scene only when it draws something itself** (`drawsInContainer()`):
-    oneway arrows, or the whole line while it's hovered or highlighted, because a glow is a
-    filter on the container and needs the line drawn in it. Anything new that a line draws in
-    its own container has to be said there, or it's drawn nowhere.
+  - **The OSM layer's areas are in batches too:** every fill in a `FillBatch`
+    (`lib/FillBatch.ts`), then every outline in a `LineBatch`, in the order of their size
+    (`feature.fillBatch` and `feature.strokeBatch`, from `_polygonBatch()`). A fill's triangles
+    are worked out once (`triangulate()` in `helpers.ts`); a partial fill's band is triangles
+    in the same batch, worked out again when the zoom changes its width. Patterns come from
+    the atlas that `PixiTextures` builds (`getPatternNumber()`), and the shader lays them out.
+    There's no `lowRes` sprite, `fill` or `strokes` for an area that batches draw.
+  - **A line or an area that its batches draw isn't in the scene.** Its container has no
+    parent, so don't reach for `feature.container.parent`, `getBounds()`, `toGlobal()` or
+    `worldTransform` on one: use its geometry, its container's `position` (the feature's place
+    in the world) and `gfx.origin` (the world's place on screen). Where a feature is drawn among
+    the others is `feature.sceneContainer` and `sceneOrder` (`featureOrder()` in `helpers.ts`).
+  - **A line or an area is in the scene only when it draws something itself**
+    (`drawsInContainer()`): a line's oneway arrows, and what a hovered or highlighted feature
+    needs under its glow, because a glow is a filter on the container (a line draws itself
+    whole there; an area its outlines). Anything new that a feature draws in its own container
+    has to be said there, or it's drawn nowhere.
+  - **What the batches share is `VertexBatch`** (`lib/VertexBatch.ts`): the buffers, a thing
+    that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
+    for), the order, the origin that follows the view. A new kind of batch says what a vertex
+    holds, and writes it.
   - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): an area's outlines, halos, the
     lasso, and the lines of layers that give no batch. Call `setStroke()` for a new width: it
     moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
@@ -79,10 +93,11 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in Užice where Pixi's
   walk took 8). `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
   `AbstractBehavior._getEventData()` reads it. Rules that follow:
-  - A point or an area is hit where its container says: its `hitArea`, or what it draws
-    (`AbstractPixiFeature.hitTest()`, `containerHit()` in `helpers.ts`). `eventMode: 'none'` and
-    `allowInteraction = false` still take a feature or a part of one out. A line is hit by its
-    distance from the pointer, in world coordinates (`PixiFeatureLine.hitTest()`).
+  - A point is hit where its container says: its `hitArea` (`AbstractPixiFeature.hitTest()`,
+    `containerHit()` in `helpers.ts`). `eventMode: 'none'` and `allowInteraction = false` still
+    take a feature out. A line is hit by its distance from the pointer, and an area by that
+    distance from its rings or by being in its fill, in world coordinates
+    (`PixiFeatureLine.hitTest()`, `PixiFeaturePolygon.hitTest()`).
   - **A feature that can be hit outside the box of its geometry sets `hitReach`**, in pixels,
     when it draws (a pin above its point, a line beside itself). The layer asks the index that
     far around the pointer, so a feature with too small a reach isn't found at its edges.

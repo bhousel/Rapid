@@ -292,14 +292,45 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   const features = await page.evaluate(() => ({ ...rapidContext.systems.gfx.pixi.renderer.events.features }));
   expect(features).toEqual({ move: true, globalMove: false, click: true, wheel: false });
 
+  // ..and none of Pixi's tickers runs a loop of its own. Its events ticker (which sends pointer
+  // moves again for objects that move under a still pointer) is gone, and its scheduler, which
+  // frees GPU resources that went unused, gets its turns from Rapid's frame loop.
+  const tickers = await page.evaluate(async () => {
+    const listeners = ticker => {
+      const names = [];
+      for (let listener = ticker._head.next; listener; listener = listener.next) {
+        names.push(listener._context?.constructor?.name ?? 'unknown');
+      }
+      return names;
+    };
+    const scheduler = rapidContext.systems.gfx.pixi.renderer.scheduler;
+    let task;
+    const turns = await new Promise(resolve => {
+      task = scheduler.repeat(() => resolve(1), 0, false);
+      setTimeout(() => resolve(0), 5000);
+    });
+    scheduler.cancel(task);
+    return {
+      systemStarted: PIXI.Ticker.system.started,
+      sharedStarted: PIXI.Ticker.shared.started,
+      systemListeners: listeners(PIXI.Ticker.system),
+      schedulerGotATurn: turns > 0
+    };
+  });
+  expect(tickers.systemStarted).toBe(false);
+  expect(tickers.sharedStarted).toBe(false);
+  expect(tickers.systemListeners).not.toContain('EventsTickerClass');
+  expect(tickers.systemListeners.length).toBeGreaterThan(0);    // Pixi's scheduler
+  expect(tickers.schedulerGotATurn).toBe(true);
+
   expect(consoleErrors).toEqual([]);
 });
 
 
 // The OSM layer finds its own features under the pointer, through the editor's spatial index
 // (`PixiLayerOsm.hitTest`), and Pixi's hit test leaves the layer's containers out. Pixi's would
-// ask every feature in the scene, and a line that's drawn in a batch isn't even in the scene.
-// The index must find what asking every feature would, and for points and areas, what Pixi would.
+// ask every feature in the scene, and a line or an area that's drawn in batches isn't even in
+// the scene. The index must find what asking every feature would, and for points, what Pixi would.
 test('finds the feature under the pointer through the spatial index, as asking every feature would', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -363,7 +394,7 @@ test('finds the feature under the pointer through the spatial index, as asking e
       return best;
     });
 
-    // Pixi, over the features that are in the scene (all but the lines that batches draw)
+    // Pixi, over the features that are in the scene (the points; lines and areas that batches draw aren't)
     scene.setHitTester('osm', null);
     const pixiFound = points.map(point => featureOf(boundary.hitTest(point.x, point.y)));
     scene.setHitTester('osm', osm);
@@ -372,9 +403,9 @@ test('finds the feature under the pointer through the spatial index, as asking e
     return {
       skipped: skipped,
       differences: found.flatMap((feature, i) => (feature === asked[i]) ? [] : [{ at: points[i], found: feature?.id, asked: asked[i]?.id }]),
-      // Where no line is under the pointer, Pixi finds the same point or area
+      // Points are still in the scene, above everything: where either finds one, both find the same
       pixiDifferences: found.flatMap((feature, i) => {
-        if (feature?.type === 'LineString' || pixiFound[i]?.type === 'LineString' || feature === pixiFound[i]) return [];
+        if ((feature?.type !== 'Point' && pixiFound[i]?.type !== 'Point') || feature === pixiFound[i]) return [];
         return [{ at: points[i], found: feature?.id, pixiFound: pixiFound[i]?.id }];
       }),
       numFound: found.filter(Boolean).length,

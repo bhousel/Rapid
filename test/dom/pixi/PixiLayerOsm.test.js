@@ -224,6 +224,62 @@ describe('PixiLayerOsm', () => {
     // A polygon's geometry, as far as `_polygonTileContainer` looks: its extent in world coordinates
     const part = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max) } });
 
+    // Polygons are drawn in two batches: every fill (`FillBatch`), then every outline (`LineBatch`).
+    describe('polygon batches', () => {
+      const polygonAt = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max), origin: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2] } });
+
+      it('has one batch for every fill and one for every outline, in the polygons\' container', () => {
+        const fills = layer._polygonBatch(true, polygonAt([10, 10], [20, 20]));
+        const outlines = layer._polygonBatch(false, polygonAt([10, 10], [20, 20]));
+        assert.strictEqual(layer._polygonBatch(true, polygonAt([90000, 100], [90050, 140])), fills);
+        assert.strictEqual(layer._polygonBatch(false, polygonAt([90000, 100], [90050, 140])), outlines);
+        assert.strictEqual(fills.label, 'fills');
+        assert.strictEqual(outlines.label, 'outlines');
+        assert.strictEqual(fills.parent, layer.polygonContainer);
+        assert.strictEqual(outlines.parent, layer.polygonContainer);
+        assert.deepEqual([fills.position.x, fills.position.y], [15, 15], 'its coordinates start at the first polygon');
+        assert.sameMembers(layer.polygonBatches, [fills, outlines]);
+      });
+
+      it('draws every fill before every outline, and both before what a polygon\'s feature draws itself', () => {
+        const order = [
+          layer._polygonBatch(true, polygonAt([10, 10], [20, 20])).zIndex,
+          layer._polygonBatch(false, polygonAt([10, 10], [20, 20])).zIndex,
+          layer._polygonTileContainer(part([0, 0], [600, 20]), 16).parent.zIndex,    // `large`: a hovered park's outlines
+          layer._polygonTileContainer(part([10, 10], [20, 20]), 16).parent.zIndex
+        ];
+        assert.deepEqual(order, order.slice().sort((a, b) => a - b));
+        assert.strictEqual(new Set(order).size, order.length);
+      });
+
+      it('destroys a batch that has nothing in it and no feature waiting to draw in it', () => {
+        const fills = layer._polygonBatch(true, polygonAt([10, 10], [20, 20]));
+        const outlines = layer._polygonBatch(false, polygonAt([10, 10], [20, 20]));
+        fills.users = 1;    // a feature got it, and isn't drawn yet
+        layer._removeEmptyContainers();
+        assert.isFalse(fills.destroyed);
+        assert.isTrue(outlines.destroyed);
+        assert.deepEqual(layer.polygonBatches, [fills]);
+
+        const again = layer._polygonBatch(false, polygonAt([10, 10], [20, 20]));
+        assert.notStrictEqual(again, outlines);
+        fills.users = 0;
+        again.add(Rapid.geomStrokeMesh([0, 0, 10, 0]), 0, 0, { width: 2, minWidth: 2, color: 0xffffff, alpha: 1 });
+        layer._removeEmptyContainers();
+        assert.isTrue(fills.destroyed);
+        assert.isFalse(again.destroyed);
+      });
+
+      it('moves the batches\' place in the world with the view, like the lines\'', () => {
+        const fills = layer._polygonBatch(true, polygonAt([990, 990], [1010, 1010]));
+        const outlines = layer._polygonBatch(false, polygonAt([990, 990], [1010, 1010]));
+        const viewport = { transform: { zoom: 19 }, center: () => [0, 0], screenToWorld: () => [41000, 1000] };    // 320,000 pixels away
+        layer._moveBatchOrigins(viewport);
+        assert.deepEqual([fills.position.x, fills.position.y], [41000, 1000]);
+        assert.deepEqual([outlines.position.x, outlines.position.y], [41000, 1000]);
+      });
+    });
+
     it('puts polygons whose centers are in the same tile in one container', () => {
       // At zoom 16 a tile is 256 world units wide
       const a = layer._polygonTileContainer(part([10, 10], [20, 20]), 16);

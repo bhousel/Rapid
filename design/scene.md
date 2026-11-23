@@ -3,8 +3,8 @@
 **Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
 mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines and points split by
 tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
-two batches a level, every casing and then every stroke; a line that its batches draw isn't in
-the scene (Nov 23). Section 4 is ideas with nothing built.
+two batches a level, every casing and then every stroke, and its areas in two, every fill and
+then every outline; a line or an area that its batches draw isn't in the scene (Nov 23). Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -35,8 +35,12 @@ origin
 ├ basemap
 │  ├ osm                 zIndex 0
 │  │  ├ polygons
+│  │  │  ├ fills         a `FillBatch`: every polygon's fill, the largest first
+│  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
-│  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area)
+│  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area).
+│  │  │                  Only the polygons that draw something themselves are in these (the
+│  │  │                  outlines of a hovered one): the rest aren't in the scene
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
 │  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
@@ -137,20 +141,21 @@ testing from Pixi:
 - **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
   within reach of the pointer (the furthest any feature drawn so far can be hit from its
   geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
-  point or an area answers by the rules Pixi has for one container (`containerHit()`): its hit
-  area, or what it draws. A line answers by its distance from the pointer in world coordinates,
-  with nothing of Pixi's: a line that its batches draw isn't in the scene.
+  point answers by the rules Pixi has for one container (`containerHit()`): its hit area. A line
+  answers by its distance from the pointer in world coordinates, and an area by that distance
+  from its rings or by being in its fill, with nothing of Pixi's: a line or an area that its
+  batches draw isn't in the scene.
 - **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
-  what draws each (`sceneContainer`: a feature's own container, or a line's strokes' batch), and
-  in one batch by the line's order there.
+  what draws each (`sceneContainer`: a feature's own container, a line's strokes' batch, an
+  area's fills' batch), and in one batch by the feature's order there.
 - **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
   spatial container: Pixi still finds those.
 
 Checked on a grid of 4,800 points, in Seattle and Užice, in nine states each (two zooms in and
 out, rotated, wireframe, full fill, a way selected), while every line was still in the scene:
 the same feature as Pixi's hit test over the whole scene at all 86,400 points. Since the lines
-left the scene, Pixi can't be asked about them: `test/e2e/select.test.js` checks the index
-against asking every feature of the layer, and against Pixi for points and areas.
+and the areas left the scene, Pixi can't be asked about them: `test/e2e/select.test.js` checks
+the index against asking every feature of the layer, and against Pixi for points.
 The numbers are in `design/graphics-system.md` section 15 (step 6).
 
 ## 3. Render groups
