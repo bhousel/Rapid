@@ -7,7 +7,8 @@ import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
 // A point always has a marker. Its icon sprite is made only when the style has an icon: most
 // vertices have none.
 describe('PixiFeaturePoint', () => {
-  let feature;
+  let feature, haloParent;
+  const dashTexture = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 16, height: 1 }) });
   const viewport = { transform: { zoom: 17, rotation: 0 } };
 
   function draw(style) {
@@ -17,8 +18,10 @@ describe('PixiFeaturePoint', () => {
 
   beforeEach(() => {
     const context = new Rapid.MockContext();
-    const gfx = { textureManager: { getTexture: () => PIXI.Texture.WHITE } };
+    const gfx = { textureManager: { getTexture: () => PIXI.Texture.WHITE, getDashTexture: () => dashTexture } };
     const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    haloParent = new PIXI.Container();
+    scene.layers.set('map-ui', { halo: haloParent });
     const layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);
@@ -114,6 +117,66 @@ describe('PixiFeaturePoint', () => {
       grid.mark('label', grid.cellsOf(495, 295, 540, 305));
       draw({ marker: { image: 'smallCircle' } });
       assert.lengthOf(hits, 1);
+    });
+  });
+
+  describe('the select halo', () => {
+    // How far a mesh's vertices are from a point, at the least and at the most
+    function reachOf(mesh, x, y) {
+      const positions = mesh.geometry.positions;
+      let min = Infinity;
+      let max = 0;
+      for (let i = 0; i < positions.length; i += 2) {
+        const reach = Math.hypot(positions[i] - x, positions[i + 1] - y);
+        min = Math.min(min, reach);
+        max = Math.max(max, reach);
+      }
+      return [min, max];
+    }
+
+    it('is a dashed line around the edge of the point\'s hit area', () => {
+      feature.setClass('select');
+      draw({ marker: { image: 'pin' } });
+      const rect = feature.container.hitArea;
+      assert.instanceOf(rect, PIXI.Rectangle);
+
+      const halo = feature.halo;
+      assert.strictEqual(halo.parent, haloParent);
+      assert.strictEqual(halo.children.length, 1);
+      const ring = halo.children[0];
+      assert.strictEqual(ring.texture, dashTexture);
+      assert.strictEqual(ring.strokeMesh.length, 2 * (rect.width + rect.height));
+
+      // The line is 2 wide, half of it either side of the rectangle's edge.
+      const xs = [];
+      for (let i = 0; i < ring.geometry.positions.length; i += 2) xs.push(ring.geometry.positions[i]);
+      assert.closeTo(Math.min(...xs), rect.left - 1, 1e-4);
+      assert.closeTo(Math.max(...xs), rect.right + 1, 1e-4);
+    });
+
+    it('is a circle around a point that is circular', () => {
+      feature.props.isCircular = true;
+      feature.setClass('select');
+      draw({ marker: { image: 'smallCircle' } });
+      const circle = feature.container.hitArea;
+      assert.instanceOf(circle, PIXI.Circle);
+
+      const [min, max] = reachOf(feature.halo.children[0], circle.x, circle.y);
+      assert.isAbove(min, circle.radius - 1.05);    // (the corners of a ring of 20 points go a little past its width)
+      assert.isBelow(max, circle.radius + 1.05);
+    });
+
+    it('is destroyed, with its mesh, when the point isn\'t selected', () => {
+      feature.setClass('select');
+      draw({ marker: { image: 'pin' } });
+      const halo = feature.halo;
+      const ring = halo.children[0];
+
+      feature.unsetClass('select');
+      draw({ marker: { image: 'pin' } });
+      assert.isNull(feature.halo);
+      assert.isTrue(halo.destroyed);
+      assert.isTrue(ring.destroyed);
     });
   });
 

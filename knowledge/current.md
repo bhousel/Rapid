@@ -41,12 +41,14 @@ are in [`design/graphics-system.md`](../design/graphics-system.md). What's left 
 follow-ups" in `backlog.md`.
 
 **Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
-order of work, Bryan's decisions and the measurements). Done: steps 1 to 3. The stroke mesh
-(`modules/geo/stroke.ts`), and lines' casings and strokes and areas' outlines drawn from it
-(`modules/pixi/lib/LineMesh.ts`): sixteen zooms in Užice allocate 6.6 GB where they allocated 13.3,
-and the heap after a load is 159 MB smaller. Next is step 4: hit areas by distance, and the halo and
-the label path from an outline, so that `lineToPoly()` and `DashLine` can go. Open from step 3 (in
-the doc's "Open questions"): the frame of a zoom itself is still 125 ms in Užice. `renderer=canvas`
+order of work, Bryan's decisions and the measurements). Done: steps 1 to 4. The stroke mesh
+(`modules/geo/stroke.ts`); lines' casings and strokes, areas' outlines, halos and the lasso drawn
+from it (`modules/pixi/lib/LineMesh.ts`); a line hit by its distance from the pointer
+(`LineHitArea`); `lineToPoly()` and `DashLine` gone. Step 3 halved what a zoom allocates in Užice;
+step 4 changed no numbers, as expected. Next is step 5: partial-fill bands instead of stencil
+masks, which starts with cleaning up an outline that crosses itself (`geomStrokeOutline()` doesn't;
+try Clipper2 first and measure it). Open (in the doc's "Open questions"): the frame of a zoom itself
+is still 125 ms in Užice, and a pointer move there is 8 ms of Pixi's hit test. `renderer=canvas`
 draws no lines now, and stays that way (`quirks.md`).
 
 Waiting on Pixi: pixijs#12437 (our partial-fill masks are always batched until it's fixed;

@@ -2,8 +2,8 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
-import { getDebugBBox, lineToPoly } from './helpers.ts';
-import { geomLineSegments } from '../geo/index.ts';
+import { getDebugBBox } from './helpers.ts';
+import { geomLineSegments, geomStrokeOutline } from '../geo/index.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { CellRect } from './lib/AvoidGrid.ts';
@@ -18,6 +18,7 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 const MINZOOM = 12;
+const POLYGON_LABEL_INSET = 12;   // how far inside a polygon's outer ring its label runs, in pixels
 
 // SpatialSystem cache identifiers for label placement boxes and debug boxes.
 const SPATIAL_LABELS = 'labels';
@@ -839,7 +840,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const measurement = this.measureLabel(feature.label, 'italic');
 
       // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
-      // as a flat array, which is what `lineToPoly` expects.
+      // as a flat array, which is what `geomStrokeOutline` expects.
       const flatOuter: number[] = new Array(outer.length * 2);
       for (let i = 0; i < outer.length; i++) {
         const p = outer[i];
@@ -848,20 +849,12 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         flatOuter[i * 2 + 1] = temp.y - labelOffset.y;
       }
 
-      // someday: precompute line buffer in geometry class maybe?
-      const hitStyle = {
-        alignment: 0.5,  // middle of line
-        color: 0x0,
-        width: 24,
-        alpha: 1.0,
-        join: 'bevel',
-        cap: 'butt'
-      };
-      const bufferdata = lineToPoly(flatOuter, hitStyle);
-      if (!bufferdata.inner) continue;
-      const coords: Vec2[] = new Array(bufferdata.inner.length / 2);  // un-flatten :(
-      for (let i = 0; i < bufferdata.inner.length / 2; ++i) {
-        coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
+      // The label runs along the inside of the ring, 12 pixels in.
+      const inner = geomStrokeOutline(flatOuter, POLYGON_LABEL_INSET, { closed: true, join: 'bevel' }).inner;
+      if (!inner) continue;
+      const coords: Vec2[] = new Array(inner.length / 2);  // un-flatten :(
+      for (let i = 0; i < inner.length / 2; ++i) {
+        coords[i] = [ inner[(i * 2)], inner[(i * 2) + 1] ];
       }
 
       this._didPlace = false;

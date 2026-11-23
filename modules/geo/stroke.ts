@@ -1,4 +1,5 @@
-// The triangles that draw a line, built without knowing how wide the line is.
+// What a line builder makes from a line: the triangles that draw it (built without knowing how
+// wide the line is), the outline of the line at a distance, and whether a point is within a distance.
 // See `design/graphics-system.md` section 15, "The line builder".
 
 /** How a line ends: at its last point (`butt`), half a width past it (`square`), or in a half circle (`round`) */
@@ -56,6 +57,17 @@ export interface StrokeMesh {
   join: StrokeJoin;
 }
 
+/**
+ * The edge of a stroke: the rings at a distance from a line. Each is `[x, y, x, y, …]`, and
+ * ends with its first point again.
+ */
+export interface StrokeOutline {
+  /** The ring around an open line, or around the outside of a closed one. Empty if the line has fewer than two points. */
+  outer: Float64Array;
+  /** The ring inside a closed line, or `null` for an open line */
+  inner: Float64Array | null;
+}
+
 /** How many numbers a vertex takes in `StrokeMesh.vertices` */
 export const STROKE_VERTEX_SIZE = 7;
 
@@ -78,8 +90,13 @@ const REVERSE_DOT = -0.99;
 // both ends of a short segment can then use more than there is, and overlap each other a little.
 const INSIDE_SHARE = 1;
 
+// How far from a corner the inside of an outline may go, in distances, when the corner's segments
+// are too short for the outline's edges to cross beside them (see `addOutlineCorner`).
+const INSIDE_REACH = 2;
+
 const EMPTY_FLOATS = new Float32Array(0);
 const EMPTY_INDICES = new Uint16Array(0);
+const EMPTY_RING = new Float64Array(0);
 
 
 // Scratch space, used while a mesh is built and reset by every call to `geomStrokeMesh`.
@@ -94,6 +111,8 @@ let _fallbacks = new Float32Array(STROKE_FALLBACK_SIZE * 256);
 let _numFallbacks = 0;
 let _numPoints = 0;
 let _closed = false;
+let _ring = new Float64Array(2 * 1024);   // the outline's ring that's being built
+let _numRing = 0;                         // how many numbers of it are used
 
 // The vertices on each side of a segment's start and end, set by the caps and joins.
 let _startL = 0;
@@ -611,4 +630,302 @@ export function geomStrokeUVs(mesh: StrokeMesh, halfWidth: number, perUnit: numb
   }
 
   return out;
+}
+
+
+/**
+ * Adds a point to the ring that's being built, unless it's where the last one is.
+ * @param x - The point
+ * @param y - The point
+ */
+function addRingPoint(x: number, y: number): void {
+  const n = _numRing;
+  if (n >= 2 && Math.abs(x - _ring[n - 2]) < EPSILON && Math.abs(y - _ring[n - 1]) < EPSILON) return;
+  if (n + 2 > _ring.length) {
+    const grown = new Float64Array(_ring.length * 2);
+    grown.set(_ring);
+    _ring = grown;
+  }
+  _ring[n] = x;
+  _ring[n + 1] = y;
+  _numRing = n + 2;
+}
+
+
+/**
+ * Adds the points of an arc around a point to the ring, without the arc's two ends.
+ * @param x - The point
+ * @param y - The point
+ * @param ex - Where the arc starts, from the point
+ * @param ey - Where the arc starts
+ * @param angle - The angle to turn through (negative for clockwise, when y is up)
+ * @param slices - How many slices make a half circle
+ */
+function addRingArc(x: number, y: number, ex: number, ey: number, angle: number, slices: number): void {
+  const steps = Math.max(1, Math.ceil(Math.abs(angle) * slices / Math.PI - 1e-9));
+  const cos = Math.cos(angle / steps);
+  const sin = Math.sin(angle / steps);
+  for (let i = 1; i < steps; i++) {
+    const rx = ex * cos - ey * sin;
+    const ry = ex * sin + ey * cos;
+    ex = rx;
+    ey = ry;
+    addRingPoint(x + ex, y + ey);
+  }
+}
+
+
+/**
+ * Adds the outline's points at a corner, on the left of the way the ring goes around it.
+ *
+ * Where the line turns away from that side, there's a gap to go around: with a miter, a bevel or
+ * an arc. Where it turns towards it, the outline is one point, where the edges of the two
+ * segments cross.
+ *
+ * Each edge runs along its segment for `distance × tan(half the turn)` before it gets to that
+ * crossing, and a short segment isn't that long. The outline goes there all the same, and so it
+ * doubles back for the difference and leaves a small loop (in lines that bend gently, most are
+ * under a tenth of the distance). Stopping short of the crossing has no loop, but puts a notch
+ * in the outline wherever a line wiggles, which looks worse. Only where the turn is sharp as
+ * well, and the crossing far away, does it stop: at `INSIDE_REACH` distances from the corner.
+ *
+ * @param x - The corner
+ * @param y - The corner
+ * @param ax - The direction the ring arrives in (a unit vector)
+ * @param ay - The direction it arrives in
+ * @param lenA - The length of the segment it arrives on
+ * @param bx - The direction it leaves in
+ * @param by - The direction it leaves in
+ * @param lenB - The length of the segment it leaves on
+ * @param distance - How far the outline is from the line
+ * @param join - How to go around the outside of a corner
+ * @param miterLimit - The longest miter, in distances
+ * @param slices - How many slices make a half circle
+ */
+function addOutlineCorner(
+  x: number, y: number, ax: number, ay: number, lenA: number, bx: number, by: number, lenB: number,
+  distance: number, join: StrokeJoin, miterLimit: number, slices: number
+): void {
+  const dot = ax * bx + ay * by;
+  const cross = ax * by - ay * bx;
+
+  // It turns towards this side, however little. From the corner, the edges cross along `b - a`,
+  // which is `2 sin(half the turn)` long.
+  if (cross > 0) {
+    const ex = bx - ax;
+    const ey = by - ay;
+    const chord = Math.sqrt(ex * ex + ey * ey);
+    if (chord > 1e-9) {
+      const sin = chord / 2;
+      const cos = Math.sqrt(Math.max(0, (1 + dot) / 2));
+      let reach = INSIDE_REACH * distance;
+      if (cos > 0 && (distance * sin <= Math.min(lenA, lenB) * cos || distance <= reach * cos)) {   // there's room, or it isn't far
+        reach = distance / cos;
+      }
+      addRingPoint(x + ex / chord * reach, y + ey / chord * reach);
+      return;
+    }
+  }
+
+  // Nearly straight, or a miter that isn't too long: one point, where the two edges cross.
+  if (dot > SMOOTH_DOT || (join === 'miter' && (1 + dot) * miterLimit * miterLimit >= 2)) {
+    const k = distance / (1 + dot);
+    addRingPoint(x - (ay + by) * k, y + (ax + bx) * k);
+    return;
+  }
+
+  addRingPoint(x - ay * distance, y + ax * distance);
+  if (join === 'round') {
+    addRingArc(x, y, -ay * distance, ax * distance, -Math.atan2(-cross, dot), slices);
+  }
+  addRingPoint(x - by * distance, y + bx * distance);
+}
+
+
+/**
+ * Adds one side of an open line to the ring: the left of the direction it's walked in, from
+ * one end to the other, and the cap around the end it arrives at.
+ * @param forward - `true` to walk from the first point to the last (the line's left side), `false` for the other way (its right side)
+ * @param distance - How far the outline is from the line
+ * @param cap - How to go around the end
+ * @param join - How to go around the outside of a corner
+ * @param miterLimit - The longest miter, in distances
+ * @param slices - How many slices make a half circle
+ */
+function addOutlineSide(forward: boolean, distance: number, cap: StrokeCap, join: StrokeJoin, miterLimit: number, slices: number): void {
+  const last = _numPoints - 1;
+  const sign = forward ? 1 : -1;
+  const back = (cap === 'square') ? distance : 0;   // a square cap starts and ends this far past the line's ends
+
+  // The first point. (Walking backwards, a segment's direction is the other way, and it's kept with the point before it.)
+  let i = forward ? 0 : last;
+  let k = (forward ? 0 : last - 1) * LINE_SIZE;
+  let dx = sign * _line[k + 2];
+  let dy = sign * _line[k + 3];
+  let length = _line[k + 4];
+  addRingPoint(_line[i * LINE_SIZE] - (dy + dx) * back - dy * (distance - back), _line[i * LINE_SIZE + 1] + (dx - dy) * back + dx * (distance - back));
+
+  for (let n = 1; n < last; n++) {
+    i += sign;
+    k = (forward ? i : i - 1) * LINE_SIZE;
+    const nextX = sign * _line[k + 2];
+    const nextY = sign * _line[k + 3];
+    const nextLength = _line[k + 4];
+    addOutlineCorner(_line[i * LINE_SIZE], _line[i * LINE_SIZE + 1], dx, dy, length, nextX, nextY, nextLength, distance, join, miterLimit, slices);
+    dx = nextX;
+    dy = nextY;
+    length = nextLength;
+  }
+
+  // The last point, and around the end to where the other side starts.
+  i = forward ? last : 0;
+  const x = _line[i * LINE_SIZE];
+  const y = _line[i * LINE_SIZE + 1];
+  addRingPoint(x - dy * distance + dx * back, y + dx * distance + dy * back);
+  if (cap === 'round') {
+    addRingArc(x, y, -dy * distance, dx * distance, -Math.PI, slices);
+  }
+}
+
+
+/**
+ * Adds one side of a closed line to the ring, all the way around: the left of the direction
+ * it's walked in.
+ * @param forward - `true` to walk the points in their order (the line's left side), `false` for the other way (its right side)
+ * @param distance - How far the outline is from the line
+ * @param join - How to go around the outside of a corner
+ * @param miterLimit - The longest miter, in distances
+ * @param slices - How many slices make a half circle
+ */
+function addOutlineLoop(forward: boolean, distance: number, join: StrokeJoin, miterLimit: number, slices: number): void {
+  const numPoints = _numPoints;
+  for (let n = 0; n < numPoints; n++) {
+    const i = forward ? n : numPoints - 1 - n;
+    const before = ((i + numPoints - 1) % numPoints) * LINE_SIZE;   // the segment that ends at this point
+    const after = i * LINE_SIZE;                                    // ..and the one that starts there
+    const x = _line[after];
+    const y = _line[after + 1];
+    if (forward) {
+      addOutlineCorner(x, y, _line[before + 2], _line[before + 3], _line[before + 4], _line[after + 2], _line[after + 3], _line[after + 4], distance, join, miterLimit, slices);
+    } else {
+      addOutlineCorner(x, y, -_line[after + 2], -_line[after + 3], _line[after + 4], -_line[before + 2], -_line[before + 3], _line[before + 4], distance, join, miterLimit, slices);
+    }
+  }
+}
+
+
+/**
+ * Ends the ring that's being built with its first point, and copies it out.
+ * @return The ring, in an array of its own
+ */
+function takeRing(): Float64Array {
+  // (the last point may be where the first is already: then it's replaced, not followed)
+  if (_numRing >= 4 && Math.abs(_ring[0] - _ring[_numRing - 2]) < EPSILON && Math.abs(_ring[1] - _ring[_numRing - 1]) < EPSILON) {
+    _numRing -= 2;
+  }
+  const ring = new Float64Array(_numRing + 2);
+  ring.set(_ring.subarray(0, _numRing));
+  ring[_numRing] = _ring[0];
+  ring[_numRing + 1] = _ring[1];
+  _numRing = 0;
+  return ring;
+}
+
+
+/**
+ * Works out the outline of a line at a distance: the edge of the stroke that `geomStrokeMesh`
+ * would fill at that half width. An open line has one ring around it. A closed one has two, one
+ * outside it and one inside.
+ *
+ * It's for what follows a line's edge: a halo around a selected feature, or the path of a label
+ * inside an area. Each side is worked out corner by corner, and nothing is cleaned up afterwards:
+ * - An inside corner whose segments are shorter than the distance needs leaves a small loop
+ *   (see `addOutlineCorner`), and a curve that's tighter than the distance a larger one.
+ * - Parts of a line that are far apart along it and close together on the map don't know of
+ *   each other: where an area is narrower than twice the distance, its inside ring crosses itself.
+ *
+ * So it isn't the outline for a partial fill's band, which shows every fold.
+ *
+ * @param coords - The line's points as `[x, y, x, y, …]`
+ * @param distance - How far the outline is from the line, in the units of its coordinates
+ * @param options - How to go around the ends and the corners, and whether the line is closed.
+ *   Defaults to an open line with butt caps and miter joins.
+ * @return The rings. Their arrays are their own.
+ */
+export function geomStrokeOutline(coords: ArrayLike<number>, distance: number, options: Partial<StrokeOptions> = {}): StrokeOutline {
+  const cap = options.cap ?? 'butt';
+  const join = options.join ?? 'miter';
+  const miterLimit = options.miterLimit ?? 10;
+  const slices = Math.max(1, Math.floor(options.roundSlices ?? 10));
+
+  readLine(coords, options.closed ?? false);
+  const numPoints = _numPoints;
+  if (numPoints < 2) {
+    return { outer: EMPTY_RING, inner: null };
+  }
+
+  _numRing = 0;
+  if (!_closed) {
+    addOutlineSide(true, distance, cap, join, miterLimit, slices);
+    addOutlineSide(false, distance, cap, join, miterLimit, slices);
+    return { outer: takeRing(), inner: null };
+  }
+
+  // Which side is the inside: the left, if the points go around counterclockwise (when y is up).
+  let area = 0;
+  for (let i = 0; i < numPoints; i++) {
+    const k = i * LINE_SIZE;
+    const k2 = ((i + 1) % numPoints) * LINE_SIZE;
+    area += _line[k] * _line[k2 + 1] - _line[k2] * _line[k + 1];
+  }
+
+  addOutlineLoop(true, distance, join, miterLimit, slices);
+  const left = takeRing();
+  addOutlineLoop(false, distance, join, miterLimit, slices);
+  const right = takeRing();
+  return (area > 0) ? { outer: right, inner: left } : { outer: left, inner: right };
+}
+
+
+/**
+ * Whether a point is within a distance of a line: inside the line's stroke at that half width,
+ * with round caps and joins. It needs no outline, only the line.
+ * @param coords - The line's points as `[x, y, x, y, …]`
+ * @param halfWidth - The distance, in the units of the line's coordinates
+ * @param x - The point
+ * @param y - The point
+ * @param closed - Whether the last point joins the first
+ * @return `true` if the point is that close to the line
+ */
+export function geomStrokeContains(coords: ArrayLike<number>, halfWidth: number, x: number, y: number, closed: boolean = false): boolean {
+  const numPoints = coords.length >> 1;
+  if (numPoints < 1 || !(halfWidth >= 0)) return false;
+
+  const reach = halfWidth * halfWidth;
+  const numSegments = (closed && numPoints > 2) ? numPoints : numPoints - 1;
+  let ax = coords[0];
+  let ay = coords[1];
+  if (numSegments === 0) {
+    return (x - ax) * (x - ax) + (y - ay) * (y - ay) <= reach;
+  }
+
+  for (let i = 1; i <= numSegments; i++) {
+    const k = (i % numPoints) * 2;
+    const bx = coords[k];
+    const by = coords[k + 1];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const px = x - ax;
+    const py = y - ay;
+    const length2 = dx * dx + dy * dy;
+    let t = (length2 > 0) ? (px * dx + py * dy) / length2 : 0;   // how far along the segment the nearest point is
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    const ex = px - t * dx;
+    const ey = py - t * dy;
+    if (ex * ex + ey * ey <= reach) return true;
+    ax = bx;
+    ay = by;
+  }
+  return false;
 }

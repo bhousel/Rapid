@@ -1,26 +1,36 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { BufferHitArea } from './lib/BufferHitArea.ts';
+import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
+import { drawHalo } from './helpers.ts';
 import { geomLineSegments, geomStrokeMesh } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import type { DashLineOptions } from './lib/DashLine.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { LineStyleProps } from '../lib/Style.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
-import type { StrokeMesh } from '../geo/stroke.ts';
+import type { StrokeMesh, StrokeOptions } from '../geo/stroke.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
+
+// How a select halo goes around the line's ends and corners: as the hit area does
+const HALO_SHAPE: Partial<StrokeOptions> = { cap: 'round', join: 'round' };
 
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
 
-/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
-type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
+
+/**
+ * Whether a line ends where it starts, with at least three points before it gets there.
+ * @param coords - The line's points as `[x, y, x, y, …]`
+ * @return `true` if it's a ring
+ */
+function isRing(coords: number[]): boolean {
+  const last = coords.length - 2;
+  return (last >= 6 && coords[0] === coords[last] && coords[1] === coords[last + 1]);
+}
 
 
 /**
@@ -43,8 +53,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   /** The mesh that draws the stroke (above) */
   public stroke: LineMesh | null;
 
-  /** Buffer polygon data for hit testing and halo */
-  protected _hitBuffer: BufferHitArea | null;
+  /** The line with a few pixels around it, for hit testing and the halo (null while the line can't be hit) */
+  protected _hitArea: LineHitArea | null;
   /** The line that the stroke meshes of the casing and the stroke were built from */
   protected _meshPart: GeometryPart | null;
 
@@ -56,7 +66,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
-    this._hitBuffer = null;
+    this._hitArea = null;
     this._meshPart = null;
 
     this.casing = null;   // add later only if needed (see `update`)
@@ -85,7 +95,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.stroke = null;
     }
 
-    this._hitBuffer = null;
+    this._hitArea = null;
     this._meshPart = null;
 
     super.destroy();
@@ -215,10 +225,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       lineMarkers.destroy({ children: true });
     }
 
-    // Buffer around line, used for hit area and halo.
-    // Build in world-local coords (origin-relative) so the polygon matches the
-    // container's local frame. Pixi composes the container transform when
-    // hit-testing, so we don't need to project to screen.
+    // The line with a few pixels around it, used for hit area and halo.
+    // It's in world-local coords (origin-relative), the container's local frame.
+    // Pixi composes the container transform when hit-testing, so we don't need to project to screen.
     if (this.visible && !this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
       const minwidth = 3;
       let bufWidth = this._style.casing.width ?? 5;
@@ -230,20 +239,18 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       if (bufWidth < minwidth) bufWidth = minwidth;
       if (isWireframe) bufWidth = 1;
 
-      const localBufWidth = (bufWidth + 10) * localScale;
-      const bufferStyle: PIXI.StrokeStyle = {
-        alpha: 1,
-        alignment: 0.5,
-        color: 0x000000,
-        width: localBufWidth,
-        cap: 'butt',
-        join: 'bevel'
-      };
-      // (Worked out when the pointer comes near, or for a halo: see `BufferHitArea`)
-      this._hitBuffer = new BufferHitArea(flat[0], bufferStyle, local!.extent);
-      container.hitArea = this._hitBuffer;
+      // (A zoom changes the distance and nothing else: the hit area is kept, and has no shape to build.)
+      const coords = flat[0];
+      const halfWidth = (bufWidth + 10) * localScale / 2;
+      const closed = isRing(coords);
+      if (this._hitArea) {
+        this._hitArea.set(coords, halfWidth, local.extent, closed);
+      } else {
+        this._hitArea = new LineHitArea(coords, halfWidth, local.extent, closed);
+      }
+      container.hitArea = this._hitArea;
     } else {
-      this._hitBuffer = null;
+      this._hitArea = null;
       container.hitArea = null;
     }
 
@@ -329,9 +336,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       strokeMesh = other;
     } else {
       // A line that ends where it starts is a ring: it gets a join there, not two caps.
-      const last = coords.length - 2;
-      const closed = (last >= 6 && coords[0] === coords[last] && coords[1] === coords[last + 1]);
-      strokeMesh = geomStrokeMesh(coords, { cap: cap, join: join, closed: closed });
+      strokeMesh = geomStrokeMesh(coords, { cap: cap, join: join, closed: isRing(coords) });
     }
 
     // Dashes are a texture that repeats along the line.
@@ -353,7 +358,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Show/Hide halo (expects `this._hitBuffer` to be already set up by `update()`)
+   * Show/Hide halo (expects `this._hitArea` to be already set up by `update()`)
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateHalo(viewport: Viewport): void {
@@ -381,13 +386,13 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     // Select
-    if (showSelect && this._hitBuffer) {
+    if (showSelect && this._hitArea) {
       const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
       const haloParent = mapui.halo;
       if (!haloParent) return;
 
       if (!this.halo) {
-        this.halo = new PIXI.Graphics();
+        this.halo = new PIXI.Container();
         this.halo.label = `${this.id}-halo`;
         this.halo.eventMode = 'none';
         haloParent.addChild(this.halo);
@@ -402,29 +407,16 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.halo.rotation = this.container.rotation;
       this.halo.scale = this.container.scale;
 
+      // The halo is the edge of the hit area: a ring around an open line, and one on each
+      // side of a line that ends where it starts.
       const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
-      const HALO_STYLE: StrokeStyleWithDash = {
-        alpha: 0.9,
-        dash: [6, 3],
-        width: 2,
-        scale: localScale,
-        color: 0xffff00
-      };
-
-      (this.halo as PIXI.Graphics).clear();
-
-      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-      const buffer = this._hitBuffer.buffer;
-      if (buffer.outer && buffer.inner) {   // closed line
-        dl.poly(buffer.outer);
-        dl.poly(buffer.inner);
-      } else {   // unclosed line
-        dl.poly(buffer.perimeter);
-      }
+      const outline = this._hitArea.outline(HALO_SHAPE);
+      const rings = outline.inner ? [outline.outer, outline.inner] : [outline.outer];
+      drawHalo(this.halo, rings, localScale, this.gfx.textureManager!);
 
     } else {
       if (this.halo) {
-        this.halo.destroy();
+        this.halo.destroy({ children: true });
         this.halo = null;
       }
     }

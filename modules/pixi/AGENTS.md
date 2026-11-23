@@ -32,9 +32,14 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   them: Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms
   in Užice allocated. Dashes are `PixiTextures.getDashTexture()`, color and opacity are the
   mesh's `tint` and `alpha`. See section 15 of `design/graphics-system.md`.
-- **`lib/DashLine.ts` is for what's still a `Graphics`:** the halos and the map UI (texture-based,
-  works with plain `Graphics`). Pixi's `DashLineShader` needs `SmoothGraphics`, and a context with
-  it is never batched.
+- **Halos and the lasso are `LineMesh`es too,** drawn with `drawHalo()` and `drawRings()`
+  (`helpers.ts`) into a container that keeps its meshes from one call to the next. A halo's rings
+  are the outline of its feature at the distance a click reaches (`geomStrokeOutline()`). There's
+  no `DashLine` anymore, and nothing of ours calls Pixi's `buildLine`. Don't use Pixi's
+  `DashLineShader`: it needs `SmoothGraphics`, and a context with it is never batched.
+- **A line's hit area is a distance, not a shape** (`lib/LineHitArea.ts`): a point hits when it's
+  within a few pixels of the line. A feature keeps the one it has and calls `set()` when the line
+  or the zoom changes. Don't build a polygon around a line to hit-test it.
 - **Render groups go through `PixiScene.worldContainer()`.** The skill says to put a panning world in
   `new Container({ isRenderGroup: true })`. Ours is in z16 world coordinates, which are too big for the
   32-bit floats a render group keeps its vertices in: shapes come out distorted, more so when zoomed
@@ -70,7 +75,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   touches them does so after `update()`, with `?.`.
 - **In a loop over every feature, don't make an object per feature.** Iterate
   `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
-  hover or a click needs (`BufferHitArea`). Garbage is what brings the half-second collections
+  hover or a selection needs (a halo's outline is built in `updateHalo()`, for what's selected).
+  Garbage is what brings the half-second collections
   (`design/graphics-system.md` section 13).
 - **A point that labels should keep clear of gets `feature.labelAvoid = true` from its layer**
   (OSM, Rapid and custom data points do; photo and QA markers don't). It then marks where it's

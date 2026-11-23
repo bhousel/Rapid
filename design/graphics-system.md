@@ -12,9 +12,10 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
 > without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
 > rendering follow-ups". The plan is in section 7. Section 15 is where the renderer could go from
-> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 3 are built on
-> `linebuilder_refactor`: lines and the outlines of areas are drawn from stroke meshes
-> (`modules/geo/stroke.ts`, `modules/pixi/lib/LineMesh.ts`).
+> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 4 are built on
+> `linebuilder_refactor`: lines, the outlines of areas, halos and the lasso are drawn from stroke
+> meshes (`modules/geo/stroke.ts`, `modules/pixi/lib/LineMesh.ts`), a line is hit by its distance
+> from the pointer, and `lineToPoly()` and `DashLine` are gone.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -364,6 +365,7 @@ Seattle, but not in the next parking lot, so it can't settle the question. `line
 `modules/pixi/helpers.ts` is the naive version of this: it runs Pixi's `buildLine` and walks the
 triangles back into an outline, which breaks on round joins and depends on Pixi's internals. It's used
 for line hit areas, select halos, area outline hit areas, and the label layer's boxes along lines.
+(It was, until Nov 22: section 15, step 4.)
 
 One line builder of our own, producing offset outlines, would replace all of those, give us the
 partial-fill band, and later the precise buffers that conflation may want (`backlog.md`, "Conflation /
@@ -382,6 +384,9 @@ round caps and joins, by screen size instead of world units (section 2).
   until the next zoom change. Frame stats will say.
 
 ## 5. Dashed lines
+
+*(`DashLine` is gone since Nov 22: lines and outlines with section 15's step 3, halos and the
+lasso with step 4. This section is what it was.)*
 
 **Today.** `lib/DashLine.ts` has two modes. Every caller uses the default, `useTexture: true`: one
 small dash texture per pattern (cached in `PixiTextures`), repeated along each segment by a texture
@@ -2054,8 +2059,9 @@ label) and against the table above, and can ship on its own.
 ## 15. Where this could go
 
 Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
-**Nothing in this section is built, and none of it is measured** except where another section is
-named. It's a direction and an order of work, to review before the line builder is started.
+It's a direction and an order of work. **Steps 1 to 4 of the order are built and measured** (the
+"What was built" parts below); the rest isn't built, and none of that is measured except where
+another section is named.
 
 **The short answer: keep the frame, change the unit of work.** APP, CULL and DRAW, the scheduler,
 the deadline, and drawing only when something changed all hold up (Unreal's render thread and
@@ -2214,7 +2220,7 @@ It has two products, from one walk along the line:
   the offset ring folds over itself and has to be cleaned up.
 
 A hit area needs neither: whether the pointer is within a distance of a line is a sum over its
-segments, with no polygon. `BufferHitArea` can do that without the builder.
+segments, with no polygon (`geomStrokeContains()`, step 4).
 
 It's plain geometry, so it goes in `modules/geo/`, with unit tests (two points, repeated points,
 a turn of 180°, a closed ring, a sliver, segments shorter than the width) and a run over seeded
@@ -2375,6 +2381,10 @@ has one, for the dashes.
   in both builds). It read 1.1 ms in the run before and 6.1 after, because of where the run was
   in its queue, not because of the lines.
 
+**The heap and zoom numbers above were taken with landuse hidden** (found with step 4, below:
+a filter left on in the debug Chrome). They compare like with like, but the whole scene is 4%
+more features: step 3's build allocates 7.4 GB over sixteen zooms there, and holds 1,517 MB.
+
 **Screenshots** of Seattle, Staten Island and Užice (z16 and z18), and of a tunnel and a closed
 line at z19.5: 0.15 to 1.1% of the pixels differ from the build before. Where I looked (the
 parts that differ most), it's the dashes: they start at another phase and their ends are sharper.
@@ -2395,6 +2405,101 @@ same. The renderers `webgl1` and `webgpu` draw them too (one view of each).
 `PixiFeaturePolygon.test.js`, and an e2e test that zooms the real app and checks that every line
 and outline is batched, kept its stroke mesh and its array, and moved.
 
+### What was built (Nov 22: step 4)
+
+**A line is hit by its distance from the pointer.** `LineHitArea` (it was `BufferHitArea`) asks
+`geomStrokeContains()`: is the point within half the line's width and 5 pixels of the line? It's
+a sum over the line's segments, done only for a point inside the line's box. There's no polygon to
+build, and a zoom changes one number, so a feature keeps its hit area and calls `set()`.
+
+- **It's round** at a line's ends and corners, where the polygon was cut square and beveled. Of
+  4,800 points on a grid, the same feature is hit at all but 10 in Seattle and 38 in Užice: a line
+  that now reaches around its corner or past its end, over what was hit there before. (Loading
+  the same build twice differs at 1 point.)
+
+**The builder's second product, an outline at a distance:** `geomStrokeOutline(coords, distance,
+{ closed, cap, join })` in `modules/geo/stroke.ts`. One ring around an open line; one outside and
+one inside a closed one, told apart by the ring's area. Each side is walked corner by corner. The
+outside of a corner gets a miter, a bevel or an arc. The inside is one point, where the edges of
+the two segments cross.
+
+- **It has no cleanup, and that's the limit of it.** Where a segment is shorter than the crossing
+  needs, the outline doubles back and leaves a loop. Where a curve is tighter than the distance,
+  or an area narrower than twice the distance, it crosses itself. That's what the code before it
+  did too (Pixi's `buildLine`, walked back into a path by `lineToPoly()`), and it's step 5's
+  first job: a partial fill's band shows every fold, a dashed halo few of them.
+- **Three rules for the inside of a corner, measured on 3,000 random lines that bend gently**
+  (steps of 1 to 5, turns of up to 34°, distances of 0.5 to 8.5):
+
+  | Rule | Lines with a loop | Loop's length, in distances (median) | |
+  |---|---|---|---|
+  | Stop at half the shorter segment | 122 | 0.55 | A notch towards the line wherever it wiggles |
+  | Two corners that share a short segment meet where their bisectors cross | 39 | 0.46 | Notches too, fewer |
+  | Go to the crossing anyway (built) | 547 | 0.07 | No notches. 90% of the loops are under 0.23 |
+
+  The first two never fold along a segment, and look worse: a notch can be as deep as the
+  distance, and a loop of 0.07 distances is half a pixel in a halo. So the count of loops isn't the
+  measure; I drew them (the pictures are in the session's scratchpad, not in the repo). The built
+  rule has one limit: a sharp corner whose segments are too short goes no further than 2
+  distances from the corner.
+
+**Drawn from it:**
+
+- **Select halos** of lines, polygons and points, and **the lasso**: `drawHalo()` and
+  `drawRings()` in `modules/pixi/helpers.ts` draw each ring as a dashed `LineMesh`, in a container
+  that keeps its meshes from one call to the next. A halo's rings are its feature's outline at
+  the distance a click reaches, with round corners and ends, as the hit area has.
+- **The path of a label inside an area** (`PixiLayerLabels.labelPolygons()`): the inside ring,
+  12 pixels in.
+
+**Gone:** `lineToPoly()` and `lineToPolygon()` (250 lines), `lib/DashLine.ts` (549 lines) and its
+texture cache. Nothing of ours calls Pixi's `buildLine` anymore.
+
+**What changed that someone might notice:**
+
+- **A halo is rounder and a little brighter.** It follows corners in arcs, not bevels, and it's
+  as opaque as its style says (0.9): `DashLine`'s texture drew it at about 0.81. Around tight
+  curves it's tangled, as before, a little less.
+- **A selected polygon that's drawn as a sprite has a halo** (around its real shape). It had one
+  only if it had been drawn in full before, at the distance of that zoom.
+- **A click a few pixels past the end of a line hits it.** A vertex is usually there, and on top.
+
+**Measured** (one run of each, except where it says):
+
+| | Step 3 | Step 4 |
+|---|---|---|
+| A hit test in Seattle, mean of 4,800 points | 0.30 ms | 0.28 ms |
+| A hit test in Užice | 8.4 ms | 7.4 ms (two runs) |
+| Užice, sixteen zooms: allocated | 7.4 GB | 7.3 GB |
+| ..heap after a load | 1,517 MB | 1,519 MB |
+| ..heap after sixteen zooms, and sixteen more | 1,523, 1,525 MB | 1,524, 1,525 MB |
+| ..minor collections | 240 (728 ms) | 247 (717 ms) |
+| `bun run measure`, Užice: redraw APP, every feature redrawn after a zoom | 117 ms, 720 ms | 120 ms, 717 ms |
+
+- **Nothing moved but the code,** which is what was expected: section 13 had already made the hit
+  shapes lazy, and halos are a handful of features. `bun run measure` draws the same scene in
+  all three places (same triangles, draw calls and masks).
+- **A hit test in Užice is 8 ms, and it's Pixi's walk** over 107,000 features. In a profile
+  (of step 3's build), 60% of the time is `EventBoundary.hitTestRecursive` itself and 12% the
+  `visible`, `renderable` and `worldTransform` getters it reads; every `contains()` together is
+  under 1%, and the rest isn't JavaScript. That's what a pointer move costs before anything is
+  drawn, and it's what the spatial index is for (step 6).
+- **Step 3's heap and zoom numbers were taken with landuse hidden.** The debug Chrome had that
+  filter on, left from an earlier session, and I didn't see it: 102,510 features where the whole
+  scene has 106,801 (892 areas drawn in full, not 1,880). All three of step 3's runs had it, so
+  its comparison stands, but its numbers (6.6 GB, 1,469 MB) aren't the whole scene's. The table
+  above is the whole scene, with step 3's build measured again beside step 4's.
+  `bun run measure` sets its own filters, so its numbers weren't affected.
+
+**Tests:** unit tests of the outline and of the distance test in `test/unit/geo/stroke.test.js`,
+with seeded lines (5,000 with `STROKE_SEEDS`): a round outline has inside it what's within the
+distance of a gentle line and nothing else; an outline of any cap and join is closed, finite and
+within reach; the distance test agrees with a plain distance. DOM tests of `LineHitArea`, of
+`drawRings()` and `drawHalo()`, and of the halos and hit areas of lines, polygons and points, and
+of a polygon's label path. Two e2e tests: a click 5 pixels beside a road selects it and draws
+its halo that far out, and a shift-drag draws the lasso and selects what's inside. Twenty ways
+of breaking the new code were each caught by a test.
+
 ### Order of work
 
 Each step is measured on the tapes of Seattle, Staten Island and Užice (`bun run measure --tape`),
@@ -2410,16 +2515,18 @@ and compared by screenshot with the build before it.
    gets 25 to 95 slices where a handful would look the same).
 3. **Casings and strokes drawn from it. Done (Nov 22),** and the outlines of areas (above). Each
    is a `Mesh` with a fixed `batchMode` (pixijs#12437) and a dash texture of its own kind. A zoom
-   rewrites positions and builds nothing. `lib/DashLine.ts` goes when the halos and the map UI no
-   longer need it.
+   rewrites positions and builds nothing. (`lib/DashLine.ts` went with step 4.)
    *Measured by:* bytes allocated over sixteen zooms in Užice (13.7 GB now; `buildContextBatches`
    was 6 GB of it in section 13 and nothing has reduced it), how often a major collection comes,
    the heap after a load, DRAW.
    *Stop if:* a `Mesh` and its geometry per line hold more than the `Graphics` they replace. Then
    keep `Graphics` for now, and bring step 6 forward.
-4. **Hit areas by distance, and the halo and label path from the outline.** `lineToPoly()` and its
-   dependence on Pixi's `buildLine` go.
-5. **Partial-fill bands instead of stencil masks** (section 4). The masks are 707 of Seattle's 771
+4. **Hit areas by distance, and the halo and label path from the outline. Done (Nov 22).**
+   `lineToPoly()` and its dependence on Pixi's `buildLine` are gone, and `DashLine` with them
+   (above). The outline has no cleanup yet: that's the next step's.
+5. **Partial-fill bands instead of stencil masks** (section 4). It starts with the cleanup that
+   step 4's outline doesn't have: an offset ring that crosses itself where an area is narrow or
+   curves tightly (Clipper2 first, measured, as decided below). The masks are 707 of Seattle's 771
    draw calls, and the mask's `Mesh` is where pixijs#12437 and #12388 bit. Bands depend on the
    zoom, so they're built per whole zoom level or over frames, as now.
 6. **The static tier, for lines first.** A mesh per tile and class with our own shader, ranges, and
@@ -2455,8 +2562,15 @@ settles how typed arrays reach Pixi before the hard geometry starts.
 - **One texture for every dash pattern.** Each pattern is a texture of its own, as before, and a
   batch holds 16 textures. A row for each pattern in one texture would keep dashed lines from
   breaking batches. Not measured.
-- **A halo as two thin offset strokes,** not an outline? It needs no cleanup, but an open line's
-  halo wouldn't close around its ends. A visual call.
+- **A halo that doesn't cross itself.** It's the outline as built (step 4), loops and all: fine
+  around most features, tangled around a tight curve or a staircase's arcs at z16, as it was
+  before. Step 5's cleanup would fix it, if it's cheap enough for a halo that's drawn again on
+  every frame of a drag.
+- **A pointer move costs 8 ms in Užice, and the hit areas aren't why.** Pixi's hit test walks
+  every interactive container (107,000 features there) and asks each for its box (step 4's
+  numbers). Finding features through the spatial index is step 6's first part, and what
+  `LineHitArea` and `geomStrokeContains()` do for one line is what it would do for the few
+  lines the index returns.
 - **Translucent strokes.** A stroke mesh overlaps itself where a line is wider than a segment is
   long: most corners at z16 (above). An opaque line doesn't show it. Tunnels are drawn at 0.5
   (`StyleSystem`), and some other layers' lines at 0.7. Looked at with step 3: Seattle's tunnels

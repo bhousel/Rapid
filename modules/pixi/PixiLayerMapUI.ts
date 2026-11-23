@@ -1,12 +1,14 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { DashLine } from './lib/DashLine.ts';
+import { drawRings } from './helpers.ts';
 import { geoMetersToLon, projWgs84ToWorld, vecSubtract, WORLD_ZOOM } from '@rapid-sdk/math';
 
-import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
+
+
+const LASSO_DASH = [6, 3];
 
 
 /**
@@ -30,8 +32,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   protected _lassoData: Vec2[] | null;
   /** Whether the lasso shape needs to be redrawn */
   protected _lassoDirty: boolean;
-  /** Graphics object for the lasso outline stroke */
-  protected _lassoLine: PIXI.Graphics | null;
+  /** Container for the lasso's outline: a dashed `LineMesh` (see `drawRings`) */
+  protected _lassoLine: PIXI.Container | null;
   /** Graphics object for the lasso translucent fill */
   protected _lassoFill: PIXI.Graphics | null;
 
@@ -123,10 +125,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
     this.halo = halo;
 
     // LASSO
-    if (this._lassoLine)  this._lassoLine.destroy();
+    if (this._lassoLine)  this._lassoLine.destroy({ children: true });
     if (this._lassoFill)  this._lassoFill.destroy();
 
-    this._lassoLine = new PIXI.Graphics();
+    this._lassoLine = new PIXI.Container();
     this._lassoFill = new PIXI.Graphics();
     this._lassoData = null;
 
@@ -254,16 +256,11 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       // Convert screen pixel values to world units
       const scale = 2 ** (WORLD_ZOOM - viewport.transform.z);
 
-      // line
-      const lineStyle: DashLineOptions = {
-        alpha: 0.7,
-        dash: [6, 3],
-        width: 1,
-        scale: scale,
-        color: 0xffffff
-      };
-      line.clear();
-      new DashLine(this.gfx, line, lineStyle).poly(flatCoords);
+      // line: white, 1 pixel wide, in dashes of 6 with gaps of 3
+      const dashTexture = this.gfx.textureManager!.getDashTexture(LASSO_DASH);
+      line.tint = 0xffffff;
+      line.alpha = 0.7;
+      drawRings(line, [flatCoords], 1 * scale, dashTexture, (LASSO_DASH[0] + LASSO_DASH[1]) * scale);
 
       // fill
       const fillStyle: PIXI.FillStyle = {

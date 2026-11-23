@@ -104,10 +104,9 @@ said otherwise. Biggest or most wanted first.
   on a scratch graph whose commit calls `Graph._markTopologyChanged()` for the whole lineage: after a
   load, 1,438 entities nobody edited have answers that can't be memoized. Cheap today.
 - **Dashes differ from one load to the next, and after a big zoom change** (up to 12,000 pixels along
-  sidewalks in Seattle), which makes screenshot comparisons noisy. Ruled out (Nov 20): geometry, the
-  `DashLine` instructions and texture matrices, the cached textures' pixels, the anchor. Worth fixing
-  anyway: `DashLine._getTexture()` caches by dash pattern alone, but height and alpha come from
-  whichever feature asked first.
+  sidewalks in Seattle), which makes screenshot comparisons noisy. Seen with `DashLine`, which is
+  gone (Nov 22): a line's dashes are now a texture along its stroke mesh, by the distance along
+  the line. Not checked again since.
 - **OSM tiles that fail to load aren't retried until the map moves** (`OsmService.loadTiles()` returns
   early when the view is unchanged). A 429 is handled (the status bar counts down and the view loads
   when it's over); a 500 or a dropped connection still waits.
@@ -306,7 +305,7 @@ the order people are likely to ask:
   a `sameKeys` disagreement (same place and direction, different tags).
 
 ## Conflation / buffers follow-ups (beyond Step 3)
-- **Replacing `lineToPoly`** with a line builder of our own is now planned for rendering (`design/graphics-system.md` section 4); the same builder could give conflation precise buffers.
+- **`lineToPoly` is gone** (Nov 22): `geomStrokeOutline()` in `modules/geo/stroke.ts` gives the rings at a distance from a line, for halos and labels. It doesn't clean up where an outline crosses itself, so it isn't a buffer polygon yet; that's step 5 of `design/graphics-system.md` section 15 (try Clipper2 first), and conflation's buffers want the same answer.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
 
 ## Performer-inspired statistics display

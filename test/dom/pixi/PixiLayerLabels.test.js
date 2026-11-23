@@ -181,6 +181,56 @@ describe('PixiLayerLabels', () => {
     });
   });
 
+  describe('labelPolygons', () => {
+    // A stand-in for a polygon feature: a rectangle `width` by `height`, drawn with its corner at [100, 100] of label space
+    function polygonOf(id, width, height) {
+      return {
+        id: id, type: 'Polygon', label: 'Park', style: {},
+        geometry: { local: { outer: [[0, 0], [width, 0], [width, height], [0, height], [0, 0]] } },
+        container: {
+          visible: true, renderable: true,
+          getBounds: () => new PIXI.Bounds(100, 100, 100 + width, 100 + height),
+          toGlobal: (p, out) => { out.x = p.x + 100; out.y = p.y + 100; return out; }
+        }
+      };
+    }
+
+    let paths;
+    beforeEach(() => {
+      paths = [];
+      layer.measureLabel = () => MEASURE;
+      layer.placeRopeLabel = (feature, measurement, coords) => { paths.push(coords); layer._didPlace = true; };
+    });
+
+    it('runs a large polygon\'s label along the inside of its outer ring, 12 pixels in', () => {
+      layer.labelPolygons([polygonOf('osm-w1', 800, 700)]);
+      assert.lengthOf(paths, 1);
+      const path = paths[0];
+      const xs = path.map(coord => coord[0]);
+      const ys = path.map(coord => coord[1]);
+      assert.closeTo(Math.min(...xs), 112, 1e-6);
+      assert.closeTo(Math.max(...xs), 888, 1e-6);
+      assert.closeTo(Math.min(...ys), 112, 1e-6);
+      assert.closeTo(Math.max(...ys), 788, 1e-6);
+      assert.deepEqual(path.at(-1), path[0]);    // it's a ring
+      assert.lengthOf(path, 5);
+    });
+
+    it('does the same whichever way the ring goes around', () => {
+      const polygon = polygonOf('osm-w1', 800, 700);
+      polygon.geometry.local.outer.reverse();
+      layer.labelPolygons([polygon]);
+      const xs = paths[0].map(coord => coord[0]);
+      assert.closeTo(Math.min(...xs), 112, 1e-6);
+      assert.closeTo(Math.max(...xs), 888, 1e-6);
+    });
+
+    it('gives no label to a polygon under 600 pixels both ways', () => {
+      layer.labelPolygons([polygonOf('osm-w1', 500, 400)]);
+      assert.lengthOf(paths, 0);
+    });
+  });
+
   // Labels are placed over several frames: each frame takes what it has time for from the queue.
   describe('_placeQueued', () => {
     const viewBox = new Rapid.sdk.Extent([0, 0], [100, 100]);

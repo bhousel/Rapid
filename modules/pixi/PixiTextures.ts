@@ -21,9 +21,6 @@ interface TextureData {
   refcount: number;
 }
 
-/** DashLine texture cache */
-type DashTextureCache = Record<string, PIXI.Texture>;
-
 // How many texels a dash texture has for each pixel of its pattern.
 const DASH_TEXELS = 4;
 
@@ -52,8 +49,6 @@ export class PixiTextures {
   protected _textureData: Map<TextureKey, TextureData>;
   /** SVG symbol elements (or null if failed) keyed by icon name (e.g. 'temaki-school') */
   protected _svgIcons: Map<TextureID, SVGSymbolElement | null>;
-  /** Cached textures used by the DashLine plugin, keyed by dash pattern string */
-  protected _dashTextureCache: DashTextureCache;
   /** The dash patterns of `getDashTexture()`, keyed by dash pattern string */
   protected _dashTextures: Map<string, PIXI.Texture>;
 
@@ -81,8 +76,6 @@ export class PixiTextures {
     // Because SVGs take some time to texturize, store the svg data and texturize only if needed
     this._svgIcons = new Map<TextureID, SVGSymbolElement | null>();  // (e.g. 'temaki-school')
 
-    // DashLine plugin needs its own cache - we could eventually put these in an atlas.
-    this._dashTextureCache = {};
     this._dashTextures = new Map<string, PIXI.Texture>();
 
     // Prepare a "bundle" to load the pattern textures
@@ -149,7 +142,6 @@ export class PixiTextures {
 
     this._textureData.clear();
     this._svgIcons.clear();
-    this._dashTextureCache = {};
     this._dashTextures.clear();
 
     this._cacheGraphics();
@@ -188,7 +180,6 @@ export class PixiTextures {
    * Returns the texture of a dash pattern, for a `LineMesh`: one repeat of the pattern, white where
    * the line is drawn and clear in the gaps. It repeats along `u`, and it's the same all the way
    * across `v`, so one texture draws the pattern at any width, color and opacity.
-   * (Not for `DashLine`, which keeps textures of its own.)
    * @param dash - The pattern, as alternating lengths of dash and gap in pixels, e.g. `[10, 5]`
    * @return The texture, or `null` if the pattern has no length or there's no canvas to draw it on
    */

@@ -6,7 +6,7 @@ import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
 // A line always has a stroke. Its casing is drawn from zoom 16, if the style has one that can
 // be seen, and the mesh for it exists only then.
 describe('PixiFeatureLine', () => {
-  let feature, effectiveZoom, context;
+  let feature, effectiveZoom, context, haloParent;
   const dashTexture = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 16, height: 1 }) });
   const viewportAt = zoom => ({ transform: { zoom: zoom, rotation: 0 } });
 
@@ -26,6 +26,8 @@ describe('PixiFeatureLine', () => {
     context.systems.map = { effectiveZoom: () => effectiveZoom, wireframeMode: false };
     const gfx = { textureManager: { getTexture: () => null, getDashTexture: () => dashTexture } };
     const scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    haloParent = new PIXI.Container();
+    scene.layers.set('map-ui', { halo: haloParent });
     const layer = new AbstractPixiLayer(scene);
 
     const part = new Rapid.GeometryPart(context);
@@ -188,10 +190,113 @@ describe('PixiFeatureLine', () => {
     });
   });
 
-  it('works out the hit buffer only when the pointer comes near', () => {
-    drawAt(17, { casing: { width: 5 }, stroke: { width: 3 } });
-    const hitArea = feature.container.hitArea;
-    assert.isFalse(hitArea.contains(1e6, 1e6));
-    assert.isNull(hitArea._buffer);
+  // The line's first segment runs along x from its first point, and nothing else is near that point.
+  // The casing is 5 pixels wide, and a hit is good 5 pixels around it: 7.5 pixels from the line.
+  describe('the hit area', () => {
+    const style = { casing: { width: 5 }, stroke: { width: 3 } };
+
+    it('is the line with a few pixels around it', () => {
+      drawAt(17, style);    // a pixel is half a unit of the line's coordinates: 3.75 units
+      const [x, y] = feature.geometry.local.flat[0];
+      const hitArea = feature.container.hitArea;
+      assert.isTrue(hitArea.contains(x + 1, y), 'on the line');
+      assert.isTrue(hitArea.contains(x + 1, y + 3.5), 'beside it');
+      assert.isTrue(hitArea.contains(x + 1, y - 3.5), 'on its other side');
+      assert.isTrue(hitArea.contains(x - 3.5, y), 'past its end');
+      assert.isFalse(hitArea.contains(x + 1, y + 4), 'too far beside it');
+      assert.isFalse(hitArea.contains(x - 4, y), 'too far past its end');
+      assert.isFalse(hitArea.contains(1e6, 1e6));
+    });
+
+    it('is kept through a zoom, with the distance of the new zoom', () => {
+      drawAt(17, style);
+      const [x, y] = feature.geometry.local.flat[0];
+      const hitArea = feature.container.hitArea;
+      assert.isTrue(hitArea.contains(x + 1, y + 3.5));
+
+      drawAt(18);    // a pixel is a quarter of a unit: 1.875 units
+      assert.strictEqual(feature.container.hitArea, hitArea);
+      assert.isFalse(hitArea.contains(x + 1, y + 3.5));
+      assert.isTrue(hitArea.contains(x + 1, y + 1.8));
+    });
+
+    it('follows a line that changed', () => {
+      drawAt(17, style);
+      const hitArea = feature.container.hitArea;
+      const length = Math.abs(feature.geometry.local.flat[0][2] - feature.geometry.local.flat[0][0]);
+
+      // A line twice as long, along x only
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.002, 0]] });
+      feature.geometry = part;
+      drawAt(17);
+      const [x, y] = part.local.flat[0];
+      assert.strictEqual(feature.container.hitArea, hitArea);
+      assert.isTrue(hitArea.contains(x + 1.9 * length, y), 'on the new line, past the end of the old one');
+      assert.isFalse(hitArea.contains(x + length, y - length / 2), 'where the old line went');
+    });
+
+    it('is gone while the line is being drawn', () => {
+      feature.setClass('drawing');
+      drawAt(17, style);
+      assert.isNull(feature.container.hitArea);
+    });
+  });
+
+  describe('the select halo', () => {
+    const style = { casing: { width: 5 }, stroke: { width: 3 } };
+
+    it('is a dashed ring around the line, at the edge of its hit area', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const halo = feature.halo;
+      assert.strictEqual(halo.parent, haloParent);
+      assert.strictEqual(halo.children.length, 1);
+      assert.strictEqual(halo.children[0].texture, dashTexture);
+      assert.strictEqual(halo.tint, 0xffff00);
+      assert.deepEqual([halo.position.x, halo.position.y], [feature.container.position.x, feature.container.position.y]);
+
+      // The ring is 3.75 units from the line, and its own line is 1 unit wide (2 pixels).
+      const coords = feature.geometry.local.flat[0];
+      const positions = halo.children[0].geometry.positions;
+      assert.isAbove(positions.length, 16);
+      for (let i = 0; i < positions.length; i += 2) {
+        assert.isTrue(Rapid.geomStrokeContains(coords, 3.75 + 1.1, positions[i], positions[i + 1]), `vertex ${i / 2} is too far from the line`);
+        assert.isFalse(Rapid.geomStrokeContains(coords, 3.75 - 1.1, positions[i], positions[i + 1]), `vertex ${i / 2} is too near the line`);
+      }
+    });
+
+    it('is two rings for a line that ends where it starts', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.001], [0, 0.001], [0, 0]] });
+      feature.geometry = part;
+      feature.setClass('select');
+      drawAt(17, style);
+      assert.strictEqual(feature.halo.children.length, 2);
+    });
+
+    it('keeps its meshes through a zoom, and is destroyed with them when the line isn\'t selected', () => {
+      feature.setClass('select');
+      drawAt(17, style);
+      const halo = feature.halo;
+      const ring = halo.children[0];
+
+      drawAt(18);
+      assert.strictEqual(feature.halo, halo);
+      assert.strictEqual(halo.children[0], ring);
+
+      feature.unsetClass('select');
+      drawAt(18);
+      assert.isNull(feature.halo);
+      assert.isTrue(halo.destroyed);
+      assert.isTrue(ring.destroyed);
+    });
+
+    it('is not drawn while the line is being drawn', () => {
+      feature.setClass('select');
+      feature.setClass('drawing');
+      drawAt(17, style);
+      assert.isNull(feature.halo);
+    });
   });
 });

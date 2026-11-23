@@ -1,296 +1,66 @@
 import * as PIXI from 'pixi.js';
-import { vecEqual, vecLength, type Vec2 } from '@rapid-sdk/math';
+import { geomStrokeMesh } from '../geo/index.ts';
+import { LineMesh } from './lib/LineMesh.ts';
+
+import type { PixiTextures } from './PixiTextures.ts';
 
 
-/** Line style options for lineToPoly */
-export interface LineStyle {
-  alignment?: number;
-  width?: number;
-  native?: boolean;
-  [key: string]: any;
-}
+// The halo around what's selected: a yellow line 2 pixels wide, in dashes of 6 with gaps of 3.
+const HALO_COLOR = 0xffff00;
+const HALO_ALPHA = 0.9;
+const HALO_WIDTH = 2;
+const HALO_DASH = [6, 3];
 
-/** Result from lineToPoly containing paths for hit areas */
-export interface LineToPolyResult {
-  /** Flattened [x,y,x,y,...] coordinates for perimeter */
-  perimeter: number[];
-  /** Flattened outer path (for closed lines only) */
-  outer?: number[];
-  /** Flattened inner path (for closed lines only) */
-  inner?: number[];
+
+/**
+ * Draws rings as lines, each a `LineMesh` child of a container. The children are made as rings
+ * come and destroyed as they go, so call it again with the container it drew into before.
+ * The container's `tint` and `alpha` color them.
+ * @param parent - The container to draw into. Nothing else should be in it.
+ * @param rings - The rings, each as `[x, y, x, y, …]` in the container's coordinates (its last point may repeat its first)
+ * @param width - The lines' width, in those coordinates
+ * @param dashTexture - The dash pattern, for dashed lines (`PixiTextures.getDashTexture()`)
+ * @param dashLength - The length of one repeat of that pattern, in those coordinates
+ */
+export function drawRings(
+  parent: PIXI.Container, rings: ArrayLike<number>[], width: number,
+  dashTexture: PIXI.Texture | null = null, dashLength: number = 0
+): void {
+  while (parent.children.length > rings.length) {   // a ring fewer than before
+    parent.children[parent.children.length - 1].destroy();
+  }
+
+  for (let i = 0; i < rings.length; i++) {
+    let mesh = parent.children[i] as LineMesh | undefined;
+    if (!mesh) {
+      mesh = new LineMesh();
+      mesh.label = `ring${i}`;
+      mesh.eventMode = 'none';
+      mesh.sortableChildren = false;
+      parent.addChild(mesh);
+    }
+    // (a miter longer than the line is wide becomes a bevel: an outline can turn sharply)
+    const strokeMesh = geomStrokeMesh(rings[i], { closed: true, cap: 'butt', join: 'miter', miterLimit: 2 });
+    mesh.setStroke(strokeMesh, width / 2, dashTexture, dashLength);
+  }
 }
 
 
 /**
- * Generates a polygon from a line. Intended for use to create custom hit areas for our ways.
- * @see https://jsfiddle.net/bigtimebuddy/xspmq8au/
- * @param   width  - Width of the polygon in pixels (deviation from either side of the line)
- * @param   points - Flat array of [x,y,x,y,...] coordinates that make up the line.
- * @return  The polygon encasing the line with specified width.
+ * Draws the halo of a selected feature: dashed yellow lines along the rings.
+ * @param halo - The feature's halo container (see `drawRings`)
+ * @param rings - The rings to draw, in the container's coordinates
+ * @param scale - How many of those coordinates a screen pixel is
+ * @param textures - The texture manager, for the dash pattern
  */
-export function lineToPolygon(width: number, points: number[]): PIXI.Polygon {
-  const numPoints = points.length / 2;
-  const output = new Array(points.length * 2);
-  for (let i = 0; i < numPoints; i++) {
-    const j = i * 2;
-
-    // Position of current point
-    const x = points[j];
-    const y = points[j + 1];
-
-    // Start
-    const x0 = points[j - 2] !== undefined ? points[j - 2] : x;
-    const y0 = points[j - 1] !== undefined ? points[j - 1] : y;
-
-    // End
-    const x1 = points[j + 2] !== undefined ? points[j + 2] : x;
-    const y1 = points[j + 3] !== undefined ? points[j + 3] : y;
-
-    // Get the angle of the line
-    const a = Math.atan2(-x1 + x0, y1 - y0);
-    const deltaX = width * Math.cos(a);
-    const deltaY = width * Math.sin(a);
-
-    // Add the x, y at the beginning
-    output[j] = x + deltaX;
-    output[j + 1] = y + deltaY;
-
-    // Add the reflected x, y at the end
-    output[(output.length - 1) - j - 1] = x - deltaX;
-    output[(output.length - 1) - j] = y - deltaY;
+export function drawHalo(halo: PIXI.Container, rings: ArrayLike<number>[], scale: number, textures: PixiTextures): void {
+  let dashLength = 0;
+  for (const part of HALO_DASH) {
+    dashLength += part * scale;
   }
-
-  // close the shape
-  output.push(output[0], output[1]);
-  return new PIXI.Polygon(output);
-}
-
-
-/**
- * Use Pixi's built-in line builder to convert a line with some width into a polygon.
- * @see https://github.com/pixijs/pixijs/blob/dev/packages/graphics/src/utils/buildLine.ts
- * @param  flatPoints - Flat array of [x,y,x,y,...] points that make up the line
- * @param  lineStyle  - Object suitable to use as a lineStyle (important options are alignment and width)
- * @return Result containing perimeter and optionally outer/inner paths
- */
-export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): LineToPolyResult {
-  const EPSILON = 1e-4;
-  const first: Vec2 = [flatPoints[0], flatPoints[1]];
-  const last: Vec2 = [flatPoints[flatPoints.length - 2], flatPoints[flatPoints.length - 1]];
-  const isClosed = vecEqual(first, last, EPSILON);
-
-  lineStyle.native = false;  // we want the non-native line builder
-
-  // Make some fake graphicsData and graphicsGeometry.
-  // (I'm avoiding using a real PIXI.Graphic because I dont want to affect the batch system)
-//  const graphicsData = { shape: sourceShape, lineStyle: lineStyle };
-  const graphicsGeometry = { closePointEps: EPSILON, indices: [], verts: [], uvs: [] };
-
-  // Pixi will do the work for us.
-// v7
-//  PIXI.buildLine(graphicsData, graphicsGeometry);
-// v8
-  PIXI.buildLine(
-    flatPoints,
-    lineStyle,
-    false,  // flipAlignment
-    isClosed,
-    graphicsGeometry.verts,
-    graphicsGeometry.indices
-  );
-
-
-  // The `graphicsGeometry` now contains the points as they would be drawn (as a strip of triangles).
-  // What we really want is a polygon representing the outer shape.
-  //
-  // Some findings about the `buildLine` triangulation code:
-  //  - PIXI doesn't actually use GL_TRIANGLE_STRIP here, they are just normal GL_TRIANGLES.
-  //  - They are a mix of ccw/cw winding (they don't follow the "ccw = frontface" convention)
-  //  - Rounded caps/joins can add a lot of triangles, the code below can't handle them
-  //  - Triangles with small area may be skipped (they appear in verts but not in indices)
-  //
-  // (it looks something like this)
-  //
-  //                        7 +…_
-  //                         / \ "-…_
-  //  L  0        2       4 / F \ G  + 8
-  //     +-------_+-------_+…_   \  /
-  //     | A _…-" | C _…-" |  "-…_\/
-  //     |_-"   B |_-"   D | E _…-+
-  //     +--------+--------+-""    6
-  //  R  1        3        5
-  //
-  //  triangle:  A ccw  B cw   C ccw  D cw   E ccw  F ccw  G cw
-  //   indices:  0 1 2  1 2 3  2 3 4  3 4 5  4 5 6  4 6 7  6 7 8  …
-  //      side:  L R L  R L R  L R L  R L R  L R R  L R L  R L R  …
-
-  const verts = graphicsGeometry.verts;
-  const indices = graphicsGeometry.indices;
-
-  const sides = new Map<number, boolean>();  // Map(index -> what side it's on) (`true` if left, `false` if right)
-  const pathL: Vec2[] = [];
-  const pathR: Vec2[] = [];
-  let lastL: Vec2 | undefined;
-  let lastR: Vec2 | undefined;
-  let lenL = 0;
-  let lenR = 0;
-
-  // Sometimes `buildLine` skips triangles if they are too small, so keep track
-  // of the previous triangle's verts and indices in case we need them.
-  let vp0: Vec2 | undefined;
-  let vp1: Vec2 | undefined;
-  let vp2: Vec2 | undefined;
-  let ip0: number | undefined;
-  let ip1: number | undefined;
-  let ip2: number | undefined;
-
-  // Inspect each triangle in the strip.
-  for (let j = 0; j < indices.length; j += 3) {
-    const i0 = indices[j];
-    const i1 = indices[j + 1];
-    const i2 = indices[j + 2];
-    const v0: Vec2 = [ verts[(i0 * 2)], verts[(i0 * 2) + 1] ];
-    const v1: Vec2 = [ verts[(i1 * 2)], verts[(i1 * 2) + 1] ];
-    const v2: Vec2 = [ verts[(i2 * 2)], verts[(i2 * 2) + 1] ];
-
-    // First triangle
-    // Pick index 0 as the "left side" and index 1 as the "right side"
-    if (j === 0) {
-      sides.set(i0, true);   // left
-      sides.set(i1, false);  // right
-      sides.set(i2, true);   // left
-      pathL.push(v0);
-      pathR.push(v1);
-      pathL.push(v2);
-      lastR = v1;
-      lastL = v2;
-      lenL = vecLength(v0, v2);
-
-    // Subsequent triangles
-    // Each subsequent triangle in the strip should have:
-    // - two "seen" vertices where we know their sides, and
-    // - one "new" vertex where we need to figure out what side of the line it's on.
-    } else {
-      let s0 = sides.get(i0);
-      let s1 = sides.get(i1);
-      let s2 = sides.get(i2);
-
-      // Sometimes `buildLine` skips triangles - (their verts appear in the vertex array but not the index array)
-      // So first - check if any of the "new" verts in this triangle happen to match the previous triangle's verts
-      if (s0 === undefined && vecEqual(v0, vp0!, EPSILON)) {  // v0 and vp0 are the same point
-        s0 = sides.get(ip0!);
-        sides.set(i0, s0!);
-      }
-      if (s1 === undefined && vecEqual(v1, vp1!, EPSILON)) {  // v1 and vp1 are the same point
-        s1 = sides.get(ip1!);
-        sides.set(i1, s1!);
-      }
-      if (s2 === undefined && vecEqual(v2, vp2!, EPSILON)) {  // v2 and vp2 are the same point
-        s2 = sides.get(ip2!);
-        sides.set(i2, s2!);
-      }
-
-      // Given 2 "seen" vertex sides, what side would the third vertex be on?
-      // `buildLine` puts the new side on the opposite of the "previous" vertex side.
-      // There is no requirement to build the lines this way, it's just how `buildLine` works.
-      // (round caps and joins aren't always this way, so this code doesn't support them!)
-
-      // One of these should be the "new" vertex..
-      let inew: number | undefined;
-      let vnew: Vec2 | undefined;
-      let snew: boolean | undefined;
-      if (s0 === undefined) {
-        inew = i0;
-        vnew = v0;
-        snew = !s2;
-      }
-      if (s1 === undefined) {
-        inew = i1;
-        vnew = v1;
-        snew = !s0;
-      }
-      if (s2 === undefined) {
-        inew = i2;
-        vnew = v2;
-        snew = !s1;
-      }
-
-      // Append the new vertex to either the left or right side path
-      if (inew !== undefined && vnew !== undefined && snew !== undefined) {
-        sides.set(inew, snew);  // snew = `true` if left, `false` if right
-        if (snew === true) {
-          pathL.push(vnew);
-          if (lastL) lenL += vecLength(lastL, vnew);
-          lastL = vnew;
-        } else {
-          pathR.push(vnew);
-          if (lastR) lenR += vecLength(lastR, vnew);
-          lastR = vnew;
-        }
-      }  // else we've seen all these vertices before - shouldnt happen?
-    }
-
-    // Remember current verts and indices for next loop iteration
-    vp0 = v0; vp1 = v1; vp2 = v2;
-    ip0 = i0; ip1 = i1; ip2 = i2;
-  }
-
-
-  const result: LineToPolyResult = {
-    perimeter: []
-  };
-
-  // This path can be used as an array of points for the hitArea.
-  // Go out on one side and back on the other, then close it off.
-  const len = pathL.length + pathR.length + 1;
-  const perimeter: number[] = new Array(len * 2);
-  let i = 0;
-  for (let j = 0; j < pathL.length; ++i, ++j) {   // flatten coords
-    perimeter[i * 2] = pathL[j][0];
-    perimeter[i * 2 + 1] = pathL[j][1];
-  }
-
-  pathR.reverse();
-  for (let j = 0; j < pathR.length; ++i, ++j) {   // flatten coords
-    perimeter[i * 2] = pathR[j][0];
-    perimeter[i * 2 + 1] = pathR[j][1];
-  }
-  // close the shape
-  perimeter[perimeter.length - 2] = perimeter[0];
-  perimeter[perimeter.length - 1] = perimeter[1];
-
-  result.perimeter = perimeter;
-
-  // If the line was closed, determine which path is longer (outer) and shorter (inner)
-  if (isClosed) {
-    const pointsL: number[] = new Array((pathL.length + 1) * 2);
-    for (let j = 0; j < pathL.length; ++j) {   // flatten coords
-      pointsL[j * 2] = pathL[j][0];
-      pointsL[j * 2 + 1] = pathL[j][1];
-    }
-    // close the shape
-    pointsL[pointsL.length - 2] = pathL[0][0];
-    pointsL[pointsL.length - 1] = pathL[0][1];
-
-    const pointsR: number[] = new Array((pathR.length + 1) * 2);
-    for (let j = 0; j < pathR.length; ++j) {   // flatten coords
-      pointsR[j * 2] = pathR[j][0];
-      pointsR[j * 2 + 1] = pathR[j][1];
-    }
-    // close the shape
-    pointsR[pointsR.length - 2] = pathR[0][0];
-    pointsR[pointsR.length - 1] = pathR[0][1];
-
-    if (lenL > lenR) {
-      result.outer = pointsL;
-      result.inner = pointsR;
-    } else {
-      result.outer = pointsR;
-      result.inner = pointsL;
-    }
-  }
-
-  return result;
+  halo.tint = HALO_COLOR;
+  halo.alpha = HALO_ALPHA;
+  drawRings(halo, rings, HALO_WIDTH * scale, textures.getDashTexture(HALO_DASH), dashLength);
 }
 
 

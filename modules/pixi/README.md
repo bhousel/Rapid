@@ -67,8 +67,8 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 
 | File | Description |
 |------|-------------|
-| `LineMesh.ts` | Draws a line's casing or stroke from its stroke mesh |
-| `DashLine.ts` | Dashed line rendering (halos, area outlines) |
+| `LineMesh.ts` | Draws a line's casing or stroke, an area's outline, a halo or the lasso from a stroke mesh |
+| `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
 | `RenderStats.ts` | Frame stats from Pixi's instructions, WebGL call counts, GPU timing |

@@ -128,6 +128,97 @@ function closeTo(actual, expected, message, epsilon = 1e-4) {
 }
 
 
+// Whether a point is inside a ring `[x, y, x, y, …]` (crossing an odd number of its edges on the way out).
+function insideRing(px, py, ring) {
+  let inside = false;
+  for (let i = 0; i + 3 < ring.length; i += 2) {
+    const ax = ring[i];
+    const ay = ring[i + 1];
+    const bx = ring[i + 2];
+    const by = ring[i + 3];
+    if ((ay > py) !== (by > py) && px < ax + (py - ay) * (bx - ax) / (by - ay)) inside = !inside;
+  }
+  return inside;
+}
+
+// The points of a ring as `[[x, y], …]`, rounded so they can be compared.
+function pointsOf(ring) {
+  const points = [];
+  for (let i = 0; i < ring.length; i += 2) {
+    points.push([Math.round(ring[i] * 1e6) / 1e6 + 0, Math.round(ring[i + 1] * 1e6) / 1e6 + 0]);
+  }
+  return points;
+}
+
+// Whether a ring has a point (to within a millionth).
+function hasPoint(ring, x, y) {
+  for (let i = 0; i < ring.length; i += 2) {
+    if (Math.abs(ring[i] - x) < 1e-6 && Math.abs(ring[i + 1] - y) < 1e-6) return true;
+  }
+  return false;
+}
+
+// The area inside a ring, positive whichever way it goes around.
+function ringArea(ring) {
+  let area = 0;
+  for (let i = 0; i + 3 < ring.length; i += 2) {
+    area += ring[i] * ring[i + 3] - ring[i + 2] * ring[i + 1];
+  }
+  return Math.abs(area) / 2;
+}
+
+// A line that keeps going right, so it never comes near itself: x grows by 12 to 30 a step.
+function gentleLine(random) {
+  const coords = [];
+  const n = 2 + Math.floor(random() * 10);
+  let x = 0;
+  for (let i = 0; i < n; i++) {
+    coords.push(x, (random() - 0.5) * 40);
+    x += 12 + random() * 18;
+  }
+  return coords;
+}
+
+// A line that wanders in a small box: short segments, sharp turns, points that repeat, steps back the way it came.
+function roughLine(random) {
+  const coords = [0, 0];
+  const n = 2 + Math.floor(random() * 14);
+  let x = 0;
+  let y = 0;
+  let angle = random() * 2 * Math.PI;
+  for (let i = 0; i < n; i++) {
+    const pick = random();
+    if (pick < 0.1) {                    // the same point again
+      coords.push(x, y);
+      continue;
+    } else if (pick < 0.2) {             // straight back
+      angle += Math.PI;
+    } else if (pick < 0.5) {             // a slight bend
+      angle += (random() - 0.5) * 0.4;
+    } else {                             // anywhere
+      angle = random() * 2 * Math.PI;
+    }
+    const step = 1 + random() * 5;
+    x += Math.cos(angle) * step;
+    y += Math.sin(angle) * step;
+    coords.push(x, y);
+  }
+  return coords;
+}
+
+// Points to test: on a grid over the box of the stroke, moved off the grid so none is on an edge.
+function* samples(coords, pad, random, perSide = 24) {
+  const box = boxOf(coords);
+  const w = box[2] - box[0] + 2 * pad;
+  const h = box[3] - box[1] + 2 * pad;
+  for (let i = 0; i < perSide; i++) {
+    for (let j = 0; j < perSide; j++) {
+      yield [box[0] - pad + (i + random()) * w / perSide, box[1] - pad + (j + random()) * h / perSide];
+    }
+  }
+}
+
+
 describe('geomStrokeMesh', () => {
 
   describe('lines with nothing to draw', () => {
@@ -473,58 +564,6 @@ describe('geomStrokeMesh', () => {
   });
 
 
-  // A line that keeps going right, so it never comes near itself: x grows by 12 to 30 a step.
-  function gentleLine(random) {
-    const coords = [];
-    const n = 2 + Math.floor(random() * 10);
-    let x = 0;
-    for (let i = 0; i < n; i++) {
-      coords.push(x, (random() - 0.5) * 40);
-      x += 12 + random() * 18;
-    }
-    return coords;
-  }
-
-  // A line that wanders in a small box: short segments, sharp turns, points that repeat, steps back the way it came.
-  function roughLine(random) {
-    const coords = [0, 0];
-    const n = 2 + Math.floor(random() * 14);
-    let x = 0;
-    let y = 0;
-    let angle = random() * 2 * Math.PI;
-    for (let i = 0; i < n; i++) {
-      const pick = random();
-      if (pick < 0.1) {                    // the same point again
-        coords.push(x, y);
-        continue;
-      } else if (pick < 0.2) {             // straight back
-        angle += Math.PI;
-      } else if (pick < 0.5) {             // a slight bend
-        angle += (random() - 0.5) * 0.4;
-      } else {                             // anywhere
-        angle = random() * 2 * Math.PI;
-      }
-      const step = 1 + random() * 5;
-      x += Math.cos(angle) * step;
-      y += Math.sin(angle) * step;
-      coords.push(x, y);
-    }
-    return coords;
-  }
-
-  // Points to test: on a grid over the box of the stroke, moved off the grid so none is on an edge.
-  function* samples(coords, pad, random, perSide = 24) {
-    const box = boxOf(coords);
-    const w = box[2] - box[0] + 2 * pad;
-    const h = box[3] - box[1] + 2 * pad;
-    for (let i = 0; i < perSide; i++) {
-      for (let j = 0; j < perSide; j++) {
-        yield [box[0] - pad + (i + random()) * w / perSide, box[1] - pad + (j + random()) * h / perSide];
-      }
-    }
-  }
-
-
   describe(`${SEEDS} random lines, from seed ${FIRST_SEED}`, () => {
 
     it('a round stroke covers what is within half a width of a gentle line, once, and nothing else', () => {
@@ -610,3 +649,285 @@ describe('geomStrokeMesh', () => {
 
 });
 
+
+describe('geomStrokeOutline', () => {
+
+  describe('lines with nothing around them', () => {
+    it('returns no ring for fewer than two points', () => {
+      for (const coords of [[], [5, 5], [5, 5, 5, 5]]) {
+        const outline = Rapid.geomStrokeOutline(coords, 2);
+        assert.equal(outline.outer.length, 0);
+        assert.equal(outline.inner, null);
+      }
+    });
+  });
+
+  describe('an open line', () => {
+    it('has a rectangle around a single segment, with butt caps', () => {
+      const outline = Rapid.geomStrokeOutline([0, 0, 10, 0], 2);
+      assert.deepEqual(pointsOf(outline.outer), [[0, 2], [10, 2], [10, -2], [0, -2], [0, 2]]);
+      assert.equal(outline.inner, null);
+    });
+
+    it('goes the distance past the ends with square caps', () => {
+      const outline = Rapid.geomStrokeOutline([0, 0, 10, 0], 2, { cap: 'square' });
+      assert.deepEqual(pointsOf(outline.outer), [[-2, 2], [12, 2], [12, -2], [-2, -2], [-2, 2]]);
+    });
+
+    it('goes around the ends in half circles with round caps', () => {
+      const coords = [0, 0, 10, 0];
+      const ring = Rapid.geomStrokeOutline(coords, 2, { cap: 'round', roundSlices: 10 }).outer;
+      assert.equal(ring.length / 2, 2 * 11 + 1);    // 11 points around each end, and the first again
+      for (let i = 0; i < ring.length; i += 2) {
+        closeTo(distanceToLine(ring[i], ring[i + 1], coords, false), 2, `point ${i / 2}`, 1e-9);
+      }
+      assert.ok(hasPoint(ring, 12, 0), 'the tip of the cap');
+      assert.ok(hasPoint(ring, -2, 0));
+    });
+
+    it('ends with its first point', () => {
+      const ring = Rapid.geomStrokeOutline([0, 0, 10, 0, 10, 10, 3, 4], 1.5, { cap: 'round', join: 'round' }).outer;
+      assert.equal(ring[ring.length - 2], ring[0]);
+      assert.equal(ring[ring.length - 1], ring[1]);
+    });
+
+    it('is the same with or without points that repeat', () => {
+      const plain = Rapid.geomStrokeOutline([0, 0, 10, 0, 10, 10], 2).outer;
+      const repeated = Rapid.geomStrokeOutline([0, 0, 0, 0, 10, 0, 10, 0, 10, 10, 10, 10], 2).outer;
+      assert.deepEqual(pointsOf(repeated), pointsOf(plain));
+    });
+
+    it('returns arrays of its own', () => {
+      const first = Rapid.geomStrokeOutline([0, 0, 10, 0], 2).outer;
+      const copy = Array.from(first);
+      Rapid.geomStrokeOutline([50, 50, 60, 70, 80, 20], 5, { cap: 'round' });
+      assert.deepEqual(Array.from(first), copy);
+    });
+  });
+
+  describe('corners', () => {
+    // It goes right, then up: the left side is the inside of the corner, the right side the outside.
+    const corner = [0, 0, 10, 0, 10, 10];
+
+    it('has one point on the inside, where the two edges cross', () => {
+      for (const join of ['bevel', 'miter', 'round']) {
+        const ring = Rapid.geomStrokeOutline(corner, 2, { join: join }).outer;
+        assert.deepEqual(pointsOf(ring).slice(0, 3), [[0, 2], [8, 2], [8, 10]], join);
+      }
+    });
+
+    it('goes to the tip of a miter on the outside', () => {
+      const ring = Rapid.geomStrokeOutline(corner, 2, { join: 'miter' }).outer;
+      assert.deepEqual(pointsOf(ring), [[0, 2], [8, 2], [8, 10], [12, 10], [12, -2], [0, -2], [0, 2]]);
+    });
+
+    it('cuts a bevel across the outside', () => {
+      const ring = Rapid.geomStrokeOutline(corner, 2, { join: 'bevel' }).outer;
+      assert.deepEqual(pointsOf(ring), [[0, 2], [8, 2], [8, 10], [12, 10], [12, 0], [10, -2], [0, -2], [0, 2]]);
+    });
+
+    it('cuts a miter that is too long as a bevel', () => {
+      const ring = Rapid.geomStrokeOutline(corner, 2, { join: 'miter', miterLimit: 1.2 }).outer;
+      assert.ok(!hasPoint(ring, 12, -2));
+      assert.ok(hasPoint(ring, 12, 0));
+      assert.ok(hasPoint(ring, 10, -2));
+    });
+
+    it('goes around the outside in an arc with a round join', () => {
+      const ring = Rapid.geomStrokeOutline(corner, 2, { join: 'round', roundSlices: 10 }).outer;
+      assert.equal(ring.length / 2, 3 + 1 + 6 + 1 + 1);    // the inside, the far end, 6 points around a quarter circle, the start, the first again
+      for (let i = 8; i < 8 + 12; i += 2) {
+        closeTo(Math.hypot(ring[i] - 10, ring[i + 1]), 2, `point ${i / 2}`, 1e-9);
+      }
+    });
+
+    it('treats a corner of a few degrees as straight, on both sides', () => {
+      const ring = Rapid.geomStrokeOutline([0, 0, 10, 0, 20, 1], 2, { join: 'round' }).outer;
+      assert.equal(ring.length / 2, 6 + 1);
+    });
+
+    it('goes to where the edges cross on the inside of a sharp corner, if its segments are long enough', () => {
+      // The line turns back by all but 11°: the edges cross 20.4 away from the corner.
+      const ring = Rapid.geomStrokeOutline([0, 0, 100, 0, 0, 20], 2).outer;
+      closeTo(Math.hypot(ring[2] - 100, ring[3]), 2 / Math.sin(Math.atan2(20, 100) / 2), 'the inside', 1e-6);
+      closeTo(distanceToLine(ring[2], ring[3], [0, 0, 100, 0, 0, 20], false), 2, 'from the line', 1e-6);
+    });
+
+    it('stays within two distances of a sharp corner whose segments are too short for that', () => {
+      const ring = Rapid.geomStrokeOutline([0, 0, 10, 0, 0, 2], 2).outer;
+      closeTo(Math.hypot(ring[2] - 10, ring[3]), 4, 'the inside', 1e-6);
+    });
+
+    it('goes to where the edges cross on the inside of a gentle corner, whatever the length of its segments', () => {
+      // A step of 1 in a line that's outlined 5 away: the outline doubles back there, a little.
+      const coords = [0, 0, 20, 0, 21, 0.5, 41, 0.5];
+      const ring = Rapid.geomStrokeOutline(coords, 5).outer;
+      for (let i = 0; i < ring.length; i += 2) {
+        const distance = distanceToLine(ring[i], ring[i + 1], coords, false);
+        assert.ok(distance > 4.9 && distance < 5.2, `point ${i / 2} is ${distance} from the line`);
+      }
+    });
+  });
+
+  describe('a closed line', () => {
+    const square = [0, 0, 10, 0, 10, 10, 0, 10];
+
+    it('has a ring outside it and a ring inside it', () => {
+      const outline = Rapid.geomStrokeOutline(square, 2, { closed: true });
+      const outer = pointsOf(outline.outer);
+      const inner = pointsOf(outline.inner);
+      assert.deepEqual(outer.slice(0, 4).sort(), [[-2, -2], [-2, 12], [12, -2], [12, 12]]);
+      assert.deepEqual(inner.slice(0, 4).sort(), [[2, 2], [2, 8], [8, 2], [8, 8]]);
+      assert.deepEqual(outer[4], outer[0]);
+      assert.deepEqual(inner[4], inner[0]);
+    });
+
+    it('knows the inside from the outside whichever way the points go around', () => {
+      const reversed = [0, 10, 10, 10, 10, 0, 0, 0];
+      const outline = Rapid.geomStrokeOutline(reversed, 2, { closed: true });
+      closeTo(ringArea(outline.outer), 14 * 14);
+      closeTo(ringArea(outline.inner), 6 * 6);
+    });
+
+    it('is the same whether or not the last point repeats the first', () => {
+      const plain = Rapid.geomStrokeOutline(square, 2, { closed: true, join: 'round' });
+      const repeated = Rapid.geomStrokeOutline([...square, 0, 0], 2, { closed: true, join: 'round' });
+      assert.deepEqual(pointsOf(repeated.outer), pointsOf(plain.outer));
+      assert.deepEqual(pointsOf(repeated.inner), pointsOf(plain.inner));
+    });
+
+    it('rounds the corners of the outside ring, not of the inside one', () => {
+      const outline = Rapid.geomStrokeOutline(square, 2, { closed: true, join: 'round', roundSlices: 10 });
+      assert.equal(outline.outer.length / 2, 4 * 6 + 1);
+      assert.equal(outline.inner.length / 2, 4 + 1);
+      closeTo(ringArea(outline.outer), 100 + 4 * 20 + Math.PI * 4, 'the outside', 0.5);    // (a little less: the arcs are chords)
+    });
+
+    it('treats a ring of two points as an open line', () => {
+      const outline = Rapid.geomStrokeOutline([0, 0, 10, 0], 2, { closed: true });
+      assert.equal(outline.inner, null);
+      assert.equal(outline.outer.length / 2, 5);
+    });
+  });
+
+  describe(`${SEEDS} random lines, from seed ${FIRST_SEED}`, () => {
+
+    it('a round outline has inside it what is within the distance of a gentle line, and nothing else', () => {
+      for (let seed = FIRST_SEED; seed < FIRST_SEED + SEEDS; seed++) {
+        const random = makeRandom(seed);
+        const coords = gentleLine(random);
+        const distance = 0.3 + random() * 1.2;    // (small enough for every inside corner of such a line)
+        const ring = Rapid.geomStrokeOutline(coords, distance, { cap: 'round', join: 'round' }).outer;
+
+        for (const [x, y] of samples(coords, distance * 1.5, random)) {
+          const from = distanceToLine(x, y, coords, false);
+          if (from < distance * 0.985) {
+            assert.ok(insideRing(x, y, ring), `seed ${seed}: ${x},${y} is ${from} from the line (distance ${distance}), outside the outline`);
+          } else if (from > distance * 1.011) {
+            assert.ok(!insideRing(x, y, ring), `seed ${seed}: ${x},${y} is ${from} from the line (distance ${distance}), inside the outline`);
+          }
+        }
+      }
+    });
+
+    it('an outline of any cap and join is whole, and stays within reach of the line', () => {
+      const caps = ['butt', 'round', 'square'];
+      const joins = ['bevel', 'miter', 'round'];
+      for (let seed = FIRST_SEED; seed < FIRST_SEED + SEEDS; seed++) {
+        const random = makeRandom(seed);
+        const coords = roughLine(random);
+        const cap = caps[Math.floor(random() * 3)];
+        const join = joins[Math.floor(random() * 3)];
+        const closed = random() < 0.3;
+        const miterLimit = 1 + random() * 9;
+        const distance = 0.2 + random() * 3;
+        const outline = Rapid.geomStrokeOutline(coords, distance, { cap: cap, join: join, closed: closed, miterLimit: miterLimit });
+        const message = `seed ${seed} (${cap}, ${join}, distance ${distance})`;
+
+        const numDistinct = countDistinct(coords);
+        const isRing = closed && numDistinct >= 3;
+        if (numDistinct < 2) {
+          assert.equal(outline.outer.length, 0, message);
+          continue;
+        }
+        assert.equal(outline.inner !== null, isRing, message);
+
+        // No point is further from the line than the join, the cap or the inside of a corner allows.
+        const reach = distance * Math.max(2, (join === 'miter') ? miterLimit : 0) + 1e-6;
+        for (const ring of [outline.outer, outline.inner]) {
+          if (!ring) continue;
+          assert.ok(ring.length >= 4, message);
+          assert.equal(ring[ring.length - 2], ring[0], message);
+          assert.equal(ring[ring.length - 1], ring[1], message);
+          for (let i = 0; i < ring.length; i += 2) {
+            assert.ok(Number.isFinite(ring[i]) && Number.isFinite(ring[i + 1]), `${message}: point ${i / 2} is ${ring[i]},${ring[i + 1]}`);
+            const from = distanceToLine(ring[i], ring[i + 1], coords, isRing);
+            assert.ok(from <= reach, `${message}: point ${i / 2} is ${from} from the line`);
+            assert.ok(Rapid.geomStrokeContains(coords, reach, ring[i], ring[i + 1], isRing), `${message}: point ${i / 2}`);
+          }
+        }
+      }
+    });
+  });
+
+});
+
+
+describe('geomStrokeContains', () => {
+  const corner = [0, 0, 10, 0, 10, 10];
+
+  it('has the points within the distance of the line', () => {
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 5, 0), true, 'on the line');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 5, 1.9), true, 'beside it');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 5, -2), true, 'at the distance');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 11.9, 5), true, 'beside the second segment');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 5, 2.1), false, 'further than the distance');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 5, 5), false, 'between the segments');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 500, 500), false, 'far away');
+  });
+
+  it('is round at the ends and at the corners', () => {
+    assert.equal(Rapid.geomStrokeContains(corner, 2, -1.9, 0), true, 'past the end');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, -1.5, 1.5), false, 'past the end, at its corner');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 11.4, -1.4), true, 'around the corner');
+    assert.equal(Rapid.geomStrokeContains(corner, 2, 11.5, -1.5), false, 'at the tip of a miter');
+  });
+
+  it('counts the segment from the last point to the first only for a closed line', () => {
+    const triangle = [0, 0, 10, 0, 10, 10];
+    assert.equal(Rapid.geomStrokeContains(triangle, 1, 5, 5), false);
+    assert.equal(Rapid.geomStrokeContains(triangle, 1, 5, 5, true), true);
+    assert.equal(Rapid.geomStrokeContains([0, 0, 10, 0, 10, 10, 0, 0], 1, 5, 5, true), true, 'with the first point repeated');
+  });
+
+  it('has the points around a single point', () => {
+    assert.equal(Rapid.geomStrokeContains([5, 5], 2, 6, 6), true);
+    assert.equal(Rapid.geomStrokeContains([5, 5], 2, 7, 7), false);
+    assert.equal(Rapid.geomStrokeContains([5, 5, 5, 5], 2, 6, 6), true, 'repeated');
+  });
+
+  it('has nothing for no line, or a distance that isn\'t one', () => {
+    assert.equal(Rapid.geomStrokeContains([], 2, 0, 0), false);
+    assert.equal(Rapid.geomStrokeContains(corner, NaN, 5, 0), false);
+    assert.equal(Rapid.geomStrokeContains(corner, -1, 5, 0), false);
+  });
+
+  it('reads typed arrays too', () => {
+    assert.equal(Rapid.geomStrokeContains(new Float64Array(corner), 2, 5, 1), true);
+  });
+
+  it(`agrees with the distance to ${SEEDS} random lines, from seed ${FIRST_SEED}`, () => {
+    for (let seed = FIRST_SEED; seed < FIRST_SEED + SEEDS; seed++) {
+      const random = makeRandom(seed);
+      const coords = roughLine(random);
+      const closed = random() < 0.3;
+      const hw = 0.2 + random() * 3;
+      const isRing = closed && coords.length > 4;
+      for (const [x, y] of samples(coords, hw * 1.5, random, 12)) {
+        const distance = distanceToLine(x, y, coords, isRing);
+        if (Math.abs(distance - hw) < 1e-9) continue;
+        assert.equal(Rapid.geomStrokeContains(coords, hw, x, y, closed), distance < hw, `seed ${seed}: ${x},${y} is ${distance} from the line (hw ${hw})`);
+      }
+    }
+  });
+});

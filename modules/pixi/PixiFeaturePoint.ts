@@ -1,17 +1,16 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
+import { drawHalo } from './helpers.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
-/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
-type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
+// How many points make the circle of a halo
+const HALO_CIRCLE_POINTS = 20;
 
 
 /** Scratch space for `PixiFeaturePoint.updateAvoid` */
@@ -492,7 +491,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       if (!haloParent) return;
 
       if (!this.halo) {
-        this.halo = new PIXI.Graphics();
+        this.halo = new PIXI.Container();
         this.halo.label = `${this.id}-halo`;
         this.halo.eventMode = 'none';
         haloParent.addChild(this.halo);
@@ -508,27 +507,24 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       this.halo.rotation = this.container.rotation;
       this.halo.scale = this.container.scale;
 
-      const HALO_STYLE: StrokeStyleWithDash = {
-        alpha: 0.9,
-        dash: [6, 3],
-        width: 2,
-        color: 0xffff00
-      };
-
-      (this.halo as PIXI.Graphics).clear();
-
+      // The halo is the edge of the hit area.
       const shape = this.container.hitArea;
-      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-
+      const rings: number[][] = [];
       if (shape instanceof PIXI.Circle) {
-        dl.circle(shape.x, shape.y, shape.radius, 20);
+        const ring: number[] = [];
+        for (let i = 0; i < HALO_CIRCLE_POINTS; i++) {
+          const angle = 2 * Math.PI * i / HALO_CIRCLE_POINTS;
+          ring.push(shape.x + shape.radius * Math.cos(angle), shape.y + shape.radius * Math.sin(angle));
+        }
+        rings.push(ring);
       } else if (shape instanceof PIXI.Rectangle) {
-        dl.rect(shape.x, shape.y, shape.width, shape.height);
+        rings.push([shape.left, shape.top, shape.right, shape.top, shape.right, shape.bottom, shape.left, shape.bottom]);
       }
+      drawHalo(this.halo, rings, 1, this.gfx.textureManager!);
 
     } else {
       if (this.halo) {
-        this.halo.destroy();
+        this.halo.destroy({ children: true });
         this.halo = null;
       }
     }

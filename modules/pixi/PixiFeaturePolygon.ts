@@ -1,22 +1,19 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { BufferHitArea } from './lib/BufferHitArea.ts';
+import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
-import { geomStrokeMesh } from '../geo/index.ts';
+import { drawHalo } from './helpers.ts';
+import { geomStrokeMesh, geomStrokeOutline } from '../geo/index.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import type { DashLineOptions } from './lib/DashLine.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
-
-/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
-type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
+const HIT_PADDING = 10;   // pixels around an outline's width that still hit it, and where its halo is drawn
 
 
 /**
@@ -44,8 +41,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   /** Debug surrounding rectangle graphics (optional) */
   public debugSurround?: PIXI.Graphics | null;
 
-  /** Buffer polygon data for hit testing and halo */
-  protected _hitBuffer: BufferHitArea | null;
   /** Whether `fill` and `mask` hold geometry from the last time they were drawn */
   protected _hasFill: boolean;
   /** The polygon that the stroke meshes of the outlines were built from */
@@ -59,7 +54,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
-    this._hitBuffer = null;
     this._hasFill = false;
     this._meshPart = null;
 
@@ -113,7 +107,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.debugSurround = null;
     }
 
-    this._hitBuffer = null;
     this._meshPart = null;
 
     super.destroy();
@@ -414,14 +407,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
       const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
       const isSameShape = (this._meshPart === this._geom);
-      const bufferStyle: PIXI.StrokeStyle = {
-        alpha: 1,
-        alignment: 0.5,   // middle of line
-        color: 0x000000,
-        width: (lineWidth + 10) * localScale,
-        cap: 'butt',
-        join: 'bevel'
-      };
+      const hitWidth = (lineWidth + HIT_PADDING) * localScale / 2;   // how far from an outline a hit can be
 
       let dashTexture: PIXI.Texture | null = null;
       let dashLength = 0;
@@ -450,12 +436,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         outline.tint = color;
         outline.setStroke(strokeMesh, lineWidth * localScale / 2, dashTexture, dashLength);
 
-        // (Worked out when the pointer comes near, or for a halo: see `BufferHitArea`)
-        const hitBuffer = new BufferHitArea(ring, bufferStyle, local.extent);
-        if (i === 0) {
-          this._hitBuffer = hitBuffer;  // save outer buffer for the hover halo.
+        // The outline with a few pixels around it. (A zoom changes the distance and nothing else:
+        // the hit area is kept, and has no shape to build.)
+        const hitArea = outline.hitArea as LineHitArea | null | undefined;
+        if (hitArea) {
+          hitArea.set(ring, hitWidth, local.extent, true);
+        } else {
+          outline.hitArea = new LineHitArea(ring, hitWidth, local.extent, true);
         }
-        outline.hitArea = hitBuffer;
       }
       this._meshPart = this._geom;
     }
@@ -591,17 +579,18 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // Select
-    if (showSelect && this._hitBuffer) {
+    const outer = this._geom?.local?.flat?.[0];
+    if (showSelect && outer?.length) {
       const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
       const haloParent = mapui.halo;
       if (!haloParent) return;
 
       if (!this.halo) {
-        this.halo = new PIXI.Graphics();
+        this.halo = new PIXI.Container();
         this.halo.label = `${this.id}-halo`;
-        (this.halo as PIXI.Graphics).eventMode = 'none';
+        this.halo.eventMode = 'none';
         haloParent.addChild(this.halo);
-      } else if (this.halo.parent !== this.container) {
+      } else if (this.halo.parent !== haloParent) {
         this.halo.parent?.removeChild(this.halo);
         haloParent.addChild(this.halo);
       }
@@ -612,29 +601,18 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.halo.rotation = this.container.rotation;
       this.halo.scale = this.container.scale;
 
+      // The halo follows the outer ring, as far outside it as a hit can be (see `_drawShapes`),
+      // and inside it too in wireframe, where there's no fill to hit.
       const localScale = 2 ** (WORLD_ZOOM - viewZoom);
-      const HALO_STYLE: StrokeStyleWithDash = {
-        alpha: 0.9,
-        dash: [6, 3],
-        width: 2,
-        scale: localScale,
-        color: 0xffff00
-      };
-
-      (this.halo as PIXI.Graphics).clear();
-
-      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-      const buffer = this._hitBuffer.buffer;
-      if (buffer.outer) {
-        dl.poly(buffer.outer);
-      }
-      if (wireframeMode && buffer.inner) {
-        dl.poly(buffer.inner);
-      }
+      const lineWidth = wireframeMode ? 1 : this._style.fill?.width || 2;
+      const distance = (lineWidth + HIT_PADDING) * localScale / 2;
+      const outline = geomStrokeOutline(outer, distance, { closed: true, join: 'round' });
+      const rings = (wireframeMode && outline.inner) ? [outline.outer, outline.inner] : [outline.outer];
+      drawHalo(this.halo, rings, localScale, this.gfx.textureManager!);
 
     } else {
       if (this.halo) {
-        this.halo.destroy();
+        this.halo.destroy({ children: true });
         this.halo = null;
       }
     }
