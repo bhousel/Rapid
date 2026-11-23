@@ -246,6 +246,10 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
     return {
       hovered: shown.filter(feature => feature.classes.has('hover')).map(feature => feature.data.id),
       verticesOnTop: shown.filter(feature => parentOf(feature) === 'selected').length,
+      // A vertex that's drawn above everything draws itself there, with sprites; the batch draws the others
+      verticesOnTopInBatch: shown.filter(feature => parentOf(feature) === 'selected' && (feature.item || !feature.marker)).length,
+      pointsDrawnTwice: shown.filter(feature => feature.type === 'Point' && feature.item?.visible && feature.marker).length,
+      pointsDrawnNowhere: shown.filter(feature => feature.type === 'Point' && !feature.item?.visible && !(feature.marker && feature.container.parent)).length,
       dirty: shown.filter(feature => feature.dirty).length,
       shown: shown.map(feature => `${feature.id} in ${parentOf(feature)} ${[...feature.classes]}`).sort(),
       // The line's glow is a filter on its container, so the line is drawn there while it glows
@@ -262,6 +266,9 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   const hovered = await state();
   expect(hovered.hovered).toEqual([road.id]);
   expect(hovered.verticesOnTop).toBe(road.nodes);
+  expect(hovered.verticesOnTopInBatch).toBe(0);
+  expect(hovered.pointsDrawnTwice).toBe(0);
+  expect(hovered.pointsDrawnNowhere).toBe(0);
   expect(hovered.dirty).toBe(0);
   expect(hovered.line).toEqual({ glows: true, drawsItself: true, inScene: true, shownInBatch: false });
 
@@ -281,6 +288,8 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   const after = await state();
   expect(after.hovered).not.toContain(road.id);
   expect(after.dirty).toBe(0);
+  expect(after.pointsDrawnTwice).toBe(0);
+  expect(after.pointsDrawnNowhere).toBe(0);
   expect(after.shown).not.toEqual(hovered.shown);
   expect(after.line).toEqual({ glows: false, drawsItself: false, inScene: false, shownInBatch: true });
 
@@ -327,10 +336,99 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
 });
 
 
+// A point's marker and icon are rectangles in the layer's batch of points, and the point isn't
+// in the scene. A glow is a filter on a container, so a hovered point draws itself, with
+// sprites, in the scene, while it's hovered. A selected point's halo is drawn around the batch's point.
+test('draws a hovered point itself, under a glow, and gives it back to the batch after', async ({ page, consoleErrors }) => {
+  // The inspector asks taginfo what values a selected point's fields can have. Which keys
+  // depends on the point, and the recording has the answers for a road's: none are needed here.
+  await page.route(/^https:\/\/taginfo\.openstreetmap\.org\//, route => route.fulfill({ json: { data: [] } }));
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // A pin with nothing else within reach of the pointer
+  const pin = await page.evaluate(() => {
+    const gfx = rapidContext.systems.gfx;
+    const layer = gfx.scene.layers.get('osm');
+    const rect = gfx.surface.getBoundingClientRect();
+    const onScreen = feature => gfx.origin.toGlobal({ x: feature.container.position.x, y: feature.container.position.y });
+    const points = [...layer.features.values()].filter(feature => feature.type === 'Point' && feature.visible);
+    const pins = points.filter(feature => feature.data.type === 'node' && feature.style.marker.image === 'pin' && feature.item?.count === 8);
+    const alone = pins.find(feature => {
+      const at = onScreen(feature);
+      if (at.x < 100 || at.y < 150 || at.x > rect.width - 100 || at.y > rect.height - 100) return false;
+      return points.every(other => other === feature || Math.hypot(onScreen(other).x - at.x, onScreen(other).y - at.y) > 45);
+    });
+    return alone && { id: alone.data.id, featureID: alone.id, loc: alone.data.loc };
+  });
+  expect(pin).toBeTruthy();
+
+  const state = () => page.evaluate(featureID => {
+    const gfx = rapidContext.systems.gfx;
+    const feature = gfx.scene.layers.get('osm').features.get(featureID);
+    return {
+      classes: [...feature.classes].sort(),
+      glows: (feature.container.filters?.length ?? 0) > 0,
+      sprites: [feature.marker, feature.icon].filter(sprite => sprite?.visible && sprite.texture.source.pixelWidth > 1).length,
+      inScene: !!feature.container.parent,
+      shownInBatch: !!feature.item?.visible,
+      halo: !!feature.halo?.parent,
+      dirty: feature.dirty
+    };
+  }, pin.featureID);
+  const IN_BATCH = { glows: false, sprites: 0, inScene: false, shownInBatch: true, dirty: false };
+  const ITSELF = { glows: true, sprites: 2, inScene: true, shownInBatch: false, dirty: false };
+
+  expect(await state()).toEqual({ classes: [], halo: false, ...IN_BATCH });
+
+  // Hovered: the pointer is over the pin's head, above the point itself
+  const point = await locToPage(page, pin.loc);
+  await page.mouse.move(point.x - 60, point.y - 60);
+  await page.mouse.move(point.x, point.y - 12, { steps: 5 });
+  await expect.poll(() => page.evaluate(() => [...rapidContext.systems.gfx.scene.getDataWithClass('hover')])).toEqual([pin.id]);
+  await waitForIdle(page);
+  expect(await state()).toEqual({ classes: ['hover'], halo: false, ...ITSELF });
+
+  // Selected, and still hovered
+  await page.mouse.click(point.x, point.y - 12);
+  await expect.poll(() => page.evaluate(() => rapidContext.selectedIDs())).toEqual([pin.id]);
+  await waitForIdle(page);
+  expect(await state()).toEqual({ classes: ['hover', 'select'], halo: true, ...ITSELF });
+
+  // Selected, with the pointer somewhere else: the batch draws it, and the halo stays
+  await page.mouse.move(point.x - 60, point.y - 60, { steps: 5 });
+  await expect.poll(() => page.evaluate(id => rapidContext.systems.gfx.scene.getDataWithClass('hover').has(id), pin.id)).toBe(false);
+  await waitForIdle(page);
+  expect(await state()).toEqual({ classes: ['select'], halo: true, ...IN_BATCH });
+
+  // The halo follows a zoom, which changes nothing in the batch
+  const haloScale = () => page.evaluate(featureID => {
+    const feature = rapidContext.systems.gfx.scene.layers.get('osm').features.get(featureID);
+    return feature.halo.scale.x * rapidContext.systems.gfx.origin.scale.x;
+  }, pin.featureID);
+  expect(await haloScale()).toBeCloseTo(1, 6);
+  await page.evaluate(() => {
+    rapidContext.systems.map.zoom(18.6);
+  });
+  await waitForIdle(page);
+  expect(await haloScale()).toBeCloseTo(1, 6);
+  expect(await state()).toEqual({ classes: ['select'], halo: true, ...IN_BATCH });
+
+  await page.keyboard.press('Escape');
+  await expect.poll(() => page.evaluate(() => rapidContext.mode.id)).toBe('browse');
+  await waitForIdle(page);
+  expect(await state()).toEqual({ classes: [], halo: false, ...IN_BATCH });
+
+  expect(consoleErrors).toEqual([]);
+});
+
+
 // The OSM layer finds its own features under the pointer, through the editor's spatial index
 // (`PixiLayerOsm.hitTest`), and Pixi's hit test leaves the layer's containers out. Pixi's would
-// ask every feature in the scene, and a line or an area that's drawn in batches isn't even in
-// the scene. The index must find what asking every feature would, and for points, what Pixi would.
+// ask every feature in the scene, and a feature that's drawn in batches isn't even in the
+// scene. The index must find what asking every feature would. A point answers from where it is
+// on screen, without Pixi: it must be hit where Pixi would hit it if it were drawn with sprites.
 test('finds the feature under the pointer through the spatial index, as asking every feature would', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -394,20 +492,31 @@ test('finds the feature under the pointer through the spatial index, as asking e
       return best;
     });
 
-    // Pixi, over the features that are in the scene (the points; lines and areas that batches draw aren't)
+    // On a finer grid: every point that's hit at each place, and what Pixi finds there among
+    // the features that are in the scene (none, unless the layer draws with sprites: see below)
+    const finer = [];
+    for (let j = 0; j < 90; j++) {
+      for (let i = 0; i < 120; i++) {
+        finer.push({ x: (i + 0.5) * rect.width / 120, y: (j + 0.5) * rect.height / 90 });
+      }
+    }
+    const pointFeatures = features.filter(feature => feature.type === 'Point');
+    const pointsHit = finer.map(place => {
+      const world = gfx.origin.worldTransform.applyInverse(place);
+      return pointFeatures.filter(feature => feature.hitTest(place, world)).map(feature => feature.id);
+    });
     scene.setHitTester('osm', null);
-    const pixiFound = points.map(point => featureOf(boundary.hitTest(point.x, point.y)));
+    const pixiFound = finer.map(place => featureOf(boundary.hitTest(place.x, place.y)));
     scene.setHitTester('osm', osm);
 
     const lines = features.filter(feature => feature.type === 'LineString');
     return {
       skipped: skipped,
       differences: found.flatMap((feature, i) => (feature === asked[i]) ? [] : [{ at: points[i], found: feature?.id, asked: asked[i]?.id }]),
-      // Points are still in the scene, above everything: where either finds one, both find the same
-      pixiDifferences: found.flatMap((feature, i) => {
-        if ((feature?.type !== 'Point' && pixiFound[i]?.type !== 'Point') || feature === pixiFound[i]) return [];
-        return [{ at: points[i], found: feature?.id, pixiFound: pixiFound[i]?.id }];
-      }),
+      pointsHit: pointsHit,
+      pixiPoints: pixiFound.map(feature => (feature?.type === 'Point') ? feature.id : null),
+      pointsInScene: pointFeatures.filter(feature => feature.container.parent).length,
+      pointsFound: new Set(found.filter(feature => feature?.type === 'Point')).size,
       numFound: found.filter(Boolean).length,
       kinds: [...new Set(found.filter(Boolean).map(feature => feature.type))].sort(),
       linesFound: new Set(found.filter(feature => feature?.type === 'LineString')).size,
@@ -419,11 +528,39 @@ test('finds the feature under the pointer through the spatial index, as asking e
   const browsing = await compare();
   expect(browsing.skipped).toBe('none');
   expect(browsing.differences).toEqual([]);
-  expect(browsing.pixiDifferences).toEqual([]);
+  expect(browsing.pointsInScene).toBe(0);                                // the batch draws them all
+  expect(browsing.pointsFound).toBeGreaterThan(20);
   expect(browsing.numFound).toBeGreaterThan(300);                        // of 1,200 points
   expect(browsing.kinds).toEqual(['LineString', 'Point', 'Polygon']);    // all three kinds were under some point
   expect(browsing.linesNotInScene).toBeGreaterThan(10);
   expect(browsing.linesFoundNotInScene).toBeGreaterThan(10);            // lines are found without being in the scene
+
+  // Drawn with sprites and not by batches, the points are in the scene, and Pixi's hit test
+  // finds the top one at each place. A point that the batch draws must be hit in the same
+  // places: where Pixi finds a point, it's one of those hit there, and where Pixi finds none,
+  // none is. (Which of several is on top can differ: sprites are ordered within a map tile.)
+  const useBatches = async val => {
+    await page.evaluate(val => {
+      const gfx = rapidContext.systems.gfx;
+      const osm = gfx.scene.layers.get('osm');
+      osm.useBatches = val;
+      osm.reset();
+      gfx.immediateRedraw();
+    }, val);
+    await waitForIdle(page);
+  };
+  await useBatches(false);
+  const sprites = await compare();
+  expect(sprites.differences).toEqual([]);
+  expect(sprites.pointsInScene).toBeGreaterThan(20);
+  expect(sprites.pixiPoints.filter(Boolean).length).toBeGreaterThan(200);    // of 10,800 places
+  const hitElsewhere = [];
+  sprites.pixiPoints.forEach((pixiID, i) => {
+    const hit = browsing.pointsHit[i];
+    if (pixiID ? !hit.includes(pixiID) : hit.length > 0) hitElsewhere.push({ place: i, pixi: pixiID, batch: hit });
+  });
+  expect(hitElsewhere).toEqual([]);
+  await useBatches(true);
 
   // With a road selected, its vertices and midpoints are drawn above everything, where Pixi finds them
   const roadID = await page.evaluate(() => {

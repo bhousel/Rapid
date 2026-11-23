@@ -71,6 +71,7 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 | `VertexBatch.ts` | The base of the batches: many things in one draw call, each a run of vertices in its buffers |
 | `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes, and the outlines of its areas |
 | `FillBatch.ts` | Draws the fills of many areas in one draw call, with their patterns from one atlas texture |
+| `PointBatch.ts` | Draws many points in one draw call: their markers, icons and viewfields, from the symbol atlas, at a size on screen |
 | `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |

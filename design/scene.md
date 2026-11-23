@@ -3,8 +3,9 @@
 **Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
 mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines and points split by
 tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
-two batches a level, every casing and then every stroke, and its areas in two, every fill and
-then every outline; a line or an area that its batches draw isn't in the scene (Nov 23). Section 4 is ideas with nothing built.
+two batches a level, every casing and then every stroke, its areas in two, every fill and
+then every outline, and its points in one; a feature that its batches draw isn't in the scene
+(Nov 23). Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -55,8 +56,12 @@ origin
 │  └ …
 ├ points
 │  ├ osm                 OSM points, interesting vertices and the virtual POI pins
-│  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude
-│  │  └ viewfields       points with viewfields, above the tiles
+│  │  ├ points           a `PointBatch`: every one of them, from north to south, the ones with
+│  │  │                  viewfields last
+│  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude. Only the
+│  │  │                  points that draw themselves are in these (a hovered one): the rest
+│  │  │                  aren't in the scene
+│  │  └ viewfields       the same, for points with viewfields, above the tiles
 │  └ <spatialID>         other layers' points, straight in the container
 ├ debug-over
 ├ streetview
@@ -141,13 +146,14 @@ testing from Pixi:
 - **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
   within reach of the pointer (the furthest any feature drawn so far can be hit from its
   geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
-  point answers by the rules Pixi has for one container (`containerHit()`): its hit area. A line
+  point answers by its hit area, a shape in pixels around where the point is on screen. A line
   answers by its distance from the pointer in world coordinates, and an area by that distance
-  from its rings or by being in its fill, with nothing of Pixi's: a line or an area that its
-  batches draw isn't in the scene.
+  from its rings or by being in its fill. None of that is Pixi's: a feature that its batches
+  draw isn't in the scene. (One that draws itself, like a hovered point, answers by the rules
+  Pixi has for one container: `containerHit()`.)
 - **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
   what draws each (`sceneContainer`: a feature's own container, a line's strokes' batch, an
-  area's fills' batch), and in one batch by the feature's order there.
+  area's fills' batch, the points' batch), and in one batch by the feature's order there.
 - **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
   spatial container: Pixi still finds those.
 
@@ -155,7 +161,9 @@ Checked on a grid of 4,800 points, in Seattle and Užice, in nine states each (t
 out, rotated, wireframe, full fill, a way selected), while every line was still in the scene:
 the same feature as Pixi's hit test over the whole scene at all 86,400 points. Since the lines
 and the areas left the scene, Pixi can't be asked about them: `test/e2e/select.test.js` checks
-the index against asking every feature of the layer, and against Pixi for points.
+the index against asking every feature of the layer. The points left it too (step 8): the test
+draws them with sprites once more, and checks that the batch's points are hit where Pixi hits
+those.
 The numbers are in `design/graphics-system.md` section 15 (step 6).
 
 ## 3. Render groups
@@ -281,6 +289,9 @@ changed. A frame of Užice replays about 3,400 draw calls in 6 ms.
   features were made.
 
 **Points** (`_pointTileContainer()`): a container per tile, for points, vertices and the POI pins.
+*(Since Nov 23 the layer's batch draws them, in one draw call, from north to south everywhere:
+see `graphics-system.md` section 15, step 8. The tiles hold the few points that draw themselves,
+and what follows is how those are ordered.)*
 - Points are drawn from north to south, so that a pin overlaps the pins above it on the map. The
   tiles' containers are ordered by row, and points within a tile as before.
 - **Not kept: two tiles side by side.** Where points overlap across the edge between them, the

@@ -77,4 +77,22 @@ How Pixi behaves, and what that means for Rapid.
   small area existed because a `Graphics` per building was too much. In a `FillBatch` a small
   area's own triangles cost no object and no draw call, so the special case went away. When
   moving something into a batch, ask what its workarounds were for.
-
+  *(Later the same day: the fill is nearly free, but the outline isn't. A small rectangle's
+  outline is 14 triangles to its fill's 3, and Staten Island's 14,000 parking spaces made them
+  a third of the frame's triangles, 1 to 3 ms of GPU. A workaround can be there for more than
+  one reason: count what each part of the replacement costs.)*
+- **A shader can do what a counter-scaled container did.** Every point had a container scaled by
+  the inverse of the zoom and turned against the map's rotation, so its sprites came out at
+  their size and upright, and every one was set again at every zoom. In a mesh's vertex shader,
+  `uWorldTransformMatrix * uTransformMatrix` takes a position to pixels on screen: add the
+  offset in pixels after that, and nothing in the vertices depends on the zoom or the rotation.
+  The map's own axes on screen are that matrix's first two columns, normalized (for what turns
+  with the map), so no uniform about the view is needed.
+- **A container's `worldTransform` is what the last render made it.** It isn't worked out when
+  you read it: in a DOM test, with no render, it's the identity whatever the container's scale.
+  Give code that reads it a matrix in tests (`{ worldTransform: new PIXI.Matrix().scale(…) }`),
+  and remember that in the app it's the view as last drawn, which is what a hit test wants.
+- **When two paths draw the same thing, work out what's drawn in one place.** Points can be
+  drawn by a batch or by sprites. Both take the same list of pictures (`_layout()`), so the two
+  can be compared pixel for pixel in one build, and a new marker or anchor can't be added to
+  one and forgotten in the other.

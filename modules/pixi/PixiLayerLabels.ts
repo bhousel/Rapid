@@ -151,6 +151,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   protected _freed: LabelRoom[];
   /** Whether the last call to `placeTextLabel` or `placeRopeLabel` placed a label */
   protected _didPlace: boolean;
+  /** Scratch space for the box of the point that `placeTextLabel` is placing a label for */
+  protected _pointBox: [number, number, number, number];
+  /** Whether the last `render()` showed no labels: the layer is off, or the view is zoomed out too far */
+  protected _isOff: boolean;
   /** The red boxes that show what labels avoid, in the label debug view, by feature (see `renderDebugAvoids`) */
   protected _debugAvoids: Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>;
   /** Whether the last frame put off placing labels (so that another frame should follow it) */
@@ -217,6 +221,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._unplaced = new Map<FeatureID, LabelRoom>();
     this._freed = [];
     this._didPlace = false;
+    this._pointBox = [0, 0, 0, 0];
+    this._isOff = false;
     this._debugAvoids = new Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>();
 
     // For ASCII-only labels, we can use PIXI.BitmapText to avoid generating label textures
@@ -397,11 +403,22 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   public render(frame: RenderFrame, viewport: Viewport): void {
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || viewZoom < MINZOOM) {
+      // No label is shown, so none is in anything's way and none waits for room. Forget what
+      // was placed (it's all placed again when labels are back), and what the scene noted
+      // since: left there, it counts as placement that's waiting (`numWaiting`), and asks for
+      // another frame after every frame.
+      if (!this._isOff) {
+        this._isOff = true;
+        this.reset();
+      }
+      this.scene.takeAvoidHits();
+      this.scene.takeAvoidFrees();
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
       this._placementWaiting = false;
       return;
     }
+    this._isOff = false;
 
     // Reset stale labels, as needed
     const tPrev = this._tPrev;
@@ -1004,7 +1021,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param  feature - The feature to place point labels on
    * @param  measurement - The label measurements (size + str/style)
    */
-  public placeTextLabel(feature: AbstractPixiFeature, measurement: LabelMeasurement): void {
+  public placeTextLabel(feature: PixiFeaturePoint, measurement: LabelMeasurement): void {
     if (!feature) return;
 
     const spatial = this.context.systems.spatial!;
@@ -1014,24 +1031,21 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const container = feature.container;
     if (!container.visible || !container.renderable) return;
 
-    // `f` - feature, these bounds are in "global" coordinates
-    // The rectangle is in global/screen coordinates (where [0,0] is top left).
-    // To work in a coordinate system that is consistent, remove the label offset.
-    // If we didn't do this, as the user pans or rotates the map, the objects that leave
-    // and re-enter the scene would end up with different coordinates each time!
-    const fRect = container.getBounds().clone().pad(1, 0);
-    fRect.x -= this.scene.labelOffset.x;
-    fRect.y -= this.scene.labelOffset.y;
+    // `f` - feature, the box of what the point draws, in label space: the screen minus the
+    // label offset. (In screen coordinates, as the user pans or rotates the map, the objects
+    // that leave and re-enter the scene would end up with different coordinates each time!)
+    // The point says where it's drawn: it may be drawn by a batch, and not be in the scene.
+    const box = feature.labelBox(this._pointBox);
+    if (!box) return;
 
-    const fLeft = fRect.x;
-    const fTop = fRect.y;
-    const fWidth = fRect.width;
-    const fHeight = fRect.height;
-    const fRight = fRect.x + fWidth;
-    const fMidX = fRect.x + (fWidth * 0.5);
-    const fBottom = fRect.y + fHeight;
-    const fMidY = (feature.type === 'Point') ? (fRect.y + fHeight - 14)  // next to marker
-      : (fRect.y + (fHeight * 0.5));
+    const fLeft = box[0] - 1;   // (a pixel of room on either side)
+    const fTop = box[1];
+    const fWidth = box[2] - box[0] + 2;
+    const fHeight = box[3] - box[1];
+    const fRight = fLeft + fWidth;
+    const fMidX = fLeft + (fWidth * 0.5);
+    const fBottom = fTop + fHeight;
+    const fMidY = fBottom - 14;  // next to marker
 
     // `l` = label, these bounds are in "local" coordinates to the label,
     // 0,0 is the center of the label

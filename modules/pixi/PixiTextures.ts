@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
 import { FillBatch } from './lib/FillBatch.ts';
+import { PointBatch } from './lib/PointBatch.ts';
 
 import type { AtlasOptions } from './lib/AtlasAllocator.ts';
 import type { Context } from '../Context.ts';
@@ -154,6 +155,10 @@ export class PixiTextures {
     this._dashTextures.clear();
 
     this._cacheGraphics();
+
+    // Point batches draw from the symbol atlas: its first texture, which has the markers now,
+    // and gets the icons as they load. (What a second one would hold, points draw with sprites.)
+    PointBatch.setTexture(this._atlas.symbol.slabs[0] ?? null);
 
     // Replace or load patterns
     Promise.resolve()

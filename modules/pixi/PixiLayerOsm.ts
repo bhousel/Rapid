@@ -7,6 +7,7 @@ import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import { PointBatch } from './lib/PointBatch.ts';
 import { featureOrder } from './helpers.ts';
 import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
@@ -64,6 +65,10 @@ const STROKE_BATCH = -1000;
  */
 const FILL_BATCH = -2000;
 const OUTLINE_BATCH = -1000;
+
+// The batch that draws the points, among the containers of the points that draw themselves
+// (a hovered one, above the others)
+const POINT_BATCH = -1000;
 
 /**
  * A batch's vertices are 32-bit floats, relative to a place in the world near its lines. The
@@ -341,6 +346,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _polygonFills: FillBatch | null;
   /** The batch that draws the polygons' outlines, above their fills */
   protected _polygonOutlines: LineBatch | null;
+  /** The batch that draws the points, vertices and virtual pins (see `_pointBatch`) */
+  protected _points: PointBatch | null;
   /** collection of calculated midpoints */
   protected _midpoints: Map<DataID, Midpoint>;
   /** Entities in view that the last pass saw, whose features aren't made yet (see `_waitToMake`) */
@@ -395,6 +402,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._lineBatches = new Map<PIXI.Container, LineBatchPair>();
     this._polygonFills = null;
     this._polygonOutlines = null;
+    this._points = null;
     this._midpoints = new Map<DataID, Midpoint>();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
@@ -462,6 +470,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._lineBatches.clear();    // (`super.reset()` destroyed them, with the containers they were in)
     this._polygonFills = null;
     this._polygonOutlines = null;
+    this._points = null;
     this._oldTiles.clear();
     this._midpoints.clear();
     this._unmadeInView = this._newUnmade();
@@ -510,14 +519,24 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * The batch that draws the points, vertices and virtual pins, if there is one (see `_pointBatch`)
+   * @return The batch, or `null`
+   * @readonly
+   */
+  public get pointBatch(): PointBatch | null {
+    return this._points;
+  }
+
+
+  /**
    * Finds the feature under the pointer, the one drawn on top if there are several.
    *
    * The scene asks this in place of Pixi's hit test (`PixiScene.setHitTester`), which walks every
    * feature: 7 ms for each pointer event among Užice's 107,000. Here the editor's spatial index
    * says which entities are near the pointer, and only their features are asked.
-   * Each feature answers for itself (`AbstractPixiFeature.hitTest`: a point or an area as it
-   * would have to Pixi, a line by its distance from the pointer), and the winner is the one
-   * that's drawn on top (`featureOrder`).
+   * Each feature answers for itself (`AbstractPixiFeature.hitTest`: a point by its hit area
+   * around where it is on screen, a line by its distance from the pointer, an area by that or
+   * by being in its fill), and the winner is the one that's drawn on top (`featureOrder`).
    *
    * (The vertices and midpoints of what's selected are in the map UI's container, above
    * everything, and Pixi still finds those.)
@@ -1974,7 +1993,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Returns the container for a point (or a vertex, or a virtual POI pin), under `points`.
+   * Returns the container for a point (or a vertex, or a virtual POI pin) that draws itself,
+   * under `points`. (Most are drawn by the layer's batch, and are in no container: see
+   * `_placePoint`.)
    * Points are split up by map tile too: in one render group, making one point among Užice's
    * 49,259 cost 38 ms.
    *
@@ -2085,6 +2106,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this._polygonOutlines.destroy();
       this._polygonOutlines = null;
     }
+    if (this._points && !this._points.size && !this._points.users) {
+      this._points.destroy();
+      this._points = null;
+    }
   }
 
 
@@ -2115,6 +2140,31 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     } else {
       this._polygonOutlines = batch as LineBatch;
     }
+    return batch;
+  }
+
+
+  /**
+   * Returns the batch that draws the points, the vertices and the virtual pins, making it if
+   * there's none. It's one mesh and one draw call for all of them (see `PointBatch`), drawn
+   * under the containers of the few points that draw themselves (`PixiFeaturePoint.drawsInContainer`).
+   * In the batch the points are in the order they were in before: from north to south, and the
+   * ones with viewfields over the others (`PixiFeaturePoint.sceneOrder`).
+   * @param part - The geometry of the point that the batch is wanted for
+   * @return The batch to draw the point in
+   */
+  protected _pointBatch(part: GeometryPart): PointBatch {
+    const existing = this._points;
+    if (existing && !existing.destroyed) return existing;
+
+    // The batch's coordinates start near its points: at the first of them (see `_moveBatchOrigins`).
+    const origin = part.world!.origin!;
+    const batch = new PointBatch();
+    batch.label = 'points';
+    batch.zIndex = POINT_BATCH;
+    batch.position.set(origin[0], origin[1]);
+    this.pointContainer!.addChild(batch);
+    this._points = batch;
     return batch;
   }
 
@@ -2167,7 +2217,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param viewport - The viewport that's being drawn
    */
   protected _moveBatchOrigins(viewport: Viewport): void {
-    if (!this._lineBatches.size && !this._polygonFills && !this._polygonOutlines) return;
+    if (!this._lineBatches.size && !this._polygonFills && !this._polygonOutlines && !this._points) return;
 
     // How far from its place a batch's floats are still good to a part of a pixel, at this zoom
     const reach = BATCH_PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
@@ -2182,6 +2232,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     }
     if (isFar(this._polygonFills)) this._polygonFills.moveOrigin(Math.round(x), Math.round(y));
     if (isFar(this._polygonOutlines)) this._polygonOutlines.moveOrigin(Math.round(x), Math.round(y));
+    if (isFar(this._points)) this._points.moveOrigin(Math.round(x), Math.round(y));
   }
 
 
@@ -2424,6 +2475,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
 
       if (isRelated) {
+        feature.batch = null;    // (it draws itself there: a batch is drawn where it is, with everything in it)
         feature.parentContainer = selectedContainer;
       } else if (feature.dirty || feature.container.parent === selectedContainer) {
         this._placePoint(feature, tileZoom);
@@ -2436,17 +2488,42 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Puts a point's feature in the container of its tile (see `_pointTileContainer`).
-   * Call this once the feature has its geometry and style.
+   * Gives a point's feature its place: the layer's batch to draw in, and, if it draws
+   * something itself (`PixiFeaturePoint.drawsInContainer`), the container of its tile (see
+   * `_pointTileContainer`). One that the batch draws alone isn't in the scene.
+   * Call this once the feature has its geometry and style, before it's drawn.
    * @param feature - The point's feature
    * @param tileZoom - The zoom of the tiles to split by
    */
   protected _placePoint(feature: PixiFeaturePoint, tileZoom: number): void {
     const part = feature.geometry;
-    if (!part) return;
+    if (!part?.world?.origin) return;
 
-    const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;
-    this._setTile(feature, this._pointTileContainer(part, hasViewfields, tileZoom));
+    feature.batch = this.useBatches ? this._pointBatch(part) : null;
+
+    if (feature.drawsInContainer()) {
+      const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;
+      this._setTile(feature, this._pointTileContainer(part, hasViewfields, tileZoom));
+    } else if (feature.container.parent) {
+      feature.parentContainer = null;
+    }
+  }
+
+
+  /**
+   * Draws a dirty feature (see `AbstractPixiLayer._drawFeature`). A point finds out as it's
+   * drawn whether the batch can draw it (its icon may be in a texture that batches don't draw
+   * from). One that has to draw itself after all gets its place in the scene here.
+   * @param feature - The feature to draw
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  protected override _drawFeature(feature: AbstractPixiFeature, frame: RenderFrame, viewport: Viewport): void {
+    super._drawFeature(feature, frame, viewport);
+
+    if (feature instanceof PixiFeaturePoint && feature.batch && !feature.container.parent && feature.drawsInContainer()) {
+      this._placePoint(feature, Math.floor(viewport.transform.zoom) + POINT_TILE_ZOOM);
+    }
   }
 
 
@@ -2673,7 +2750,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (feature.dirty) {
         // Important to apply viewport rotation - this needs to go on the marker,
         // because the container automatically rotates to be north-up.
-        feature.marker!.rotation = midpoint.props.rotation + viewport.transform.rotation;
+        feature.markerRotation = midpoint.props.rotation + viewport.transform.rotation;
       }
       feature.update(viewport);
       this.retainFeature(feature, frame);

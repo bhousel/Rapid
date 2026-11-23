@@ -38,4 +38,20 @@ How to measure frames, memory and garbage without fooling yourself. See also `de
 - **A checksum of a typed array has to leave out its huge values.** A sum over a batch's floats
   included a "never" of 3e38 in most vertices, and nothing else that changed could move it: the
   test passed whatever happened to the array.
-
+- **A wait that hits its timeout has found something.** A script waited for `gfx.pending` to be
+  false and ran to its 90 s timeout in some states. That was noted as a quirk of the script
+  and worked around for a day. It was Rapid drawing sixty frames a second for good after a pan
+  with the labels layer off. When "idle" never comes, ask the app who's waiting (each layer's
+  `numWaiting`) before lengthening the timeout.
+- **Label placement isn't the same on every load.** Two loads of one build and place differed
+  in 9,000 pixels in Seattle, all labels: placement follows the order features are drawn in,
+  which follows the frames' timing. Compare screenshots with the labels off, or compare two
+  ways of drawing in one load.
+- **GPU time from two sessions can't be compared.** Staten Island's frame read 7.8 and 8.0 ms
+  one hour, 5.8 to 6.2 the next (four runs), and 6.6 and 7.7 after that, drawing the same
+  562,000 triangles. Within a session, alternating, the readings held: four ways of drawing
+  small areas kept their order in both rounds. A difference between this turn's table and the
+  last one's is not a result; measure both sides again, in one run of the script.
+- **Check an estimate against a count before it's written down.** "A small building is about 45
+  triangles" came from dividing a difference by a guess at how many there were. A snippet that
+  walked the batch said 17, and that most were parking spaces, not buildings.

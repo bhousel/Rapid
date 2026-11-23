@@ -144,7 +144,8 @@ export async function waitForIdle(page) {
  * Describes what the OSM layer shows: for each visible feature, the container it's in, its
  * classes, whether it's been drawn (not dirty), whether it's bound to the entity as it is now,
  * and where it is. For a line, which level's batches draw it, and whether its casing and stroke
- * are shown there (see `LineBatch`). A line that its batches draw isn't in the scene itself.
+ * are shown there (see `LineBatch`); the same for an area's fill and outlines, and for a point.
+ * A feature that its batches draw isn't in the scene itself.
  * Two of these are equal if a mapper would see the same features the same way.
  *
  * Use it to check work the layer does without its whole pass (a hover, an edit, a change of
@@ -166,8 +167,16 @@ export async function osmSceneState(page) {
       // A line is drawn in batches: in which level's, and whether its casing and stroke are shown
       // there. Its own container is in the scene only while it draws something itself.
       const item = part => (part ? (part.visible ? 'shown' : 'hidden') : 'none');
-      const batched = (feature.type === 'LineString') ?
-        `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}` : '';
+      // An area's fill and outlines, and a point, are in batches too. A point that draws itself
+      // (hovered, or a vertex of what's hovered) has sprites, and is hidden in its batch or not in one.
+      let batched = '';
+      if (feature.type === 'LineString') {
+        batched = `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}`;
+      } else if (feature.type === 'Polygon') {
+        batched = `batches: fill ${item(feature.fillItem)}, outlines ${feature.ringItems.map(item).join(' ') || 'none'}`;
+      } else if (feature.type === 'Point') {
+        batched = `batch: ${item(feature.item)}, ${feature.marker ? 'sprites' : 'no sprites'}`;
+      }
       results.push([
         feature.id, feature.container.parent?.label ?? 'not in the scene', [...feature.classes].sort().join(','),
         feature.dirty ? 'dirty' : 'drawn', `bound: ${bound}`, `${position.x.toFixed(3)},${position.y.toFixed(3)}`, batched

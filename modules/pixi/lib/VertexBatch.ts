@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 
 
 /**
- * One thing in a batch: a line's casing or stroke, an area's fill. The batch's `add()` returns
+ * One thing in a batch: a line's casing or stroke, an area's fill, a point. The batch's `add()` returns
  * it, and the caller keeps it to change the thing or take it out. Its properties are the
  * batch's to change.
  */
@@ -19,7 +19,7 @@ export interface BatchItem {
   order: number;
   /** Whether it's drawn */
   visible: boolean;
-  /** Its opacity as it's in the vertices when it's drawn, from 1 to 255 (a hidden one has 0 there) */
+  /** What its vertices have in the batch's `alphaByte` when it's drawn, from 1 to 255 (a hidden one has 0 there) */
   alpha: number;
 }
 
@@ -39,7 +39,11 @@ export interface BatchLayout {
   floats: number;
   /** How many bytes a vertex has besides */
   bytes: number;
-  /** Which of those bytes is the opacity: 0 there means "hidden", and the shader has to draw nothing for it */
+  /**
+   * Which of those bytes is 0 in a hidden thing's vertices, where the shader has to draw nothing.
+   * (The opacity in a `LineBatch` and a `FillBatch`; a byte of its own in a `PointBatch`, whose
+   * things have several opacities.)
+   */
   alphaByte: number;
   /** The attributes that the shader reads, by name */
   attributes: Record<string, BatchAttribute>;
@@ -65,8 +69,8 @@ const _state = PIXI.State.for2d();
 /**
  * A `VertexBatch` draws many things as one mesh, in one draw call, with a shader of its own.
  * Each thing is a run of vertices in the batch's buffers, and its triangles a run of indices.
- * `LineBatch` (casings and strokes) and `FillBatch` (the fills of areas) say what a vertex
- * holds and how it's written; this class keeps the buffers.
+ * `LineBatch` (casings and strokes), `FillBatch` (the fills of areas) and `PointBatch` (markers
+ * and icons) say what a vertex holds and how it's written; this class keeps the buffers.
  *
  * - **A vertex is some floats in one buffer and some bytes in another.** The first two floats
  *   are its position, relative to the batch's own `position` in the world. Keep them small
@@ -74,8 +78,8 @@ const _state = PIXI.State.for2d();
  *   they're 32-bit floats.
  * - **Things are drawn in the order of their `order`.** The index buffer is built again when
  *   one joins, leaves or changes its order.
- * - **A hidden thing stays where it is, with an opacity of 0 in its vertices,** which the
- *   shader has to draw nothing for. Hiding and showing (as a pan does at the edge of what's
+ * - **A hidden thing stays where it is, with a 0 in one byte of its vertices** (its opacity,
+ *   in most batches), which the shader has to draw nothing for. Hiding and showing (as a pan does at the edge of what's
  *   drawn) writes a byte per vertex, and builds nothing.
  * - **A thing that changes is written where it was** if it has as many vertices as before;
  *   otherwise at the end, and the batch packs itself when half of it is unused.

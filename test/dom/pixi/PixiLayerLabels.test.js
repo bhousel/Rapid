@@ -9,13 +9,21 @@ import { PixiLayerLabels } from '../../../modules/pixi/PixiLayerLabels.ts';
 describe('PixiLayerLabels', () => {
   let layer, spatial, grid, hits, frees, changed;
 
-  // A stand-in for a point feature drawn 10 px wide at [x, y] of label space
+  // A stand-in for a point feature drawn 10 px wide at [x, y] of label space.
+  // (It says where it's drawn itself: a point that a batch draws has nothing in its container.)
   function pointAt(id, x, y, avoided = true) {
     const cells = avoided ? grid.cellsOf(x, y, x + 10, y + 10) : null;
     if (cells) grid.mark('avoid', cells);
     return {
       id: id, type: 'Point', style: {}, avoidCells: cells,
-      container: { visible: true, renderable: true, getBounds: () => new PIXI.Bounds(x, y, x + 10, y + 10) }
+      container: { visible: true, renderable: true },
+      labelBox: out => {
+        out[0] = x;
+        out[1] = y;
+        out[2] = x + 10;
+        out[3] = y + 10;
+        return out;
+      }
     };
   }
 
@@ -84,6 +92,13 @@ describe('PixiLayerLabels', () => {
       grid.mark('avoid', grid.cellsOf(0, 112, 300, 300));
       grid.mark('avoid', grid.cellsOf(0, 0, 98, 300));
       grid.mark('avoid', grid.cellsOf(112, 0, 300, 300));
+      layer.placeTextLabel(point, MEASURE);
+      assert.lengthOf(labelBoxes(), 0);
+    });
+
+    it('places no label for a point that draws nothing', () => {
+      const point = pointAt('osm-n1', 100, 100, false);
+      point.labelBox = () => null;
       layer.placeTextLabel(point, MEASURE);
       assert.lengthOf(labelBoxes(), 0);
     });
@@ -162,6 +177,57 @@ describe('PixiLayerLabels', () => {
       assert.strictEqual(layer.numWaiting, 0);             // nothing is waiting for room
       layer._unplaced.set('osm-w1', [100, 100, 300, 120]);
       assert.strictEqual(layer.numWaiting, 1);
+    });
+  });
+
+  // With the layer off, or the view zoomed out too far, no label is placed. What the scene
+  // notes about labels meanwhile must not count as placement that's waiting: the layer would
+  // ask for a frame after every frame, forever (a pan with labels off did that).
+  describe('while no labels are shown', () => {
+    const FRAME = { time: 0 };
+    let resets;
+
+    beforeEach(() => {
+      resets = 0;
+      layer.reset = () => {
+        resets++;
+        layer._unplaced.clear();
+      };
+      layer.labelContainer = { visible: true };
+      layer.debugContainer = { visible: true };
+      layer._enabled = false;
+    });
+
+    it('forgets what was placed, once, and hides the labels', () => {
+      layer._unplaced.set('osm-w1', [100, 100, 300, 120]);
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      assert.strictEqual(resets, 1);
+      assert.isFalse(layer.labelContainer.visible);
+      assert.strictEqual(layer._unplaced.size, 0);
+    });
+
+    it('waits for nothing, whatever is drawn over a label or makes room for one meanwhile', () => {
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      layer._unplaced.set('osm-w1', [100, 100, 300, 120]);       // (if anything were still remembered)
+      frees.push(grid.cellsOf(200, 104, 210, 114));
+      hits.push(grid.cellsOf(200, 104, 210, 114));
+      layer.scene.numAvoidHits = 1;
+      assert.strictEqual(layer.numWaiting, 1);
+
+      layer.scene.numAvoidHits = 0;      // (the stand-in scene's count doesn't follow its list)
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      assert.lengthOf(frees, 0);
+      assert.lengthOf(hits, 0);
+      assert.strictEqual(layer.numWaiting, 0);
+    });
+
+    it('does the same when the view is zoomed out too far for labels', () => {
+      layer._enabled = true;
+      frees.push(grid.cellsOf(200, 104, 210, 114));
+      layer.render(FRAME, { transform: { zoom: 11 } });
+      assert.strictEqual(resets, 1);
+      assert.lengthOf(frees, 0);
     });
   });
 

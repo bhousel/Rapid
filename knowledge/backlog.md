@@ -74,6 +74,22 @@ said otherwise. Biggest or most wanted first.
   container per tile for a class of lines with few members; hide the tiles outside the view so Pixi
   skips them. Watch for: wrong overlaps at tile edges (polygons; pins side by side across a tile edge
   are ordered by tile, 1% of overlapping pairs).
+- **A lower level of detail for small areas, in the batches** (Bryan, Nov 23: Rapid draws a
+  lot of buildings, more of them the further out, so it's worth doing well). The sprite for an
+  area under 20 pixels went with step 8; drawn as it is, a small area is 17 triangles where
+  the sprite was 2, and 14 of them are its outline (3 a corner). In Staten Island those
+  outlines are a third of the frame's triangles and 1 to 3 ms of GPU on the M4. A simpler
+  shape doesn't help (they're rectangles already). Section 15 has the measurements and three
+  ways ("A lower level of detail for small areas"): no edge under 20 pixels, the edge drawn by
+  the fills' shader (the same picture for the sprite's price), or a stroke mesh without joins.
+- **Dashes of two colors** (meta/Rapid#1291, Bryan: for another time). An unpaved road's dashed
+  casing goes away on a background of its own color; alternating two contrasting colors would
+  show on any. The lines' batch makes its dashes in the shader from the distance along the
+  line, so a second color for the gaps is 4 more bytes a vertex and a line of the fragment
+  shader. (`LineMesh`es dash with a texture, which could hold two colors as it is.)
+- **Other layers' points in a batch.** Only the OSM layer's are (`PointBatch`, step 8). The
+  photo layers draw thousands of markers with viewfields, and the Rapid layer draws vertices
+  like OSM's; each layer would get a batch of its own from `_placePoint()`'s like.
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
   `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, batch sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another

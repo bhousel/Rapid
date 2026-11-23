@@ -14,6 +14,7 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 | `VertexBatch.ts` | The base of the batches: a Pixi `Mesh` with a shader of its own that draws many things in one draw call, each a run of vertices in its buffers. Keeps the buffers: a thing that changes in place, hiding, order, an origin that follows the view |
 | `LineBatch.ts` | A `VertexBatch` of lines: the shader works out the widths and the dashes, so a zoom changes nothing in it. The OSM layer has two for each level (its casings, and its strokes), and one for the outlines of areas |
 | `FillBatch.ts` | A `VertexBatch` of fills: each area's triangles, with its color and pattern. The shader lays the patterns out from one atlas texture. The OSM layer has one for every area's fill |
+| `PointBatch.ts` | A `VertexBatch` of points: each a few rectangles of the symbol atlas (viewfields, marker, icon), a number of pixels from where the point is on screen. The shader keeps them that size and upright, so neither a zoom nor a rotation changes anything in it. The OSM layer has one for its points, vertices and pins |
 | `AtlasAllocator.ts` | Manages texture atlas allocation, plus the `AtlasSource` texture source and its GPU upload handlers |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
 | `AvoidGrid.ts` | A grid over label space that counts what covers each cell: what labels must avoid, and the labels placed (no Pixi in it; `PixiScene` owns one) |
@@ -41,6 +42,14 @@ The OSM layer draws its lines in batches: for each level, one for every casing a
 ## FillBatch
 
 The fills of the OSM layer's areas are one `FillBatch`. A fill is the corners of its triangles (`triangulate()` in [`../helpers.ts`](../helpers.ts)), with its color, opacity and pattern number in each. A partial fill's band is the same thing with other triangles. Patterns are cells of one atlas texture that `PixiTextures` draws (`FillBatch.setPatterns()`); the shader tiles them at 32 pixels on screen, upright, from the view's numbers (`FillBatch.setView()`).
+
+## PointBatch
+
+The OSM layer's points, vertices and the pins of its areas are one `PointBatch`, from north to south (`PixiLayerOsm._pointBatch()`). A point is an item of four vertices for each of its pictures: where the point is (the same in all of them), where the corner is in pixels from it, and where the corner is in the texture, with the picture's color and opacity. The shader works out where the point is on screen and adds the pixels, along the screen's axes, or along the map's for a picture that turns with the map (a viewfield).
+
+- `add()` and `set()` take a list of pictures (`PointBatchQuad`: what a sprite would be told) and how many of them to use. `PixiFeaturePoint._layout()` fills one list for every point, so drawing a point makes no objects.
+- Every picture has to be in the one texture that the batches draw from (`PointBatch.setTexture()`, `canDraw()`): the symbol atlas's first. A point with any other draws itself, with sprites.
+- A hidden point has a 0 in a byte of its own in each vertex (the pictures have their own opacities).
 
 ## LineHitArea
 

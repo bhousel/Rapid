@@ -24,7 +24,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   use `Texture.from()` or `Assets.load()` for them (only area patterns use an `Assets` bundle).
 - **Features draw in z16 world coordinates**, under the `origin` container (which scales them), positioned at
   their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
-  counter-scale to stay screen-sized. The skill's screen-pixel examples need converting. See
+  counter-scale to stay screen-sized (a batch's shader does that for what's in it). The skill's screen-pixel examples need converting. See
   "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
 - **A line's casing and stroke, and an area's outlines, are drawn from stroke meshes**
   (`geomStrokeMesh()` in `modules/geo/stroke.ts`, built once for any width), not by `Graphics`.
@@ -48,16 +48,37 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     in the same batch, worked out again when the zoom changes its width. Patterns come from
     the atlas that `PixiTextures` builds (`getPatternNumber()`), and the shader lays them out.
     There's no `lowRes` sprite, `fill` or `strokes` for an area that batches draw.
-  - **A line or an area that its batches draw isn't in the scene.** Its container has no
-    parent, so don't reach for `feature.container.parent`, `getBounds()`, `toGlobal()` or
+  - **The OSM layer's points are in one batch** (`lib/PointBatch.ts`): points, vertices and the
+    pins of areas, from north to south, the ones with viewfields over the others. The layer
+    gives each its batch and its place with `_placePoint()`. A point is a few pictures (its
+    viewfields, its marker, its icon), each a rectangle of the symbol atlas, a number of pixels
+    from where the point is on screen: the shader keeps them that size and upright, so **a
+    zoom or a rotation must change nothing in the batch** either. (Below zoom 17 points are
+    drawn smaller and pins as circles: crossing that writes every point again, once.)
+    - **A point that a batch draws has no sprites:** `marker`, `icon` and `viewfields` are
+      `null`. What it draws is `feature.item`. To turn a marker, set `feature.markerRotation`
+      before `update()` (the midpoints do); don't reach into `feature.marker`.
+    - **What a point is drawn with is worked out in one place,** `PixiFeaturePoint._layout()`,
+      for the batch and for sprites alike. A new picture, size or anchor goes there.
+    - **Where a point is on screen is `feature.labelBox()`,** from arithmetic. Labels and the
+      avoid grid use it.
+    - **A batch draws from one texture,** the symbol atlas's first (`PointBatch.setTexture()`,
+      from `PixiTextures.reset()`). A point with a picture from anywhere else draws itself with
+      sprites, and finds that out as it's drawn: `PixiLayerOsm._drawFeature()` gives it its
+      place in the scene then.
+    - **Vertices and midpoints that are drawn above everything** (the map UI's `selected`
+      container) have no batch and draw themselves, where Pixi's hit test finds them.
+  - **A line, an area or a point that its batches draw isn't in the scene.** Its container has
+    no parent, so don't reach for `feature.container.parent`, `getBounds()`, `toGlobal()` or
     `worldTransform` on one: use its geometry, its container's `position` (the feature's place
     in the world) and `gfx.origin` (the world's place on screen). Where a feature is drawn among
     the others is `feature.sceneContainer` and `sceneOrder` (`featureOrder()` in `helpers.ts`).
-  - **A line or an area is in the scene only when it draws something itself**
+  - **A feature is in the scene only when it draws something itself**
     (`drawsInContainer()`): a line's oneway arrows, and what a hovered or highlighted feature
-    needs under its glow, because a glow is a filter on the container (a line draws itself
-    whole there; an area its outlines). Anything new that a feature draws in its own container
-    has to be said there, or it's drawn nowhere.
+    needs under its glow, because a glow is a filter on the container (a line or a point draws
+    itself whole there; an area its outlines, and its fill in the batch is more opaque
+    meanwhile). Anything new that a feature draws in its own container has to be said there,
+    or it's drawn nowhere.
   - **What the batches share is `VertexBatch`** (`lib/VertexBatch.ts`): the buffers, a thing
     that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
     for), the order, the origin that follows the view. A new kind of batch says what a vertex
@@ -93,7 +114,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in Užice where Pixi's
   walk took 8). `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
   `AbstractBehavior._getEventData()` reads it. Rules that follow:
-  - A point is hit where its container says: its `hitArea` (`AbstractPixiFeature.hitTest()`,
+  - A point is hit in its `hitArea`, a shape in pixels around where the point is on screen
+    (`PixiFeaturePoint.hitTest()`; one that draws itself is asked as Pixi would,
     `containerHit()` in `helpers.ts`). `eventMode: 'none'` and `allowInteraction = false` still
     take a feature out. A line is hit by its distance from the pointer, and an area by that
     distance from its rings or by being in its fill, in world coordinates
@@ -104,7 +126,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   - A feature's data has to be in the index under its own ID (`_dataHasFeature`). What isn't
     (the midpoints) goes in a container that Pixi tests, such as the map UI's `selected`.
   - After changing any of this, run the comparison in `test/e2e/select.test.js`: the index
-    must find what asking every feature does, at every point.
+    must find what asking every feature does, at every point, and a point in the batch must
+    be hit where Pixi hits it drawn with sprites.
 - **Look at what a change does to a hovered, a selected and a dragged feature,** in a
   screenshot. Moving lines into batches took the glow off every hovered line, and every test
   passed: the tests looked at classes, and the glow is a filter on a container that had nothing
@@ -128,8 +151,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   always drawn (too small at this zoom, no icon), and every `Container`, `Sprite` or `Graphics`
   is about 0.7 KB before it draws anything. `PixiFeaturePolygon` makes its sprite or its shapes
   in `update()`, for the level of detail it's at, and destroys what the level doesn't show.
-  A point's `icon` and a line's `casing` are `null` while there's none to draw: a layer that
-  touches them does so after `update()`, with `?.`.
+  A point's `marker` and `icon` and a line's `casing` are `null` while there's none to draw
+  (or a batch draws them): a layer that touches them does so after `update()`, with `?.`.
 - **In a loop over every feature, don't make an object per feature.** Iterate
   `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
   hover or a selection needs (a halo's outline is built in `updateHalo()`, for what's selected).
@@ -147,8 +170,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   layer knows which features to look at; it doesn't walk the scene. Setting `visible` or
   `label`, and `destroy()`, say so themselves. A class (`setClass()`) doesn't mark the label
   out of date, so don't make a hover or a selection set `dirty = true` on a feature.
-- **Put an OSM feature in its tile's container with `_setTile()`**, not by setting
-  `parentContainer`. After the view crosses a whole zoom level, features move to the new zoom's
+- **Put an OSM feature in its tile's container with `_setTile()`** (a point with
+  `_placePoint()`), not by setting `parentContainer`. After the view crosses a whole zoom level, features move to the new zoom's
   tiles a whole old tile at a time (`_retile()`), and a feature moved on its own in between
   makes Pixi rebuild both tiles.
 - **The OSM layer's pass doesn't see every vertex.** It leaves out the ones that only shape

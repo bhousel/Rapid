@@ -20,6 +20,11 @@ const PARTIALFILLWIDTH = 32;
 const INRADIUS_PRECISION = 1;   // a polygon's `inradius` may be this much short of the truth (see `GeometryPart`)
 const HIT_PADDING = 10;   // pixels around an outline's width that still hit it, and where its halo is drawn
 
+// How much more opaque the fill of a hovered or highlighted polygon is, while a batch draws it.
+// (Its outlines glow. The fill can't: a glow is a filter on a container, and the fill stays in
+// its batch, under the smaller polygons inside it.)
+const LIT_FILL_OPACITY = 2;
+
 
 /**
  * This class renders a Polygon feature.
@@ -431,10 +436,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.visible = true;
       this._dropLowRes();
       const patternNumber = (texture === PIXI.Texture.WHITE) ? 0 : textureManager.getPatternNumber(pattern);
-      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe);
+      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe, hasGlow);
 
       // A polygon that glows draws its outlines itself meanwhile, under the glow's filter, and
-      // hides the ones in the batch. Its fill stays where it is.
+      // hides the ones in the batch. Its fill stays where it is, and is more opaque meanwhile.
       if (hasGlow) {
         this._needShapes();
         this._drawShapes(viewport, texture, textureMatrix, doFullFill, true);
@@ -527,8 +532,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param doFullFill - Whether to fill the whole polygon, not only along its edge
    * @param pattern - The pattern to fill with (its number in the atlas), 0 for none
    * @param isWireframe - Whether wireframe mode is active
+   * @param isLit - Whether the polygon is hovered or highlighted: its fill is drawn more opaque
    */
-  protected _drawBatched(scale: number, doFullFill: boolean, pattern: number, isWireframe: boolean): void {
+  protected _drawBatched(scale: number, doFullFill: boolean, pattern: number, isWireframe: boolean, isLit: boolean): void {
     const fillBatch = this._fillBatch!;
     const strokeBatch = this._strokeBatch!;
     const part = this._geom!;
@@ -540,6 +546,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const isRestyled = !this.onlyTransformDirty;
     const band = doFullFill ? null : this._bandFor(PARTIALFILLWIDTH * scale);
     const color = style.fill?.color ?? 0xaaaaaa;
+    const fillOpacity = Math.min(1, (style.fill?.opacity ?? 0.3) * (isLit ? LIT_FILL_OPACITY : 1));
 
     // FILL
     const fillItem = this._fillItem;
@@ -548,7 +555,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const triangles = triangulate(band ?? [{ outer: flat[0], holes: flat.slice(1) }]);
       const dx = origin.x - fillBatch.position.x;
       const dy = origin.y - fillBatch.position.y;
-      const fillStyle = { color: color, alpha: style.fill?.opacity ?? 0.3, pattern: pattern };
+      const fillStyle = { color: color, alpha: fillOpacity, pattern: pattern };
       if (fillItem && fillInBatch) {
         fillBatch.setFill(fillItem, triangles.positions, triangles.indices, dx, dy);
         fillBatch.setStyle(fillItem, fillStyle);
@@ -562,7 +569,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this._batchPattern = pattern;
 
     } else if (isRestyled || pattern !== this._batchPattern) {
-      fillBatch.setStyle(fillItem, { color: color, alpha: style.fill?.opacity ?? 0.3, pattern: pattern });
+      fillBatch.setStyle(fillItem, { color: color, alpha: fillOpacity, pattern: pattern });
       fillBatch.setOrder(fillItem, order);
       this._batchPattern = pattern;
     }

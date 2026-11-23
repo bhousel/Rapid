@@ -129,6 +129,37 @@ Step 8 of section 15, the first part. Choices someone might undo:
   resources). If something of ours ever needs `eventMode: 'dynamic'`, the events ticker is what
   made that work.
 
+## Points are drawn in one batch (Nov 2026)
+Step 8 of section 15, the rest. Choices someone might undo:
+- **One batch for points, vertices and the pins of areas,** from north to south everywhere, the
+  ones with viewfields last. The tiles' containers ordered them by row and then by tile, so
+  pins that overlapped across a tile's edge could be in either order.
+- **The shader sizes the pictures in pixels and keeps them upright,** so a zoom or a rotation
+  writes nothing. Below zoom 17 points are smaller and pins are circles: that's in the
+  vertices, and crossing 17 writes every point once.
+- **A batch draws from one texture: the symbol atlas's first.** It has always been the only one
+  (8192 pixels across, or 2048 without `highQuality`). A point with a picture from anywhere
+  else draws itself with sprites; several textures in the shader would be the fix if a second
+  one ever filled up.
+- **What's drawn above everything draws itself:** the vertices and midpoints of what's hovered
+  or selected, in the map UI's container, where Pixi's hit test finds them before anything of
+  the OSM layer's. A second batch there was the alternative (no sprites made on a hover); the
+  sprites are a few dozen for a typical way.
+- **A hovered or highlighted point draws itself too,** under its glow, like a line.
+- **A point's sprites are made when it first draws itself,** so `feature.marker` is `null`
+  until then. The midpoints used to turn `feature.marker`: they set `markerRotation` now.
+- **Labels and the avoid grid ask the point where it's drawn** (`labelBox()`, arithmetic), not
+  Pixi (`container.getBounds()`). The two agree to 1e-13 pixels for points drawn with sprites;
+  the one difference is that viewfields hidden below zoom 17 no longer count.
+- **A photo marker with viewfields that's selected or highlighted is always drawn over the
+  others** (`zIndex` 99000). Before, it was only if the class was there when the viewfields'
+  sprites were made, and the next redraw undid it.
+- **A hovered area's fill is twice as opaque while it's hovered** (`LIT_FILL_OPACITY`), in its
+  batch. Bryan (Nov 23): the fill has to change somehow on a hover, or users will miss it;
+  he didn't love the old glow over the whole area. The outlines still glow.
+- **No hit test when the scene changes under a still pointer** (Bryan, Nov 23: not needed; our
+  scene doesn't move, and hovering data that just arrived might surprise the user anyway).
+
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
 Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.

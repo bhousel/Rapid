@@ -640,6 +640,33 @@ describe('PixiFeaturePolygon', () => {
         assert.isFalse(feature.drawsInContainer());
       });
 
+      it('has a fill twice as opaque in the batch meanwhile, which a glow can\'t reach', () => {
+        const opacityOf = item => item.batch._bytes[item.first * 8 + 3];
+        drawAt(16);
+        const { fillItem } = feature;
+        const first = fillItem.first;
+        const plain = opacityOf(fillItem);
+        assert.closeTo(plain, 0.3 * 255, 1);
+
+        for (const classID of ['hover', 'highlight']) {
+          feature.setClass(classID);
+          feature.update(viewportAt(16));
+          assert.strictEqual(feature.fillItem, fillItem);
+          assert.strictEqual(fillItem.first, first, 'written where it was');
+          assert.closeTo(opacityOf(fillItem), 0.6 * 255, 1);
+
+          feature.unsetClass(classID);
+          feature.update(viewportAt(16));
+          assert.strictEqual(opacityOf(fillItem), plain);
+        }
+
+        // (never more than opaque)
+        feature.style = { fill: { color: 0x336699, opacity: 0.8 } };
+        feature.setClass('hover');
+        feature.update(viewportAt(16));
+        assert.strictEqual(opacityOf(feature.fillItem), 255);
+      });
+
       it('doesn\'t show its outlines in the batch when it\'s hidden and shown while it glows', () => {
         drawAt(16);
         feature.setClass('highlight');

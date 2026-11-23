@@ -2067,9 +2067,9 @@ label) and against the table above, and can ship on its own.
 ## 15. Where this could go
 
 Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
-It's a direction and an order of work. **Steps 1 to 6 of the order are built and measured, and
-the areas of step 8** (the "What was built" parts below); the rest isn't built, and none of that
-is measured except where another section is named.
+It's a direction and an order of work. **Steps 1 to 6 and 8 of the order are built and
+measured** (the "What was built" parts below; step 7 was skipped); step 9 isn't built, and none
+of that is measured except where another section is named.
 
 **The short answer: keep the frame, change the unit of work.** APP, CULL and DRAW, the scheduler,
 the deadline, and drawing only when something changed all hold up (Unreal's render thread and
@@ -2956,7 +2956,8 @@ part, where only lines were in batches):
   frame: it has fewer render groups to walk and nothing to triangulate.
 - **GPU time is up 1.5 ms in Staten Island,** with 63% more triangles. Its small buildings were
   a sprite each, two triangles; drawn as they are, with a 2 pixel outline around five corners,
-  each is about 45. Užice has 26% more. On this machine that's the only cost; a weaker GPU may
+  each is about 17 (this said 45 at first: see "A lower level of detail for small areas" in the
+  next part). Užice has 26% more. On this machine that's the only cost; a weaker GPU may
   feel triangles more, or draw calls more (Bryan expects the latter). If it's the triangles:
   the outlines of areas under 20 pixels can be hidden, a byte per vertex, for the look of a
   fill with no border.
@@ -2989,6 +2990,186 @@ tests: lines and areas are in batches that a zoom leaves alone except for bands,
 is a band that a click in the middle misses, the index finds what asking every feature does,
 and none of Pixi's tickers runs. Fifty-nine ways of breaking the new code were each caught by a
 test.
+
+### What was built (Nov 23: step 8, the rest: points)
+
+**Decided (Bryan, Nov 23):** the changes in the look from the first part are fine ("ok (very
+minor) changes"): outlines over every fill, small areas as they are, patterns that line up, both
+sets of dashes of two ways on top of each other. A hit test when the scene changes under a
+pointer that's still isn't needed: "Our scene doesn't have animation or movement - aside from
+having new data pop in as tiles load - and I'm very ok with not hit testing against that newly
+arrived data (it might be surprising to the user anyway)." A hovered area's fill has to change
+somehow, though he didn't love the old glow: "users might complain if we take it out without
+replacing the fill hover some other way." Dashes of more than one color (meta/Rapid#1291) are
+for another time.
+
+**Points are in one batch:** the points, the vertices and the pins of areas, a `PointBatch` in
+the points' container (`PixiLayerOsm._pointBatch()`, `_placePoint()`). A point that the batch
+draws has no sprites, nothing in its container and no place in the scene, like a line and an area.
+
+- **`PointBatch`** (`modules/pixi/lib/PointBatch.ts`) is a `VertexBatch` of pictures. A point is
+  up to a few: its viewfields, its marker, its icon, in that order. A picture is four vertices
+  of 32 bytes: where the point is in the world (the same in all four), where the corner is in
+  pixels from the point, where the corner is in the texture, the tint and opacity, and two
+  flags.
+- **The shader does what a point's container did.** A container was scaled by the inverse of
+  the zoom and turned against the map's rotation, so that its sprites came out at their size
+  and upright; every point's container was set again at every zoom. The shader works out where
+  the point is on screen and adds the corner's pixels there, so a zoom or a rotation writes
+  nothing. A viewfield points somewhere on the ground: its corners are added along the map's
+  axes as they are on screen, which the shader reads from the same matrix. The batch needs no
+  numbers from the view at all.
+- **What a zoom does change is in the vertices:** below zoom 17 points are drawn at 0.8 of
+  their size, pins as circles, without viewfields, and below 16 not at all. Crossing 17 writes
+  every point again, once, where it was. (Hiding is a byte.)
+- **One texture.** Every marker, icon and viewfield is in the symbol atlas of `PixiTextures`,
+  which has only ever had one texture (8192 pixels across; 2048 without `highQuality`). The
+  batches draw from that one (`PointBatch.setTexture()`). An icon that hasn't loaded is left
+  out, and the point is written again when it arrives. A picture from any other texture makes
+  its point draw itself with sprites; nothing does today.
+- **What a point is drawn with is worked out once,** for the batch and for sprites alike
+  (`PixiFeaturePoint._layout()`): the pictures, as a sprite would be told, in a list that every
+  point uses in turn. `updateStyle()` used to set sprites as it went.
+- **North to south, everywhere.** A pin overlaps the pins above it on the map. In tiles'
+  containers that held within a tile and between rows of tiles, not between two tiles side by
+  side (1% of overlapping pairs in Užice). Points with viewfields are last, as before.
+- **A point's sprites are made when it first draws itself,** which most never do. That is: a
+  hovered or highlighted point (its glow is a filter on its container), and the vertices and
+  midpoints of what's hovered or selected, which are drawn above everything in the map UI's
+  container, where Pixi's hit test finds them first. Every point used to have a marker sprite
+  from the moment it was made.
+- **A point is hit without Pixi:** its hit area is a rectangle or a circle in pixels, and the
+  pointer's distance from the point in the world, through the world's matrix as it was last
+  drawn, is in pixels too.
+- **Labels and the avoid grid ask the point where it's drawn** (`labelBox()`), which it knows
+  from its pictures. They asked Pixi for the container's bounds.
+- **A hovered or highlighted area's fill is twice as opaque** while it is, in its batch (0.3
+  to 0.6). Its outlines glow as before.
+
+**Checked against the sprites,** in one build (`layer.useBatches`), Seattle at zoom 17.5:
+
+- **The same pixels,** with the labels off: at zoom 19, turned, 1,085 of 6.8 million pixels
+  differ, none by more than 2 levels of 255 (how a translucent viewfield's color is rounded).
+  At zoom 17.5, 1,399 differ by more than that: pins that overlap across what were tile edges,
+  which are in the other order now.
+- **The same points hit:** at each of 19,200 places on a grid, with the map turned 34°, the set
+  of points whose hit area the pointer is in is the same, for 6,011 points. Which one is on top
+  differs at 79 places, where the order of the pins does.
+- **The same boxes:** `labelBox()` and Pixi's bounds of the container agree to 1e-13 pixels for
+  all 6,011 points, turned viewfields included. (One difference, wanted: viewfields that
+  aren't drawn below zoom 17 counted in Pixi's bounds, and pushed labels away.)
+
+**Measured** (the three places from their tapes; points as sprites → points in the batch, in
+the same build, labels on, alternating, two runs of each. The sprites' side is what the build
+before drew: lines and areas in batches.)
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 160 → 123 | 82 → 52 | 135 → 78 |
+| ..of them for points | 38 → 1 | 31 → 1 | 58 → 1 |
+| Render groups | 187 → 149 | 114 → 83 | 181 → 123 |
+| DRAW, nothing changed | 0.8, 0.7 → 0.6, 0.6 ms | 0.3, 0.4 → 0.3, 0.4 ms | 0.6, 0.6 → 0.5, 0.4 ms |
+| DRAW, a pan frame | 0.9, 1.0 → 1.0, 0.9 ms | 0.7, 0.7 → 0.6, 0.7 ms | 0.9, 0.7 → 0.6, 0.7 ms |
+| DRAW, a frame that moves the cull box | 4.3, 4.9 → 1.8, 1.7 ms | 3.1, 2.8 → 1.4, 1.1 ms | 7.8, 5.2 → 1.4, 1.4 ms |
+| DRAW, the first frame after a zoom | 3.5, 3.4 → 3.9, 2.8 ms | 0.6, 0.6 → 0.6, 0.6 ms | 0.5, 0.5 → 0.4, 0.4 ms |
+| APP, the frames after a zoom | 8.3, 8.4 → 8.1, 7.1 ms | 4.5, 4.8 → 4.8, 4.9 ms | 7.1, 6.4 → 5.8, 5.5 ms |
+| GPU | 5.0, 4.0 → 4.0, 3.8 ms | 6.2, 5.8 → 5.9, 6.1 ms | 20.5, 20.1 → 18.4, 16.2 ms |
+| Every feature redrawn after a zoom | 133, 134 → 133, 116 ms | 158, 148 → 140, 167 ms | 705, 655 → 650, 650 ms |
+
+- **Draw calls are down by 23 to 42% again,** to a third, a fifth and an eighth of the 385,
+  279 and 672 that a display object for each feature made. What's left in Seattle: 103 for the oneway arrows
+  (step 9), 16 for the lines' batches, 2 for the areas', 1 for the points', 1 for the labels.
+- **The frame that moves the cull box is where DRAW fell,** to a third or less. That frame
+  shows and hides the features at the edge of what's drawn; shown or hidden sprites made Pixi
+  build their tile's instructions again, and a point in the batch is a byte in four vertices.
+- **GPU time can only be compared within a session.** The first part of this step read 7.8 and
+  8.0 ms in Staten Island with the areas in batches. All four runs here draw the same 562,000
+  triangles there and read 5.8 to 6.2 ms; an hour later the same drawing read 6.6 and 7.7. So
+  the points' batch costs the GPU nothing that shows, and what the small areas' triangles
+  cost is measured below, in one session.
+- **Sixteen zooms in Užice allocate 3.1 GB** (3.9 with the areas' part, 6.3 at step 6). A point
+  comes through `update()` after a zoom and finds nothing to do, where it used to set its
+  container's scale, its sprites and a new hit area. The heap after a load is 1,352 MB
+  (1,393), and 1,368 after thirty-two zooms (1,456): the marker sprite that every point had,
+  and what the zooms left behind. (The trace of collections came back empty again.)
+
+**Seen on the way:**
+
+- **Labels aren't placed the same on every load.** Two loads of the same build and place
+  differ in 9,000 of 6.8 million pixels in Seattle, all of it labels (which ones got room, and
+  on which side of their pin). Placement goes in the order features are drawn in, and that
+  depends on when the frames had time. It makes screenshot comparisons of labels noisy.
+- **With the labels layer off, a pan left Rapid drawing sixty frames a second for good.** The
+  layer counted what the scene noted for it (something drawn over a label, room made for one)
+  as placement that was waiting, and took none of it while it was off: 1,800 notes after one
+  pan, and another frame asked for after every frame. It's `quirks.md`'s "`gfx.pending` seemed
+  to stay true". Fixed: a layer that shows no labels forgets what it placed, once, and throws
+  the scene's notes away. (Nothing in the UI turns labels off; a script that waits for the map
+  to be idle did, and ran to its timeout.)
+- **A selected photo's marker didn't stay on top.** `PixiFeaturePoint` gave a marker with
+  viewfields a `zIndex` of 99000 when it had the `selectphoto` or `highlightphoto` class, but
+  only inside the loop that makes the viewfields' sprites, and the next redraw set it back. It's
+  set from the class now.
+
+**A lower level of detail for small areas** (Bryan, Nov 23: "Rapid is unusual, we do draw a
+_lot_ of buildings, and at low zooms it's exponential, so it is worth thinking about how to do it
+efficiently"; perhaps low-detail meshes, so that nothing changes from a mesh to a sprite, and
+the shaders stay as they are). Nothing is built; this is what was measured, with the batches
+changed from the console (`_drawBatched` patched in the page).
+
+What a small area costs now, in Staten Island at zoom 16.5 (the mall, with every parking space
+mapped): 14,095 of the 14,724 areas drawn are under 20 pixels, and 2,668 of those are
+buildings. They have 5.0 corners each. A fill is 3.0 triangles, and an outline 14.4: three for
+each corner (two for the segment, one for the join). **A small area is 17 triangles where its
+sprite was 2, and 14 of them are its outline.** (The first part of this step said "about 45":
+that was wrong.) Together they're 245,000 of the frame's 562,000 triangles.
+
+Four ways of drawing the areas under 20 pixels, two rounds in one session, alternating:
+
+| | Triangles, Staten Island | GPU: nothing changed, a pan, a zoom | Triangles, Užice | GPU, nothing changed |
+|---|---|---|---|---|
+| As they are (now) | 562,000 | 7.7, 6.6 / 7.2, 7.8 / 9.4, 9.2 ms | 1,687,000 | 23.2, 21.6 ms |
+| A: its surrounding rectangle, filled and outlined | 515,000 | 8.0, 7.7 / 6.8, 6.9 / 8.8, 8.6 ms | 1,479,000 | 21.6, 19.7 ms |
+| B: its own fill, no outline | 359,000 | 5.2, 6.3 / 6.0, 6.5 / 6.5, 6.5 ms | 1,394,000 | 19.8, 20.0 ms |
+| C: the rectangle's fill, no outline (the sprite's triangles) | 346,000 | 6.4, 6.5 / 6.4, 6.5 / 6.5, 6.5 ms | 1,333,000 | 18.6, 18.6 ms |
+
+- **A simpler shape saves almost nothing.** The small areas are rectangles already, so a
+  rectangle in their place (A) takes off 8% of the triangles and none of the time.
+- **The outlines are the cost:** without them (B) Staten Island has 36% fewer triangles, and
+  the GPU takes 1 to 3 ms less of 7 to 9 on the M4. That's the 1.5 ms the first part saw.
+- **The fill's own shape is nearly free** (B against C: 13,000 triangles).
+- **What B looks like:** a block of its fill's color, a third opaque, with no edge. A row of
+  parking spaces becomes one grey band; with outlines it's a grid.
+
+So the efficient small area keeps its own fill and gets its edge some cheaper way than a stroke
+mesh. Ways, cheapest first:
+
+1. **No edge under 20 pixels** (B). A few lines in `PixiFeaturePolygon`. The look changes.
+2. **The edge drawn by the fills' shader.** A fill's triangles know which of their sides are
+   the area's edge: with a flag for each side in the vertices (there are three unused bytes in
+   each, but the corners of a triangle can't be shared then), the fragment shader can draw the
+   two pixels inside those sides in the outline's color. A small area is then its fill's 3
+   triangles, edge included, and looks as it does now. It needs screen-space derivatives
+   (`fwidth`), which WebGL 1 has as an extension.
+3. **A thinner stroke mesh:** two triangles a segment and no joins, 10 for a rectangle where
+   there are 14. A notch of a pixel at each corner. Saves under a third of what the outlines cost.
+
+The second is the one that draws the same picture for the sprite's price, and it changes the
+fills' shader, not the lines'. Not decided.
+
+**Not done:** the other layers' points (Rapid's vertices, the photo layers' markers) are sprites
+as before; a layer has to give its points a batch.
+
+**Tests:** `PointBatch.test.js`; a point with sprites and a point in a batch in
+`PixiFeaturePoint.test.js` (its pictures, the levels of detail, a zoom that writes nothing, a
+move, an icon that arrives, a glow, the hit test at four zooms and rotations, the label box, the
+halo); the layer's batch and the place of a point in `PixiLayerOsm.test.js`; point labels from
+the point's own box, and no waiting while labels are off, in `PixiLayerLabels.test.js`; a
+hovered area's fill in `PixiFeaturePolygon.test.js`. The e2e tests:
+every point is in the batch, which a zoom leaves alone; the avoid grid has every point where the
+batch draws it; a hovered pin draws itself and goes back; the vertices of a hovered road draw
+themselves above everything; and the batch's points are hit where Pixi hits them drawn with
+sprites. A hundred and one ways of breaking the new code were each caught by a test.
 
 ### Order of work
 
@@ -3032,9 +3213,8 @@ and compared by screenshot with the build before it.
    making a feature now. Skipped; a profile of a load would have to ask for it.
 8. **Polygons and points in the static tier.** A point is two or three `Container`s today, and
    a `Container` is 0.7 KB before it draws anything (section 13).
-   **Areas done (Nov 23):** every fill in a `FillBatch` and every outline in a `LineBatch`
-   (above). **Points are next:** 49,000 of them in Užice are 121,000 display objects and 57
-   draw calls.
+   **Done (Nov 23):** every fill in a `FillBatch` and every outline in a `LineBatch`, and
+   every point in a `PointBatch` (above). The other layers' features are as they were.
 9. **Line markers in the stroke shader** (Bryan, Nov 23: after step 8). Oneway arrows and sided
    markers are a sprite every 30 or 35 pixels along a line, built again at every zoom, and they
    keep one line in ten in the scene: 103 of Seattle's 160 draw calls. The stroke's shader has
@@ -3077,12 +3257,6 @@ settles how typed arrays reach Pixi before the hard geometry starts.
   those faces with the distance at each vertex, built once, could be cut at any width by a
   shader (or by clipping each face on the CPU). That's for the static tier, and it needs a
   straight skeleton that survives OSM's polygons.
-- **A fill mesh of our own.** The fill is still a `Graphics`: Pixi triangulates every area again
-  at every zoom (`buildContextBatches` is 590 MB of the 6.9 GB that sixteen zooms allocate, 350
-  of it `triangulateWithHoles`), and draws the ones over 200 vertices outside a batch (71
-  graphics in Užice).
-  An area filled whole has the same triangles at every zoom: a `Mesh` built once, like
-  `LineMesh`, would only need its pattern's scale changed. It's also step 8's first part.
 - **The `inradius` is good to 1 unit,** which is 8 pixels at zoom 19. Clipper is asked in that
   margin, so nothing is drawn wrong; a finer `polylabel` would ask it less often.
 - **Snapping by distance.** The pointer finds the OSM layer's features through the spatial index

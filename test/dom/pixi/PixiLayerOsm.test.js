@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
@@ -158,6 +159,23 @@ describe('PixiLayerOsm', () => {
     assert.strictEqual(layer._midpoints.get('a'), first);   // same MarkerData reused
     assert.sameMembers([...layer._midpoints.keys()], ['a', 'c']);   // 'b' dropped, map stays bounded
     assert.sameMembers([...layer.getSelfAndDescendants('w1')], ['w1', 'a', 'c']);   // and unlinked from its way
+  });
+
+  it('turns a midpoint\'s marker along its way, on screen', () => {
+    const context = new Rapid.MockContext();
+    const viewport = { transform: { z: 16, zoom: 16, rotation: 0.25 } };
+    const a = { ...midpointProps('a', [0, 0]), rotation: 1 };
+    const layer = makeLayer(context, [[a], [a]]);
+    const feature = layer.features.get('osm-midpoint-a');
+
+    feature.dirty = true;
+    layer.renderMidpoints(1, viewport, {}, RELATED);
+    assert.closeTo(feature.markerRotation, 1.25, 1e-9);
+
+    feature.dirty = false;       // drawn: nothing to turn until it's drawn again
+    feature.markerRotation = 0;
+    layer.renderMidpoints(2, viewport, {}, RELATED);
+    assert.strictEqual(feature.markerRotation, 0);
   });
 
   it('makes a new midpoint when its segment now belongs to another way (after a merge or split)', () => {
@@ -471,6 +489,126 @@ describe('PixiLayerOsm', () => {
           layer._moveBatchOrigins(viewportAt(1000, 1000 + 5000, 22));
           assert.strictEqual(batch.position.y, 6000);
         });
+      });
+    });
+
+    // Points, vertices and virtual pins are drawn in one batch (`PointBatch`). The few that draw
+    // themselves (a hovered one) are in the containers of their tiles, over the batch.
+    describe('point batch', () => {
+      const placed = (x, y) => ({ world: { extent: new Rapid.sdk.Extent([x, y], [x, y]), origin: [x, y] } });
+
+      // A stand-in for a point's feature, with what `_placePoint` and `_drawFeature` use
+      function pointFeature(x, y, drawsItself = false) {
+        const feature = Object.create(PixiFeaturePoint.prototype);
+        Object.defineProperties(feature, {
+          batch: { value: null, writable: true },
+          dirty: { value: false, writable: true },
+          onlyTransformDirty: { value: false, writable: true }
+        });
+        feature.geometry = placed(x, y);
+        feature.style = { viewfield: { angles: [] } };
+        feature.container = new PIXI.Container();
+        feature.hitReach = 0;
+        feature.drawsItself = drawsItself;
+        feature.drawsInContainer = () => !feature.batch || feature.drawsItself;
+        feature.update = () => {};
+        return feature;
+      }
+
+      it('has one batch for every point, in the points\' container, under the tiles', () => {
+        const batch = layer._pointBatch(placed(300, 10));
+        assert.strictEqual(layer._pointBatch(placed(90000, 400)), batch);
+        assert.strictEqual(batch.label, 'points');
+        assert.strictEqual(batch.parent, layer.pointContainer);
+        assert.deepEqual([batch.position.x, batch.position.y], [300, 10], 'its coordinates start at the first point');
+        assert.strictEqual(layer.pointBatch, batch);
+
+        const tile = layer._pointTileContainer(pointAt(10, 10), false, 16);
+        const viewfields = layer._pointTileContainer(pointAt(10, 10), true, 16);
+        assert.isBelow(batch.zIndex, tile.parent.zIndex);
+        assert.isBelow(batch.zIndex, viewfields.parent.zIndex);
+      });
+
+      it('gives a point the batch, and no place in the scene', () => {
+        const feature = pointFeature(300, 10);
+        const elsewhere = new PIXI.Container();
+        elsewhere.addChild(feature.container);       // (it was in the map UI's container: a vertex of what was hovered)
+        layer._placePoint(feature, 16);
+        assert.strictEqual(feature.batch, layer.pointBatch);
+        assert.isNull(feature.container.parent);
+      });
+
+      it('gives a point that draws itself a place in its tile, over the batch', () => {
+        const feature = pointFeature(300, 10, true);
+        layer._placePoint(feature, 16);
+        assert.strictEqual(feature.batch, layer.pointBatch);
+        assert.strictEqual(feature.container.parent.label, '1,0,16');
+      });
+
+      it('gives no batch when the layer draws without batches', () => {
+        layer.useBatches = false;
+        const feature = pointFeature(300, 10);
+        layer._placePoint(feature, 16);
+        assert.isNull(feature.batch);
+        assert.isNull(layer.pointBatch);
+        assert.strictEqual(feature.container.parent.label, '1,0,16');
+      });
+
+      it('leaves a point without a place alone', () => {
+        const feature = pointFeature(300, 10);
+        feature.geometry = { world: null };
+        layer._placePoint(feature, 16);
+        assert.isNull(feature.batch);
+        assert.isNull(layer.pointBatch);
+      });
+
+      it('puts a point in the scene once it is drawn, if it has to draw itself after all', () => {
+        const frame = { drawDebt: 0 };
+        const viewport = { transform: { zoom: 16.4 } };
+        const feature = pointFeature(300, 10);
+        layer._placePoint(feature, 16);
+        assert.isNull(feature.container.parent);
+
+        layer._drawFeature(feature, frame, viewport);
+        assert.isNull(feature.container.parent, 'the batch drew it');
+
+        feature.update = () => { feature.drawsItself = true; };    // its icon isn't in the batch's texture
+        layer._drawFeature(feature, frame, viewport);
+        assert.strictEqual(feature.container.parent.label, '1,0,16');
+      });
+
+      it('leaves alone, once drawn, a point that has no batch: a vertex in the map UI\'s container, a midpoint', () => {
+        const feature = pointFeature(300, 10);
+        layer._drawFeature(feature, { drawDebt: 0 }, { transform: { zoom: 16.4 } });
+        assert.isNull(feature.container.parent);
+        assert.isNull(layer.pointBatch);
+      });
+
+      it('destroys the batch when it has no points and no feature waiting to draw in it', () => {
+        const batch = layer._pointBatch(placed(300, 10));
+        batch.users = 1;    // a feature got it, and isn't drawn yet
+        layer._removeEmptyContainers();
+        assert.isFalse(batch.destroyed);
+
+        batch.users = 0;
+        layer._removeEmptyContainers();
+        assert.isTrue(batch.destroyed);
+        assert.isNull(layer.pointBatch);
+
+        const again = layer._pointBatch(placed(300, 10));
+        assert.notStrictEqual(again, batch);
+        assert.isFalse(again.destroyed);
+      });
+
+      it('moves the batch\'s place in the world with the view, like the lines\'', () => {
+        const batch = layer._pointBatch(placed(1000, 1000));
+        const near = { transform: { zoom: 19 }, center: () => [0, 0], screenToWorld: () => [1500, 1000] };
+        layer._moveBatchOrigins(near);
+        assert.deepEqual([batch.position.x, batch.position.y], [1000, 1000]);
+
+        const far = { transform: { zoom: 19 }, center: () => [0, 0], screenToWorld: () => [41000.4, 1000] };    // 320,000 pixels away
+        layer._moveBatchOrigins(far);
+        assert.deepEqual([batch.position.x, batch.position.y], [41000, 1000]);
       });
     });
 
