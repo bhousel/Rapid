@@ -606,13 +606,15 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
     // The batches work out their lines' widths from this, on every frame. (A zoom changes
-    // nothing else in them.) Lines are narrower below zoom 17, and have no casing below 16.
+    // nothing else in them.) Lines are narrower below zoom 17, and have no casing and no
+    // markers (oneway arrows) below 16.
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
     LineBatch.setView({
       pixel: 2 ** (WORLD_ZOOM - viewZoom),
       narrow: (styleZoom < 16) ? 4 : (styleZoom < 17) ? 2 : 0,
       wireframe: !!map?.wireframeMode,
-      casing: styleZoom >= 16
+      casing: styleZoom >= 16,
+      markers: styleZoom >= 16
     });
     FillBatch.setView({
       pixel: 2 ** (WORLD_ZOOM - viewZoom),
@@ -2326,6 +2328,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             style.lineMarker ??= {};
             const isAlternating = (way.tags.oneway === 'alternating' || way.tags.oneway === 'reversible');
             style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
+            // (An arrow shows the way of travel: back along a way tagged `oneway=-1`.)
+            if (!isAlternating && way.isOneWayBackward()) {
+              style.lineMarker.scale = [-1, 1];
+            }
           } else {
             delete style.lineMarker;
           }

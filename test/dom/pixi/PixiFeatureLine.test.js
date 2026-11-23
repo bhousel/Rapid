@@ -206,7 +206,7 @@ describe('PixiFeatureLine', () => {
 
     // Counts what the feature asks of a batch
     function watch(target, name) {
-      ['add', 'remove', 'setStroke', 'setStyle'].forEach(method => {
+      ['add', 'remove', 'setStroke', 'setStyle', 'addMarkers', 'setMarkers', 'setMarkerStyle'].forEach(method => {
         const original = target[method].bind(target);
         target[method] = (...args) => {
           calls.push(`${name}.${method}`);
@@ -472,6 +472,230 @@ describe('PixiFeatureLine', () => {
       });
     });
 
+    // Oneway arrows and the triangles of a line with sides are a strip in the strokes' batch,
+    // which the batch's shader draws them in. Without a batch they're sprites, made at every zoom.
+    describe('markers along the line', () => {
+      const oneway = { ...style, lineMarker: { image: 'oneway', color: 0x123456 } };
+      const markerBytes = item => Array.from(batch._bytes.subarray(item.first * 8, item.first * 8 + 6));
+      const sprites = () => feature.container.getChildByLabel('lineMarkers')?.children ?? [];
+
+      it('are a strip in the strokes\' batch, over every stroke, and no sprites', () => {
+        feature.container.zIndex = 4.25;
+        drawAt(17, oneway);
+        assert.deepEqual(calls, ['casings.add', 'strokes.add', 'strokes.addMarkers']);
+        assert.lengthOf(feature.container.children, 0);
+        assert.isFalse(feature.drawsInContainer());
+
+        const { arrowItem, strokeItem } = feature;
+        assert.strictEqual(arrowItem.batch, batch);
+        assert.strictEqual(arrowItem.order, 1e6 + 4.25);
+        assert.isAbove(arrowItem.order, strokeItem.order + 1000);
+        assert.deepEqual(markerBytes(arrowItem), [0x12, 0x34, 0x56, 255, 1, 35]);
+        assert.isNull(feature.sidedItem);
+
+        // ..at the line's place in the batch
+        const [x, y] = feature.geometry.world.origin;
+        const local = feature.geometry.local.flat[0];
+        assert.closeTo(batch._floats[arrowItem.first * 12], local[0] + x - 8388608, 1e-3);
+        assert.closeTo(batch._floats[arrowItem.first * 12 + 1], local[1] + y - 8388608, 1e-3);
+      });
+
+      it('get a mesh of their own, without caps, when the stroke has round ones', () => {
+        drawAt(17, { ...oneway, stroke: { width: 3, color: 0xffffff, cap: 'round', join: 'round' }, casing: { width: 5, cap: 'round', join: 'round' } });
+        const { arrowItem, strokeItem } = feature;
+        assert.notStrictEqual(arrowItem.indices, strokeItem.indices);
+        assert.isBelow(arrowItem.count, strokeItem.count);
+      });
+
+      it('are made from the stroke\'s mesh when that has no caps either', () => {
+        drawAt(17, { ...oneway, stroke: { width: 3, color: 0xffffff, cap: 'butt', join: 'miter' }, casing: { width: 5, cap: 'butt', join: 'miter' } });
+        assert.strictEqual(feature.arrowItem.indices, feature.strokeItem.indices);
+      });
+
+      it('are arrows with two heads for a way that alternates, and triangles in the stroke\'s color for one with sides', () => {
+        drawAt(17, { ...style, lineMarker: { image: 'twoway' }, sidedMarker: { image: 'sided' } });
+        assert.deepEqual(markerBytes(feature.arrowItem).slice(4), [2, 35]);
+        assert.deepEqual(markerBytes(feature.sidedItem), [255, 255, 255, 255, 3, 30]);
+        assert.strictEqual(batch.size, 3);
+        assert.strictEqual(feature.sidedItem.indices, feature.arrowItem.indices, 'one strip mesh for both');
+      });
+
+      it('point back along a line whose style turns them around (a way tagged oneway=-1)', () => {
+        drawAt(17, { ...style, lineMarker: { image: 'oneway', scale: [-1, 1] } });
+        assert.strictEqual(markerBytes(feature.arrowItem)[4], 4);
+
+        drawAt(17, { ...style, lineMarker: { image: 'oneway' } });
+        assert.strictEqual(markerBytes(feature.arrowItem)[4], 1);
+
+        // ..and as sprites, while the line draws itself
+        feature.setClass('hover');
+        drawAt(17, { ...style, lineMarker: { image: 'oneway', scale: [-1, 1] } });
+        const [first] = sprites();
+        assert.isBelow(first.scale.x, 0);
+        assert.isAbove(first.scale.y, 0);
+      });
+
+      it('are left alone by a zoom, also below zoom 16 where the shader leaves them out', () => {
+        drawAt(17, oneway);
+        const item = feature.arrowItem;
+        calls = [];
+        for (const zoom of [18, 15, 16.5, 19]) {
+          feature.dirtyTransform();
+          effectiveZoom = zoom;
+          feature.update(viewportAt(zoom));
+        }
+        assert.deepEqual(calls, []);
+        assert.strictEqual(feature.arrowItem, item);
+        assert.isTrue(item.visible);
+        assert.lengthOf(sprites(), 0);
+      });
+
+      it('change color where they are, and go when the style has none anymore', () => {
+        drawAt(17, oneway);
+        const item = feature.arrowItem;
+        const first = item.first;
+        calls = [];
+
+        drawAt(17, { ...oneway, lineMarker: { image: 'oneway', color: 0xff0000 } });
+        assert.strictEqual(feature.arrowItem, item);
+        assert.strictEqual(item.first, first);
+        assert.deepEqual(markerBytes(item).slice(0, 3), [255, 0, 0]);
+        assert.notInclude(calls, 'strokes.addMarkers');
+        assert.notInclude(calls, 'strokes.setMarkers');
+
+        drawAt(17, style);
+        assert.isNull(feature.arrowItem);
+        assert.isNull(item.batch);
+        assert.strictEqual(batch.size, 1);
+      });
+
+      it('follow a line that changed', () => {
+        drawAt(17, oneway);
+        const item = feature.arrowItem;
+        calls = [];
+        const part = new Rapid.GeometryPart(context);
+        part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.002]] });
+        feature.geometry = part;
+        drawAt(17);
+        assert.strictEqual(feature.arrowItem, item);
+        assert.include(calls, 'strokes.setMarkers');
+        assert.notInclude(calls, 'strokes.addMarkers');
+
+        // Its last vertices are at the line's new end
+        const [x, y] = feature.geometry.world.origin;
+        const local = feature.geometry.local.flat[0];
+        let reached = false;
+        for (let i = 0; i < item.count; i++) {
+          const o = (item.first + i) * 12;
+          if (Math.abs(batch._floats[o + 1] - (local[5] + y - 8388608)) < 1e-2 && Math.abs(batch._floats[o] - (local[4] + x - 8388608)) < 1e-2) reached = true;
+        }
+        assert.isTrue(reached);
+      });
+
+      it('are hidden and shown with the feature, and leave the batch with it', () => {
+        drawAt(17, { ...oneway, sidedMarker: { image: 'sided' } });
+        const { arrowItem, sidedItem } = feature;
+        feature.visible = false;
+        assert.isFalse(arrowItem.visible);
+        assert.isFalse(sidedItem.visible);
+        feature.visible = true;
+        assert.isTrue(arrowItem.visible);
+        assert.isTrue(sidedItem.visible);
+
+        feature.destroy();
+        assert.isNull(arrowItem.batch);
+        assert.isNull(sidedItem.batch);
+        assert.strictEqual(batch.size, 0);
+      });
+
+      it('are sprites while the line glows, and the batch\'s again after', () => {
+        drawAt(17, { ...oneway, sidedMarker: { image: 'sided' } });
+        const item = feature.arrowItem;
+        const sided = feature.sidedItem;
+
+        feature.setClass('hover');
+        feature.update(viewportAt(17));
+        assert.isFalse(item.visible);
+        assert.isFalse(sided.visible);
+        assert.isAbove(sprites().length, 0);
+        feature.visible = false;
+        feature.visible = true;
+        assert.isFalse(item.visible, 'not shown in the batch while the line draws them');
+
+        feature.unsetClass('hover');
+        feature.update(viewportAt(17));
+        assert.strictEqual(feature.arrowItem, item);
+        assert.isTrue(item.visible);
+        assert.isTrue(sided.visible);
+        assert.lengthOf(sprites(), 0);
+        assert.lengthOf(feature.container.children, 0);
+      });
+
+      it('are put back if the batch has lost them, though only the zoom changed', () => {
+        drawAt(17, oneway);
+        const item = feature.arrowItem;
+        batch.remove(item);
+
+        feature.dirtyTransform();
+        feature.update(viewportAt(17.5));
+        assert.notStrictEqual(feature.arrowItem, item);
+        assert.strictEqual(feature.arrowItem.batch, batch);
+        assert.isTrue(feature.arrowItem.visible);
+      });
+
+      it('go to the batch that the line was given since, though only the zoom changed', () => {
+        drawAt(17, oneway);
+        const item = feature.arrowItem;
+        const other = new LineBatch();
+        const otherCasings = new LineBatch();
+        other.position.set(8388608, 8388608);
+        otherCasings.position.set(8388608, 8388608);
+
+        feature.dirtyTransform();
+        feature.batch = other;              // (its level's batches were destroyed and made again)
+        feature.casingBatch = otherCasings;
+        feature.update(viewportAt(17.5));
+        assert.isNull(item.batch);
+        assert.strictEqual(feature.arrowItem.batch, other);
+        assert.strictEqual(feature.strokeItem.batch, other);
+        assert.strictEqual(batch.size, 0);
+
+        feature.destroy();
+        other.destroy();
+        otherCasings.destroy();
+      });
+
+      it('are sprites, in the scene, when a batch has no shape for them', () => {
+        drawAt(17, { ...style, lineMarker: { image: 'maki-star' } });
+        assert.isNull(feature.arrowItem);
+        assert.isOk(feature.strokeItem, 'the stroke is still the batch\'s');
+        assert.isAbove(sprites().length, 0);
+        assert.isTrue(feature.drawsInContainer());
+      });
+
+      it('are all sprites when a batch has a shape for some of them only: none is drawn twice', () => {
+        drawAt(17, { ...oneway, sidedMarker: { image: 'maki-star' } });
+        assert.isNull(feature.arrowItem);
+        assert.isNull(feature.sidedItem);
+        assert.strictEqual(batch.size, 1);
+        assert.isAbove(sprites().length, 0);
+      });
+
+      it('are sprites 35 pixels apart without batches, from zoom 16', () => {
+        feature.batch = null;
+        feature.casingBatch = null;
+        drawAt(17, oneway);
+        const markers = sprites();
+        assert.isAbove(markers.length, 2);
+        const gap = Math.hypot(markers[1].x - markers[0].x, markers[1].y - markers[0].y) * 2;    // world units to pixels, at zoom 17
+        assert.closeTo(gap, 35, 0.01);
+        assert.strictEqual(markers[0].tint, 0x123456);
+
+        drawAt(15.5);
+        assert.lengthOf(sprites(), 0);
+      });
+    });
+
     // A line that its batches draw has nothing in its container, and its layer keeps it out of the scene.
     describe('drawsInContainer', () => {
       it('is false for a line that its batches draw, and true without batches', () => {
@@ -493,10 +717,17 @@ describe('PixiFeatureLine', () => {
         assert.isFalse(feature.drawsInContainer());
       });
 
-      it('is true for a line with markers along it', () => {
+      it('is false for a line with markers along it that the batch draws', () => {
         feature.style = { ...style, lineMarker: { image: 'oneway' } };
+        assert.isFalse(feature.drawsInContainer());
+        feature.style = { ...style, lineMarker: { image: 'twoway' }, sidedMarker: { image: 'sided' } };
+        assert.isFalse(feature.drawsInContainer());
+      });
+
+      it('is true for a line with markers that a batch has no shape for', () => {
+        feature.style = { ...style, lineMarker: { image: 'maki-star' } };
         assert.isTrue(feature.drawsInContainer());
-        feature.style = { ...style, sidedMarker: { image: 'sided' } };
+        feature.style = { ...style, sidedMarker: { image: 'maki-star' } };
         assert.isTrue(feature.drawsInContainer());
       });
 

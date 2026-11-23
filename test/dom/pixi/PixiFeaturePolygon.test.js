@@ -446,12 +446,66 @@ describe('PixiFeaturePolygon', () => {
       assert.deepEqual(Array.from(outlines._bytes.subarray(ring.first * 8, ring.first * 8 + 4)), [0x11, 0x22, 0x33, 255]);
     });
 
-    it('draws a small polygon as it is, with no sprite in its place', () => {
+    // An outline is three triangles a corner, and a rectangle's fill is two: under 20 pixels a
+    // polygon is its fill alone. (Its own shape, not a sprite's.)
+    it('draws a small polygon as its fill, with no outline and no sprite in its place', () => {
       drawAt(15);    // 13 pixels wide
       assert.strictEqual(feature.lod, 1);
       assert.isNull(feature.lowRes);
       assert.isTrue(feature.fillItem.visible);
+      assert.lengthOf(feature.ringItems, 0);
+      assert.strictEqual(outlines.size, 0);
+      assert.deepEqual(calls, ['fills.add']);
+    });
+
+    it('gives a polygon its outline when a zoom makes it large enough, and takes it away again', () => {
+      drawAt(15);
+      const { fillItem } = feature;
+      calls = [];
+
+      feature.dirtyTransform();
+      feature.update(viewportAt(16));    // 26 pixels
+      assert.strictEqual(feature.lod, 2);
+      assert.lengthOf(feature.ringItems, 1);
+      assert.strictEqual(feature.fillItem, fillItem);
+      assert.deepEqual(calls, ['outlines.add']);
+
+      calls = [];
+      feature.dirtyTransform();
+      feature.update(viewportAt(15));
+      assert.lengthOf(feature.ringItems, 0);
+      assert.strictEqual(outlines.size, 0);
+      assert.deepEqual(calls, ['outlines.remove']);
+    });
+
+    it('keeps a small polygon\'s outline in wireframe mode, where no fill is drawn', () => {
+      context.systems.map = { wireframeMode: true, effectiveZoom: () => 15 };
+      drawAt(15);
+      assert.strictEqual(feature.lod, 1);
+      assert.lengthOf(feature.ringItems, 1);
       assert.isTrue(feature.ringItems[0].visible);
+    });
+
+    it('shows a small polygon\'s outline while it is hovered, drawn by the polygon itself', () => {
+      drawAt(15);
+      feature.setClass('hover');
+      feature.update(viewportAt(15));
+      assert.lengthOf(feature.ringItems, 0);
+      assert.isOk(feature.strokes);
+      assert.isAbove(feature.strokes.children[0].strokeMesh.vertexCount, 0);
+
+      feature.unsetClass('hover');
+      feature.update(viewportAt(15));
+      assert.isNull(feature.strokes);
+      assert.lengthOf(feature.ringItems, 0);
+    });
+
+    it('is hit in its fill and near its edge when it is small, though it has no outline', () => {
+      drawAt(15);
+      assert.isTrue(feature.hitTest(STAGE, worldAt(0, 0)));
+      const edge = feature.geometry.local.extent.max[0];
+      assert.isTrue(feature.hitTest(STAGE, worldAt(edge + 4, 0)));     // 2 pixels outside it, at zoom 15
+      assert.isFalse(feature.hitTest(STAGE, worldAt(edge + 30, 0)));
     });
 
     it('destroys the sprite that the polygon had before it got its batches', () => {
@@ -481,7 +535,7 @@ describe('PixiFeaturePolygon', () => {
     it('does nothing to the batches for a zoom', () => {
       drawAt(16);
       calls = [];
-      for (const zoom of [17, 15, 18.5]) {
+      for (const zoom of [17, 15.8, 18.5]) {    // (22 pixels wide at the least: not small)
         feature.dirtyTransform();
         feature.update(viewportAt(zoom));
       }
@@ -640,24 +694,31 @@ describe('PixiFeaturePolygon', () => {
         assert.isFalse(feature.drawsInContainer());
       });
 
-      it('has a fill twice as opaque in the batch meanwhile, which a glow can\'t reach', () => {
+      it('has a fill tinted with the glow\'s color in the batch meanwhile, and twice as opaque', () => {
         const opacityOf = item => item.batch._bytes[item.first * 8 + 3];
+        const colorOf = item => Array.from(item.batch._bytes.subarray(item.first * 8, item.first * 8 + 3));
+        feature.style = { fill: { color: 0x204060, opacity: 0.3 } };
         drawAt(16);
         const { fillItem } = feature;
         const first = fillItem.first;
         const plain = opacityOf(fillItem);
         assert.closeTo(plain, 0.3 * 255, 1);
+        assert.deepEqual(colorOf(fillItem), [0x20, 0x40, 0x60]);
 
+        // Halfway to the hover's yellow, or the highlight's blue
+        const tinted = { hover: [0x90, 0xa0, 0x30], highlight: [0x48, 0x69, 0xb0] };
         for (const classID of ['hover', 'highlight']) {
           feature.setClass(classID);
           feature.update(viewportAt(16));
           assert.strictEqual(feature.fillItem, fillItem);
           assert.strictEqual(fillItem.first, first, 'written where it was');
           assert.closeTo(opacityOf(fillItem), 0.6 * 255, 1);
+          assert.deepEqual(colorOf(fillItem), tinted[classID], classID);
 
           feature.unsetClass(classID);
           feature.update(viewportAt(16));
           assert.strictEqual(opacityOf(fillItem), plain);
+          assert.deepEqual(colorOf(fillItem), [0x20, 0x40, 0x60]);
         }
 
         // (never more than opaque)

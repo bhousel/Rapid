@@ -20,10 +20,35 @@ const PARTIALFILLWIDTH = 32;
 const INRADIUS_PRECISION = 1;   // a polygon's `inradius` may be this much short of the truth (see `GeometryPart`)
 const HIT_PADDING = 10;   // pixels around an outline's width that still hit it, and where its halo is drawn
 
-// How much more opaque the fill of a hovered or highlighted polygon is, while a batch draws it.
-// (Its outlines glow. The fill can't: a glow is a filter on a container, and the fill stays in
-// its batch, under the smaller polygons inside it.)
+// The colors of a hover and of a highlight: the glow around the outlines, and the tint of the fill
+const HOVER_COLOR = 0xffff00;
+const HIGHLIGHT_COLOR = 0x7092ff;
+
+// The fill of a hovered or highlighted polygon, while a batch draws it: this much of the way to
+// the hover's color, and this many times as opaque. (Its outlines glow. The fill can't: a glow
+// is a filter on a container, and the fill stays in its batch, under the smaller polygons
+// inside it.)
+const LIT_FILL_TINT = 0.5;
 const LIT_FILL_OPACITY = 2;
+
+// A polygon smaller than this, in pixels, is drawn in less detail: a batch draws its fill and
+// no outline. (An outline is 3 triangles a corner, a rectangle's fill is 2.)
+const SMALL_SIZE = 20;
+
+
+/**
+ * Mixes two colors.
+ * @param a - A color, as 0xRRGGBB
+ * @param b - Another
+ * @param t - How much of the second: 0 for none of it, 1 for all
+ * @return The color between them
+ */
+function mixColors(a: number, b: number, t: number): number {
+  const red = Math.round(((a >> 16) & 0xff) * (1 - t) + ((b >> 16) & 0xff) * t);
+  const green = Math.round(((a >> 8) & 0xff) * (1 - t) + ((b >> 8) & 0xff) * t);
+  const blue = Math.round((a & 0xff) * (1 - t) + (b & 0xff) * t);
+  return (red << 16) | (green << 8) | blue;
+}
 
 
 /**
@@ -420,7 +445,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     const isBatched = this._isBatched();
-    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
+    const glowColor = this._classes.has('hover') ? HOVER_COLOR : this._classes.has('highlight') ? HIGHLIGHT_COLOR : null;
+    const hasGlow = (glowColor !== null);
 
     // Cull really tiny shapes
     if (screenW < 4 && screenH < 4) {  // so tiny
@@ -429,17 +455,20 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this._dropLowRes();
       this._dropShapes();
 
-    // Batches draw it: the fill and the outlines as they are, at any size. (A zoom changes
-    // nothing there, unless the polygon gets or loses its middle, or its pattern.)
+    // Batches draw it: the fill and the outlines as they are. (A zoom changes nothing there,
+    // unless the polygon gets or loses its middle, its pattern, or its outlines.)
+    // A small polygon is its fill alone, where there's a fill to see: better a block without an
+    // edge than nothing, and its outlines would be most of its triangles.
     } else if (isBatched) {
-      this.lod = (screenW < 20 && screenH < 20) ? 1 : 2;
+      this.lod = (screenW < SMALL_SIZE && screenH < SMALL_SIZE) ? 1 : 2;
       this.visible = true;
       this._dropLowRes();
       const patternNumber = (texture === PIXI.Texture.WHITE) ? 0 : textureManager.getPatternNumber(pattern);
-      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe, hasGlow);
+      const hasOutlines = (this.lod === 2 || isWireframe);
+      this._drawBatched(localScale, doFullFill, patternNumber, isWireframe, glowColor, hasOutlines);
 
       // A polygon that glows draws its outlines itself meanwhile, under the glow's filter, and
-      // hides the ones in the batch. Its fill stays where it is, and is more opaque meanwhile.
+      // hides the ones in the batch. Its fill stays where it is, tinted and more opaque meanwhile.
       if (hasGlow) {
         this._needShapes();
         this._drawShapes(viewport, texture, textureMatrix, doFullFill, true);
@@ -452,7 +481,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       }
 
     // Very small, swap with lowRes sprite
-    } else if (local.surround && (screenW < 20 && screenH < 20)) {
+    } else if (local.surround && (screenW < SMALL_SIZE && screenH < SMALL_SIZE)) {
       this._dropItems();
       this.lod = 1;
       this.visible = true;
@@ -532,9 +561,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param doFullFill - Whether to fill the whole polygon, not only along its edge
    * @param pattern - The pattern to fill with (its number in the atlas), 0 for none
    * @param isWireframe - Whether wireframe mode is active
-   * @param isLit - Whether the polygon is hovered or highlighted: its fill is drawn more opaque
+   * @param litColor - The color of the hover or the highlight, if the polygon has one: its fill is tinted with it, and more opaque
+   * @param hasOutlines - Whether the rings' outlines are drawn (not a small polygon's)
    */
-  protected _drawBatched(scale: number, doFullFill: boolean, pattern: number, isWireframe: boolean, isLit: boolean): void {
+  protected _drawBatched(scale: number, doFullFill: boolean, pattern: number, isWireframe: boolean, litColor: number | null, hasOutlines: boolean): void {
     const fillBatch = this._fillBatch!;
     const strokeBatch = this._strokeBatch!;
     const part = this._geom!;
@@ -546,6 +576,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const isRestyled = !this.onlyTransformDirty;
     const band = doFullFill ? null : this._bandFor(PARTIALFILLWIDTH * scale);
     const color = style.fill?.color ?? 0xaaaaaa;
+    const isLit = (litColor !== null);
+    const fillColor = isLit ? mixColors(color, litColor, LIT_FILL_TINT) : color;
     const fillOpacity = Math.min(1, (style.fill?.opacity ?? 0.3) * (isLit ? LIT_FILL_OPACITY : 1));
 
     // FILL
@@ -555,7 +587,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const triangles = triangulate(band ?? [{ outer: flat[0], holes: flat.slice(1) }]);
       const dx = origin.x - fillBatch.position.x;
       const dy = origin.y - fillBatch.position.y;
-      const fillStyle = { color: color, alpha: fillOpacity, pattern: pattern };
+      const fillStyle = { color: fillColor, alpha: fillOpacity, pattern: pattern };
       if (fillItem && fillInBatch) {
         fillBatch.setFill(fillItem, triangles.positions, triangles.indices, dx, dy);
         fillBatch.setStyle(fillItem, fillStyle);
@@ -569,7 +601,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this._batchPattern = pattern;
 
     } else if (isRestyled || pattern !== this._batchPattern) {
-      fillBatch.setStyle(fillItem, { color: color, alpha: fillOpacity, pattern: pattern });
+      fillBatch.setStyle(fillItem, { color: fillColor, alpha: fillOpacity, pattern: pattern });
       fillBatch.setOrder(fillItem, order);
       this._batchPattern = pattern;
     }
@@ -578,7 +610,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     // (Their width isn't narrowed at lower zooms as a line's is: the least width is the width.)
     const lineWidth = style.fill?.width || 2;
     const ringItems = this._ringItems;
-    for (let i = 0; i < flat.length; i++) {
+    const numRings = hasOutlines ? flat.length : 0;
+    for (let i = 0; i < numRings; i++) {
       const item = ringItems[i];
       const inBatch = (item?.batch === strokeBatch);
       if (item && inBatch && isSame && !isRestyled) continue;    // as it is
@@ -601,7 +634,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         }
       }
     }
-    while (ringItems.length > flat.length) {   // a ring fewer than before
+    while (ringItems.length > numRings) {   // a ring fewer than before, or none for a polygon that's small now
       const item = ringItems.pop()!;
       item.batch?.remove(item);
     }
@@ -855,13 +888,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     // Hover
     if (showHover) {
       if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
+        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: HOVER_COLOR });
         glow.resolution = 2;
         this.container.filters = [glow];
       }
     } else if (showHighlight) {
       if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0x7092ff });
+        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: HIGHLIGHT_COLOR });
         glow.resolution = 2;
         this.container.filters = [glow];
       }

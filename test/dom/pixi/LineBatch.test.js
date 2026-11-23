@@ -1,4 +1,4 @@
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatch, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatch.ts';
 import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
 
 
@@ -262,6 +262,69 @@ describe('LineBatch', () => {
     assert.strictEqual(more.first, 10 * zigzag.vertexCount);
   });
 
+  it('keeps the buffers it has when lines come and go, as long as what\'s in use fits in three quarters of them', () => {
+    const items = [];
+    for (let i = 0; i < 40; i++) {
+      items.push(batch.add(zigzag, i, 0, STYLE));
+    }
+    batch.flush();
+    const capacity = batch.vertexUse[1];
+    const floats = batch._floats;
+
+    // Take a few out and put as many in, again and again: more than the buffers could hold
+    // if nothing were packed. (Half as many in use as there's room for, give or take.)
+    const turns = Math.ceil(3 * capacity / (4 * zigzag.vertexCount));
+    for (let turn = 0; turn < turns; turn++) {
+      for (let i = 0; i < 4; i++) {
+        batch.remove(items.shift());
+        items.push(batch.add(zigzag, 100 + turn, i, STYLE));
+      }
+      batch.flush();
+    }
+    assert.strictEqual(batch.vertexUse[0], 40 * zigzag.vertexCount);
+    assert.strictEqual(batch.vertexUse[1], capacity, 'no more room than before');
+    assert.strictEqual(batch._floats, floats, 'the same arrays');
+    assert.closeTo(floatsOf(items[39])[0], zigzag.vertices[0] + 100 + turns - 1, 1e-4);
+    assert.strictEqual(batch.geometry.indexCount, 40 * zigzag.indices.length);
+  });
+
+  it('gets smaller buffers when less than a third of them is in use, and keeps what it has', () => {
+    const items = [];
+    for (let i = 0; i < 60; i++) {
+      items.push(batch.add(zigzag, i, 0, { ...STYLE, width: i + 1 }));
+    }
+    batch.flush();
+    const capacity = batch.vertexUse[1];
+
+    for (let i = 0; i < 50; i++) {
+      batch.remove(items[i]);
+    }
+    batch.flush();
+    const [used, smaller] = batch.vertexUse;
+    assert.strictEqual(used, 10 * zigzag.vertexCount);
+    assert.isBelow(smaller, capacity / 2);
+    assert.isAtLeast(smaller, used * 1.4, 'with room to grow');
+    assert.lengthOf(batch._floats, smaller * FLOATS);
+    assert.lengthOf(batch._bytes, smaller * BYTES);
+    assert.strictEqual(batch._floatBuffer.data, batch._floats, 'the GPU gets the smaller array');
+
+    const kept = items.slice(50);
+    kept.forEach((item, i) => {
+      assert.strictEqual(item.first, i * zigzag.vertexCount);
+      assert.closeTo(floatsOf(item)[0], zigzag.vertices[0] + 50 + i, 1e-4);
+      assert.strictEqual(floatsOf(item)[10], 51 + i);
+    });
+    assert.strictEqual(batch.geometry.indexCount, 10 * zigzag.indices.length);
+
+    // ..and never smaller than a batch starts
+    for (const item of kept) {
+      batch.remove(item);
+    }
+    batch.flush();
+    assert.strictEqual(batch.vertexUse[1], 256);
+    assert.isFalse(batch.renderable);
+  });
+
   it('moves its origin, and keeps every line where it is in the world', () => {
     batch.position.set(1000, 2000);
     const a = batch.add(corner, 10, 20, STYLE);
@@ -306,11 +369,160 @@ describe('LineBatch', () => {
     assert.strictEqual(other.shader, batch.shader);
     other.destroy();
 
-    LineBatch.setView({ pixel: 0.25, narrow: 2, wireframe: true, casing: false });
+    LineBatch.setView({ pixel: 0.25, narrow: 2, wireframe: true, casing: false, markers: true });
     const uniforms = batch.shader.resources.lineUniforms.uniforms;
-    assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing], [0.25, 2, 1, 0]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true });
-    assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing], [1, 0, 0, 1]);
+    assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing, uniforms.uMarkers], [0.25, 2, 1, 0, 1]);
+    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: false });
+    assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing, uniforms.uMarkers], [1, 0, 0, 1, 0]);
+    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+  });
+
+  // The markers along a line (oneway arrows, the triangles of a line with sides) are a strip
+  // along the line, in the batch like any line. The shader draws the markers in the strip, from
+  // the distance along the line and the distance to its side.
+  describe('markers', () => {
+    const ARROWS = { kind: 'oneway', color: 0x112233, alpha: 1 };
+
+    it('are the line\'s vertices, with a width of their own and a least width of 0, which says what they are', () => {
+      const item = batch.addMarkers(corner, 100, -50, ARROWS, 7);
+      assert.strictEqual(batch.size, 1);
+      assert.strictEqual(item.count, corner.vertexCount);
+      assert.strictEqual(item.indices, corner.indices);
+      assert.strictEqual(item.order, 7);
+
+      for (let i = 0; i < corner.vertexCount; i++) {
+        const v = corner.vertices.subarray(i * 7, i * 7 + 7);
+        const f = floatsOf(item, i);
+        assert.closeTo(f[0], v[0] + 100, 1e-4, 'x');
+        assert.closeTo(f[1], v[1] - 50, 1e-4, 'y');
+        assert.deepEqual(f.slice(2, 6), [v[2], v[3], v[4], v[5]], 'offset, distance, further along');
+        assert.deepEqual(f.slice(10, 12), [LINE_MARKERS.oneway.width, 0]);
+      }
+    });
+
+    it('have their color, their kind and their spacing in each vertex', () => {
+      const arrows = batch.addMarkers(straight, 0, 0, ARROWS);
+      const both = batch.addMarkers(straight, 0, 0, { kind: 'twoway', color: 0xff0000, alpha: 0.5 });
+      const sided = batch.addMarkers(straight, 0, 0, { kind: 'sided', color: 0xcccccc, alpha: 1 });
+      for (let i = 0; i < straight.vertexCount; i++) {
+        assert.deepEqual(bytesOf(arrows, i).slice(0, 6), [0x11, 0x22, 0x33, 255, 1, 35]);
+        assert.deepEqual(bytesOf(both, i).slice(0, 6), [255, 0, 0, 128, 2, 35]);
+        assert.deepEqual(bytesOf(sided, i).slice(0, 6), [0xcc, 0xcc, 0xcc, 255, 3, 30]);
+      }
+      assert.deepEqual(floatsOf(sided).slice(10, 12), [LINE_MARKERS.sided.width, 0]);
+      assert.isAtLeast(LINE_MARKERS.oneway.width, 5 + 1, 'an arrow is 5 across');
+      assert.isAtLeast(LINE_MARKERS.sided.width, 2 * 9.5 + 1, 'a sided marker reaches 9.5 from the line');
+    });
+
+    it('have a number of their own for a oneway arrow that points back along the line', () => {
+      const back = batch.addMarkers(straight, 0, 0, { ...ARROWS, reversed: true });
+      assert.deepEqual(bytesOf(back).slice(4, 6), [4, 35]);
+      batch.setMarkerStyle(back, ARROWS);
+      assert.deepEqual(bytesOf(back).slice(4, 6), [1, 35]);
+
+      // (An arrow with two heads, or a marker on the side, has no other way around.)
+      const both = batch.addMarkers(straight, 0, 0, { kind: 'twoway', color: 0, alpha: 1, reversed: true });
+      assert.strictEqual(bytesOf(both)[4], 2);
+    });
+
+    it('know which side of the line each vertex is on, at its place and at its second place', () => {
+      const item = batch.addMarkers(corner, 0, 0, ARROWS);
+      const seconds = new Map();
+      for (let f = 0; f < corner.fallbacks.length; f += 6) {
+        seconds.set(corner.fallbacks[f], corner.fallbacks[f + 5]);
+      }
+      assert.isAbove(seconds.size, 0);
+
+      const sides = new Set();
+      for (let i = 0; i < corner.vertexCount; i++) {
+        const side = corner.vertices[i * 7 + 6];
+        sides.add(side);
+        const bytes = bytesOf(item, i);
+        assert.strictEqual(bytes[6], side + 1, `vertex ${i}`);
+        assert.strictEqual(bytes[7], (seconds.get(i) ?? side) + 1, `vertex ${i}, at its second place`);
+      }
+      assert.includeMembers([...sides], [-1, 1]);
+
+      // With a round corner, a vertex's second place is on the line, not on the side it was on
+      const round = geomStrokeMesh([0, 0, 10, 0, 10, 10], { join: 'round' });
+      const strip = batch.addMarkers(round, 0, 0, ARROWS);
+      let moved = 0;
+      for (let f = 0; f < round.fallbacks.length; f += 6) {
+        const i = round.fallbacks[f];
+        const bytes = bytesOf(strip, i);
+        assert.strictEqual(bytes[7], round.fallbacks[f + 5] + 1, `vertex ${i}, at its second place`);
+        if (bytes[7] !== bytes[6]) moved++;
+      }
+      assert.isAbove(moved, 0);
+    });
+
+    it('change their kind and color where they are, and keep their sides', () => {
+      const item = batch.addMarkers(corner, 0, 0, ARROWS);
+      const sides = Array.from({ length: corner.vertexCount }, (_, i) => bytesOf(item, i).slice(6, 8));
+      const first = item.first;
+      batch.setMarkerStyle(item, { kind: 'sided', color: 0x445566, alpha: 1 });
+      assert.strictEqual(item.first, first);
+      for (let i = 0; i < corner.vertexCount; i++) {
+        assert.deepEqual(bytesOf(item, i), [0x44, 0x55, 0x66, 255, 3, 30, ...sides[i]]);
+        assert.deepEqual(floatsOf(item, i).slice(10, 12), [LINE_MARKERS.sided.width, 0]);
+      }
+    });
+
+    it('go along another line: where they were if it has as many vertices, otherwise at the end', () => {
+      const item = batch.addMarkers(corner, 0, 0, ARROWS);
+      batch.add(straight, 0, 0, STYLE);
+      const first = item.first;
+
+      const other = geomStrokeMesh([0, 0, 20, 0, 20, 30]);     // the same corners, somewhere else
+      assert.strictEqual(other.vertexCount, corner.vertexCount);
+      batch.setMarkers(item, other, 5, 5, ARROWS);
+      assert.strictEqual(item.first, first);
+      assert.closeTo(floatsOf(item, 0)[0], other.vertices[0] + 5, 1e-4);
+      assert.strictEqual(item.indices, other.indices);
+
+      batch.setMarkers(item, zigzag, 0, 0, { kind: 'twoway', color: 0x112233, alpha: 1 });
+      assert.strictEqual(item.count, zigzag.vertexCount);
+      assert.isAbove(item.first, first);
+      for (let i = 0; i < zigzag.vertexCount; i += 7) {
+        const bytes = bytesOf(item, i);
+        assert.deepEqual(bytes.slice(0, 6), [0x11, 0x22, 0x33, 255, 2, 35]);
+        assert.strictEqual(bytes[6], zigzag.vertices[i * 7 + 6] + 1);
+      }
+    });
+
+    it('are hidden like a line, and stay hidden when they change', () => {
+      const item = batch.addMarkers(corner, 0, 0, ARROWS);
+      batch.setVisible(item, false);
+      assert.strictEqual(bytesOf(item, 2)[3], 0);
+      batch.setMarkerStyle(item, { kind: 'oneway', color: 0xffffff, alpha: 1 });
+      assert.strictEqual(bytesOf(item, 2)[3], 0);
+      batch.setMarkers(item, corner, 1, 1, ARROWS);
+      assert.strictEqual(bytesOf(item, 2)[3], 0);
+      batch.setVisible(item, true);
+      assert.strictEqual(bytesOf(item, 2)[3], 255);
+    });
+
+    it('are drawn in their order among the lines', () => {
+      const markers = batch.addMarkers(straight, 0, 0, ARROWS, 1000);
+      const line = batch.add(corner, 0, 0, STYLE, 5);
+      batch.flush();
+      assert.deepEqual(drawn(), [
+        ...Array.from(corner.indices, index => index + line.first),
+        ...Array.from(straight.indices, index => index + markers.first)     // over the line, though they were added first
+      ]);
+    });
+
+    it('ignore the markers of another batch', () => {
+      const other = new LineBatch();
+      const item = other.addMarkers(straight, 0, 0, ARROWS);
+      batch.setMarkers(item, corner, 0, 0, ARROWS);
+      batch.setMarkerStyle(item, { kind: 'sided', color: 0, alpha: 1 });
+      assert.strictEqual(item.count, straight.vertexCount);
+      assert.strictEqual(other._bytes[item.first * BYTES + 4], 1);
+      assert.strictEqual(batch._bytes[item.first * BYTES + 4], 0, 'nothing was written in this one');
+      assert.strictEqual(batch.size, 0);
+      other.destroy();
+    });
   });
 
   it('brings itself up to date when Pixi is about to render it', () => {

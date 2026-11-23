@@ -154,11 +154,38 @@ Step 8 of section 15, the rest. Choices someone might undo:
 - **A photo marker with viewfields that's selected or highlighted is always drawn over the
   others** (`zIndex` 99000). Before, it was only if the class was there when the viewfields'
   sprites were made, and the next redraw undid it.
-- **A hovered area's fill is twice as opaque while it's hovered** (`LIT_FILL_OPACITY`), in its
-  batch. Bryan (Nov 23): the fill has to change somehow on a hover, or users will miss it;
-  he didn't love the old glow over the whole area. The outlines still glow.
+- **A hovered area's fill changes while it's hovered,** in its batch (`LIT_FILL_OPACITY`, and
+  since step 9 `LIT_FILL_TINT`). Bryan (Nov 23): the fill has to change somehow on a hover, or
+  users will miss it; he didn't love the old glow over the whole area. The outlines still glow.
 - **No hit test when the scene changes under a still pointer** (Bryan, Nov 23: not needed; our
   scene doesn't move, and hovering data that just arrived might surprise the user anyway).
+
+## Line markers are drawn by the lines' shader (Nov 2026)
+Step 9 of section 15. Choices someone might undo:
+- **A strip in the strokes' batch, not a batch of its own and not the stroke's own pixels.**
+  The markers of a line are a second copy of its stroke mesh, 7 pixels wide for arrows and 21
+  for sided markers, in the batch that draws the level's strokes, ordered after every stroke.
+  That's no draw call more. Drawing them in the stroke's own fragments would need no vertices
+  at all, but an arrow is 5 pixels across and a stream's stroke is 3, and a sided marker is
+  beside the line.
+- **The shapes are formulas in the fragment shader,** in pixels, the same as the textures that
+  sprites use (`PixiTextures`). They can't be read off a buffer, so an e2e test compares the
+  pixels with the sprites'.
+- **No new bytes in a vertex.** A strip's vertices say what they are with a least width of 0,
+  and use the four dash bytes for the kind, the spacing, and the side of the line.
+- **A marker follows the line around a corner,** where a sprite stuck straight out past it.
+  And there's no limit of 100 markers on a segment anymore (it was there for the sprites).
+- **Arrows point back along a way tagged `oneway=-1`** (`OsmWay.isOneWayBackward()`,
+  `lineMarker.scale: [-1, 1]`). They pointed along the way it was drawn, whatever the tag:
+  wrong for those ways. The midpoints already turned around for them.
+- **An area under 20 pixels has no outline in the batch** (Bryan, Nov 23: "at least
+  _something_ is drawn, and if a user hovers over it, they will see"; "I'd prefer to draw
+  something imperfect than draw nothing that the user can see and risk them thinking there is
+  nothing mapped there"). Not in wireframe mode, where the outline is all there is.
+- **A hovered area's fill is tinted halfway to the hover's color** (yellow; blue for a
+  highlight) and twice as opaque (Bryan, Nov 23: tinted "for now"; what matters today is that
+  a user sees what they're hovering). He expects to change it: see "Hovers and selections that
+  move" in `backlog.md`.
 
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 

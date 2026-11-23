@@ -461,6 +461,31 @@ describe('OsmWay', () => {
   });
 
 
+  describe('isOneWayBackward', () => {
+    it('returns true when the way has a tag in the oneway_backward list', () => {
+      let way = new Rapid.OsmWay(context, { tags: { highway: 'residential', oneway: '-1' } });
+      assert.isTrue(way.isOneWayBackward(), 'oneway=-1');
+      way = new Rapid.OsmWay(context, { tags: { conveying: 'backward' } });
+      assert.isTrue(way.isOneWayBackward(), 'conveying=backward');
+      way = new Rapid.OsmWay(context, { tags: { flow_direction: 'backward' } });
+      assert.isTrue(way.isOneWayBackward(), 'flow_direction=backward');
+    });
+
+    it('returns false for a oneway that runs forward, either way, or not at all', () => {
+      let way = new Rapid.OsmWay(context, { tags: { oneway: 'yes' } });
+      assert.isFalse(way.isOneWayBackward(), 'oneway=yes');
+      way = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
+      assert.isFalse(way.isOneWayBackward(), 'highway=motorway');
+      way = new Rapid.OsmWay(context, { tags: { oneway: 'reversible' } });
+      assert.isFalse(way.isOneWayBackward(), 'oneway=reversible');
+      way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
+      assert.isFalse(way.isOneWayBackward(), 'highway=residential');
+      way = new Rapid.OsmWay(context);
+      assert.isFalse(way.isOneWayBackward(), 'no tags');
+    });
+  });
+
+
   describe('isOneWay', () => {
     it('returns false when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);

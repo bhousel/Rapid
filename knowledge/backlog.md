@@ -39,11 +39,12 @@ said otherwise. Biggest or most wanted first.
   an `Extent` each on a `Geometry` and its part; (3) Pixi's `syncShader` polyfill allocates on every
   draw call (5%, upstream); (4) a tile label string per feature drawn (4%); (5) whether the scheduler's
   long tail after a load leaves V8 idle time to collect in.
-- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Section 15 has
-  the order of work. Done on `linebuilder_refactor` (steps 1 to 5): the stroke mesh, lines and area
-  outlines drawn from it, hit areas by distance, halos and the label path from an outline, and
-  partial-fill bands without stencil masks. Left: the static tier (step 6), and before it maybe a
-  fill mesh of our own.
+- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Done on
+  `linebuilder_refactor`: section 15's whole order of work (Nov 22 and 23) but the worker,
+  which was skipped. The OSM layer's lines, areas, points and line markers are drawn by three
+  kinds of batch with shaders of our own, in 13 to 22 draw calls where there were 279 to 672,
+  and none of them is in Pixi's scene. Left: section 15's open questions, the items around
+  this one, and merging the branch.
 - **Features keep a full copy of their style, and matching makes two** (Bryan: "this could be better").
   `styleMatch()` returns a copy, and `feature.style =` merges it with the defaults into another: 14% of
   the APP time of making features. `styleMatch()` once returned the base style by reference and
@@ -74,22 +75,28 @@ said otherwise. Biggest or most wanted first.
   container per tile for a class of lines with few members; hide the tiles outside the view so Pixi
   skips them. Watch for: wrong overlaps at tile edges (polygons; pins side by side across a tile edge
   are ordered by tile, 1% of overlapping pairs).
-- **A lower level of detail for small areas, in the batches** (Bryan, Nov 23: Rapid draws a
-  lot of buildings, more of them the further out, so it's worth doing well). The sprite for an
-  area under 20 pixels went with step 8; drawn as it is, a small area is 17 triangles where
-  the sprite was 2, and 14 of them are its outline (3 a corner). In Staten Island those
-  outlines are a third of the frame's triangles and 1 to 3 ms of GPU on the M4. A simpler
-  shape doesn't help (they're rectangles already). Section 15 has the measurements and three
-  ways ("A lower level of detail for small areas"): no edge under 20 pixels, the edge drawn by
-  the fills' shader (the same picture for the sprite's price), or a stroke mesh without joins.
+- **Hovers and selections that move, drawn by the shaders** (Bryan, Nov 23). A hover is a
+  yellow glow (a filter on a container) and a tinted fill; a selection is a dashed halo, which
+  "we don't do a great job with" around lines. Animating them in shader code would make them
+  easier to see, and wouldn't lean on color alone, which matters for colorblind users. It
+  means a uniform for time, and drawing frames at a steady rate while something is hovered or
+  selected, not only when something changed: the frames are cheap enough for that now. It
+  would also take the last features out of the scene (a hovered line or point draws itself
+  for its glow), and the `GlowFilter` with them.
+- **A small area's edge, drawn by the fills' shader.** An area under 20 pixels is its fill
+  alone since step 9 (Bryan: a grey block is fine, something is drawn; a hover shows its
+  outline). Section 15 ("A lower level of detail for small areas") has a way to give it back
+  its edge for no more triangles, if the blocks turn out to be missed.
 - **Dashes of two colors** (meta/Rapid#1291, Bryan: for another time). An unpaved road's dashed
   casing goes away on a background of its own color; alternating two contrasting colors would
   show on any. The lines' batch makes its dashes in the shader from the distance along the
   line, so a second color for the gaps is 4 more bytes a vertex and a line of the fragment
   shader. (`LineMesh`es dash with a texture, which could hold two colors as it is.)
-- **Other layers' points in a batch.** Only the OSM layer's are (`PointBatch`, step 8). The
-  photo layers draw thousands of markers with viewfields, and the Rapid layer draws vertices
-  like OSM's; each layer would get a batch of its own from `_placePoint()`'s like.
+- **The other layers' features in batches.** Only the OSM layer's are (section 15, steps 6 to 9).
+  The photo layers draw thousands of markers with viewfields, and the Rapid layer draws lines
+  with oneway arrows, areas and vertices like OSM's; each layer would give its features
+  batches of its own, as `PixiLayerOsm` does (`_lineBatch()`, `_polygonBatch()`,
+  `_placePoint()`).
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
   `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, batch sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another

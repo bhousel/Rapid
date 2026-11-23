@@ -171,7 +171,7 @@ export async function osmSceneState(page) {
       // (hovered, or a vertex of what's hovered) has sprites, and is hidden in its batch or not in one.
       let batched = '';
       if (feature.type === 'LineString') {
-        batched = `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}`;
+        batched = `batches of ${feature.strokeItem?.batch?.parent?.label ?? 'no level'}: casing ${item(feature.casingItem)}, stroke ${item(feature.strokeItem)}, arrows ${item(feature.arrowItem)}, sided ${item(feature.sidedItem)}`;
       } else if (feature.type === 'Polygon') {
         batched = `batches: fill ${item(feature.fillItem)}, outlines ${feature.ringItems.map(item).join(' ') || 'none'}`;
       } else if (feature.type === 'Point') {

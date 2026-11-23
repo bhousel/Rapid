@@ -2067,9 +2067,10 @@ label) and against the table above, and can ship on its own.
 ## 15. Where this could go
 
 Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
-It's a direction and an order of work. **Steps 1 to 6 and 8 of the order are built and
-measured** (the "What was built" parts below; step 7 was skipped); step 9 isn't built, and none
-of that is measured except where another section is named.
+It's a direction and an order of work. **Every step of the order is built and measured**
+(the "What was built" parts below) but step 7, which was skipped. What the direction says
+beyond those steps isn't built, and none of that is measured except where another section is
+named.
 
 **The short answer: keep the frame, change the unit of work.** APP, CULL and DRAW, the scheduler,
 the deadline, and drawing only when something changed all hold up (Unreal's render thread and
@@ -3155,7 +3156,7 @@ mesh. Ways, cheapest first:
    there are 14. A notch of a pixel at each corner. Saves under a third of what the outlines cost.
 
 The second is the one that draws the same picture for the sprite's price, and it changes the
-fills' shader, not the lines'. Not decided.
+fills' shader, not the lines'. *Decided (Bryan, Nov 23): the first. Built with step 9, below.*
 
 **Not done:** the other layers' points (Rapid's vertices, the photo layers' markers) are sprites
 as before; a layer has to give its points a batch.
@@ -3170,6 +3171,128 @@ every point is in the batch, which a zoom leaves alone; the avoid grid has every
 batch draws it; a hovered pin draws itself and goes back; the vertices of a hovered road draw
 themselves above everything; and the batch's points are hit where Pixi hits them drawn with
 sprites. A hundred and one ways of breaking the new code were each caught by a test.
+
+### What was built (Nov 23: step 9, line markers)
+
+**Decided (Bryan, Nov 23):**
+- **A hovered area's fill is tinted, for now.** "My biggest concern today is just that a user
+  won't see what they are hovering on." The old glow's yellow was jarring, "but it was at
+  least visible".
+- **A small area without its outline is fine:** "at least _something_ is drawn, and if a user
+  hovers over it, they will see the parking stuff. As a general rule, I'd prefer to draw
+  something imperfect than draw nothing that the user can see and risk them thinking there is
+  nothing mapped there."
+- **Where hovers and selections should go:** drawn and animated by shader code, which would
+  also stop them leaning on color alone (colorblind users), and would do better than the dashed
+  halos around lines. It means frames at regular intervals while something is hovered or
+  selected, not only when something changed, "but this should be ok, as our passes are a lot
+  faster now". Not built: `backlog.md`.
+
+**The markers along a line are drawn by the lines' shader.** Oneway arrows, arrows with two
+heads (a way that alternates) and the triangles on the right of a line with sides were sprites:
+one every 35 or 30 pixels, all made again at every zoom, in the line's own container, which
+kept the line in the scene. Now:
+
+- **A line's markers are a strip in the strokes' batch** of its level
+  (`LineBatch.addMarkers()`): a copy of the line's stroke mesh, without caps, as wide as the
+  markers need (7 pixels for arrows, 21 for sided markers, at every zoom), ordered after every
+  stroke of the level. No draw call is added.
+- **The fragment shader draws the markers in the strip.** It has the distance along the line
+  in pixels, as for dashes, and now the distance to the line's side (a vertex knows which
+  side of the line it's on: the stroke mesh always had that). The nearest marker's middle is
+  the nearest multiple of the spacing, and each shape is a few lines of arithmetic that say
+  how far inside it a pixel is: a shaft and a triangle for an arrow, a triangle 4.5 to 9.5
+  pixels to the right for a sided marker. Half a pixel either side of the edge is smoothed.
+- **No bytes were added to a vertex.** A strip says what it is with a least width of 0, and
+  its four dash bytes hold the kind, the spacing and the vertex's side.
+- **They're left out below zoom 16** by one more of the view's numbers (`uMarkers`).
+- **A line that glows draws its markers as sprites, with the rest of itself,** as before. So
+  do the lines of the layers that have no batches (Rapid's).
+- **A line whose style has a marker image that the shader has no shape for** draws its
+  markers as sprites, in the scene. None of Rapid's styles has one.
+
+**What looks different:**
+
+- **The arrows are sharper.** A sprite was a 10 by 5 texture, turned and smoothed.
+- **A marker follows its line around a corner,** where a sprite stuck straight out past it.
+- **A long segment has a marker every 35 pixels.** Sprites were limited to 100 a segment
+  (Rapid#544), spread out.
+- **Arrows point back along a way tagged `oneway=-1`** (or `conveying=backward`,
+  `flow_direction=backward`). They used to point the way the line was drawn whatever the tag,
+  which is the wrong way for those. `OsmWay.isOneWayBackward()` says so, the layers turn the
+  marker around in the style (`lineMarker.scale: [-1, 1]`), and both the shader and the
+  sprites follow it. **Bryan didn't ask for this one.**
+
+**With it, from Bryan's answers:**
+
+- **An area under 20 pixels is its fill alone** (way 1 of "A lower level of detail for small
+  areas", above): no outline in the batch, except in wireframe mode, where there's no fill.
+  Its outline comes with a zoom that makes it large enough, and with a hover.
+- **A hovered or highlighted area's fill is tinted halfway to the glow's color,** yellow or
+  blue, as well as twice as opaque.
+
+**Checked against the sprites,** in one build, with the labels off: in Seattle at zoom 17.5,
+the pixels that differ are the edges of the arrows (13,600 of 6.8 million by more than a tenth
+of full brightness, for 281 lines with arrows and 15 with sides), at zoom 19 turned 34° 7,000.
+In the test map, 91% of the pixels that the shader's arrows cover are covered by the sprites',
+and 99% the other way around.
+
+**Measured** (the three places from their tapes; markers as sprites → markers in the batch, in
+the same build, labels on, alternating, two runs of each. Both sides have the small areas
+without outlines; in brackets, the build before this step.)
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 123 → 20 | 52 → 13 | 78 → 22 |
+| Render groups | 149 → 40 | 83 → 36 | 123 → 40 |
+| Triangles | 132,800 → 132,500 [133,800] | 359,100 → 362,700 [562,200] | 1,394,000 → 1,432,000 [1,687,000] |
+| DRAW, nothing changed | 0.7, 0.7 → 0.3, 0.3 ms | 0.3, 0.4 → 0.2, 0.2 ms | 0.5, 0.5 → 0.3, 0.2 ms |
+| DRAW, a pan frame | 1.1, 1.0 → 0.6, 0.6 ms | 0.7, 0.6 → 0.5, 0.5 ms | 0.7, 0.7 → 0.5, 0.6 ms |
+| DRAW, a frame that moves the cull box | 2.0, 1.9 → 0.9, 0.9 ms | 1.2, 1.4 → 0.8, 0.9 ms | 1.6, 1.3 → 0.8, 0.9 ms |
+| DRAW, the first frame after a zoom | 3.7, 3.6 → 3.0, 2.6 ms | 0.5, 0.6 → 0.5, 0.4 ms | 0.4, 0.4 → 0.3, 0.2 ms |
+| APP, the frames after a zoom | 8.4, 7.8 → 7.1, 7.3 ms | 4.7, 4.5 → 4.7, 4.6 ms | 5.9, 5.8 → 5.8, 6.0 ms |
+| GPU | 4.1, 5.1 → 4.2, 4.2 ms | 5.2, 6.2 → 6.4, 6.0 ms | 19.3, 19.9 → 19.1, 21.7 ms |
+
+- **Seattle is 20 draw calls, where it was 385** with a display object for each feature: 16
+  for the lines (a batch of casings and one of strokes for each of 8 levels), 2 for the areas,
+  1 for the points, 1 for the labels. Staten Island is 13 of 279, Užice 22 of 672. No line,
+  area or point of the OSM layer is in Pixi's scene unless it's hovered, highlighted, or a
+  vertex of what's selected.
+- **Pixi's DRAW pass is 0.2 to 0.3 ms on a frame where nothing changed,** from 0.95 to 1.75
+  with a display object for each feature. It has 36 to 40 render groups to walk where it had
+  246 to 580.
+- **GPU time didn't move** on the M4, with the strips' triangles (38,000 in Užice) and their
+  pixels that draw nothing.
+- **The small areas' outlines were 203,000 of Staten Island's 562,000 triangles,** and 293,000
+  of Užice's 1,687,000. ("A lower level of detail for small areas", above, measured what that
+  is in GPU time: 1 to 3 ms in Staten Island.)
+- **Sixteen zooms in Užice allocate 2.9 GB** (3.1 before this step, 13.7 at the start of this
+  section). The heap after a load is 1,371 MB (1,352), and 1,404 after thirty-two zooms
+  (1,368): the outlines' batch keeps the room that its busiest zoom needed, since outlines now
+  come and go with the zoom ("Seen on the way", below). The trace of collections came back
+  empty again.
+
+**Seen on the way:**
+
+- **A batch whose things come and go kept getting larger buffers.** When its buffers were
+  full, a `VertexBatch` packed itself in place only if what was in use fit in half of them,
+  and otherwise took buffers half as large again. With outlines that come and go at every zoom
+  across 20 pixels, Užice's outlines batch had room for 861,000 vertices after two zooms in
+  and out, with 285,000 in use (48 MB where 16 are needed), and was still growing. It packs in
+  place now up to three quarters full, and takes smaller buffers when less than a third is in
+  use: the same two zooms end with room for 575,000.
+- **A marker was drawn twice** in the first version here, when a line had one marker that the
+  shader has a shape for and one that it hasn't: in the batch and as a sprite. Found by the
+  pixel comparison's first run, which is why that's a test now.
+
+**Tests:** markers in `LineBatch.test.js` (the strip, the bytes, the sides, another line,
+hiding) and `PixiFeatureLine.test.js` (the strip over the strokes, its own mesh, a zoom that
+changes nothing, a restyle, a glow, an image with no shape, sprites without batches, a way
+that runs backward); `OsmWay.isOneWayBackward()`; a small area's fill alone, and a tinted
+hover, in `PixiFeaturePolygon.test.js`. The e2e tests: every oneway line's arrows are in its
+level's strokes' batch and no line is in the scene; an area has outlines only from 20 pixels;
+and the shader's arrows cover the pixels that sprites' do. Sixty-seven ways of breaking the new
+code were each caught by a test.
 
 ### Order of work
 
@@ -3219,6 +3342,7 @@ and compared by screenshot with the build before it.
    markers are a sprite every 30 or 35 pixels along a line, built again at every zoom, and they
    keep one line in ten in the scene: 103 of Seattle's 160 draw calls. The stroke's shader has
    the distance along the line, and can draw them from it.
+   **Done (Nov 23):** a strip in the strokes' batch for each line with markers (above).
 
 Steps 2 to 5 are section 7's step 6, in more detail and in a different order: strokes before
 bands, because the stroke mesh is the simpler product and the larger share of the garbage, and it

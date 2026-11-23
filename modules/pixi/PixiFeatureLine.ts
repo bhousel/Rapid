@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { GlowFilter } from 'pixi-filters';
-import { LineBatch } from './lib/LineBatch.ts';
+import { LineBatch, LINE_MARKERS } from './lib/LineBatch.ts';
 import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
 import { drawHalo } from './helpers.ts';
@@ -10,7 +10,7 @@ import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
-import type { LineBatchItem, LineBatchStyle } from './lib/LineBatch.ts';
+import type { LineBatchItem, LineBatchMarkers, LineBatchStyle, LineMarkerKind } from './lib/LineBatch.ts';
 import type { LineStyleProps } from '../lib/Style.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { StrokeMesh, StrokeOptions } from '../geo/stroke.ts';
@@ -20,8 +20,19 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
 // How a select halo goes around the line's ends and corners: as the hit area does
 const HALO_SHAPE: Partial<StrokeOptions> = { cap: 'round', join: 'round' };
 
-const ONEWAY_SPACING = 35;
-const SIDED_SPACING = 30;
+// How far apart the markers along a line are, in pixels, and how far beside the line the
+// middle of a sided marker is. (A batch's shader draws the same: see `LINE_MARKERS`.)
+const ONEWAY_SPACING = LINE_MARKERS.oneway.spacing;
+const SIDED_SPACING = LINE_MARKERS.sided.spacing;
+const SIDED_OFFSET = 7;
+
+// In a batch, the markers along a line are drawn over every stroke of its level (see
+// `_drawBatched`). (A line's place among the others is its road class and ID, far below this.)
+const MARKERS_ABOVE = 1e6;
+
+// The stroke mesh that the markers' strip is made from: no caps, and the simplest corners
+const MARKER_CAP = 'butt';
+const MARKER_JOIN = 'miter';
 
 // The narrowest a casing and a stroke are drawn, in pixels
 const MIN_CASING_WIDTH = 3;
@@ -60,6 +71,50 @@ function batchStyle(partStyle: LineStyleProps, minWidth: number, isCasing: boole
 
 
 /**
+ * Whether a part of a line is in its batch as it should be: there and shown if the line has
+ * that part, not there at all if it hasn't.
+ * @param item - The part in a batch, if any
+ * @param batch - The batch it belongs in
+ * @param wanted - Whether the line has that part
+ * @return `true` if nothing has to be done about it
+ */
+function isAsWanted(item: LineBatchItem | null, batch: LineBatch, wanted: boolean): boolean {
+  return wanted ? (item?.batch === batch && item.visible) : !item;
+}
+
+/**
+ * Which arrows a batch draws along a line for a style's `lineMarker`.
+ * @param image - The marker's image, if the style has one
+ * @return The kind of marker, `null` for none, or `undefined` for an image that a batch has no shape for
+ */
+function arrowKind(image: Nullable<string>): LineMarkerKind | null | undefined {
+  if (!image) return null;
+  return (image === 'oneway' || image === 'twoway') ? image : undefined;
+}
+
+/**
+ * Whether a style's marker is drawn the other way around along its line: its `scale` is
+ * negative along the line (a oneway that runs against the way it's drawn, `oneway=-1`).
+ * @param scale - The marker's `scale`, if the style has one
+ * @return `true` if the marker points back along the line
+ */
+function isFlipped(scale: Nullable<number | number[]>): boolean {
+  const along = Array.isArray(scale) ? scale[0] : scale;
+  return (along ?? 1) < 0;
+}
+
+/**
+ * Which markers a batch draws beside a line for a style's `sidedMarker`.
+ * @param image - The marker's image, if the style has one
+ * @return The kind of marker, `null` for none, or `undefined` for an image that a batch has no shape for
+ */
+function sidedKind(image: Nullable<string>): LineMarkerKind | null | undefined {
+  if (!image) return null;
+  return (image === 'sided') ? image : undefined;
+}
+
+
+/**
  * This class renders a Line feature.
  *
  * The casing and the stroke are drawn from a stroke mesh (`geomStrokeMesh()`), which has the
@@ -69,10 +124,13 @@ function batchStyle(partStyle: LineStyleProps, minWidth: number, isCasing: boole
  * for its stroke (the layer draws every casing of a level, then every stroke). Each is then a
  * run of vertices in its batch's buffers, drawn with the other lines there, and the feature has
  * no mesh of its own and nothing in its container: it needn't be in the scene at all
- * (`drawsInContainer()`). A zoom changes nothing in a batch.
+ * (`drawsInContainer()`). A zoom changes nothing in a batch. The markers along the line
+ * (oneway arrows, the triangles of a line with sides) are a strip in the strokes' batch too,
+ * which the batch's shader draws them in.
  *
  * Without batches, the casing and the stroke are each a `LineMesh` in the feature's container,
- * and a zoom works out where its vertices are for the new width. A line that's hovered or
+ * and a zoom works out where its vertices are for the new width; the markers are sprites, made
+ * again at every zoom. A line that's hovered or
  * highlighted is drawn that way too, while it is: its glow is a filter on the container.
  * (See `design/graphics-system.md` section 15.)
  *
@@ -104,6 +162,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   protected _casingItem: LineBatchItem | null;
   /** The stroke in a batch, if a batch draws it */
   protected _strokeItem: LineBatchItem | null;
+  /** The arrows along the line (oneway) in the strokes' batch, if the style has them and a batch draws the line */
+  protected _arrowItem: LineBatchItem | null;
+  /** The markers beside the line (sided) in the strokes' batch, if the style has them and a batch draws the line */
+  protected _sidedItem: LineBatchItem | null;
   /** The cap and join that the casing in the batch was built with */
   protected _casingShape: string;
   /** The cap and join that the stroke in the batch was built with */
@@ -121,6 +183,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._meshPart = null;
     this._casingItem = null;
     this._strokeItem = null;
+    this._arrowItem = null;
+    this._sidedItem = null;
     this._casingShape = '';
     this._strokeShape = '';
 
@@ -196,16 +260,25 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * A line whose casing and stroke are in batches draws nothing itself, unless:
    * - it's hovered or highlighted: the glow is a filter on the container, so the line is drawn
    *   there, by meshes of its own, while it is
-   * - it has markers along it (oneway arrows), which are sprites in the container. (They're
-   *   drawn from zoom 16. The line stays in the scene below that, so that a zoom across 16
-   *   doesn't move every oneway road in and out of it.)
+   * - it has markers along it that a batch has no shape for (none of Rapid's styles has):
+   *   those are sprites in the container
    * @return `true` if its container has to be in the scene
    */
   public drawsInContainer(): boolean {
     if (!this._batchesFor()) return true;
     if (this._classes.has('hover') || this._classes.has('highlight')) return true;
+    return !this._markersBatchable();
+  }
+
+
+  /**
+   * Whether a batch can draw the markers that this line's style has along it, if it has any:
+   * oneway arrows and the triangles of a line with sides (see `LINE_MARKERS`).
+   * @return `true` if no marker needs a sprite
+   */
+  protected _markersBatchable(): boolean {
     const style = this._style;
-    return !!(style.lineMarker.image || style.sidedMarker.image);
+    return arrowKind(style.lineMarker?.image) !== undefined && sidedKind(style.sidedMarker?.image) !== undefined;
   }
 
 
@@ -276,6 +349,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const inBatch = val && !this.stroke;
     this._casingItem?.batch?.setVisible(this._casingItem, inBatch);
     this._strokeItem?.batch?.setVisible(this._strokeItem, inBatch);
+    this._arrowItem?.batch?.setVisible(this._arrowItem, inBatch);
+    this._sidedItem?.batch?.setVisible(this._sidedItem, inBatch);
   }
 
 
@@ -300,6 +375,26 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
+   * The oneway arrows along the line in the strokes' batch, if a batch draws them
+   * @return The batch's item, or `null`
+   * @readonly
+   */
+  public get arrowItem(): LineBatchItem | null {
+    return this._arrowItem;
+  }
+
+
+  /**
+   * The markers on the line's side in the strokes' batch, if a batch draws them
+   * @return The batch's item, or `null`
+   * @readonly
+   */
+  public get sidedItem(): LineBatchItem | null {
+    return this._sidedItem;
+  }
+
+
+  /**
    * Destroys the meshes of the casing and the stroke, if this feature has them.
    */
   protected _dropMeshes(): void {
@@ -318,6 +413,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._casingItem = null;
     this._strokeItem?.batch?.remove(this._strokeItem);
     this._strokeItem = null;
+    this._arrowItem?.batch?.remove(this._arrowItem);
+    this._arrowItem = null;
+    this._sidedItem?.batch?.remove(this._sidedItem);
+    this._sidedItem = null;
     this._batchPart = null;
   }
 
@@ -338,7 +437,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
     const style = this._style;
-    const textureManager = this.gfx.textureManager!;
     const localScale = 2 ** (WORLD_ZOOM - viewZoom);
 
     const type = this._geom?.type;
@@ -367,67 +465,16 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     this.lod = (styleZoom < 16) ? 1 : 2;
 
-    // Update line markers (oneway arrows, sided markers)
-    const showMarkers = (styleZoom >= 16);
-    const lineMarkerTextureID = style.lineMarker.image;
-    const sideMarkerTextureID = style.sidedMarker.image;
-    let lineMarkers = container.getChildByLabel('lineMarkers');
+    // The casing and the stroke are in the layer's batches if it gave them and they can draw
+    // the line. A line that glows draws itself meanwhile: the glow is a filter on its container.
+    const isBatched = this._batchesFor();
+    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
+    const inBatches = (isBatched && !hasGlow);
 
-    if (showMarkers && (lineMarkerTextureID || sideMarkerTextureID)) {
-      // Create line marker container, if necessary
-      if (!lineMarkers) {
-        lineMarkers = new PIXI.Container();
-        lineMarkers.label = 'lineMarkers';
-        lineMarkers.eventMode = 'none';
-        lineMarkers.sortableChildren = false;
-        container.addChild(lineMarkers);
-      }
-      for (const sprite of lineMarkers.removeChildren()) {
-        sprite.destroy();
-      }
-
-      // Show line markers (e.g. oneway arrows)
-      if (lineMarkerTextureID) {
-        const lineMarkerTexture = textureManager.getTexture('symbol', lineMarkerTextureID) || PIXI.Texture.WHITE;
-        const segments = geomLineSegments(points, ONEWAY_SPACING * localScale, false, true);  /* sided = false, limited = true */
-        segments.forEach(segment => {
-          segment.coords.forEach(([x, y]) => {
-            const sprite = new PIXI.Sprite(lineMarkerTexture);
-            sprite.eventMode = 'none';
-            sprite.sortableChildren = false;
-            sprite.anchor.set(0.5, 0.5); // middle, middle
-            sprite.position.set(x, y);
-            sprite.rotation = segment.angle;
-            sprite.scale.set(localScale, localScale);
-            sprite.tint = style.lineMarker.color ?? 0x000000;
-            lineMarkers!.addChild(sprite);
-          });
-        });
-      }
-
-      // Show side markers (e.g. sided triangles)
-      if (sideMarkerTextureID) {
-        const sideMarkerTexture = textureManager.getTexture('symbol', sideMarkerTextureID) || PIXI.Texture.WHITE;
-        const segments = geomLineSegments(points, SIDED_SPACING * localScale, true, true, 7 * localScale);  /* sided = true, limited = true */
-        segments.forEach(segment => {
-          segment.coords.forEach(([x, y]) => {
-            const sprite = new PIXI.Sprite(sideMarkerTexture);
-            sprite.eventMode = 'none';
-            sprite.sortableChildren = false;
-            sprite.anchor.set(0.5, 0.5); // middle, middle
-            sprite.position.set(x, y);
-            sprite.rotation = segment.angle;
-            sprite.scale.set(localScale, localScale);
-            sprite.tint = style.stroke.color ?? 0xcccccc;
-            lineMarkers!.addChild(sprite);
-          });
-        });
-      }
-
-    } else if (lineMarkers) {  // No line markers, remove if it exists
-      container.removeChild(lineMarkers);
-      lineMarkers.destroy({ children: true });
-    }
+    // The markers along the line (oneway arrows, sided markers): sprites in the container,
+    // unless the strokes' batch draws them (see `_drawBatched`).
+    const showMarkers = (styleZoom >= 16) && !(inBatches && this._markersBatchable());
+    this._drawMarkerSprites(points, localScale, showMarkers);
 
     // The line with a few pixels around it, used for hit area and halo.
     // It's in world-local coords (origin-relative), the container's local frame.
@@ -464,10 +511,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     // otherwise as meshes of this feature's own.
     const casingStyle = style.casing;
     const hasCasing = !!casingStyle && casingStyle.opacity !== 0;
-    const isBatched = this._batchesFor();
-    const hasGlow = this._classes.has('hover') || this._classes.has('highlight');
 
-    if (isBatched && !hasGlow) {
+    if (inBatches) {
       this._dropMeshes();
       this._drawBatched(this._batch!, this._casingBatch!, flat[0], origin, hasCasing);
       this._batchPart = this._geom;
@@ -478,6 +523,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       if (isBatched) {
         if (this._casingItem) this._casingItem.batch?.setVisible(this._casingItem, false);
         if (this._strokeItem) this._strokeItem.batch?.setVisible(this._strokeItem, false);
+        if (this._arrowItem) this._arrowItem.batch?.setVisible(this._arrowItem, false);
+        if (this._sidedItem) this._sidedItem.batch?.setVisible(this._sidedItem, false);
       } else {
         this._dropItems();
       }
@@ -490,6 +537,83 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     this.updateHalo(viewport);
     this.scene.featureChanged(this);
+  }
+
+
+  /**
+   * Draws the markers along the line as sprites in the feature's container: an arrow every
+   * 35 pixels along a oneway, a triangle every 30 on the right of a line with sides. They're
+   * made again on every call (their places depend on the zoom), and taken away when there's
+   * nothing to show.
+   * @param points - The line's points, in container-local space
+   * @param localScale - How many units of the line's coordinates a pixel is
+   * @param showMarkers - Whether to draw the markers that the style has (not below zoom 16, and not while a batch draws them)
+   */
+  protected _drawMarkerSprites(points: Vec2[], localScale: number, showMarkers: boolean): void {
+    const container = this.container;
+    const style = this._style;
+    const textureManager = this.gfx.textureManager!;
+
+    const lineMarkerTextureID = style.lineMarker.image;
+    const sideMarkerTextureID = style.sidedMarker.image;
+    let lineMarkers = container.getChildByLabel('lineMarkers');
+
+    if (showMarkers && (lineMarkerTextureID || sideMarkerTextureID)) {
+      // Create line marker container, if necessary
+      if (!lineMarkers) {
+        lineMarkers = new PIXI.Container();
+        lineMarkers.label = 'lineMarkers';
+        lineMarkers.eventMode = 'none';
+        lineMarkers.sortableChildren = false;
+        container.addChild(lineMarkers);
+      }
+      for (const sprite of lineMarkers.removeChildren()) {
+        sprite.destroy();
+      }
+
+      // Show line markers (e.g. oneway arrows)
+      if (lineMarkerTextureID) {
+        const lineMarkerTexture = textureManager.getTexture('symbol', lineMarkerTextureID) || PIXI.Texture.WHITE;
+        const flip = isFlipped(style.lineMarker.scale) ? -1 : 1;   // an arrow that points back along the line
+        const segments = geomLineSegments(points, ONEWAY_SPACING * localScale, false, true);  /* sided = false, limited = true */
+        segments.forEach(segment => {
+          segment.coords.forEach(([x, y]) => {
+            const sprite = new PIXI.Sprite(lineMarkerTexture);
+            sprite.eventMode = 'none';
+            sprite.sortableChildren = false;
+            sprite.anchor.set(0.5, 0.5); // middle, middle
+            sprite.position.set(x, y);
+            sprite.rotation = segment.angle;
+            sprite.scale.set(localScale * flip, localScale);
+            sprite.tint = style.lineMarker.color ?? 0x000000;
+            lineMarkers!.addChild(sprite);
+          });
+        });
+      }
+
+      // Show side markers (e.g. sided triangles)
+      if (sideMarkerTextureID) {
+        const sideMarkerTexture = textureManager.getTexture('symbol', sideMarkerTextureID) || PIXI.Texture.WHITE;
+        const segments = geomLineSegments(points, SIDED_SPACING * localScale, true, true, SIDED_OFFSET * localScale);  /* sided = true, limited = true */
+        segments.forEach(segment => {
+          segment.coords.forEach(([x, y]) => {
+            const sprite = new PIXI.Sprite(sideMarkerTexture);
+            sprite.eventMode = 'none';
+            sprite.sortableChildren = false;
+            sprite.anchor.set(0.5, 0.5); // middle, middle
+            sprite.position.set(x, y);
+            sprite.rotation = segment.angle;
+            sprite.scale.set(localScale, localScale);
+            sprite.tint = style.stroke.color ?? 0xcccccc;
+            lineMarkers!.addChild(sprite);
+          });
+        });
+      }
+
+    } else if (lineMarkers) {  // No line markers, remove if it exists
+      container.removeChild(lineMarkers);
+      lineMarkers.destroy({ children: true });
+    }
   }
 
 
@@ -548,7 +672,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   /**
    * Draws the casing and the stroke in their batches: each is a run of vertices there, written
    * when the line or its cap or join changes. The batches' shader works out their width at
-   * every zoom, so a zoom alone changes nothing here.
+   * every zoom, so a zoom alone changes nothing here. The markers along the line, if a batch
+   * has a shape for them, are a strip in the strokes' batch, over every stroke of the level.
    * @param batch - The batch for the stroke
    * @param casingBatch - The batch for the casing
    * @param coords - The line's points as `[x, y, x, y, …]`, in container-local space
@@ -560,12 +685,18 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const strokeStyle = style.stroke;
     const hasStroke = !!strokeStyle && strokeStyle.opacity !== 0;
     const isSameLine = (this._batchPart === this._geom);
+    // (If a batch has no shape for one of the line's markers, the line draws them all itself.)
+    const inBatch = this._markersBatchable();
+    const arrows = inBatch ? (arrowKind(style.lineMarker?.image) ?? null) : null;
+    const sided = inBatch ? (sidedKind(style.sidedMarker?.image) ?? null) : null;
 
     // Only the zoom or the rotation changed, and the batches have the line as it is: nothing to do.
     // (This runs for every line after a zoom, so it makes no objects.)
     if (isSameLine && this.onlyTransformDirty &&
-      (hasCasing ? (this._casingItem?.batch === casingBatch && this._casingItem.visible) : !this._casingItem) &&
-      (hasStroke ? (this._strokeItem?.batch === batch && this._strokeItem.visible) : !this._strokeItem)
+      isAsWanted(this._casingItem, casingBatch, hasCasing) &&
+      isAsWanted(this._strokeItem, batch, hasStroke) &&
+      isAsWanted(this._arrowItem, batch, !!arrows) &&
+      isAsWanted(this._sidedItem, batch, !!sided)
     ) {
       return;
     }
@@ -640,9 +771,99 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this._strokeItem = null;
     }
 
+    this._drawBatchedMarkers(batch, coords, origin, closed, (builtShape === `${MARKER_CAP}/${MARKER_JOIN}`) ? built : null, arrows, sided, order, isSameLine);
+
     // (A line that was hidden, or drew itself, is shown again: `update()` made it visible before this.)
     if (this._casingItem) casingBatch.setVisible(this._casingItem, true);
     if (this._strokeItem) batch.setVisible(this._strokeItem, true);
+    if (this._arrowItem) batch.setVisible(this._arrowItem, true);
+    if (this._sidedItem) batch.setVisible(this._sidedItem, true);
+  }
+
+
+  /**
+   * Draws the markers along the line in the strokes' batch: a strip along the line that the
+   * batch's shader draws them in, over every stroke of the level. It's made from a stroke mesh
+   * without caps.
+   * @param batch - The batch for the stroke
+   * @param coords - The line's points as `[x, y, x, y, …]`, in container-local space
+   * @param origin - Where those coordinates start, in the world's
+   * @param closed - Whether the line ends where it starts
+   * @param built - A stroke mesh without caps that was just built for this line, if there is one
+   * @param arrows - The kind of arrows the style has along the line, or `null` for none
+   * @param sided - The kind of markers the style has beside the line, or `null` for none
+   * @param order - The line's place among the lines of the batch
+   * @param isSameLine - Whether the line is the one that was last drawn in the batches
+   */
+  protected _drawBatchedMarkers(
+    batch: LineBatch,
+    coords: number[],
+    origin: Vec2,
+    closed: boolean,
+    built: StrokeMesh | null,
+    arrows: LineMarkerKind | null,
+    sided: LineMarkerKind | null,
+    order: number,
+    isSameLine: boolean
+  ): void {
+    const style = this._style;
+    const dx = origin[0] - batch.position.x;
+    const dy = origin[1] - batch.position.y;
+
+    const needsStrip = (arrows && !(this._arrowItem?.batch === batch && isSameLine)) || (sided && !(this._sidedItem?.batch === batch && isSameLine));
+    let strip: StrokeMesh | null = null;
+    if (needsStrip) {
+      strip = built ?? geomStrokeMesh(coords, { cap: MARKER_CAP, join: MARKER_JOIN, closed: closed });
+    }
+    const arrowMarkers = arrows && { kind: arrows, color: style.lineMarker.color ?? 0x000000, alpha: 1, reversed: isFlipped(style.lineMarker.scale) };
+    const sidedMarkers = sided && { kind: sided, color: style.stroke?.color ?? 0xcccccc, alpha: 1 };
+    this._arrowItem = this._batchMarkers(batch, this._arrowItem, arrowMarkers, strip, dx, dy, MARKERS_ABOVE + order, isSameLine);
+    this._sidedItem = this._batchMarkers(batch, this._sidedItem, sidedMarkers, strip, dx, dy, MARKERS_ABOVE + order, isSameLine);
+  }
+
+
+  /**
+   * Puts one kind of marker along this line in the strokes' batch, changes the ones that are
+   * there, or takes them out.
+   * @param batch - The batch for the stroke
+   * @param item - The markers of this kind that are in a batch now, if any
+   * @param markers - Which markers the style has, and their color, or `null` for none
+   * @param strip - The stroke mesh to make their strip from, if the line isn't the one the batch has
+   * @param dx - Where the line's coordinates start, in the batch's
+   * @param dy - The same, for y
+   * @param order - Where they're drawn among everything in the batch
+   * @param isSameLine - Whether the line is the one that was last drawn in the batches
+   * @return The markers in the batch, or `null` if there are none
+   */
+  protected _batchMarkers(
+    batch: LineBatch,
+    item: LineBatchItem | null,
+    markers: LineBatchMarkers | null,
+    strip: StrokeMesh | null,
+    dx: number,
+    dy: number,
+    order: number,
+    isSameLine: boolean
+  ): LineBatchItem | null {
+    if (!markers) {
+      item?.batch?.remove(item);
+      return null;
+    }
+
+    if (item?.batch === batch && isSameLine) {    // on the line they were on
+      batch.setMarkerStyle(item, markers);
+      batch.setOrder(item, order);
+      return item;
+    }
+    if (!strip) return item;    // (not reached: a strip is made whenever it's needed)
+
+    if (item?.batch === batch) {
+      batch.setMarkers(item, strip, dx, dy, markers);
+      batch.setOrder(item, order);
+      return item;
+    }
+    item?.batch?.remove(item);
+    return batch.addMarkers(strip, dx, dy, markers, order);
   }
 
 

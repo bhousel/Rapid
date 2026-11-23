@@ -37,10 +37,19 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     The layer gives each line feature its two (`feature.casingBatch` and `feature.batch`, from
     `_lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
     its own. The shader works out widths, the narrowing below zoom 17, the casing's absence
-    below 16, wireframe and dashes from four numbers the layer sets on every frame
+    below 16, wireframe and dashes from five numbers the layer sets on every frame
     (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
     on the zoom out of the vertices. Don't split the batches (by road class, by tile) without
     counting the draw calls: fewer is the point, and the order of the classes is in the batch.
+  - **The markers along a line are in the strokes' batch too** (`feature.arrowItem`,
+    `feature.sidedItem`): oneway arrows, and the triangles on the right of a line with sides.
+    They're a strip along the line (`LineBatch.addMarkers()`), over every stroke of the level,
+    and the fragment shader draws the shapes in it from the distance along the line and to
+    its side. So the shapes are in the shaders (GLSL and WGSL, in `LineBatch.ts`), with their
+    spacing and the strip's width in `LINE_MARKERS`; the sprites that a line draws when it
+    draws itself (`PixiTextures`' `oneway`, `twoway` and `sided`) have to look the same.
+    A new kind of marker needs both. `test/e2e/rendering.test.js` compares the two by
+    their pixels: run it after touching either.
   - **The OSM layer's areas are in batches too:** every fill in a `FillBatch`
     (`lib/FillBatch.ts`), then every outline in a `LineBatch`, in the order of their size
     (`feature.fillBatch` and `feature.strokeBatch`, from `_polygonBatch()`). A fill's triangles
@@ -48,6 +57,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     in the same batch, worked out again when the zoom changes its width. Patterns come from
     the atlas that `PixiTextures` builds (`getPatternNumber()`), and the shader lays them out.
     There's no `lowRes` sprite, `fill` or `strokes` for an area that batches draw.
+    **An area under 20 pixels is its fill alone,** with no outline in the batch (an outline is
+    3 triangles a corner; `SMALL_SIZE`), except in wireframe mode, where the outline is all
+    there is. Draw something imperfect before drawing nothing (Bryan): don't add a level of
+    detail that leaves a mapped thing invisible.
   - **The OSM layer's points are in one batch** (`lib/PointBatch.ts`): points, vertices and the
     pins of areas, from north to south, the ones with viewfields over the others. The layer
     gives each its batch and its place with `_placePoint()`. A point is a few pictures (its
@@ -74,10 +87,11 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     in the world) and `gfx.origin` (the world's place on screen). Where a feature is drawn among
     the others is `feature.sceneContainer` and `sceneOrder` (`featureOrder()` in `helpers.ts`).
   - **A feature is in the scene only when it draws something itself**
-    (`drawsInContainer()`): a line's oneway arrows, and what a hovered or highlighted feature
-    needs under its glow, because a glow is a filter on the container (a line or a point draws
-    itself whole there; an area its outlines, and its fill in the batch is more opaque
-    meanwhile). Anything new that a feature draws in its own container has to be said there,
+    (`drawsInContainer()`): what a hovered or highlighted feature needs under its glow,
+    because a glow is a filter on the container (a line or a point draws itself whole there,
+    a line with its arrows as sprites; an area its outlines, and its fill in the batch is
+    tinted with the glow's color and more opaque meanwhile). **A hover has to show:** if a
+    change takes away what a user sees under the pointer, put something in its place. Anything new that a feature draws in its own container has to be said there,
     or it's drawn nowhere.
   - **What the batches share is `VertexBatch`** (`lib/VertexBatch.ts`): the buffers, a thing
     that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
@@ -88,7 +102,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
     are the mesh's `tint` and `alpha`.
   - **A line feature may have no `stroke` or `casing` mesh** (`null` while a batch draws it).
-    To know what's drawn, read `strokeItem` and `casingItem`.
+    To know what's drawn, read `strokeItem`, `casingItem`, `arrowItem` and `sidedItem`.
 - **Halos and the lasso are `LineMesh`es too,** drawn with `drawHalo()` and `drawRings()`
   (`helpers.ts`) into a container that keeps its meshes from one call to the next. A halo's rings
   are the outline of its feature at the distance a click reaches (`geomStrokeOutline()`). There's

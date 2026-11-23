@@ -96,3 +96,16 @@ How Pixi behaves, and what that means for Rapid.
   drawn by a batch or by sprites. Both take the same list of pictures (`_layout()`), so the two
   can be compared pixel for pixel in one build, and a new marker or anchor can't be added to
   one and forgotten in the other.
+- **What a fragment shader draws can only be tested by its pixels.** The lines' shader draws
+  oneway arrows from a few lines of arithmetic. Every buffer was right while the sided markers
+  were on the wrong side of their lines, and while a marker was drawn twice (by the batch and
+  by a sprite). An e2e test that renders the map with and without them, and compares the
+  pixels they change with the sprites', caught both kinds: `gfx.pixi.renderer.render()`, then
+  `drawImage()` of the canvas into a 2D one in the same task, and `getImageData()`.
+- **"Left" depends on which way y goes.** The stroke mesh calls a vertex's side 1 "left of the
+  direction of travel", by `(-dy, dx)`. On screen, where y is down, that's the right. Check a
+  side against a picture, not against the word.
+- **A growth rule can be bounded and still wasteful.** A batch that got larger buffers whenever
+  it was more than half full of live vertices stops growing at twice its peak, in theory. With
+  things that come and go at every zoom it was at three times what it used and climbing. Count
+  the room against the use after the churn a real session makes, not after a load.

@@ -41,7 +41,7 @@ are in [`design/graphics-system.md`](../design/graphics-system.md). What's left 
 follow-ups" in `backlog.md`.
 
 **Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
-order of work, Bryan's decisions and the measurements). Done: steps 1 to 6 and 8.
+order of work, Bryan's decisions and the measurements). Done: steps 1 to 6, 8 and 9.
 - The stroke mesh (`modules/geo/stroke.ts`); lines' casings and strokes, areas' outlines, halos and
   the lasso drawn from it (`modules/pixi/lib/LineMesh.ts`). A zoom in Užice allocates half of what
   it did.
@@ -56,28 +56,28 @@ order of work, Bryan's decisions and the measurements). Done: steps 1 to 6 and 8
     our own shader): every casing, then every stroke (Bryan's decision; he likes the look).
   - A line that its batches draw isn't in Pixi's scene. A hovered line draws itself meanwhile
     (its glow is a filter on its container), and a line with oneway arrows stays in the scene.
-- Step 8 (areas committed in `4f906a9af`; points not committed yet, Nov 23):
-  - Areas in two batches, every fill (`lib/FillBatch.ts`) and then every outline. A fill's
-    triangles are worked out once; patterns come from one atlas texture. Outlines are over
-    every fill (Bryan has seen it: fine). Pixi's events and system tickers are off.
-  - Points, vertices and the pins of areas in one batch (`lib/PointBatch.ts`): pictures from
-    the symbol atlas, sized in pixels and kept upright by the shader, so a zoom or a rotation
-    writes nothing. A point has no sprites unless it draws itself (hovered, or a vertex of
-    what's hovered or selected). Labels and the avoid grid ask the point where it's drawn.
-  - A hovered area's fill is twice as opaque while it's hovered (Bryan asked for the fill to
-    change somehow). **He hasn't seen how it looks.**
-  - Fixed on the way: with the labels layer off, a pan left Rapid drawing sixty frames a
-    second for good (`quirks.md` had it as `gfx.pending` staying true).
-  - Every OSM feature is out of Pixi's scene now, except what draws itself: oneway arrows
-    (step 9), and what's hovered, highlighted, or a vertex of the selection.
+- Step 8 (committed, `4f906a9af` and `26cf4e07f`): areas in two batches, every fill
+  (`lib/FillBatch.ts`) and then every outline; points, vertices and the pins of areas in one
+  (`lib/PointBatch.ts`), sized in pixels and kept upright by the shader. Pixi's tickers are
+  off. Labels and the avoid grid ask a point where it's drawn.
+- Step 9 (not committed yet, Nov 23): the markers along lines (oneway arrows, the triangles of
+  a line with sides) are a strip in the strokes' batch, drawn by the lines' fragment shader.
+  With it:
+  - An area under 20 pixels is its fill alone, with no outline (Bryan: fine, something is
+    drawn, and a hover shows the outline).
+  - A hovered area's fill is tinted halfway to the hover's yellow, and twice as opaque (Bryan
+    asked for a tint "for now"). **He hasn't seen how it looks.**
+  - Arrows point back along a way tagged `oneway=-1`. They didn't before: **Bryan hasn't been
+    asked**, it was wrong and a few lines to fix.
+  - Every OSM feature is out of Pixi's scene, except what's hovered, highlighted, or a vertex
+    of the selection.
 
-Next, in Bryan's order (Nov 23): step 9, oneway arrows and sided markers in the stroke shader
-(they're 103 of Seattle's remaining draw calls, and keep one line in ten in the scene). Open
-with Bryan: a lower level of detail for small areas (section 15 has what each way costs; he
-wants buildings at low zooms drawn efficiently). Step 7 (a worker) is probably unnecessary
-(Bryan). Bryan (Nov 23): fewer draw calls are a result in themselves, since the M4 we measure on
-hides their cost; numbers from other devices are on the backlog. `renderer=canvas` is blank
-since the lines became meshes, and stays that way (`quirks.md`).
+Next: nothing of section 15's order of work is left. Candidates, for Bryan to pick: hovers and
+selections drawn (and animated) by the shaders (his idea, Nov 23; `backlog.md`), the other
+layers' features in batches, or numbers from weaker hardware. Step 7 (a worker) was skipped as
+probably unnecessary (Bryan). Bryan (Nov 23): fewer draw calls are a result in themselves,
+since the M4 we measure on hides their cost. `renderer=canvas` is blank since the lines became
+meshes, and stays that way (`quirks.md`).
 
 Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
 

@@ -37,7 +37,8 @@ origin
 │  ├ osm                 zIndex 0
 │  │  ├ polygons
 │  │  │  ├ fills         a `FillBatch`: every polygon's fill, the largest first
-│  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill
+│  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill (a polygon
+│  │  │  │               under 20 pixels has none)
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area).
 │  │  │                  Only the polygons that draw something themselves are in these (the
@@ -45,11 +46,12 @@ origin
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
 │  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
-│  │        ├ strokes              a `LineBatch`: every stroke, above every casing
+│  │        ├ strokes              a `LineBatch`: every stroke, above every casing, and then the
+│  │        │                      markers along the lines (oneway arrows), above every stroke
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
 │  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile.
-│  │                               Only the lines that draw something themselves are in these
-│  │                               (oneway arrows, a hovered line): the rest aren't in the scene
+│  │                               Only the lines that draw themselves are in these (a hovered
+│  │                               line): the rest aren't in the scene
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
 │  │  ├ polygons         the order they first draw (so external data is above OSM, and a dataset's
 │  │  └ lines            polygons are above OSM lines, as before)

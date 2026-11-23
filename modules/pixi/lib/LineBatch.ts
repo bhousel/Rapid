@@ -22,9 +22,51 @@ export interface LineBatchStyle {
   isCasing?: boolean;
 }
 
+/** The kinds of marker that a batch can draw along a line (see `LineBatch.addMarkers`) */
+export type LineMarkerKind = 'oneway' | 'twoway' | 'sided';
+
+/** The markers drawn along one line of a batch */
+export interface LineBatchMarkers {
+  /** Which marker: an arrow along the line, an arrow at both ends, or a triangle on the line's right side */
+  kind: LineMarkerKind;
+  /** The color, as 0xRRGGBB */
+  color: number;
+  /** The opacity, from 0 to 1 */
+  alpha: number;
+  /** Whether a `oneway` arrow points back along the line, towards its start */
+  reversed?: boolean;
+}
+
+/** How a kind of marker is laid out along a line, in pixels */
+export interface LineMarkerLayout {
+  /** How far apart the markers are, from middle to middle. The first is this far from the line's start. */
+  spacing: number;
+  /** How wide the strip along the line has to be for the markers to fit in it */
+  width: number;
+  /** The kind's number in a vertex */
+  code: number;
+}
+
 /**
- * One line in a batch (a casing or a stroke). `LineBatch.add()` returns it, and the caller keeps
- * it to change the line or take it out.
+ * The markers a batch can draw. Their shapes are in the fragment shaders below, in pixels:
+ * - `oneway`: an arrow 10 long and 5 across, in the middle of the line, pointing along it (or
+ *   back along it, which is one more number in a vertex: `REVERSED_CODE`)
+ * - `twoway`: an arrow 15 long with a head at both ends
+ * - `sided`: a triangle with a base of 10 along the line, 4.5 to its right (as it's drawn on
+ *   screen, going from its first point to its last), and its point 9.5 to its right
+ */
+export const LINE_MARKERS: Record<LineMarkerKind, LineMarkerLayout> = {
+  oneway: { spacing: 35, width: 7, code: 1 },
+  twoway: { spacing: 35, width: 7, code: 2 },
+  sided: { spacing: 30, width: 21, code: 3 }
+};
+
+/** The kind's number in a vertex for a `oneway` arrow that points back along the line */
+const REVERSED_CODE = 4;
+
+/**
+ * One line in a batch (a casing, a stroke, or the markers along a line). `LineBatch.add()` and
+ * `addMarkers()` return it, and the caller keeps it to change the line or take it out.
  */
 export type LineBatchItem = BatchItem;
 
@@ -38,6 +80,8 @@ export interface LineBatchView {
   wireframe: boolean;
   /** Whether casings are drawn */
   casing: boolean;
+  /** Whether the markers along lines are drawn */
+  markers: boolean;
 }
 
 
@@ -46,9 +90,12 @@ export interface LineBatchView {
 //           2, 3    aOffset    how far the vertex is from that point, for a half width of 1
 //           4, 5    aAlong     the distance along the line to that point, and how much further the vertex is for a half width of 1
 //           6 - 9   aFallback  the offset and the further-along that replace those above a half width, and that half width
-//           10, 11  aWidth     the width in pixels, and the least width (negative for a casing)
+//           10, 11  aWidth     the width in pixels, and the least width (negative for a casing, 0 for markers)
 //   bytes   0 - 3   aColor     red, green, blue, opacity (0 for a line that's hidden)
 //           4 - 7   aDash      the dash pattern, in pixels
+//                              For markers: the kind of marker, their spacing in pixels, and the
+//                              side of the line the vertex is on as its stroke mesh has it, plus 1
+//                              (0, 1 on the line, or 2), at its first place and at its second
 const FLOATS = 12;
 const BYTES = 8;
 
@@ -90,13 +137,17 @@ uniform float uPixel;
 uniform float uNarrow;
 uniform float uWireframe;
 uniform float uCasing;
+uniform float uMarkers;
 
 out vec4 vColor;
 out vec4 vDash;
 out float vDistance;
+out vec2 vMarker;
 
 void main() {
-  float width = mix(max(aWidth.x - uNarrow, abs(aWidth.y)), 1.0, uWireframe);
+  // The markers along a line are a strip of a width of its own, whatever the zoom.
+  bool markers = (aWidth.y == 0.0);
+  float width = markers ? aWidth.x : mix(max(aWidth.x - uNarrow, abs(aWidth.y)), 1.0, uWireframe);
   float halfWidth = 0.5 * width * uPixel;
 
   // A vertex on the inside of a corner has a second place, for when the line is too wide for the first.
@@ -108,14 +159,19 @@ void main() {
   mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
   gl_Position = vec4((mvp * vec3(position, 1.0)).xy, 0.0, 1.0);
 
-  // A line that's hidden, or a casing that isn't drawn at this zoom: all of its vertices in one
-  // place, outside the view.
-  if (aColor.a == 0.0 || (aWidth.y < 0.0 && uCasing < 0.5)) {
+  // A line that's hidden, or a casing or markers that aren't drawn at this zoom: all of its
+  // vertices in one place, outside the view.
+  if (aColor.a == 0.0 || (aWidth.y < 0.0 && uCasing < 0.5) || (markers && uMarkers < 0.5)) {
     gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
   }
 
   vDistance = (aAlong.x + along * halfWidth) / uPixel;
   vDash = aDash * 255.0;
+
+  // For markers: which kind, and how many pixels the vertex is to the side of the line (the
+  // side that the stroke mesh calls 1).
+  float side = (second ? vDash.w : vDash.z) - 1.0;
+  vMarker = markers ? vec2(vDash.x, side * 0.5 * width) : vec2(0.0);
   vColor = vec4(aColor.rgb * aColor.a, aColor.a) * uColor * uWorldColorAlpha;
 }
 `;
@@ -126,13 +182,45 @@ precision highp float;
 in vec4 vColor;
 in vec4 vDash;
 in float vDistance;
+in vec2 vMarker;
 
 out vec4 finalColor;
 
 void main() {
   float alpha = 1.0;
   float total = vDash.x + vDash.y + vDash.z + vDash.w;
-  if (total > 0.0) {
+  if (vMarker.x > 0.5) {
+    // Markers: where this pixel is from the middle of the nearest one, along the line (u) and
+    // to the side that the stroke mesh calls 1 (v): the line's right on screen, where y is
+    // down. The line's start has none. Then how far inside the marker's shape that
+    // is, in pixels (negative outside): half a pixel either side of its edge is the smooth part.
+    float spacing = vDash.y;
+    float u = vDistance - max(1.0, floor(vDistance / spacing + 0.5)) * spacing;
+    float v = vMarker.y;
+    float kind = vMarker.x;
+    if (kind > 3.5) {   // a oneway arrow that points back along the line
+      u = -u;
+      kind = 1.0;
+    }
+    float inside;
+    if (kind < 1.5) {
+      // oneway: a shaft 5 long and 1 across, then a head 5 long and 5 across at its base
+      float shaft = min(min(u + 5.0, 1.0 - u), 0.5 - abs(v));
+      float head = min(u, (2.5 - 0.5 * u - abs(v)) / 1.118);
+      inside = max(shaft, head);
+    } else if (kind < 2.5) {
+      // twoway: a shaft 5 long, and a head at each end
+      float w = abs(u);
+      float shaft = min(3.5 - w, 0.5 - abs(v));
+      float head = min(w - 2.5, (3.75 - 0.5 * w - abs(v)) / 1.118);
+      inside = max(shaft, head);
+    } else {
+      // sided: a triangle on that side, its base 4.5 from the line and its point 9.5 from it
+      float q = v - 4.5;
+      inside = min(q, (5.0 - q - abs(u)) / 1.414);
+    }
+    alpha = clamp(inside + 0.5, 0.0, 1.0);
+  } else if (total > 0.0) {
     // How much of this pixel is in a dash: the pattern has up to two, and then starts again.
     float t = mod(vDistance, total);
     float second = vDash.x + vDash.y;
@@ -164,6 +252,7 @@ struct LineUniforms {
   uNarrow: f32,
   uWireframe: f32,
   uCasing: f32,
+  uMarkers: f32,
 }
 
 @group(0) @binding(0) var<uniform> globalUniforms: GlobalUniforms;
@@ -175,6 +264,7 @@ struct VSOutput {
   @location(0) vColor: vec4<f32>,
   @location(1) vDash: vec4<f32>,
   @location(2) vDistance: f32,
+  @location(3) vMarker: vec2<f32>,
 }
 
 @vertex
@@ -187,7 +277,8 @@ fn mainVert(
   @location(5) aColor: vec4<f32>,
   @location(6) aDash: vec4<f32>,
 ) -> VSOutput {
-  let width = mix(max(aWidth.x - lineUniforms.uNarrow, abs(aWidth.y)), 1.0, lineUniforms.uWireframe);
+  let markers = (aWidth.y == 0.0);
+  let width = select(mix(max(aWidth.x - lineUniforms.uNarrow, abs(aWidth.y)), 1.0, lineUniforms.uWireframe), aWidth.x, markers);
   let halfWidth = 0.5 * width * lineUniforms.uPixel;
 
   let second = halfWidth > aFallback.w;
@@ -199,11 +290,13 @@ fn mainVert(
 
   var out: VSOutput;
   out.position = vec4<f32>((mvp * vec3<f32>(position, 1.0)).xy, 0.0, 1.0);
-  if (aColor.a == 0.0 || (aWidth.y < 0.0 && lineUniforms.uCasing < 0.5)) {
+  if (aColor.a == 0.0 || (aWidth.y < 0.0 && lineUniforms.uCasing < 0.5) || (markers && lineUniforms.uMarkers < 0.5)) {
     out.position = vec4<f32>(2.0, 2.0, 0.0, 1.0);
   }
   out.vDistance = (aAlong.x + along * halfWidth) / lineUniforms.uPixel;
   out.vDash = aDash * 255.0;
+  let side = select(out.vDash.z, out.vDash.w, second) - 1.0;
+  out.vMarker = select(vec2<f32>(0.0, 0.0), vec2<f32>(out.vDash.x, side * 0.5 * width), markers);
   out.vColor = vec4<f32>(aColor.rgb * aColor.a, aColor.a) * localUniforms.uColor * globalUniforms.uWorldColorAlpha;
   return out;
 }
@@ -213,10 +306,35 @@ fn mainFrag(
   @location(0) vColor: vec4<f32>,
   @location(1) vDash: vec4<f32>,
   @location(2) vDistance: f32,
+  @location(3) vMarker: vec2<f32>,
 ) -> @location(0) vec4<f32> {
   var alpha = 1.0;
   let total = vDash.x + vDash.y + vDash.z + vDash.w;
-  if (total > 0.0) {
+  if (vMarker.x > 0.5) {
+    let spacing = vDash.y;
+    var u = vDistance - max(1.0, floor(vDistance / spacing + 0.5)) * spacing;
+    let v = vMarker.y;
+    var kind = vMarker.x;
+    if (kind > 3.5) {
+      u = -u;
+      kind = 1.0;
+    }
+    var inside = 0.0;
+    if (kind < 1.5) {
+      let shaft = min(min(u + 5.0, 1.0 - u), 0.5 - abs(v));
+      let head = min(u, (2.5 - 0.5 * u - abs(v)) / 1.118);
+      inside = max(shaft, head);
+    } else if (kind < 2.5) {
+      let w = abs(u);
+      let shaft = min(3.5 - w, 0.5 - abs(v));
+      let head = min(w - 2.5, (3.75 - 0.5 * w - abs(v)) / 1.118);
+      inside = max(shaft, head);
+    } else {
+      let q = v - 4.5;
+      inside = min(q, (5.0 - q - abs(u)) / 1.414);
+    }
+    alpha = clamp(inside + 0.5, 0.0, 1.0);
+  } else if (total > 0.0) {
     let t = vDistance - total * floor(vDistance / total);
     let second = vDash.x + vDash.y;
     let a0 = clamp(min(t, vDash.x - t) + 0.5, 0.0, 1.0);
@@ -242,7 +360,8 @@ function lineUniforms(): PIXI.UniformGroup {
     uPixel: { value: 1, type: 'f32' },
     uNarrow: { value: 0, type: 'f32' },
     uWireframe: { value: 0, type: 'f32' },
-    uCasing: { value: 1, type: 'f32' }
+    uCasing: { value: 1, type: 'f32' },
+    uMarkers: { value: 1, type: 'f32' }
   });
   return _uniforms;
 }
@@ -271,7 +390,9 @@ function lineShader(): PIXI.Shader {
  * color, opacity and dashes) in every vertex.
  *
  * The shader puts each vertex where the line's width at the current zoom says, so a zoom changes
- * four numbers (`LineBatch.setView()`) and nothing in any batch. What the batch does with its
+ * five numbers (`LineBatch.setView()`) and nothing in any batch. The markers along a line (oneway
+ * arrows, the triangles of a line with sides) are a strip in the batch too, and the shader
+ * draws them in it (`addMarkers()`). What the batch does with its
  * buffers (a line that changes, hiding, order, the place its coordinates start at) is
  * `VertexBatch`'s.
  *
@@ -296,6 +417,7 @@ export class LineBatch extends VertexBatch {
     uniforms.uNarrow = view.narrow;
     uniforms.uWireframe = view.wireframe ? 1 : 0;
     uniforms.uCasing = view.casing ? 1 : 0;
+    uniforms.uMarkers = view.markers ? 1 : 0;
   }
 
 
@@ -361,6 +483,56 @@ export class LineBatch extends VertexBatch {
   public setStyle(item: LineBatchItem, style: LineBatchStyle): void {
     if (item.batch !== this) return;
     this._writeStyle(item, style);
+  }
+
+
+  /**
+   * Adds the markers along a line to the batch: oneway arrows, or the triangles on the side of
+   * a line that has sides. They're a strip along the line, as wide as the markers need, that
+   * the shader draws the markers in from the distance along the line: so many pixels apart at
+   * every zoom, with nothing to build when the zoom changes.
+   * @param stroke - The line's stroke mesh. Its vertices are copied; its `indices` are kept, and must not change.
+   * @param dx - Where the line's coordinates start, in the batch's
+   * @param dy - The same, for y
+   * @param markers - Which markers, and their color
+   * @param order - Where they're drawn among the others (higher is on top)
+   * @return The markers in the batch, to change or remove them with
+   */
+  public addMarkers(stroke: StrokeMesh, dx: number, dy: number, markers: LineBatchMarkers, order: number = 0): LineBatchItem {
+    const item = this._addItem(stroke.vertexCount, stroke.indices, order);
+    this._writeStroke(item, stroke, dx, dy);
+    this._writeMarkers(item, markers);
+    this._writeSides(item, stroke);
+    return item;
+  }
+
+
+  /**
+   * Gives the markers along a line another line to go along, another kind or another color.
+   * If the line has as many vertices as before, they're written where the old ones were.
+   * @param item - The markers (from `addMarkers`)
+   * @param stroke - The line's stroke mesh now
+   * @param dx - Where the line's coordinates start, in the batch's
+   * @param dy - The same, for y
+   * @param markers - Which markers, and their color
+   */
+  public setMarkers(item: LineBatchItem, stroke: StrokeMesh, dx: number, dy: number, markers: LineBatchMarkers): void {
+    if (item.batch !== this) return;
+    this._resizeItem(item, stroke.vertexCount, stroke.indices);
+    this._writeStroke(item, stroke, dx, dy);
+    this._writeMarkers(item, markers);
+    this._writeSides(item, stroke);
+  }
+
+
+  /**
+   * Changes the kind or the color of the markers along a line, on the line they're on.
+   * @param item - The markers (from `addMarkers`)
+   * @param markers - Which markers, and their color
+   */
+  public setMarkerStyle(item: LineBatchItem, markers: LineBatchMarkers): void {
+    if (item.batch !== this) return;
+    this._writeMarkers(item, markers);
   }
 
 
@@ -441,6 +613,69 @@ export class LineBatch extends VertexBatch {
     }
 
     this._markDirty(item);
+    this._markBytesDirty(item);
+  }
+
+
+  /**
+   * Writes which markers a strip draws, and their color, into each of its vertices.
+   * @param item - The markers
+   * @param markers - Which markers, and their color
+   */
+  protected _writeMarkers(item: LineBatchItem, markers: LineBatchMarkers): void {
+    const floats = this._floats;
+    const bytes = this._bytes;
+    const count = item.count;
+    const layout = LINE_MARKERS[markers.kind];
+    const code = (markers.kind === 'oneway' && markers.reversed) ? REVERSED_CODE : layout.code;
+
+    const color = markers.color;
+    const r = (color >> 16) & 0xff;
+    const g = (color >> 8) & 0xff;
+    const b = color & 0xff;
+    // (At least 1: an opacity of 0 in a vertex means the markers are hidden.)
+    item.alpha = Math.max(1, Math.round(Math.min(Math.max(markers.alpha, 0), 1) * 255));
+    const a = item.visible ? item.alpha : 0;
+
+    for (let i = 0, o = item.first * FLOATS, p = item.first * BYTES; i < count; i++, o += FLOATS, p += BYTES) {
+      floats[o + 10] = layout.width;
+      floats[o + 11] = 0;     // a least width of 0 says it's markers
+      bytes[p] = r;
+      bytes[p + 1] = g;
+      bytes[p + 2] = b;
+      bytes[p + 3] = a;
+      bytes[p + 4] = code;
+      bytes[p + 5] = layout.spacing;
+    }
+
+    this._markDirty(item);
+    this._markBytesDirty(item);
+  }
+
+
+  /**
+   * Writes which side of the line each vertex of a strip of markers is on: at its own place,
+   * and at the second place of a vertex that has one. (A casing and a stroke don't need to
+   * know: they're the same color all the way across.)
+   * @param item - The markers
+   * @param stroke - The stroke mesh that the strip was copied from
+   */
+  protected _writeSides(item: LineBatchItem, stroke: StrokeMesh): void {
+    const bytes = this._bytes;
+    const vertices = stroke.vertices;
+    const count = item.count;
+
+    for (let i = 0, k = 6, p = item.first * BYTES; i < count; i++, k += STROKE_VERTEX_SIZE, p += BYTES) {
+      const side = vertices[k] + 1;
+      bytes[p + 6] = side;
+      bytes[p + 7] = side;
+    }
+
+    const fallbacks = stroke.fallbacks;
+    for (let f = 0; f < fallbacks.length; f += STROKE_FALLBACK_SIZE) {
+      bytes[(item.first + fallbacks[f]) * BYTES + 7] = fallbacks[f + 5] + 1;
+    }
+
     this._markBytesDirty(item);
   }
 

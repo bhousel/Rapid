@@ -12,7 +12,7 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 |------|-------------|
 | `LineMesh.ts` | A Pixi `Mesh` that draws a line from its stroke mesh (`geomStrokeMesh()` in `modules/geo/`): a new width moves the vertices it has. The outlines of areas, halos, the lasso, and the lines of layers that don't batch theirs |
 | `VertexBatch.ts` | The base of the batches: a Pixi `Mesh` with a shader of its own that draws many things in one draw call, each a run of vertices in its buffers. Keeps the buffers: a thing that changes in place, hiding, order, an origin that follows the view |
-| `LineBatch.ts` | A `VertexBatch` of lines: the shader works out the widths and the dashes, so a zoom changes nothing in it. The OSM layer has two for each level (its casings, and its strokes), and one for the outlines of areas |
+| `LineBatch.ts` | A `VertexBatch` of lines: the shader works out the widths and the dashes, and draws the markers along a line (oneway arrows), so a zoom changes nothing in it. The OSM layer has two for each level (its casings, and its strokes with their markers), and one for the outlines of areas |
 | `FillBatch.ts` | A `VertexBatch` of fills: each area's triangles, with its color and pattern. The shader lays the patterns out from one atlas texture. The OSM layer has one for every area's fill |
 | `PointBatch.ts` | A `VertexBatch` of points: each a few rectangles of the symbol atlas (viewfields, marker, icon), a number of pixels from where the point is on screen. The shader keeps them that size and upright, so neither a zoom nor a rotation changes anything in it. The OSM layer has one for its points, vertices and pins |
 | `AtlasAllocator.ts` | Manages texture atlas allocation, plus the `AtlasSource` texture source and its GPU upload handlers |
@@ -38,6 +38,7 @@ The OSM layer draws its lines in batches: for each level, one for every casing a
 - The vertices are 32-bit floats relative to the batch's `position`. `moveOrigin()` moves that place and keeps the lines where they are; the layer calls it when the view has gone far from it.
 - What changed is sent to the GPU once, when Pixi is about to render the batch (`onRender`).
 - The shader is in GLSL and in WGSL, in the file. A batch can draw dashes of two or four whole numbers of pixels up to 255 (`canDraw()`); a line with another pattern gets `LineMesh`es.
+- The markers along a line (oneway arrows, arrows with two heads, the triangles on the right of a line with sides) are items too: `addMarkers()` copies the line's stroke mesh as a strip of the width the markers need, with the side of the line each vertex is on. The fragment shader draws a marker every so many pixels along the strip (`LINE_MARKERS`), from the distance along the line and the distance to its side, so there are no sprites and nothing to do at a zoom. `setMarkerStyle()` changes their kind or color; `setMarkers()` puts them on another line.
 
 ## FillBatch
 

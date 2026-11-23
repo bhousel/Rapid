@@ -62,6 +62,17 @@ const MAX_WASTE = 0.5;
  */
 const GROWTH = 1.5;
 
+/**
+ * When the buffers are full: if what's in use would fill no more than this part of them, the
+ * batch packs itself and keeps the buffers it has; otherwise it gets larger ones.
+ * (At a half, a batch whose things come and go kept getting larger buffers: Užice's outlines had
+ * room for three times their vertices after two zooms in and out.)
+ */
+const MAX_FILL = 0.75;
+
+/** A batch with less than this part of its buffers in use gets smaller ones (when it's flushed) */
+const MIN_FILL = 0.3;
+
 // A mesh with a shader of its own is never batched by Pixi, and never reads more of its `State`.
 const _state = PIXI.State.for2d();
 
@@ -82,7 +93,9 @@ const _state = PIXI.State.for2d();
  *   in most batches), which the shader has to draw nothing for. Hiding and showing (as a pan does at the edge of what's
  *   drawn) writes a byte per vertex, and builds nothing.
  * - **A thing that changes is written where it was** if it has as many vertices as before;
- *   otherwise at the end, and the batch packs itself when half of it is unused.
+ *   otherwise at the end, and the batch packs itself when half of it is unused. Its buffers
+ *   get larger when they're three quarters full of what's in use, and smaller when less than
+ *   a third of them is.
  * - **What changed is sent to the GPU when the batch is next rendered,** once, however much
  *   changed (`flush()`, which Pixi calls through `onRender`).
  *
@@ -326,7 +339,12 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * to the GPU. Pixi calls this before it renders the batch; there's no need to call it otherwise.
    */
   public flush(): void {
-    if (this._wasted > MIN_CAPACITY && this._wasted > this._end * MAX_WASTE) {
+    // Smaller buffers when most of their room has gone unused (the view moved somewhere with
+    // less in it, or zoomed out to where areas have no outlines), with room to grow again.
+    const used = this._end - this._wasted;
+    if (this._capacity > MIN_CAPACITY && used < this._capacity * MIN_FILL) {
+      this._pack(Math.max(MIN_CAPACITY, Math.ceil(used * GROWTH)));
+    } else if (this._wasted > MIN_CAPACITY && this._wasted > this._end * MAX_WASTE) {
       this._pack(this._capacity);
     }
     if (this._indexDirty) {
@@ -407,7 +425,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
   protected _place(item: BatchItem, count: number): void {
     if (this._end + count > this._capacity) {
       const needed = this._end - this._wasted + count;
-      const capacity = (needed <= this._capacity * MAX_WASTE) ? this._capacity : Math.ceil(Math.max(needed, this._capacity * GROWTH));
+      const capacity = (needed <= this._capacity * MAX_FILL) ? this._capacity : Math.ceil(Math.max(needed, this._capacity * GROWTH));
       item.count = 0;    // (it has no vertices to keep while the batch is packed)
       this._pack(capacity);
     }

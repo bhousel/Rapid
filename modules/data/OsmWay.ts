@@ -319,6 +319,19 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
+   * Returns whether a oneway line runs against the direction it's drawn in, given the tags
+   * present (e.g. `oneway=-1`): travel is from its last node to its first.
+   * @return `true` if the tags suggest that this is a oneway that runs backward, `false` if not.
+   */
+  public isOneWayBackward(): boolean {
+    const context = this.context;
+    const schema = context.systems.schema;
+    const rulesets = schema?.getScope('osm')?.rulesets;
+
+    return rulesets?.get('oneway_backward')?.match(this.tags) || false;
+  }
+
+  /**
    * Returns whether a line is sided, given the tags present.
    * For a sided way, the direction that the way is drawn is significant.
    * Conventionally, the right side is the 'inside'/'lower'.
