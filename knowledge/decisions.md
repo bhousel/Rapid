@@ -135,6 +135,14 @@ Section 16 of `design/graphics-system-log.md`. Choices someone might undo:
   layer still hides what its box left at once, through its index.
 - **A service's getter takes an extent** (`getData(…, extent)`), not a box the graphics system
   sets for the frame somewhere the services read: what a layer gathers by is in its own code.
+- **`SpatialSystem` says what changed in its caches, and services don't ask the renderer to draw**
+  (Bryan, Nov 24; section 19 of the log). Every write is noted and reported once the writing task
+  is done (`datachange`), and the scene routes it to the layers that draw from the cache. Rejected:
+  an arrival event from each service that its layer listens to (15 services to change, and the
+  same thing to forget next time; Mapillary's old `loaded…` events were that, and nothing listened
+  anymore); reporting data IDs (the layers gather by extent, not by datum).
+- **The OSM layer listens to the editor itself** (`merge`, `stagingchange`), and `FilterSystem`
+  clears its own cache; `MapSystem` stopped passing them on.
 
 ## Areas are drawn in two batches: fills, then outlines (Nov 2026)
 Step 8 of section 15, the first part. Choices someone might undo:

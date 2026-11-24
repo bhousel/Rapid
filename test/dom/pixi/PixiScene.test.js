@@ -512,6 +512,25 @@ describe('PixiScene', () => {
       assert.strictEqual(next.layers.get('osm').waiting, 0);
     });
 
+    // `SpatialSystem` reports what changed in its caches: the layers that draw from them hear of it,
+    // and the scene asks for a frame (not a redraw)
+    it('tells the layers what changed in the spatial caches, and asks for a frame if one draws from them', () => {
+      const told = [];
+      let frames = 0;
+      const layerFor = (id, cache) => ({ spatialChanged: (spatialID, change) => { told.push([id, spatialID]); return spatialID === cache; } });
+      const scene = {
+        gfx: { requestFrame: () => frames++ },
+        layers: new Map([['mapillary', layerFor('mapillary', 'mapillary-images')], ['osm', layerFor('osm', null)]])
+      };
+      const change = { boxes: [], changedIDs: new Set(), cleared: false };
+
+      PixiScene.prototype._spatialChanged.call(scene, new Map([['labels', change]]));
+      assert.strictEqual(frames, 0);
+      PixiScene.prototype._spatialChanged.call(scene, new Map([['mapillary-images', change]]));
+      assert.strictEqual(frames, 1);
+      assert.deepEqual(told.slice(2), [['mapillary', 'mapillary-images'], ['osm', 'mapillary-images']]);
+    });
+
     // What a cull box left behind when it moved without a pass is outside the view: it's culled
     // in a frame that has time left once every layer has rendered (see `AbstractPixiLayer.cullLater`).
     it('culls what a layer\'s cull box left behind when the frame has time, and asks for another frame when it hasn\'t', () => {

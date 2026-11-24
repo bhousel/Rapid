@@ -205,11 +205,16 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   (`PixiLayerOsm._renderChanged()`): a hover in Užice costs 3 ms of APP that way, and 175 with
   `immediateRedraw()`.
 - **For an edit, `scene.dataChanged('osm', ids)`,** with everything the edit affects
-  (`Difference.complete()`). It asks for a frame. `MapSystem` does this for `stagingchange`. The
-  layer draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
-- **For data that arrived, `scene.dataArrived('osm', ids)`,** which asks for a frame too.
-  `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
-  A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
+  (`Difference.complete()`). It asks for a frame. The OSM layer does this itself, for the
+  editor's `stagingchange`. It draws those entities again without its pass; `scene.dirtyData()`
+  still means "do the pass".
+- **For OSM data that arrived, `scene.dataArrived('osm', ids)`,** which asks for a frame too. The
+  OSM layer does this itself, for the editor's `merge`, and sorts and draws it when its frames have
+  time.
+- **A service doesn't ask the renderer to draw the data it loads.** It writes it to its spatial
+  cache, `SpatialSystem` says what changed there (`datachange`), and the scene passes that to the
+  layers that draw from the cache (`gathersFrom()`), which gather there without a pass. Don't add
+  `gfx.deferredRedraw()` after a write to a cache.
 - **Destroy the Pixi objects you replace.** `removeChildren()` and assigning a new
   `mesh.geometry` leave the old ones alive: Pixi keeps what it built for them until they're
   destroyed, or until its own collector finds them unused a minute later. After a zoom that
@@ -316,10 +321,12 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
     feature outside the box may still be visible for a frame or two. It goes by what a pass
     would gather: if a layer draws data because of other data (the Rapid layer, the ends of its
     roads), it says so in `_gatheredInBox()`.
-  - **Whatever changes what such a layer draws must ask for a redraw naming it,** or mark its
-    features dirty: data arriving, a filter (`PhotoSystem._filtersChanged()`), an issue that
-    changed (the QA services' `replaceItem()`), a Rapid feature accepted (`RapidSystem`). A class
-    on the layer's own data makes it do its pass by itself (`classChanged()`). Nothing else looks.
+  - **Say which spatial caches the layer draws from** (`gathersFrom(spatialID)`): then what changes
+    there reaches it by itself (`spatialChanged()`, "Data that arrives" in the design doc).
+  - **Whatever else changes what such a layer draws must ask for a redraw naming it,** or mark its
+    features dirty: a filter (`PhotoSystem._filtersChanged()`), conflation results, a Rapid feature
+    accepted (`RapidSystem`). A class on the layer's own data makes it do its pass by itself
+    (`classChanged()`). Nothing else looks.
 - **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
   it, and a layer that kept its features did no pass.
 - **Work out a feature's style when `feature.needsStyle` says so, not when it's `dirty`.** A zoom
@@ -365,7 +372,7 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
   (`scheduler.throttle()`).
 - **`immediateRedraw()` is for something the user did.** It skips the wait that spaces out
   expensive frames. With a layer's ID, only that layer is drawn at once (in a held frame, if a pass
-  is waiting). For data that arrived, use `deferredRedraw()`.
+  is waiting). For something that changed by itself (conflation results), use `deferredRedraw()`.
 - **Don't change the frame loop's timing without measuring it.** `bun run measure` reports frames
   a second and long ticks while the view moves on every tick (`glide`), and section 9 of
   `design/graphics-system-log.md` has a real drag and a load to compare with. `FramePacer` holds the rule and has unit

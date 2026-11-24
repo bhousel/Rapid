@@ -32,6 +32,7 @@ the numbers, and what they say. Then change `graphics-system.md` to say what's t
 | 16 | The other layers in batches (Nov 24) |
 | 17 | The other layers keep their features (Nov 24) |
 | 18 | The other layers follow the cull box, and cull later (Nov 24) |
+| 19 | Data that arrives, from `SpatialSystem` (Nov 24) |
 
 ## 1. How a frame is made
 
@@ -3713,3 +3714,54 @@ fixes to the deferred cull:
 
 What's left is in "Where it's heading": a tile that arrives is still a pass of its layer, and so is
 a hovered photo.
+
+## 19. Data that arrives, from `SpatialSystem` (Nov 24)
+
+After section 18, a tile that arrived was still a pass of its layer: each service wrote its tile to
+its spatial cache, then asked for a redraw of the layer that draws it (`gfx.deferredRedraw(layerID)`).
+That was a pass (Mapillary's 15 to 34 ms in Bellevue), every service had to know which layer draws
+its data, and had to remember to ask: the QA issues that their editors changed didn't (section 17).
+
+Bryan's call: `SpatialSystem` is the natural place to know where data arrived. Now every write to a
+cache is noted (where items appeared or moved from, which were replaced or removed, a cache cleared)
+and reported once the task that wrote it is done (`datachange`). The scene passes each change to the
+layers that draw from that cache (`gathersFrom()`, `spatialChanged()`), and asks for a frame. A layer
+gathers where data arrived as it gathers the strips of a moved box, with no pass; the features of
+replaced or removed data are hidden if that gathering doesn't find them again. A cleared cache is a
+pass. About 18 redraw calls left the services, and so did the three `loaded…` events Mapillary
+emitted, which nothing listened to anymore. Vector tiles are cached per source and zoom, so the
+Rapid layer (Overture) and custom data ask the vector tile service which caches are theirs
+(`holdsData()`).
+
+The OSM layer was told by `MapSystem`, which heard `merge` and `stagingchange` from the editor and
+cleared the filter cache. Now the OSM layer listens to the editor itself (as the Rapid layer listens
+to conflation), and `FilterSystem` clears its own cache. OSM keeps its own path because `merge` says
+what a tile reshaped, which a cache can't, and its local indexes are written on every edit.
+
+**Measured** (Bellevue, the same layers as section 16, five pans of 700 to 900 px into places not
+loaded yet, live): no pass of any data layer while tiles arrived, but 4 or 5 of the Rapid layer's,
+for conflation results. The longest frames, 25 to 46 ms, were making features: 1,084 Mapillary
+photos made in one frame (13.7 ms), since the drawing waits but making doesn't.
+
+**Checked against a pass** after those pans: a full pass of each data layer changed nothing shown.
+The first time, 3 parts of one Mapillary sequence were shown by the pass and not before: the
+sequence curved around the cull box, so its box reached in and none of its parts did. The deferred
+cull of section 18 went by the parts. It goes by the data's own box now, which is what a cache finds
+it by (the Rapid layer, whose roads are OSM entities, still goes by its features).
+
+**A flaky e2e test that wasn't.** "leaves every label where it is while features are hovered" had
+failed now and then in full parallel runs, and passed alone. With this change it failed 3 times in 6
+full runs, against none in 4 of the commit before, so I looked. A copy of the test that traced one
+point (a Subway, which got a label after a hover and had none before) showed it every time: the
+point's change notice was still in label space when the map went idle. A feature that changes after
+the labels layer has placed this frame's labels (drawn in the scene's catch-up after every layer, or
+hidden by a deferred cull) leaves its notice there, and the labels layer didn't count it as waiting,
+so no frame came to look at it: its label waited for whatever drew the next frame (here, the hover).
+This change put more work after the layers render, which made it likelier. Now the labels layer
+counts untaken notices as waiting (`labelSpace.numChangedFeatures`), and throws them away while
+labels are off (or they'd ask for frames forever). Four full runs passed after the fix.
+
+**Seen on the way:** downtown Seattle at z17.5 has 107,000 Mapillary photo features and 295,000
+detection features in the cull box (280,000 visible), where Bellevue has 28,000 and 14,500. After a
+load the layers spend a few seconds drawing what's outside the view, at about 20 frames a second.
+That's a question for a level of detail (`design/filter-system.md` section 6), not for this.

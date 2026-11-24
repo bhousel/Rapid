@@ -367,7 +367,6 @@ export class EsriService extends AbstractSystem {
    */
   protected _loadTileNextPage(ds: EsriDataset, layer: EsriLayer, tile: Tile): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const locations = context.systems.locations;
     const network = context.systems.network!;
 
@@ -403,7 +402,6 @@ export class EsriService extends AbstractSystem {
           this._loadTileNextPage(ds, layer, tile);
         } else {  // all pages loaded
           cache.nextPage.set(tile.id, Infinity);
-          gfx?.deferredRedraw('rapid');   // only the Rapid layer draws this data
         }
       })
       .catch(e => {

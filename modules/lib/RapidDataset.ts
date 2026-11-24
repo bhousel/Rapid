@@ -474,7 +474,6 @@ export class RapidDataset {
     }
 
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
 
     const isString = (typeof data === 'string');
@@ -536,7 +535,6 @@ export class RapidDataset {
 
     if (newFeatures.length) {
       spatial.addData(this.spatialID, newFeatures);
-      gfx?.deferredRedraw('rapid');
     }
 
 

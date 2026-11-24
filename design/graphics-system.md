@@ -275,12 +275,13 @@ A frame is wanted for one of four reasons, and it carries which:
 
 **`immediateRedraw()` is for something the user did:** the pass doesn't wait for its gap, and the
 frame is **urgent** (`frame.urgent`): what the user changed is drawn whatever the deadline.
-**`deferredRedraw()` is for data that arrived:** it waits at least 250 ms, so arrivals batch up.
+**`deferredRedraw()` is for something that changed by itself** (conflation results, data whose
+cache doesn't say what changed): it waits at least 250 ms, so such changes batch up.
 
 **A request names its layer when only one layer's drawing changed.** A request without one makes
 every layer do its pass, and the OSM layer's is 134 ms in Užice. So the imagery names
-`'background'`, the lasso and the geolocation dot `'map-ui'`, a dataset `'rapid'`, a photo or QA
-service the layer that draws its data, and the filters `'osm'`. Turning layers on or off redraws
+`'background'`, the lasso and the geolocation dot `'map-ui'`, conflation results and a dataset's
+settings `'rapid'`, the photo filters each photo layer, and the filters `'osm'`. Turning layers on or off redraws
 only the layers that were turned on or off (`scene.enableLayers()` and the others, which always
 emit `layerchange`). The requests left without a layer are for changes that reach every layer:
 the styles, the locale, the schema, the area fill, the color scheme, debug flags, a resume or a
@@ -288,7 +289,8 @@ reset, another OSM connection or user, and icons that were registered (`UiDefs`)
 
 **What asks for a frame instead of a pass.** The scene asks for one itself when a class changes
 (`setClass()`, `unsetClass()`, `clearClass()`), when it's told of an edit or of data that arrived
-(`dataChanged()`, `dataArrived()`), and when textures arrive (`texturesLoaded()`). A change of mode
+(`dataChanged()`, `dataArrived()`), when data changes in a spatial cache that a layer draws from
+("Data that arrives"), and when textures arrive (`texturesLoaded()`). A change of mode
 asks for one (`Context.enter()`): what a mode changes on the map reaches the layers as classes,
 edits, or `AbstractPixiLayer.modeChanged()`. Turning frame stats on and the colorblind filter ask
 for one too: nothing in the scene changed.
@@ -298,10 +300,10 @@ won't look. Marking features dirty (`dirtyScene()`, `dirtyLayers()`, `dirtyData(
 layer do its next pass, but doesn't ask for a frame. Every path that changes what the OSM layer
 draws was traced once (the log's section 8, "Redraw requests, checked"), and the e2e tests check
 work done without a pass against a pass ("Checked against a pass", below). So were the other data
-layers' (the log's section 17): their data arriving names the layer, and so do the photo filters
-(`PhotoSystem`, for each photo and detection layer), a QA issue that changed (`replaceItem()`,
-`removeItem()` in the services) and a Rapid feature accepted or ignored, or that stops being so
-(`RapidSystem`).
+layers' (the log's sections 17 and 19): whatever changes their data changes a spatial cache, which
+says so (`SpatialSystem`'s `datachange`), and the photo filters (`PhotoSystem`, for each photo and
+detection layer), conflation results, and a Rapid feature accepted or ignored, or that stops
+being so (`RapidSystem`), ask for a redraw of the layer.
 
 ## The cull box
 
@@ -333,10 +335,12 @@ A layer doesn't need to decide what's in view on every frame.
   what's in both left as it is; the whole box for a pass. The services' getters take the extent
   (`spatial.getVisibleItems(spatialID, extent)`). The OSM layer follows the box its own way, by
   its spatial index (`_moveBox()`, "A cull box that moves").
+- **They gather where their data changed, too,** when a spatial cache says so ("Data that
+  arrives"), on a frame that's otherwise kept.
 - **The data layers other than OSM do their pass for whatever else changed:** a zoom or a
-  rotation, a class on their own data (a hovered or selected photo: `classChanged()`), or data
-  that arrived (a service names its layer). The OSM layer does those without a pass ("The pass,
-  and what asks for it"). The others' passes are short where they've been measured (Mapillary's
+  rotation, a class on their own data (a hovered or selected photo: `classChanged()`), a redraw
+  request (conflation results, a filter), or a cache that was cleared. The OSM layer does those
+  without a pass ("The pass, and what asks for it"). The others' passes are short where they've been measured (Mapillary's
   13,000 photos 15 ms), and they draw what's dirty by the deadline (`updateFeature()`).
 - **The imagery tiles and the labels follow the view themselves,** and do their pass on every
   frame.
@@ -486,9 +490,10 @@ that were only drawn because their way was hovered are destroyed. A hover in Už
 
 ### An edit
 
-`MapSystem` hears `stagingchange` with everything the edit affects (`Difference.complete()`: what
-changed, the nodes of changed ways, the members of changed relations, and all their parents), and
-passes it to `scene.dataChanged('osm', …)`. The OSM layer marks those features dirty and runs them
+The OSM layer hears `stagingchange` from `EditSystem` with everything the edit affects
+(`Difference.complete()`: what changed, the nodes of changed ways, the members of changed
+relations, and all their parents), and passes it to `scene.dataChanged('osm', …)`, which asks for
+a frame. (`FilterSystem` hears it too, and forgets what was matched for those entities.) The OSM layer marks those features dirty and runs them
 through `_renderChanged()`, which also makes what's new and hides what's gone. Beyond 5,000
 entities (`MAX_CHANGED`: a big undo, a paste) it does its pass, which is cheaper then.
 
@@ -505,11 +510,29 @@ scene through `FilterSystem.forceVisible()`.
 
 ### Data that arrives
 
-`EditSystem` lists everything on a tile with its `merge` event (also what was there already, and
-what the new data reshaped). `MapSystem` passes that to `scene.dataArrived('osm', …)`. The OSM
-layer remembers the IDs, and on each frame sorts and draws them 1,000 at a time while the frame has
-time (`_renderArrived()`, `ARRIVED_CHUNK`). New entities go through `_waitToMake()` like any
-others.
+**OSM:** `EditSystem` lists everything on a tile with its `merge` event (also what was there
+already, and what the new data reshaped). The OSM layer hears it itself, and passes it to
+`scene.dataArrived('osm', …)`, which asks for a frame. (`FilterSystem` hears it too, and forgets
+what was matched for those entities.) The OSM layer remembers the IDs, and on each frame sorts and
+draws them 1,000 at a time while the frame has time (`_renderArrived()`, `ARRIVED_CHUNK`). New
+entities go through `_waitToMake()` like any others.
+
+**Everything else is in a spatial cache, and `SpatialSystem` says what changed in it.** A service
+writes a tile to its cache (`addData`, `replaceData`, `removeItems`) and asks nothing of the
+renderer. `SpatialSystem` notes where each write put items, which it replaced or removed, and
+whether the cache was cleared, and reports all of a task's notes at once (`datachange`, see
+[`spatial-system.md`](spatial-system.md)). The scene passes each cache's change to the layers that
+draw from it (`AbstractPixiLayer.gathersFrom()`, `spatialChanged()`) and asks for a frame:
+
+- **A layer gathers where data arrived,** inside its cull box, on its next frame, as it gathers the
+  strips a moved box covers (`_gatherExtents()`): no pass, and what it gathers belongs to the last
+  pass. New features are made then, and drawn by the deadline.
+- **The features of replaced or removed data are hidden if that gathering doesn't find them
+  again** (in `cull()`), so a replaced item that moved shows only where it is now.
+- **A cleared cache is a pass.**
+- **Which caches a layer draws from is the layer's to say:** Mapillary's photos layer the photos'
+  and sequences' caches, the Rapid layer its enabled datasets' (and an Overture dataset's vector
+  tiles, a cache for each zoom: `holdsData()`), custom data its own or its vector tiles'.
 
 ### A cull box that moves
 
@@ -1019,10 +1042,10 @@ What's bitten before:
 What's left, biggest first, is in `knowledge/backlog.md`, "Pixi rendering follow-ups". The
 direction, from the log's section 15:
 
-- **The other data layers without a pass for a zoom, a hover or arriving data,** as the OSM layer
-  does. They follow their box and cull later now (the log's section 18), but a tile that arrives
-  is a pass of its layer (a service names the layer, not the tile), and so is a hovered photo.
-  Putting off making features, not only drawing them (`_waitToMake()`), is the other half.
+- **The other data layers without a pass for a zoom or a hover,** as the OSM layer does. They
+  follow their box, cull later and draw what arrived without one now (the log's sections 18 and
+  19), but a hovered photo or a zoom is still a pass. And putting off making features, not only
+  drawing them (`_waitToMake()`): a tile of 1,000 photos is made in one frame.
 - **A feature without a display object.** A feature in a batch needs a position and an order, not a
   `Container` (0.7 KB each); `AbstractPixiFeature` assumes one.
 - **Animation draws that don't draw the whole scene:** what's still drawn to a texture once, and an

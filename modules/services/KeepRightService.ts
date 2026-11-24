@@ -251,7 +251,6 @@ export class KeepRightService extends AbstractSystem {
    */
   protected _gotTile(response: any): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
     const spatialID = 'keepright';
 
@@ -337,7 +336,6 @@ export class KeepRightService extends AbstractSystem {
       spatial.addData(spatialID, new MarkerData(context, props));
     }
 
-    gfx?.deferredRedraw('keepright');
   }
 
 
@@ -420,10 +418,8 @@ export class KeepRightService extends AbstractSystem {
   public replaceItem(item: MarkerData): MarkerData | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
-    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('keepright', item);
-    gfx?.immediateRedraw('keepright');   // (its layer keeps its features while only the view moves)
     return item;
   }
 
@@ -435,10 +431,8 @@ export class KeepRightService extends AbstractSystem {
   public removeItem(item: MarkerData): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
-    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.removeItems('keepright', item.id);
-    gfx?.immediateRedraw('keepright');   // (its layer keeps its features while only the view moves)
   }
 
 

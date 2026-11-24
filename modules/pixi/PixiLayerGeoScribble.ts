@@ -81,6 +81,17 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * GeoScribble's scribbles.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'geoscribble';
+  }
+
+
+  /**
    * Render the geojson custom data
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering

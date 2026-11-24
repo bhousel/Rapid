@@ -123,6 +123,17 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
 
   /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * the OSM notes.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'osm-notes';
+  }
+
+
+  /**
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  The frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering

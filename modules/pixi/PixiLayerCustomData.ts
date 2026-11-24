@@ -118,6 +118,20 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * the custom data's, or its vector tiles' (a cache for each zoom).
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    const vtService = this.context.services.vectortile;
+    const template = this._template;
+    if (template) return !!vtService?.holdsData(template, spatialID);
+    return !!this._spatialID && spatialID === this._spatialID;
+  }
+
+
+  /**
    * Render the GeoJSONData custom data
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering

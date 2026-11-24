@@ -17,6 +17,11 @@ describe('MapRouletteService', () => {
   // Spy on redraws..
   const gfx = context.systems.gfx;
   const spyRedraw = mock();
+  // What the spatial system reports of the data that a load wrote: the map's layers draw what arrived from that
+  const spyReport = mock();
+  context.systems.spatial.on('datachange', changes => {
+    if ([...changes.values()].some(change => !change.cleared)) spyReport(changes);
+  });
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
@@ -33,6 +38,7 @@ describe('MapRouletteService', () => {
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
     spyRedraw.mockClear();
+    spyReport.mockClear();
   });
 
 
@@ -152,7 +158,7 @@ describe('MapRouletteService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', async () => {
+      it('loads a tile of data and reports it to the spatial system', async () => {
         fetchMock.route(/tasks/, sample.data10, { delay: 1 });
         fetchMock.route(/challenge/, sample.challenge100, { delay: 1 });
         _maproulette.loadTiles();
@@ -160,7 +166,7 @@ describe('MapRouletteService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, '1 for tasks, 1 for the challenge');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 2, 'reported for the tasks, and again with their challenges\' details');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -174,7 +180,7 @@ describe('MapRouletteService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, '1 for tasks, 1 for the challenge');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 2, 'reported for the tasks, and again with their challenges\' details');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
@@ -190,7 +196,7 @@ describe('MapRouletteService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'still 1 for tasks, 1 for the challenge');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 2, 'reported for the tasks, and again with their challenges\' details');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -216,7 +222,7 @@ describe('MapRouletteService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] considered loaded');
-        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
+        assert.lengthOf(spyReport.mock.calls, 0, 'nothing reported');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
         assert.match(spyError.mock.lastCall[0], /Forbidden/i);
 
@@ -224,7 +230,7 @@ describe('MapRouletteService', () => {
         _maproulette.loadTiles();        // try again
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw still not called');
+        assert.lengthOf(spyReport.mock.calls, 0, 'still nothing reported');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error still called once');
       });
     });

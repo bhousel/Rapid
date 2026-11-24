@@ -247,16 +247,41 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Whether a pass would gather some data in the cull box (see `AbstractPixiLayer.cullLater`):
-   * a road's end is drawn while any road of its reaches into the box, as a pass draws it.
-   * @param dataID - The data
+   * Whether a pass would gather a feature's data in the cull box (see `AbstractPixiLayer.cullLater`):
+   * if any feature of its data reaches in (a road from MapWithAI is an OSM entity, whose shape is
+   * its dataset's graph's, and one part), and a road's end while any road of its does, as a pass
+   * draws it.
+   * @param feature - A feature outside the box
+   * @param _box - The cull box
    * @param anyReaches - Whether any feature of some data reaches into the box
-   * @return `true` if the data's features belong in the box
+   * @return `true` if the feature belongs in the box
    */
-  protected override _gatheredInBox(dataID: DataID, anyReaches: (dataID: DataID) => boolean): boolean {
+  protected override _gatheredInBox(feature: AbstractPixiFeature, _box: Extent, anyReaches: (dataID: DataID) => boolean): boolean {
+    const dataID = this._featureHasData.get(feature.id);
+    if (!dataID) return false;
     if (anyReaches(dataID)) return true;
     for (const roadID of this._roadsOf.get(dataID) ?? []) {
       if (anyReaches(roadID)) return true;
+    }
+    return false;
+  }
+
+
+  /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * an enabled dataset's, or for an Overture dataset, its vector tiles' (a cache for each zoom).
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    const overture = this.context.services.overture;
+    const rapid = this.context.systems.rapid;
+    if (!rapid) return false;
+
+    for (const ds of rapid.datasets.values()) {
+      if (!rapid.enabledDatasetIDs.has(ds.id)) continue;
+      if (ds.spatialID === spatialID) return true;
+      if (ds.serviceID === 'overture' && overture?.holdsData(ds.id, spatialID)) return true;
     }
     return false;
   }

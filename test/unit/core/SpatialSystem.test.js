@@ -518,6 +518,72 @@ describe('SpatialSystem', () => {
     });
 
 
+    // What changed is reported once the task that wrote it is done (the map's layers draw from it)
+    describe('datachange', () => {
+      const box = (id, x, y) => ({ id: id, contents: id, minX: x, minY: y, maxX: x + 1, maxY: y + 1 });
+      const nextTask = () => new Promise(resolve => { setTimeout(resolve, 0); });
+      let reports;
+      const listen = changes => reports.push(changes);
+
+      beforeAll(() => {
+        _spatial.on('datachange', listen);
+      });
+
+      it('reports where items were added, once for all the writes of a task', async () => {
+        reports = [];
+        _spatial.addItems('test-change-a', [box('a', 0, 0), box('b', 10, 10)]);
+        _spatial.addItems('test-change-a', box('c', 20, 20));
+        _spatial.addItems('test-change-b', box('d', 5, 5));
+        await nextTask();
+
+        assert.lengthOf(reports, 1);
+        const a = reports[0].get('test-change-a');
+        assert.deepEqual(a.boxes, [{ minX: 0, minY: 0, maxX: 11, maxY: 11 }, { minX: 20, minY: 20, maxX: 21, maxY: 21 }]);
+        assert.strictEqual(a.changedIDs.size, 0);
+        assert.isFalse(a.cleared);
+        assert.isTrue(reports[0].has('test-change-b'));
+      });
+
+      it('reports an item that was replaced, and where it was', async () => {
+        _spatial.addItems('test-change-c', box('a', 0, 0));
+        await nextTask();
+        reports = [];
+        _spatial.addItems('test-change-c', box('a', 50, 50));
+        await nextTask();
+
+        const c = reports[0].get('test-change-c');
+        assert.sameMembers([...c.changedIDs], ['a']);
+        assert.sameDeepMembers(c.boxes, [{ minX: 50, minY: 50, maxX: 51, maxY: 51 }, { minX: 0, minY: 0, maxX: 1, maxY: 1 }]);
+      });
+
+      it('reports items that were removed, and a cache that was cleared', async () => {
+        _spatial.addItems('test-change-d', [box('a', 0, 0), box('b', 1, 1)]);
+        await nextTask();
+        reports = [];
+        _spatial.removeItems('test-change-d', ['a', 'nothing']);
+        await nextTask();
+        assert.sameMembers([...reports[0].get('test-change-d').changedIDs], ['a']);
+
+        _spatial.clearCache('test-change-d');
+        await nextTask();
+        assert.isTrue(reports[1].get('test-change-d').cleared);
+
+        _spatial.clearCache('test-change-d');    // (nothing in it: nothing to report)
+        await nextTask();
+        assert.lengthOf(reports, 2);
+      });
+
+      it('reports one box around many, for items written one at a time', async () => {
+        reports = [];
+        for (let i = 0; i < 40; i++) {
+          _spatial.addItems('test-change-e', box(`i${i}`, i * 10, 0));
+        }
+        await nextTask();
+        assert.deepEqual(reports[0].get('test-change-e').boxes, [{ minX: 0, minY: 0, maxX: 391, maxY: 1 }]);
+      });
+    });
+
+
     describe('getVisibleItems', () => {
       it('returns items within the current viewport', () => {
         const spatialID = 'test-getVisibleItems';

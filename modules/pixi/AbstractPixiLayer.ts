@@ -1,16 +1,17 @@
 import * as PIXI from 'pixi.js';
 import RBush from 'rbush';
 import { LayerBatches } from './lib/LayerBatches.ts';
-import { WORLD_ZOOM } from '@rapid-sdk/math';
+import { Extent, WORLD_ZOOM } from '@rapid-sdk/math';
 import { extentMinus, featureOrder } from './helpers.ts';
-import { splitDataID } from '../data/dataID.ts';
+import { makeDataID, splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
-import type { Extent, Viewport } from '@rapid-sdk/math';
+import type { SpatialChange } from '../core/SpatialSystem.ts';
+import type { Viewport } from '@rapid-sdk/math';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { LayerWork, RenderFrame } from './RenderFrame.ts';
 import type { PixiScene } from './PixiScene.ts';
@@ -160,6 +161,12 @@ export class AbstractPixiLayer {
   protected _hiddenAt: Map<FeatureID, number>;
   /** Whether the cull box moved since what it left behind was last hidden (see `cullLater`) */
   protected _cullDue: boolean;
+  /** Where data that the layer draws arrived, or moved from, since it last looked (see `spatialChanged`) */
+  protected _arrivedBoxes: Extent[];
+  /** The data that was replaced or removed since the layer last looked (see `spatialChanged`) */
+  protected _arrivedIDs: Set<DataID>;
+  /** Features of replaced or removed data, to hide if the frame's gathering doesn't find them again */
+  protected _unconfirmed: Set<AbstractPixiFeature>;
 
   /**
    * Whether the layer's lines, polygons and points are drawn in batches (see `batches`), not
@@ -218,6 +225,9 @@ export class AbstractPixiLayer {
     this._moves = 0;
     this._hiddenAt = new Map<FeatureID, number>();
     this._cullDue = false;
+    this._arrivedBoxes = [];
+    this._arrivedIDs = new Set<DataID>();
+    this._unconfirmed = new Set<AbstractPixiFeature>();
 
     this.useBatches = false;
     this.batches = new LayerBatches(scene.batchShaders);
@@ -327,6 +337,9 @@ export class AbstractPixiLayer {
     this._parentOf.clear();
     this._hiddenAt.clear();
     this._cullDue = false;
+    this._arrivedBoxes = [];
+    this._arrivedIDs.clear();
+    this._unconfirmed.clear();
     this.batches.forget();    // (they were destroyed with the containers they were in)
   }
 
@@ -424,6 +437,16 @@ export class AbstractPixiLayer {
    */
   public cull(frame: RenderFrame): void {
     this._catchingUp = false;    // (see `_gatherExtents`)
+
+    // Data that was replaced or removed, and that this frame's gathering didn't find again
+    for (const feature of this._unconfirmed) {
+      if (this.retained.has(feature.id)) continue;
+      feature.visible = false;
+      this._waitingInView.delete(feature);
+      this._waitingOutside.delete(feature);
+    }
+    this._unconfirmed.clear();
+
     if (this._keptFrame === frame.id) return;   // the features are as the last pass left them
 
     // If `render()` returned before `keepFeatures()` (the layer is off, or zoomed out too far),
@@ -473,9 +496,8 @@ export class AbstractPixiLayer {
     this._cullDue = false;
     if (!box) return;    // a pass is coming, and culls everything
 
-    // A feature stays while any feature of its data reaches into the box (`_gatheredInBox`): a pass
-    // gathers data by its whole shape, and keeps every part of a long line (a photo sequence) that
-    // reaches in anywhere.
+    // A feature stays while a pass would gather its data in the box (`_gatheredInBox`): by the
+    // data's whole shape, so every part of a long line (a photo sequence) that reaches in anywhere.
     const reaches = (feature: AbstractPixiFeature): boolean => !!feature.geometry?.world?.extent.intersects(box);
     const dataReaches = new Map<DataID, boolean>();
     const anyReaches = (dataID: DataID): boolean => {
@@ -497,8 +519,7 @@ export class AbstractPixiLayer {
     for (const feature of this.features.values()) {
       if (!feature.visible || reaches(feature)) continue;
 
-      const dataID = this._featureHasData.get(feature.id);
-      if (dataID && this._gatheredInBox(dataID, anyReaches)) continue;
+      if (this._gatheredInBox(feature, box, anyReaches)) continue;
 
       feature.visible = false;
       this._waitingInView.delete(feature);   // (drawing it again could show it)
@@ -510,15 +531,21 @@ export class AbstractPixiLayer {
 
 
   /**
-   * Whether a pass would gather some data in the cull box (see `cullLater`): here, if any of its
-   * features reaches into the box. A layer that draws data because of other data overrides
-   * this (the Rapid layer draws the ends of the roads it gathers).
-   * @param dataID - The data
+   * Whether a pass would gather a feature's data in the cull box (see `cullLater`): here, by the
+   * data's own box, which is what a service's spatial cache finds it by, or if it has none, by
+   * whether any feature of the data reaches in. A layer whose data's shape isn't its own (OSM
+   * entities, whose shape belongs to a graph), or that draws data because of other data,
+   * overrides this (the Rapid layer).
+   * @param feature - A feature outside the box
+   * @param box - The cull box
    * @param anyReaches - Whether any feature of some data reaches into the box
-   * @return `true` if the data's features belong in the box
+   * @return `true` if the feature belongs in the box
    */
-  protected _gatheredInBox(dataID: DataID, anyReaches: (dataID: DataID) => boolean): boolean {
-    return anyReaches(dataID);
+  protected _gatheredInBox(feature: AbstractPixiFeature, box: Extent, anyReaches: (dataID: DataID) => boolean): boolean {
+    const data = feature.data;
+    if (!data) return false;
+    const extent = data.geoms.world?.extent;
+    return extent ? extent.intersects(box) : anyReaches(data.dataID);
   }
 
 
@@ -543,8 +570,11 @@ export class AbstractPixiLayer {
    * returns:
    * - **None,** when only the view moved inside the cull box (`keepFeatures`). Then it goes on
    *   drawing what waited, in view (`continueWaiting`).
+   * - **Where data arrived, in the cull box,** on such a frame, if any did (`spatialChanged`).
+   *   What's gathered belongs to the last pass, and the features of data that was replaced or
+   *   removed are hidden if this gathering doesn't find them again (`cull()`).
    * - **The parts of the cull box that the last one didn't cover,** when only the view moved, out
-   *   of the box. The features in both boxes stay as they are, and what the box left behind is
+   *   of the box (and where data arrived in it). The features in both boxes stay as they are, and what the box left behind is
    *   hidden later, when a frame has time (`cullLater`). There's no pass: `cull()` leaves the
    *   features alone, and what's gathered belongs to the last pass (`retainFeature`).
    * - **The cull box,** for a pass: anything else changed (a redraw request, a zoom, a class
@@ -557,7 +587,7 @@ export class AbstractPixiLayer {
     const prevBox = this._currentBox;
     if (this.keepFeatures(frame)) {
       this.continueWaiting(frame, viewport);
-      return [];
+      return this._takeArrivals(frame.cullBox);
     }
 
     // (`keepFeatures()` took the new box, and expects a pass.)
@@ -567,12 +597,88 @@ export class AbstractPixiLayer {
       this._cullDue = true;
       this._moves++;
       this.continueWaiting(frame, viewport);
-      return extentMinus(frame.cullBox, prevBox);
+      return [...extentMinus(frame.cullBox, prevBox), ...this._takeArrivals(frame.cullBox)];
     }
 
+    this._arrivedBoxes = [];      // (the pass gathers everything)
+    this._arrivedIDs.clear();
     this._moves++;
     this._forgetHidden();
     return [frame.cullBox];
+  }
+
+
+  /**
+   * Takes what arrived since the layer last looked (`spatialChanged`), for a frame that's no pass:
+   * the parts of the cull box where data arrived or moved from, to gather in. The features of data
+   * that was replaced or removed are noted, to be hidden if the gathering doesn't find them again
+   * (`cull()`). What's gathered belongs to the last pass.
+   * @param box - The frame's cull box
+   * @return The extents to gather data in, in world coordinates
+   */
+  protected _takeArrivals(box: Extent): Extent[] {
+    const boxes = this._arrivedBoxes;
+    const changedIDs = this._arrivedIDs;
+    if (!boxes.length && !changedIDs.size) return [];
+
+    this._arrivedBoxes = [];
+    this._arrivedIDs = new Set<DataID>();
+    this._catchingUp = true;    // (`cull()` ends this)
+
+    for (const dataID of changedIDs) {
+      for (const featureID of this._dataHasFeature.get(dataID) ?? []) {
+        const feature = this.features.get(featureID);
+        if (!feature) continue;
+        this.retained.delete(featureID);
+        this._unconfirmed.add(feature);
+      }
+    }
+
+    const extents: Extent[] = [];
+    for (const arrived of boxes) {
+      if (arrived.intersects(box)) {
+        extents.push(arrived.intersection(box));
+      }
+    }
+    return extents;
+  }
+
+
+  /**
+   * Whether the layer draws data from a spatial cache, and gathers it by extent (`_gatherExtents`):
+   * then the scene tells it what changed there (`spatialChanged`). Here, from none: a layer
+   * that gathers its data from a service says which caches the service keeps it in.
+   * @param _spatialID - The cache's spatial ID
+   * @return `true` if the layer draws data from it
+   */
+  public gathersFrom(_spatialID: SpatialID): boolean {
+    return false;
+  }
+
+
+  /**
+   * Data changed in a spatial cache (`SpatialSystem`'s `datachange`, which the scene passes on):
+   * it arrived, was replaced or removed, or the cache was cleared. A layer that draws from the
+   * cache (`gathersFrom`) notes where, and gathers there on its next frame without a pass
+   * (`_gatherExtents`). A cleared cache means a pass.
+   * @param spatialID - The cache's spatial ID
+   * @param change - What changed in it
+   * @return `true` if the layer has something to draw for it (the scene asks for a frame)
+   */
+  public spatialChanged(spatialID: SpatialID, change: SpatialChange): boolean {
+    if (!this.enabled || !this.gathersFrom(spatialID)) return false;
+
+    if (change.cleared) {
+      this._currentBox = null;
+      return true;
+    }
+    for (const box of change.boxes) {
+      this._arrivedBoxes.push(new Extent([box.minX, box.minY], [box.maxX, box.maxY]));
+    }
+    for (const id of change.changedIDs) {
+      this._arrivedIDs.add(makeDataID(spatialID, id));
+    }
+    return true;
   }
 
 

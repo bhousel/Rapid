@@ -364,9 +364,6 @@ export class KartaviewService extends AbstractSystem {
    * @param response - Response data
    */
   protected _gotTile(tile: Tile, page: number, response: any): void {
-    const context = this.context;
-    const gfx = context.systems.gfx;
-
     const data = response?.currentPageItems || [];
     if (!data.length) return;
 
@@ -400,7 +397,6 @@ export class KartaviewService extends AbstractSystem {
       this._cacheSequence(images);
     }
 
-    gfx?.deferredRedraw('kartaview');
 
     if (data.length === MAXRESULTS) {
       this._nextPage.set(tile.id, page + 1);
@@ -609,7 +605,6 @@ export class KartaviewService extends AbstractSystem {
    */
   protected _loadImageAsync(imageID: PhotoID): Promise<KartaviewImage | void> {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
@@ -647,7 +642,6 @@ export class KartaviewService extends AbstractSystem {
 
         // Update the sequence to include this image, create if needed..
         this._cacheSequence([image]);
-        gfx?.deferredRedraw('kartaview');
         return image;
       })
       .catch(err => {

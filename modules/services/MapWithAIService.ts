@@ -316,7 +316,6 @@ export class MapWithAIService extends AbstractSystem {
     if (!results) return;  // ignore empty responses
 
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
 
     const graph = ds.graph;
@@ -377,7 +376,6 @@ export class MapWithAIService extends AbstractSystem {
     graph.rebase(entities, [graph], true);   // true = force replace entities
 
     spatial.addData(ds.spatialID, entities, graph);
-    gfx?.deferredRedraw('rapid');   // only the Rapid layer draws this data
   }
 
 

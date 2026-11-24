@@ -53,11 +53,17 @@ said otherwise. Biggest or most wanted first.
   rendering changed it by accident; the layers still change what they get (`markerStyle.marker.image =
   'pin'`), so sharing needs frozen styles with overrides built apart, or a cache of the finished style
   per kind of feature.
-- **The other data layers without a pass for a tile, a hover or a zoom.** They keep their features,
-  follow the cull box and cull later since Nov 24 (sections 17 and 18), but a tile that arrives is
-  a pass of its layer (the service names the layer, not what arrived), and so is a hovered photo
-  or a zoom. In Bellevue a Mapillary pass is 15 to 34 ms. Services could say what arrived, as
-  `EditSystem` does for OSM (`dataArrived()`); the photo layers first, then the Rapid layer.
+- **The other data layers without a pass for a hover or a zoom, and making features in chunks.**
+  They keep their features, follow the cull box, cull later, and draw what arrived without a pass
+  since Nov 24 (sections 17 to 19), but a hovered photo or a zoom is a pass of its layer (15 to
+  34 ms for Mapillary in Bellevue), and a tile of 1,000 photos is made in one frame (13.7 ms).
+- **Destroying in bursts.** A feature hidden for 20 moves of the cull box is destroyed (a number
+  picked by feel), and everything hidden by one move becomes destroyable at once, 20 moves later:
+  thousands of photos, garbage for a major collection. Ideas (Bryan, Nov 24): a queue destroyed as
+  frames have time; reusing features' Pixi objects instead. Measure with a GC trace first.
+- **Mapillary's layers in a dense city:** downtown Seattle at z17.5 has 107,000 photo features and
+  295,000 detection features in the cull box, all drawn (Nov 24). A level of detail would leave
+  most out at that zoom (`design/filter-system.md` section 6).
 - **What still asks for the OSM layer's pass** (section 12): a filter and the styles. The pass is 134 ms:
   71 of looking at each shown feature and finding nothing to do, 30 of vertices in the spatial index,
   30 of sorting, plus asking each entity for its geometry twice (`FilterSystem.filterScene()`, then to

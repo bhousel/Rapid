@@ -154,6 +154,20 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
+   * Whether a spatial cache holds a template's data: its data is cached for each zoom, in caches
+   * named for its source (`${source.id}.z${zoom}`). A layer that draws the data asks this, to know
+   * which caches' changes concern it (see `AbstractPixiLayer.gathersFrom`).
+   * @param template - The template
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if the cache is one of the template's
+   */
+  public holdsData(template: string, spatialID: SpatialID): boolean {
+    const source = this._sources.get(template);
+    return !!source && spatialID.startsWith(`${source.id}.z`);
+  }
+
+
+  /**
    * Get already loaded data that appears in the current map view
    * @param  template - template to get data for
    * @param extent - The part of the world to look in, in world coordinates (by default the view)
@@ -441,7 +455,6 @@ export class VectorTileService extends AbstractSystem {
     if (!results || !results.length) return;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
 
     const z = tile.xyz[2];
@@ -503,8 +516,6 @@ export class VectorTileService extends AbstractSystem {
     if (newFeatures.length) {
       spatial.addData(cache.spatialID, newFeatures);
       // (Vector tiles are custom data, or an Overture dataset on the Rapid layer.)
-      gfx?.deferredRedraw('custom-data');
-      gfx?.deferredRedraw('rapid');
     }
   }
 
@@ -609,9 +620,6 @@ export class VectorTileService extends AbstractSystem {
       }
     }
 
-    const gfx = this.context.systems.gfx;
-    gfx?.deferredRedraw('custom-data');
-    gfx?.deferredRedraw('rapid');
   }
 
 

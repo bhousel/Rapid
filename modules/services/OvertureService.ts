@@ -19,6 +19,13 @@ const WANTED_THEMES = new Set(['buildings', 'places', 'transportation']);
 /** Minimum zoom level for loading data */
 const MINZOOM = 14;
 
+/** The theme of the Overture release that each dataset's data comes from */
+const THEMES: Record<DatasetID, string> = {
+  'overture-places': 'places',
+  'overture-buildings': 'buildings',
+  'overture-tomtom-roads': 'transportation'
+};
+
 
 /**
  * `OvertureService` connects to the 'official' sources of Overture PMTiles
@@ -205,6 +212,20 @@ export class OvertureService extends VectorTileService {
       const url = this._pmtilesUrls.get('transportation');
       if (url) super.loadTiles(url, datasetID);
     }
+  }
+
+
+  /**
+   * Whether a spatial cache holds a dataset's data (one of its vector tiles' caches, see
+   * `VectorTileService.holdsData`).
+   * @param datasetID - The dataset
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if the cache is one of the dataset's
+   */
+  public override holdsData(datasetID: DatasetID, spatialID: SpatialID): boolean {
+    const theme = THEMES[datasetID];
+    const url = theme && this._pmtilesUrls.get(theme);
+    return !!url && super.holdsData(url, spatialID);
   }
 
 

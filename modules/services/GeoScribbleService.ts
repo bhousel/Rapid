@@ -137,7 +137,6 @@ export class GeoScribbleService extends AbstractSystem {
    */
   protected _gotTile(response: any): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
 
     if (!Array.isArray(response?.features)) {
@@ -153,7 +152,6 @@ export class GeoScribbleService extends AbstractSystem {
     }
 
     spatial.addData('geoscribble', toLoad);
-    gfx?.deferredRedraw('geoscribble');
   }
 
 }

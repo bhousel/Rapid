@@ -30,6 +30,7 @@ import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { RenderFrame } from './RenderFrame.ts';
+import type { SpatialChange } from '../core/SpatialSystem.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 /** Returned by `getClasses()` for data that has no classes */
@@ -160,8 +161,10 @@ export class PixiScene extends EventEmitter {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
     this._modeChanged = this._modeChanged.bind(this);
+    this._spatialChanged = this._spatialChanged.bind(this);
 
     this.context.on('modechange', this._modeChanged);
+    this.context.systems.spatial?.on('datachange', this._spatialChanged);   // (optional: not in some tests)
 
     // Create Layers
     [
@@ -546,6 +549,31 @@ export class PixiScene extends EventEmitter {
       }
     }
     return best;
+  }
+
+
+  /**
+   * Data changed in some spatial caches (`SpatialSystem`'s `datachange`): it arrived from a service,
+   * or was replaced or removed. Each layer that draws from a cache hears of it
+   * (`AbstractPixiLayer.spatialChanged`) and draws it on the next frame without a pass, so this
+   * asks for a frame, not a redraw. A service that writes its data to `SpatialSystem` needn't ask
+   * the renderer for anything.
+   * @param changes - What changed, by the caches' spatial IDs
+   */
+  protected _spatialChanged(changes: Map<SpatialID, SpatialChange>): void {
+    const gfx = this.gfx;
+
+    let any = false;
+    for (const layer of this.layers.values()) {
+      for (const [spatialID, change] of changes) {
+        if (layer.spatialChanged(spatialID, change)) {
+          any = true;
+        }
+      }
+    }
+    if (any) {
+      gfx.requestFrame();
+    }
   }
 
 

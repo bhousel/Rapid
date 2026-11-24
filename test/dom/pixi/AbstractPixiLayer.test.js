@@ -751,6 +751,72 @@ describe('AbstractPixiLayer', () => {
       assert.strictEqual(layer.retained.get('new'), layer.retained.get('old'));
     });
 
+    // `SpatialSystem` reports what changed in its caches, and the scene passes it on (`spatialChanged`)
+    it('gathers where data arrived in the cull box, on a frame that\'s otherwise kept, and no pass', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      layer.enabled = true;
+      layer.gathersFrom = spatialID => spatialID === 'photos';
+      layer._gatherExtents(frameAt(1, a), {});
+      layer.cull(frameAt(1, a));
+
+      const change = { boxes: [{ minX: 90, minY: 90, maxX: 150, maxY: 150 }], changedIDs: new Set(), cleared: false };
+      assert.isFalse(layer.spatialChanged('osm', change), 'not a cache it draws from');
+      assert.isTrue(layer.spatialChanged('photos', change));
+
+      const extents = layer._gatherExtents(frameAt(2, a), {});
+      assert.lengthOf(extents, 1);
+      assert.deepEqual([extents[0].min, extents[0].max], [[90, 90], [100, 100]], 'what of it is in the box');
+      assert.isTrue(layer.keptFeatures(frameAt(2, a)));
+      assert.deepEqual(layer._gatherExtents(frameAt(3, a), {}), [], 'taken');
+    });
+
+    it('hides the features of replaced or removed data that the gathering doesn\'t find again', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      layer.enabled = true;
+      layer.gathersFrom = () => true;
+      const moved = makeFeature('moved', [10, 10], [20, 20]);
+      const gone = makeFeature('gone', [30, 30], [40, 40]);
+      layer.bindData('moved', 'photos:1');
+      layer.bindData('gone', 'photos:2');
+      layer._gatherExtents(frameAt(1, a), {});
+      for (const feature of [moved, gone]) layer.retainFeature(feature, frameAt(1, a));
+      layer.cull(frameAt(1, a));
+
+      layer.spatialChanged('photos', { boxes: [], changedIDs: new Set(['1', '2']), cleared: false });
+      layer._gatherExtents(frameAt(2, a), {});
+      layer.retainFeature(moved, frameAt(2, a));    // found again, where it is now
+      layer.cull(frameAt(2, a));
+      assert.isTrue(moved.visible);
+      assert.isFalse(gone.visible);
+    });
+
+    // (A photo sequence that curves around the box, so that none of its parts reaches in, is
+    // still gathered by a pass: its data's box does.)
+    it('keeps a feature outside the box while its data\'s own box reaches in, as a pass gathers it', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const part = makeFeature('part', [150, 0], [160, 10]);
+      part.data = { dataID: 'photos:s1', geoms: { world: { extent: new Extent([50, 0], [160, 10]) } } };
+      layer._currentBox = a;
+      layer._cullDue = true;
+      layer.cullLater();
+      assert.isTrue(part.visible);
+
+      part.data = { dataID: 'photos:s1', geoms: { world: { extent: new Extent([150, 0], [160, 10]) } } };
+      layer._cullDue = true;
+      layer.cullLater();
+      assert.isFalse(part.visible);
+    });
+
+    it('does a pass when a cache it draws from was cleared', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      layer.enabled = true;
+      layer.gathersFrom = () => true;
+      layer._gatherExtents(frameAt(1, a), {});
+      layer.cull(frameAt(1, a));
+      layer.spatialChanged('photos', { boxes: [], changedIDs: new Set(), cleared: true });
+      assert.deepEqual(layer._gatherExtents(frameAt(2, a), {}), [a]);
+    });
+
     it('hides what the box left behind when told there\'s time, and destroys it once it\'s been hidden long enough', () => {
       const a = new Extent([0, 0], [100, 100]);
       const stays = makeFeature('stays', [70, 10], [80, 20]);

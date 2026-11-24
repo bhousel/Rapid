@@ -404,7 +404,6 @@ export class StreetsideService extends AbstractSystem {
    */
   protected _gotTile(bubbles: any): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const photos = context.systems.photos!;
     const spatial = context.systems.spatial!;
     const spatialID = 'streetside-images';
@@ -458,7 +457,6 @@ export class StreetsideService extends AbstractSystem {
       photos.selectPhoto('streetside', selectBubbleID);  // reselect
     }
 
-    gfx?.deferredRedraw('streetside');
   }
 
 

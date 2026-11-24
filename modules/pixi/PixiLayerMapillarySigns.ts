@@ -147,6 +147,17 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
 
   /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * Mapillary's traffic signs.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'mapillary-signs';
+  }
+
+
+  /**
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  The frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering

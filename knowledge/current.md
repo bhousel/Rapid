@@ -59,6 +59,11 @@ no PR yet). Done, a commit each:
 - They follow the cull box too, gathering only the strips it moved over, and cull what it left
   behind when a frame has time (Bryan's idea: CULL as its own stage; the log's section 18). The
   frame where the view leaves the box is 26 to 35 ms at worst in Bellevue, where it was 90.
+- `SpatialSystem` says what changed in its caches (`datachange`), and the layers draw what arrived
+  without a pass; the services stopped asking for redraws. The OSM layer listens to the editor
+  itself, and `FilterSystem` clears its own cache (the log's section 19).
+- Next, from Bryan (Nov 24): measure the garbage that destroying hidden features makes, and
+  destroy them from a queue as frames have time, or reuse their Pixi objects.
 
 Left from the review, for Bryan to pick: the features' two ways of drawing (batch or own
 objects), the near-duplicate QA and photo layers, label rasterization out of `PixiLayerLabels`,

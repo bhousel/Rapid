@@ -216,7 +216,6 @@ export class OsmoseService extends AbstractSystem {
    */
   protected _gotTile(response: any): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
     const spatialID = 'osmose';
 
@@ -250,7 +249,6 @@ export class OsmoseService extends AbstractSystem {
       spatial.addData(spatialID, new MarkerData(context, props));
     }
 
-    gfx?.deferredRedraw('osmose');
   }
 
 
@@ -385,10 +383,8 @@ export class OsmoseService extends AbstractSystem {
   public replaceItem(item: MarkerData): MarkerData | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
-    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('osmose', item);
-    gfx?.immediateRedraw('osmose');   // (its layer keeps its features while only the view moves)
     return item;
   }
 
@@ -400,10 +396,8 @@ export class OsmoseService extends AbstractSystem {
   public removeItem(item: MarkerData): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
-    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.removeItems('osmose', item.id);
-    gfx?.immediateRedraw('osmose');   // (its layer keeps its features while only the view moves)
   }
 
 

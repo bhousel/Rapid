@@ -1910,7 +1910,6 @@ export class OsmService extends AbstractSystem {
     noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
 
     const context = this.context;
-    const gfx = context.systems.gfx;
     const locations = context.systems.locations;
     const network = context.systems.network!;
 
@@ -1938,7 +1937,6 @@ export class OsmService extends AbstractSystem {
         for (const props of (results.data ?? [])) {
           this._cacheNote(props);
         }
-        gfx?.deferredRedraw('osm-notes');
       }
     };
 
@@ -1960,7 +1958,6 @@ export class OsmService extends AbstractSystem {
   public loadNoteAsync(id: string | number): Promise<OsmNote> {
     const context = this.context;
     const spatial = context.systems.spatial!;
-    const gfx = context.systems.gfx;
 
     const noteID = id.toString();
     let note = spatial.getItem<OsmNote>('osm-notes', noteID);
@@ -1974,7 +1971,6 @@ export class OsmService extends AbstractSystem {
           reject(err);
         } else if (Array.isArray(results?.data)) {
           note = this._cacheNote(results!.data[0]);
-          gfx?.deferredRedraw('osm-notes');
           resolve(note!);
         } else {
           reject(new Error(`Note ${noteID} not found`));
@@ -1998,7 +1994,6 @@ export class OsmService extends AbstractSystem {
    */
   public postNoteCreate(note: OsmNote, callback: Errback): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const network = context.systems.network!;
     const noteID = note.id;
     const requestID = `osm-note-post-create-${noteID}`;
@@ -2023,7 +2018,6 @@ export class OsmService extends AbstractSystem {
         // We get the updated note back, remove from caches and reparse..
         this.removeNote(note);
         note = this._cacheNote(results!.data[0]);
-        gfx?.deferredRedraw('osm-notes');
         callback?.(null, note!);
         return;
       } else {
@@ -2066,7 +2060,6 @@ export class OsmService extends AbstractSystem {
    */
   public postNoteUpdate(note: OsmNote, newStatus: string, callback: Errback): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const network = context.systems.network!;
 
     const cache = this._noteCache;
@@ -2109,7 +2102,6 @@ export class OsmService extends AbstractSystem {
         // We get the updated note back, remove from caches and reparse..
         this.removeNote(note);
         note = this._cacheNote(results!.data[0]);
-        gfx?.deferredRedraw('osm-notes');
         callback?.(null, note!);
         return;
       } else {

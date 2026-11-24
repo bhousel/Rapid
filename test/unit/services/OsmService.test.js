@@ -20,6 +20,11 @@ describe('OsmService', () => {
   // Spy on redraws..
   const gfx = context.systems.gfx;
   const spyRedraw = mock();
+  // What the spatial system reports of the data that a load wrote: the map's layers draw what arrived from that
+  const spyReport = mock();
+  context.systems.spatial.on('datachange', changes => {
+    if ([...changes.values()].some(change => !change.cleared)) spyReport(changes);
+  });
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
   gfx.requestFrame = spyRedraw;   // (a frame without a pass: what a loaded tile asks for)
@@ -42,6 +47,7 @@ describe('OsmService', () => {
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
     spyRedraw.mockClear();
+    spyReport.mockClear();
   });
 
 
@@ -1225,14 +1231,14 @@ describe('OsmService', () => {
 
 
     describe('loadNotes', () => {
-      it('loads a tile of notes and requests a redraw', async () => {
+      it('loads a tile of notes and reports it to the spatial system', async () => {
         fetchMock.route(/notes/, sample.notesJSON);
         _osm.loadNotes({ /*no options*/ });
         // no errback to promisify :-(
 
         await Bun.sleep(10);
         assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
-        assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
+        assert.lengthOf(spyReport.mock.calls, 1);           // reported once
 
         assert.isNotEmpty(_osm.getNotes());  // notes were loaded into the visible area
       });

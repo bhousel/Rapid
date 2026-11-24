@@ -84,11 +84,13 @@ describe('PixiLayerRapid', () => {
     const context = new Rapid.MockContext();
     const layer = new PixiLayerRapid({ context: context, gfx: {}, layers: new Map() });
     layer._roadsOf.set('fbRoads:n1', new Set(['fbRoads:w1']));
+    layer.bindData('rapid-fbRoads-n1', 'fbRoads:n1');
+    const end = { id: 'rapid-fbRoads-n1' };
 
     const reaching = new Set(['fbRoads:w1']);
     const anyReaches = dataID => reaching.has(dataID);
-    assert.isTrue(layer._gatheredInBox('fbRoads:n1', anyReaches));
+    assert.isTrue(layer._gatheredInBox(end, null, anyReaches));
     reaching.clear();
-    assert.isFalse(layer._gatheredInBox('fbRoads:n1', anyReaches));
+    assert.isFalse(layer._gatheredInBox(end, null, anyReaches));
   });
 });
