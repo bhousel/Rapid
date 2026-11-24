@@ -15,8 +15,8 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 | `LineBatchMesh.ts` | A `BatchMesh` of lines: the shader works out the widths and the dashes, and draws the markers along a line (oneway arrows), so a zoom changes nothing in it. It also draws the glow around a hovered line, which breathes, and lines whose dashes march (a selection's halo), from a clock that every batch shares. The OSM layer has two for each level (its casings, and its strokes with their markers) and one for the outlines of areas, each with a small batch for its glows; the map UI layer has one for every halo |
 | `FillBatchMesh.ts` | A `BatchMesh` of fills: each area's triangles, with its color and pattern. The shader lays the patterns out from one atlas texture. The OSM layer has one for every area's fill |
 | `PointBatchMesh.ts` | A `BatchMesh` of points: each a few rectangles of the symbol atlas (viewfields, marker, icon), a number of pixels from where the point is on screen. The shader keeps them that size and upright, so neither a zoom nor a rotation changes anything in it. A picture can pulse with the batches' clock: the glow behind a hovered point. The OSM layer has one for its points, vertices and pins, and a small one under it for their glows |
-| `AtlasAllocator.ts` | Manages texture atlas allocation, plus the `AtlasSource` texture source and its GPU upload handlers |
-| `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
+| `AtlasAllocator.ts` | Manages texture atlas allocation, plus `AtlasTextureSource` (the texture source behind each atlas page) and its GPU upload handlers |
+| `GuillotineAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
 | `AvoidGrid.ts` | A grid over label space that counts what covers each cell: what labels must avoid, and the labels placed (no Pixi in it; `PixiScene` owns one) |
 | `LineHitArea.ts` | The hit area of a line or a polygon's ring: a point within a distance of it (`geomStrokeContains()`), with no shape to build. Gives its edge for a halo |
 | `FramePacer.ts` | Decides how long a frame that does a pass waits after the last one (no Pixi in it; `GraphicsSystem` asks it on each tick) |
@@ -67,6 +67,6 @@ A feature's `hitArea` only has to answer `contains(x, y)`. For a line that's whe
 
 Texture atlases combine many small textures into one large texture to reduce draw calls. The allocators manage packing sprites efficiently:
 
-- `GuilloteneAllocator` - Implements the guillotine algorithm for dividing atlas space
+- `GuillotineAllocator` - Implements the guillotine algorithm for dividing atlas space
 - `AtlasAllocator` - Higher-level wrapper that manages the atlas lifecycle (used by `PixiTextures`)
-- `AtlasSource` / `registerAtlasUploader()` - A texture source backed by the atlas, with WebGL and WebGPU upload handlers that must be registered with the renderer
+- `AtlasTextureSource` / `registerAtlasUploader()` - A texture source backed by the atlas, with WebGL and WebGPU upload handlers that must be registered with the renderer

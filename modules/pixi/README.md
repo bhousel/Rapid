@@ -74,5 +74,5 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 | `PointBatchMesh.ts` | Draws many points in one draw call: their markers, icons and viewfields, from the symbol atlas, at a size on screen, and the glow behind a hovered one |
 | `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
-| `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
+| `GuillotineAllocator.ts` | Guillotine bin-packing algorithm |
 | `RenderStats.ts` | Frame stats from Pixi's instructions, WebGL call counts, GPU timing |

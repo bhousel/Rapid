@@ -14,7 +14,7 @@ const enum SplitOrientation {
 }
 
 /**
- * An area node in the guillotene tree.
+ * An area node in the guillotine tree.
  * - Element 0: Parent node (or null for root)
  * - Element 1: Area data (31-bit field encoding offsets and orientation)
  * - Element 2: Either boolean (allocated/free) or array of children
@@ -123,7 +123,7 @@ class Area {
 
 
 /** Guillotine texture atlas allocator — splits free rectangular areas by bisection. */
-export class GuilloteneAllocator {
+export class GuillotineAllocator {
   /** Reusable scratch rectangle to avoid per-allocation allocations */
   protected _tempRect: PIXI.Rectangle;
   /** Total width of the managed texture region */
@@ -178,7 +178,7 @@ export class GuilloteneAllocator {
 
   /**
    * Frees the area represented by the given area pointer. The original rectangle returned by
-   * {@link GuilloteneAllocator#allocate} included this pointer (the `__mem_area` property).
+   * {@link GuillotineAllocator#allocate} included this pointer (the `__mem_area` property).
    * @param rect - The rectangle to free
    */
   public free(rect: AllocatedRect): void {

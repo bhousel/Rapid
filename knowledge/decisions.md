@@ -532,7 +532,7 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 
 - **Pixi's canvas renderer has no upload pipeline**: it draws `TextureSource.resource` directly. So with
   `useCanvas: true` (only when `RendererType.CANVAS` is detected, saving ~16 MB per slab otherwise),
-  `AtlasSource` keeps a backing canvas as its `resource`, and `AtlasAllocator.allocate()` blits each item
+  `AtlasTextureSource` keeps a backing canvas as its `resource`, and `AtlasAllocator.allocate()` blits each item
   into it. The `(this as any).resource = canvas` cast is intentional: the generic expects a typed array.
 - **Freed regions aren't cleared**, as on GL/GPU: they're overwritten when reallocated.
 
