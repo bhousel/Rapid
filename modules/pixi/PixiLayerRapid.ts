@@ -11,7 +11,7 @@ import { splitDataID } from '../data/dataID.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { ConflationResult, ConflationStatus, LineRun } from '../core/ConflationSystem.ts';
 import type { Geometry } from '../lib/Geometry.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { PixiScene } from './PixiScene.ts';
@@ -48,6 +48,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    */
   protected _drawnFrom: WeakMap<AbstractPixiFeature, ConflationResult | LineRun | null>;
 
+  /** The roads that each road end that's drawn belongs to (see `_gatheredInBox`) */
+  protected _roadsOf: Map<DataID, Set<DataID>>;
+
 
   /**
    * @param scene - The Scene that owns this Layer
@@ -58,6 +61,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     this.useBatches = true;
     this._enabled = true;     // Rapid features should be enabled by default
     this._drawnFrom = new WeakMap<AbstractPixiFeature, ConflationResult | LineRun | null>();
+    this._roadsOf = new Map<DataID, Set<DataID>>();
 
     // Conflation results change when OSM data changes or when a dataset's rules change.
     const conflation = this.context.systems.conflation;   // optional
@@ -238,6 +242,23 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    */
   public reset(): void {
     super.reset();   // releases each dataset's containers; `renderDataset()` makes them again as needed
+    this._roadsOf.clear();
+  }
+
+
+  /**
+   * Whether a pass would gather some data in the cull box (see `AbstractPixiLayer.cullLater`):
+   * a road's end is drawn while any road of its reaches into the box, as a pass draws it.
+   * @param dataID - The data
+   * @param anyReaches - Whether any feature of some data reaches into the box
+   * @return `true` if the data's features belong in the box
+   */
+  protected override _gatheredInBox(dataID: DataID, anyReaches: (dataID: DataID) => boolean): boolean {
+    if (anyReaches(dataID)) return true;
+    for (const roadID of this._roadsOf.get(dataID) ?? []) {
+      if (anyReaches(roadID)) return true;
+    }
+    return false;
   }
 
 
@@ -262,10 +283,11 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       this._loadTiles(ds, viewZoom);
     }
 
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
     for (const ds of datasets) {
-      this.renderDataset(ds, frame, viewport);
+      this.renderDataset(ds, frame, viewport, extents);
     }
   }
 
@@ -287,12 +309,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Render any data we have in the frame's cull box (`_loadTiles` asks for more).
+   * Render any data we have in some extents (`_loadTiles` asks for more).
    * @param ds - RapidDataset Object
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderDataset(ds: RapidDataset, frame: RenderFrame, viewport: Viewport): void {
+  public renderDataset(ds: RapidDataset, frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const context = this.context;
     const conflation = context.systems.conflation;   // optional
     const rapid = context.systems.rapid!;
@@ -312,9 +335,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     if (ds.serviceID === 'mapwithai') {
       const mapwithai = context.services.mapwithai!;
 
-      // Gather data in the cull box - we only want OsmWays here
+      // Gather data in the extents - we only want OsmWays here
       const dsGraph = mapwithai.graph(ds.id);
-      const entities = mapwithai.getData(ds.id, frame.cullBox)
+      const entities = this._gatherIn(extents, extent => mapwithai.getData(ds.id, extent))
         .filter((entity: OsmEntity) => entity.type === 'way' && !rapid.isAcceptedOrIgnored(entity.dataID)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
@@ -328,6 +351,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           const last = dsGraph.entity(way.last() as EntityID) as OsmNode;
           renderData.vertices.add(first);
           renderData.vertices.add(last);
+          for (const end of [first, last]) {      // (they're shown while a road of theirs is)
+            let roads = this._roadsOf.get(end.dataID);
+            if (!roads) {
+              roads = new Set<DataID>();
+              this._roadsOf.set(end.dataID, roads);
+            }
+            roads.add(way.dataID);
+          }
         }
 
       } else {  // Legacy: Microsoft or Esri buildings retrieved through the MapWithAI conflation service
@@ -338,8 +369,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     } else if (ds.serviceID === 'esri') {
       const esri = context.services.esri!;
 
-      // Gather data in the cull box
-      for (const d of esri.getData(ds.id, frame.cullBox)) {   // GeoJSONData, one geometry each
+      // Gather data in the extents
+      for (const d of this._gatherIn(extents, extent => esri.getData(ds.id, extent))) {   // GeoJSONData, one geometry each
         if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
         const type = d.geoms.parts[0]?.type;
@@ -355,7 +386,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* Overture */
     } else if (ds.serviceID === 'overture') {
       const overture = context.services.overture!;
-      const data = overture.getData(ds.id, frame.cullBox);   // GeoJSONData from the VectorTileService
+      const data = this._gatherIn(extents, extent => overture.getData(ds.id, extent));   // GeoJSONData from the VectorTileService
       for (const d of data) {
         if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
@@ -380,7 +411,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* (this includes datasets from asset files without a serviceID) */
     } else if (!ds.serviceID) {
       const spatial = this.context.systems.spatial!;
-      const data = spatial.getVisibleItems(ds.spatialID, frame.cullBox).map(hit => hit.contents as GeoJSONData);
+      const data = this._gatherIn(extents, extent => spatial.getVisibleItems(ds.spatialID, extent)).map(hit => hit.contents as GeoJSONData);
       for (const d of data) {
         if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
@@ -467,7 +498,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           const tags = this._getTags(d);
           feature.style = style;
           feature.label = l10n.displayName(tags);
-          this._drawInBatches(feature, parentContainer, viewport);
+          this.updateFeature(feature, frame, viewport, parentContainer);
         }
 
         this.retainFeature(feature, frame);
@@ -569,7 +600,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
           feature.style = style;
           feature.label = l10n.displayName(tags);
-          this._drawInBatches(feature, parentContainer, viewport);
+          this.updateFeature(feature, frame, viewport, parentContainer);
         }
 
         this.retainFeature(feature, frame);
@@ -632,7 +663,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (feature.dirty) {
         feature.style = this._lineStyle(colorNum, run.status);
         feature.label = l10n.displayName(this._getTags(d));
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
       }
 
       this.retainFeature(feature, frame);
@@ -723,7 +754,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.label = housenumber;
         }
 
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
       }
 
       this.retainFeature(feature, frame);
@@ -759,7 +790,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (!feature.label && housenumber) {
           feature.label = housenumber;
         }
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
       }
 
       this.retainFeature(feature, frame);

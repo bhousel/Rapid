@@ -51,12 +51,14 @@ no PR yet). Done, a commit each:
 - Redraw requests name their layer when only one layer's drawing changed (39 of 53).
 - The design doc split into how it works now and a log (Nov 24).
 - Every layer that draws data draws in batches, and finds its own features under the pointer
-  (`AbstractPixiLayer._drawInBatches()`, `hitTest()`; the log's section 16). With photos and
+  (`AbstractPixiLayer.updateFeature()` with a container, and `hitTest()`; the log's section 16). With photos and
   detections on in Bellevue, a pan's DRAW went from 22.6 to 1.5 ms.
 - Every data layer keeps its features while the view moves inside the cull box (the log's section
-  17): a pan frame there is 0.8 ms of APP where it was 22. The frame that moves the box is longer
-  (up to 90 ms, every layer's pass at once); spreading it is on the backlog. The photo filters had
-  stopped asking for any frame, and now ask their layers for a redraw.
+  17): a pan frame there is 0.8 ms of APP where it was 22. The photo filters had stopped asking
+  for any frame, and now ask their layers for a redraw.
+- They follow the cull box too, gathering only the strips it moved over, and cull what it left
+  behind when a frame has time (Bryan's idea: CULL as its own stage; the log's section 18). The
+  frame where the view leaves the box is 26 to 35 ms at worst in Bellevue, where it was 90.
 
 Left from the review, for Bryan to pick: the features' two ways of drawing (batch or own
 objects), the near-duplicate QA and photo layers, label rasterization out of `PixiLayerLabels`,

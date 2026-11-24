@@ -133,13 +133,16 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     if (this._template && vtService && viewZoom >= 13) {   // fetch data from vector tile service (not too many requests)
       vtService.loadTiles(this._template);
     }
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
     let geoData: GeoJSONData[] = [];
-    if (this._template && vtService) {
-      geoData = vtService.getData(this._template, frame.cullBox);
-    } else if (this._spatialID) {
-      geoData = spatial.getVisibleItems(this._spatialID, frame.cullBox).map(hit => hit.contents as GeoJSONData);
+    const template = this._template;
+    const spatialID = this._spatialID;
+    if (template && vtService) {
+      geoData = this._gatherIn(extents, extent => vtService.getData(template, extent));
+    } else if (spatialID) {
+      geoData = this._gatherIn(extents, extent => spatial.getVisibleItems(spatialID, extent).map(hit => hit.contents as GeoJSONData));
     }
 
     // Determine which renderer(s) to use for each feature
@@ -275,7 +278,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }
@@ -330,7 +333,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }
@@ -426,7 +429,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }

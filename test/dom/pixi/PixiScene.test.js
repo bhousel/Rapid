@@ -511,6 +511,33 @@ describe('PixiScene', () => {
       assert.isFalse(next.unfinished);
       assert.strictEqual(next.layers.get('osm').waiting, 0);
     });
+
+    // What a cull box left behind when it moved without a pass is outside the view: it's culled
+    // in a frame that has time left once every layer has rendered (see `AbstractPixiLayer.cullLater`).
+    it('culls what a layer\'s cull box left behind when the frame has time, and asks for another frame when it hasn\'t', () => {
+      let culled = 0;
+      const layer = {
+        id: 'mapillary', enabled: true, features: new Map(), numWaiting: 0, numWaitingInView: 0, cullDue: true,
+        batches: { followView: () => {} },
+        render: () => {}, cull: () => {},
+        cullLater: () => { culled++; layer.cullDue = false; },
+        keptFeatures: () => true,
+        takeWork: () => ({ created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} })
+      };
+      const scene = { gfx: { origin: null }, labelSpace: { update: () => {} }, setBatchViews: () => {}, layers: new Map([['mapillary', layer]]) };
+
+      const busy = new RenderFrame(7, 17);
+      busy.deadline = -Infinity;    // out of time
+      PixiScene.prototype.render.call(scene, busy, 'viewport');
+      assert.strictEqual(culled, 0);
+      assert.isTrue(busy.unfinished);
+
+      const idle = new RenderFrame(8, 17);
+      idle.deadline = Infinity;
+      PixiScene.prototype.render.call(scene, idle, 'viewport');
+      assert.strictEqual(culled, 1);
+      assert.isFalse(idle.unfinished);
+    });
   });
 
 

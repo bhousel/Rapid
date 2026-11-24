@@ -5,7 +5,7 @@ import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { featureOrder } from './helpers.ts';
+import { extentMinus, featureOrder } from './helpers.ts';
 import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
@@ -151,12 +151,6 @@ const MAX_CHANGED = 5000;
  */
 const ARRIVED_CHUNK = 1000;
 
-/**
- * How many moves of the cull box (or passes) a hidden feature is kept for before it's destroyed.
- * Panning back within that many finds it still made.
- */
-const KEEP_HIDDEN_MOVES = 20;
-
 
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
@@ -206,34 +200,6 @@ function tileOrder(tile: Vec2): number {
 function entityOrder(entityID: EntityID): number {
   const num = Math.abs(parseInt(entityID.slice(1), 10)) || 0;
   return (num % 1048576) / 1048576;
-}
-
-
-/**
- * Returns the parts of one box that another doesn't cover, as up to four boxes: left and right of
- * the other at full height, and above and below it in between.
- * @param a - The box
- * @param b - The box to take away from it
- * @returns The parts of `a` outside `b` (`a` itself if they don't overlap)
- */
-function extentMinus(a: Extent, b: Extent): Extent[] {
-  if (!a.intersects(b)) return [a];
-
-  const [ax0, ay0] = a.min;
-  const [ax1, ay1] = a.max;
-  const [bx0, by0] = b.min;
-  const [bx1, by1] = b.max;
-  const parts: Extent[] = [];
-
-  if (bx0 > ax0)  parts.push(new Extent([ax0, ay0], [bx0, ay1]));
-  if (bx1 < ax1)  parts.push(new Extent([bx1, ay0], [ax1, ay1]));
-
-  const x0 = Math.max(ax0, bx0);
-  const x1 = Math.min(ax1, bx1);
-  if (by0 > ay0)  parts.push(new Extent([x0, ay0], [x1, by0]));
-  if (by1 < ay1)  parts.push(new Extent([x0, by1], [x1, ay1]));
-
-  return parts;
 }
 
 
@@ -307,10 +273,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _modeDirty: boolean;
   /** Entities that arrived since the last pass, to sort and draw when frames have time (see `dataArrived`, `_moveBox`) */
   protected _arrivedIDs: Set<EntityID>;
-  /** How many times the cull box moved, or a pass was done: hidden features age by this */
-  protected _moves: number;
-  /** The features that are hidden, and the value of `_moves` when each was (see `_forgetHidden`) */
-  protected _hiddenAt: Map<FeatureID, number>;
   /** Whether the zoom was high enough for vertices the last time the layer looked (see `MIN_VERTEX_ZOOM`) */
   protected _showsVertices: boolean;
   /** Whether the features were marked to be drawn again for a new zoom or rotation (see `dirtyTransform`) */
@@ -352,8 +314,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._seenFeatureIDs = null;
     this._modeDirty = false;
     this._arrivedIDs = new Set<EntityID>();
-    this._moves = 0;
-    this._hiddenAt = new Map<FeatureID, number>();
     this._showsVertices = false;
     this._zoomed = false;
     this._tileFloor = 0;
@@ -412,7 +372,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._unmadeOutside = this._newUnmade();
     this._changedIDs.clear();
     this._arrivedIDs.clear();
-    this._hiddenAt.clear();
 
     // This layer finds its own features under the pointer (see `hitTest`)
     this.scene.setHitTester('osm', this);
@@ -810,42 +769,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Notes which features are hidden, and since when (see `_forgetHidden`).
-   * @param feature - The feature
-   * @param visible - Whether it's visible now
-   */
-  public override visibilityChanged(feature: AbstractPixiFeature, visible: boolean): void {
-    super.visibilityChanged(feature, visible);
-    if (visible) {
-      this._hiddenAt.delete(feature.id);
-    } else {
-      this._hiddenAt.set(feature.id, this._moves);
-    }
-  }
-
-
-  /**
-   * Adds a feature to the layer (see `AbstractPixiLayer.addFeature`). A new feature is visible,
-   * whatever became of an earlier one with its ID.
-   * @param feature - The feature
-   */
-  public override addFeature(feature: AbstractPixiFeature): void {
-    super.addFeature(feature);
-    this._hiddenAt.delete(feature.id);
-  }
-
-
-  /**
-   * Removes a feature from the layer (see `AbstractPixiLayer.removeFeature`).
-   * @param feature - The feature
-   */
-  public override removeFeature(feature: AbstractPixiFeature): void {
-    super.removeFeature(feature);
-    this._hiddenAt.delete(feature.id);
-  }
-
-
-  /**
    * Retains a feature (see `AbstractPixiLayer.retainFeature`), and notes that it was seen, while
    * `_renderChanged()` is watching for the features that aren't.
    * @param feature - The feature
@@ -854,9 +777,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   public override retainFeature(feature: AbstractPixiFeature, frame: RenderFrame): void {
     super.retainFeature(feature, frame);
     this._seenFeatureIDs?.add(feature.id);
-    if (this._hiddenAt.size) {
-      this._hiddenAt.delete(feature.id);   // wanted, even if it isn't shown at this zoom
-    }
   }
 
 
@@ -1331,20 +1251,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._moves++;
     this._forgetHidden();
     this._removeEmptyContainers();
-  }
-
-
-  /**
-   * Destroys the features that have been hidden for more than `KEEP_HIDDEN_MOVES` moves of the
-   * cull box (or passes). A pass does this for what it hasn't seen in a while (`cull()`), but
-   * while the view only moves there are no passes, and what the box leaves behind would pile up.
-   */
-  protected _forgetHidden(): void {
-    for (const [featureID, hiddenAt] of this._hiddenAt) {
-      if (this._moves - hiddenAt <= KEEP_HIDDEN_MOVES) continue;
-      this._hiddenAt.delete(featureID);    // (deleting from a Map while iterating over it is safe)
-      this.features.get(featureID)?.destroy();
-    }
   }
 
 

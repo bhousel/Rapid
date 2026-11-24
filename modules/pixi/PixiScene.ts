@@ -613,7 +613,9 @@ export class PixiScene extends EventEmitter {
     }
 
     // With every layer done, whatever time the frame has left goes to the features that were put
-    // off because they're outside the view (see `AbstractPixiLayer.updateFeature`).
+    // off because they're outside the view (see `AbstractPixiLayer.updateFeature`), and then to
+    // culling what a cull box left behind when it moved without a pass, which is outside the view
+    // too (see `AbstractPixiLayer.cullLater`).
     for (const layer of this.layers.values()) {
       const time = times.get(layer.id)!;
       if (layer.numWaiting) {
@@ -621,9 +623,14 @@ export class PixiScene extends EventEmitter {
         layer.continueWaiting(frame, viewport, true);
         time.renderMs += performance.now() - t0;
       }
+      if (layer.cullDue && frame.hasTime()) {
+        const t0 = performance.now();
+        layer.cullLater();
+        time.cullMs += performance.now() - t0;
+      }
 
       const waiting = layer.numWaiting;
-      if (waiting) {
+      if (waiting || layer.cullDue) {
         frame.unfinished = true;   // another frame should follow
       }
 

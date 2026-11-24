@@ -8,7 +8,7 @@ import type { MarkerData } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 
 
 const MINZOOM = 12;
@@ -174,8 +174,9 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * Renders the KartaView photo markers and sequences for this frame.
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
@@ -183,8 +184,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const parentContainer = this._spatialContainer('streetview', this.id);
     const sequencesContainer = this._childContainer(parentContainer, 'sequences', 0);
     const markersContainer = this._childContainer(parentContainer, 'markers', 1);
-    let markers = kartaview.getImages(frame.cullBox);
-    let sequences = kartaview.getSequences(frame.cullBox);
+    let markers = this._gatherIn(extents, extent => kartaview.getImages(extent));
+    let sequences = this._gatherIn(extents, extent => kartaview.getSequences(extent));
 
     sequences = this.filterSequences(sequences);
     markers = this.filterMarkers(markers);
@@ -212,7 +213,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      this._drawInBatches(feature, sequencesContainer, viewport);
+      this.updateFeature(feature, frame, viewport, sequencesContainer);
       this.retainFeature(feature, frame);
     }
 
@@ -270,7 +271,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      this._drawInBatches(feature, markersContainer, viewport);
+      this.updateFeature(feature, frame, viewport, markersContainer);
       this.retainFeature(feature, frame);
     }
   }
@@ -288,8 +289,9 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     if (!this.enabled || !kartaview?.started || viewZoom < MINZOOM) return;
 
     kartaview.loadTiles();
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
-    this.renderMarkers(frame, viewport);
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+    this.renderMarkers(frame, viewport, extents);
   }
 
 }

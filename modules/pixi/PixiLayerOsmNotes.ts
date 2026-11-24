@@ -4,7 +4,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 
@@ -65,13 +65,14 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    * Renders the OSM note markers for this frame.
    * @param  frame    -  The frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const osm = this.context.services.osm;
     if (!osm?.started) return;
 
     const parentContainer = this._spatialContainer('qa', this.id);
-    const notes = osm.getNotes(frame.cullBox);
+    const notes = this._gatherIn(extents, extent => osm.getNotes(extent));
 
     for (const d of notes) {
       const dataID = d.id;
@@ -115,7 +116,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      this._drawInBatches(feature, parentContainer, viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
       this.retainFeature(feature, frame);
     }
   }
@@ -132,8 +133,9 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     if (!this.enabled || !osm?.started || viewZoom < MINZOOM) return;
 
     osm.loadNotes();
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
-    this.renderMarkers(frame, viewport);
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+    this.renderMarkers(frame, viewport, extents);
   }
 
 }

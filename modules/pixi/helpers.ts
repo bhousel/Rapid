@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { geomStrokeMesh } from '../geo/index.ts';
+import { Extent } from '@rapid-sdk/math';
 import { GlowFilter } from 'pixi-filters';
 import { LineMesh } from './lib/LineMesh.ts';
 
@@ -353,3 +354,30 @@ export function ringsContain(rings: ArrayLike<number>[], x: number, y: number): 
   return inside;
 }
 
+
+/**
+ * Returns the parts of one box that another doesn't cover, as up to four boxes: left and right of
+ * the other at full height, and above and below it in between.
+ * @param a - The box
+ * @param b - The box to take away from it
+ * @returns The parts of `a` outside `b` (`a` itself if they don't overlap)
+ */
+export function extentMinus(a: Extent, b: Extent): Extent[] {
+  if (!a.intersects(b)) return [a];
+
+  const [ax0, ay0] = a.min;
+  const [ax1, ay1] = a.max;
+  const [bx0, by0] = b.min;
+  const [bx1, by1] = b.max;
+  const parts: Extent[] = [];
+
+  if (bx0 > ax0)  parts.push(new Extent([ax0, ay0], [bx0, ay1]));
+  if (bx1 < ax1)  parts.push(new Extent([bx1, ay0], [ax1, ay1]));
+
+  const x0 = Math.max(ax0, bx0);
+  const x1 = Math.min(ax1, bx1);
+  if (by0 > ay0)  parts.push(new Extent([x0, ay0], [x1, by0]));
+  if (by1 < ay1)  parts.push(new Extent([x0, by1], [x1, ay1]));
+
+  return parts;
+}

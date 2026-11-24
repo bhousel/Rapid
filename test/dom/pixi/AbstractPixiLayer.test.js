@@ -496,13 +496,13 @@ describe('AbstractPixiLayer', () => {
   // drawn for, puts it in the scene only if it draws something itself, and finds its features under
   // the pointer itself: Pixi can't see what a batch draws.
   describe('batches', () => {
-    let layer, scene, spatial, child, testers, interactive;
+    let layer, scene, spatial, child, testers, interactive, frame;
 
-    // A stand-in feature: what `_drawInBatches` and `hitTest` use of one
+    // A stand-in feature: what `updateFeature` and `hitTest` use of one
     function makeFeature(id, extent, { drawsItself = false, hit = true } = {}) {
       const feature = {
         id: id, dirty: true, visible: true, allowInteraction: true, hitReach: 0,
-        geometry: { world: { extent: { min: extent.slice(0, 2), max: extent.slice(2) } } },
+        geometry: { world: { extent: new Rapid.sdk.Extent(extent.slice(0, 2), extent.slice(2)) } },
         container: new PIXI.Container(), placed: [], asked: 0,
         placeInBatches: (batches, parent) => feature.placed.push([batches, parent]),
         update: () => { feature.dirty = false; },
@@ -529,6 +529,7 @@ describe('AbstractPixiLayer', () => {
     beforeEach(() => {
       const context = new Rapid.MockContext();
       context.viewport.transform = { x: 0, y: 0, z: 16 };    // a pixel is a world unit
+      frame = { id: 1, viewBox: new Rapid.sdk.Extent([-1e6, -1e6], [1e6, 1e6]), urgent: false, drawDebt: 0, hasTime: () => true };
       spatial = new PIXI.Container();
       child = new PIXI.Container();
       spatial.addChild(child);
@@ -556,25 +557,25 @@ describe('AbstractPixiLayer', () => {
 
     it('gives a dirty feature the layer\'s batches in the container, and draws it', () => {
       const feature = makeFeature('a', [0, 0, 10, 10]);
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
       assert.deepEqual(feature.placed, [[layer.batches, child]]);
       assert.isFalse(feature.dirty);
       assert.isNull(feature.parentContainer, 'its batches draw it: it isn\'t in the scene');
 
-      layer._drawInBatches(feature, child, {});    // not dirty: nothing to do
+      layer.updateFeature(feature, frame, {}, child);    // not dirty: nothing to do
       assert.lengthOf(feature.placed, 1);
     });
 
     it('puts a feature that draws something itself in the container', () => {
       const feature = makeFeature('a', [0, 0, 10, 10], { drawsItself: true });
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
       assert.strictEqual(feature.parentContainer, child);
     });
 
     it('gives no batches without `useBatches`', () => {
       layer.useBatches = false;
       const feature = makeFeature('a', [0, 0, 10, 10], { drawsItself: true });
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
       assert.deepEqual(feature.placed, [[null, child]]);
       assert.strictEqual(feature.parentContainer, child);
     });
@@ -584,7 +585,7 @@ describe('AbstractPixiLayer', () => {
       const over = makeFeature('over', [5, 5, 15, 15]);
       const far = makeFeature('far', [500, 500, 510, 510]);
       for (const feature of [under, over, far]) {
-        layer._drawInBatches(feature, child, {});
+        layer.updateFeature(feature, frame, {}, child);
         child.addChild(feature.container);    // (where each is drawn, for `featureOrder`)
       }
 
@@ -596,7 +597,7 @@ describe('AbstractPixiLayer', () => {
 
     it('finds no feature that\'s hidden, not interactive, or of data the mode keeps from the pointer', () => {
       const feature = makeFeature('a', [0, 0, 10, 10]);
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
 
       feature.visible = false;
       assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
@@ -612,11 +613,11 @@ describe('AbstractPixiLayer', () => {
 
     it('finds a feature that moved where it is now, and no feature that\'s gone', () => {
       const feature = makeFeature('a', [0, 0, 10, 10]);
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
 
-      feature.geometry = { world: { extent: { min: [100, 100], max: [110, 110] } } };
+      feature.geometry = { world: { extent: new Rapid.sdk.Extent([100, 100], [110, 110]) } };
       feature.dirty = true;
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
       assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
       assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 105, y: 105 }), feature);
 
@@ -627,7 +628,7 @@ describe('AbstractPixiLayer', () => {
     it('looks as far around the pointer as the furthest a feature it drew can be hit', () => {
       const feature = makeFeature('pin', [0, 0, 0, 0]);    // a point
       feature.hitReach = 30;                                // a pin, hit up to its top
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
       assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: -28 }), feature);
     });
 
@@ -642,23 +643,136 @@ describe('AbstractPixiLayer', () => {
       assert.isNull(layer._currentBox);
     });
 
-    it('does its pass again when a feature is still dirty after it\'s drawn (a texture it needs hasn\'t loaded)', () => {
+    it('draws a feature that\'s still dirty after it\'s drawn (a texture it needs hasn\'t loaded) again when one arrives', () => {
       const feature = makeFeature('a', [0, 0, 10, 10]);
       feature.update = () => {};    // stays dirty, as a point without its icon does
-      layer._currentBox = {};
-      layer._drawInBatches(feature, child, {});
-      assert.isNull(layer._currentBox);
+      layer.updateFeature(feature, frame, {}, child);
+      assert.isTrue(layer._waitingForTexture.has(feature));
+      layer.texturesLoaded();
+      assert.strictEqual(layer.numWaiting, 1);
+    });
+
+    it('puts off drawing a feature outside the view, and draws it later in its container\'s batches', () => {
+      const feature = makeFeature('far', [5000, 5000, 5010, 5010]);
+      frame.viewBox = new Rapid.sdk.Extent([0, 0], [100, 100]);
+      layer.retainFeature(feature, frame);
+      layer.cull(frame);    // (a pass ends: what waits belongs to it)
+      layer.updateFeature(feature, frame, {}, child);
+      assert.lengthOf(feature.placed, 0);
+      assert.strictEqual(layer.numWaiting, 1);
+
+      layer.continueWaiting(frame, {}, true);
+      assert.deepEqual(feature.placed, [[layer.batches, child]]);
+      assert.isFalse(feature.dirty);
     });
 
     it('forgets its batches and its index in a reset', () => {
       const feature = makeFeature('a', [0, 0, 10, 10]);
-      layer._drawInBatches(feature, child, {});
+      layer.updateFeature(feature, frame, {}, child);
       let forgot = 0;
       layer.batches.forget = () => forgot++;
       feature.destroy = () => layer.removeFeature(feature);
       layer.reset();
       assert.strictEqual(forgot, 1);
       assert.strictEqual(layer._featureIndex.all().length, 0);
+    });
+  });
+
+
+  // A data layer that gets its data from a service by extent follows the cull box without a pass:
+  // it gathers only the parts the new box covers, and hides what the box left behind when a frame
+  // has time (see "The cull box" in `design/graphics-system.md`).
+  describe('following the cull box', () => {
+    const Extent = Rapid.sdk.Extent;
+    let layer;
+
+    const frameAt = (id, cullBox, changed = false) => ({
+      id: id, cullBox: cullBox, viewBox: cullBox, held: false, urgent: false, drawDebt: 0,
+      changedFor: () => changed, hasTime: () => true
+    });
+
+    // A stand-in feature whose visibility the layer counts, as a real one's is
+    function makeFeature(id, min, max) {
+      let visible = true;
+      const feature = {
+        id: id, lod: 2, dirty: false,
+        geometry: { world: { extent: new Extent(min, max) } },
+        destroy: () => layer.removeFeature(feature)
+      };
+      Object.defineProperty(feature, 'visible', {
+        get: () => visible,
+        set: val => {
+          if (val === visible) return;
+          visible = val;
+          layer.visibilityChanged(feature, val);
+        }
+      });
+      layer.addFeature(feature);
+      return feature;
+    }
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      layer = new AbstractPixiLayer({ context: context, gfx: {} });
+    });
+
+    it('gathers the cull box for a pass, nothing while the view moves inside it, and what\'s new when it leaves', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const b = new Extent([60, 0], [160, 100]);     // the view went right, out of `a`
+
+      assert.deepEqual(layer._gatherExtents(frameAt(1, a), {}), [a]);
+      layer.cull(frameAt(1, a));
+
+      assert.deepEqual(layer._gatherExtents(frameAt(2, a), {}), []);
+      assert.isTrue(layer.keptFeatures(frameAt(2, a)));
+
+      const strips = layer._gatherExtents(frameAt(3, b), {});
+      assert.lengthOf(strips, 1);
+      assert.deepEqual([strips[0].min, strips[0].max], [[100, 0], [160, 100]]);
+      assert.isTrue(layer.keptFeatures(frameAt(3, b)), 'it\'s not a pass: `cull()` leaves the features alone');
+      assert.isTrue(layer.cullDue);
+
+      assert.deepEqual(layer._gatherExtents(frameAt(4, b, true), {}), [b], 'something changed: a pass');
+    });
+
+    it('counts what it gathers after the box moved as seen by the last pass, and culls nothing then', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const b = new Extent([60, 0], [160, 100]);
+      const old = makeFeature('old', [10, 10], [20, 20]);
+      layer._gatherExtents(frameAt(1, a), {});
+      layer.retainFeature(old, frameAt(1, a));
+      layer.cull(frameAt(1, a));
+
+      layer._gatherExtents(frameAt(2, b), {});
+      const fresh = makeFeature('new', [120, 10], [130, 20]);
+      layer.retainFeature(fresh, frameAt(2, b));
+      layer.cull(frameAt(2, b));
+      assert.isTrue(old.visible, 'left behind, but not hidden by `cull()`');
+      assert.strictEqual(layer.retained.get('new'), layer.retained.get('old'));
+    });
+
+    it('hides what the box left behind when told there\'s time, and destroys it once it\'s been hidden long enough', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const stays = makeFeature('stays', [70, 10], [80, 20]);
+      const left = makeFeature('left', [10, 10], [20, 20]);
+      layer._gatherExtents(frameAt(1, a), {});
+      for (const feature of [stays, left]) layer.retainFeature(feature, frameAt(1, a));
+      layer.cull(frameAt(1, a));
+
+      let box = a;
+      for (let i = 2; i < 25; i++) {     // keep moving right, a little out of the box each time
+        box = new Extent([box.min[0] + 60, 0], [box.max[0] + 60, 100]);
+        layer._gatherExtents(frameAt(i, box), {});
+        if (i === 2) {
+          layer.cullLater();
+          assert.isTrue(stays.visible);
+          assert.isFalse(left.visible);
+          assert.isFalse(layer.cullDue);
+        } else {
+          layer.cullLater();
+        }
+      }
+      assert.isFalse(layer.features.has('left'), 'destroyed after 20 moves of the box');
     });
   });
 });

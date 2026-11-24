@@ -35,7 +35,7 @@ tick (a requestAnimationFrame callback): SchedulerSystem._onTick
  │  │    ├ may a pass happen? (FramePacer's gap) → new cull box; the frame's deadline
  │  │    ├ scene.render(): each layer's render() (a pass, or kept), then cull()
  │  │    │    (the labels layer places labels from its queue until the deadline)
- │  │    ├ time left → features put off outside the view
+ │  │    ├ time left → features put off outside the view, then CULL what moved boxes left behind
  │  │    └ APP took under 8 ms? → DRAW phase in this tick too
  │  ├ no frame drawn? → the CSS transform follows the view
  │  └ nothing pending, something moves by itself, AnimationPacer due → an animation draw
@@ -75,7 +75,8 @@ pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer'
 - **Cull box:** the part of the world a frame wants features ready for: the view, and padding
   around it. While the view moves inside it, a layer needs no pass ("The cull box").
 - **Cull:** a layer hiding the features its pass didn't see, and destroying the ones it hasn't
-  seen for a while (`cull()`).
+  seen for a while (`cull()`). After the cull box moved without a pass, it's what the box left
+  behind, and waits for a frame with time to spare (`cullLater()`): it's outside the view.
 - **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view
   had moved, inside the cull box it already had everything for. The OSM layer also keeps them
   when it's told which data changed, or follows the cull box when that moves.
@@ -158,8 +159,9 @@ on.
 
 With the other layers on too (Bellevue at z17.5, Nov 24: 13,000 Mapillary photos, 6,400
 detections, a buildings dataset and the QA layers), a frame that only moves the view is about
-0.8 ms of APP and 0.6 of DRAW, in 28 draw calls. A frame where the view leaves the cull box is
-the layers' passes, about 50 ms there and up to 90 (the log's sections 16 and 17).
+0.8 ms of APP and 0.6 of DRAW, in 28 draw calls, and a frame where the view leaves the cull box
+up to 26 to 35 ms: the layers gather only what the box moved over, and cull later (the log's
+sections 16 to 18).
 
 Where the time goes:
 
@@ -226,7 +228,8 @@ once per tick. A tick does this:
 
    Then `scene.render(frame, viewport)`. The frame has a deadline: work that can wait is put off
    once it has passed, and if any was, another frame follows on the next tick ("A deadline on
-   the frame").
+   the frame"). After every layer has rendered, what time is left goes to the features put off
+   outside the view, and then to culling what a moved cull box left behind ("Culling later").
 4. **DRAW in the same tick**, if the tick has used less than 8 ms so far (`DRAW_SAME_TICK_MS`), as
    it has after a frame that only moved the view. Otherwise DRAW waits for the next tick. DRAW
    resizes the renderer if needed, calls `pixi.render()`, drops the CSS transform, emits `move` if
@@ -319,20 +322,45 @@ A layer doesn't need to decide what's in view on every frame.
   `dirtyFeatures()`, `dirtyData()`, and the scene's versions), whatever the frame is for. So does
   a `render()` that returned before asking (the layer is off, or zoomed out too far).
 - **Passes are counted, not frames.** `cull()` destroys a feature that 20 passes haven't seen
-  (`KEEP_UNSEEN_PASSES`). The OSM layer, which seldom does a pass, counts the moves of its cull box
-  instead: a feature hidden for 20 moves is destroyed (`KEEP_HIDDEN_MOVES`, `_forgetHidden()`).
+  (`KEEP_UNSEEN_PASSES`). A layer that follows the box without a pass counts the moves of its cull
+  box too: a feature hidden for 20 moves is destroyed (`KEEP_HIDDEN_MOVES`, `_forgetHidden()`).
   Panning back within that finds it still made.
-- **Every layer that draws data keeps its features**: OSM, the Rapid datasets, custom data, the
-  photo, detection and QA layers, GeoScribble. Each asks its service for the tiles that cover the
-  view on every frame, and for its data in the cull box only on a pass (the services' getters take
-  an extent: `spatial.getVisibleItems(spatialID, frame.cullBox)`).
-- **The data layers other than OSM do their pass for whatever else changed:** a new cull box, a
-  zoom or a rotation, a class on their own data (a hovered or selected photo: `classChanged()`),
-  data that arrived, or a feature still waiting for a texture. The OSM layer does those without
-  a pass ("The pass, and what asks for it"). The others' passes are short where they've been
-  measured (Mapillary's 13,000 photos 15 ms), and they draw only what's dirty.
+- **Every layer that draws data keeps its features, and follows the box when it moves**: OSM,
+  the Rapid datasets, custom data, the photo, detection and QA layers, GeoScribble. Each asks its
+  service for the tiles that cover the view on every frame, then asks the layer what to gather
+  (`_gatherExtents()`): nothing while the view moves inside the box; when it leaves, only the
+  parts of the new box that the old one didn't cover (`extentMinus()`, up to four strips), with
+  what's in both left as it is; the whole box for a pass. The services' getters take the extent
+  (`spatial.getVisibleItems(spatialID, extent)`). The OSM layer follows the box its own way, by
+  its spatial index (`_moveBox()`, "A cull box that moves").
+- **The data layers other than OSM do their pass for whatever else changed:** a zoom or a
+  rotation, a class on their own data (a hovered or selected photo: `classChanged()`), or data
+  that arrived (a service names its layer). The OSM layer does those without a pass ("The pass,
+  and what asks for it"). The others' passes are short where they've been measured (Mapillary's
+  13,000 photos 15 ms), and they draw what's dirty by the deadline (`updateFeature()`).
 - **The imagery tiles and the labels follow the view themselves,** and do their pass on every
   frame.
+
+### Culling later
+
+Hiding what the cull box left behind can wait, and does (Bryan, Nov 24). It's outside the view,
+so nobody sees it either way; doing it in the frame that moves the box made that frame longer for
+nothing. This is SGI Performer's CULL as a stage of its own, run only when there's time:
+
+- **A layer that follows its box without a pass notes that a cull is due** (`cullDue`), and its
+  `cull()` leaves the features alone on that frame.
+- **After every layer has rendered and drawn what waited, a frame with time left culls**
+  (`PixiScene.render()` calls `cullLater()`): the layer hides each feature outside the box, and
+  destroys the ones that have been hidden for 20 moves. A frame without time leaves it to the
+  next, and asks for one (`frame.unfinished`).
+- **It hides by what a pass would gather:** a feature stays while any feature of its data reaches
+  into the box (every part of a long photo sequence), or what it's drawn with (a Rapid road's ends:
+  `_gatheredInBox()`). So a pass after it changes nothing that's shown, which is how it was
+  checked.
+- **A pass culls everything, and clears what was due.**
+
+The OSM layer's `_moveBox()` still hides what its box left behind at once. It finds it through the
+editor's index, by what the box moved off, which costs what moved, not what there is.
 
 A pan frame that only moves the view costs 1 to 1.5 ms of APP and under 1 ms of DRAW, where every
 frame was a pass of 6 to 66 ms before the cull box (the log's sections 8, 9 and 15).
@@ -429,8 +457,10 @@ GPU work is done in DRAW, so each feature drawn adds what it's expected to cost 
 makes another, pass or no pass. These frames aren't paced: they're cheap by construction.
 `gfx.pending` is true until nothing is left, and scripts and tests wait for that.
 
-Only the OSM layer checks `needsStyle`, draws with `updateFeature()` and puts off making features.
-The other layers check `dirty`, which works as before.
+Every layer that draws data draws with `updateFeature()`, so what's outside the view, or past the
+deadline, is drawn in later frames. Only the OSM layer checks `needsStyle` and puts off making
+features (`_waitToMake()`); the other layers make a feature when they gather its data, and check
+`dirty` for its style.
 
 ## The pass, and what asks for it
 
@@ -664,9 +694,9 @@ hovered things. It places them by `zIndex` under the containers of features that
 keeps their places near the view (the scene has each layer's follow the view before it renders),
 and destroys the ones that empty (`cull()`).
 
-**A layer that draws data says `useBatches`,** and draws each dirty feature with
-`_drawInBatches(feature, container, viewport)` where it called `feature.update(viewport)`, giving
-the container it would have put the feature in. The feature takes that container's batches
+**A layer that draws data says `useBatches`,** and draws each feature with
+`updateFeature(feature, frame, viewport, container)` where it called `feature.update(viewport)`,
+giving the container it would have put the feature in. The feature takes that container's batches
 (`placeInBatches()`, which each kind of feature knows its own of), is drawn, and goes in the
 container only if it draws something itself. Lines, polygons and points in one container are
 drawn in the order of their batches there (casings and fills, then strokes and outlines, with
@@ -989,12 +1019,10 @@ What's bitten before:
 What's left, biggest first, is in `knowledge/backlog.md`, "Pixi rendering follow-ups". The
 direction, from the log's section 15:
 
-- **The other data layers' passes, spread or skipped as OSM's are.** When the view leaves the cull
-  box, every data layer does its pass in the same frame, over twice the area the view shows: up to
-  90 ms in Bellevue with photos and detections on (the log's section 17). Following the box
-  (`_moveBox()`), and putting off what's outside the view to later frames (`updateFeature()`), would
-  make that frame as cheap as it is for OSM; so would a zoom, a hover and arriving data without a
-  pass.
+- **The other data layers without a pass for a zoom, a hover or arriving data,** as the OSM layer
+  does. They follow their box and cull later now (the log's section 18), but a tile that arrives
+  is a pass of its layer (a service names the layer, not the tile), and so is a hovered photo.
+  Putting off making features, not only drawing them (`_waitToMake()`), is the other half.
 - **A feature without a display object.** A feature in a batch needs a position and an order, not a
   `Container` (0.7 KB each); `AbstractPixiFeature` assumes one.
 - **Animation draws that don't draw the whole scene:** what's still drawn to a texture once, and an

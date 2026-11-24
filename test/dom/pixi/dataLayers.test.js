@@ -73,3 +73,22 @@ describe('the data layers', () => {
     });
   });
 });
+
+
+// When its cull box moves, a layer hides what's left behind once a frame has time (`cullLater`),
+// by what a pass would gather. The Rapid layer draws the ends of the roads it gathers, so an end
+// stays while a road of its reaches into the box.
+describe('PixiLayerRapid', () => {
+  it('keeps a road\'s end while the road reaches into the cull box', async () => {
+    const { PixiLayerRapid } = await import('../../../modules/pixi/PixiLayerRapid.ts');
+    const context = new Rapid.MockContext();
+    const layer = new PixiLayerRapid({ context: context, gfx: {}, layers: new Map() });
+    layer._roadsOf.set('fbRoads:n1', new Set(['fbRoads:w1']));
+
+    const reaching = new Set(['fbRoads:w1']);
+    const anyReaches = dataID => reaching.has(dataID);
+    assert.isTrue(layer._gatheredInBox('fbRoads:n1', anyReaches));
+    reaching.clear();
+    assert.isFalse(layer._gatheredInBox('fbRoads:n1', anyReaches));
+  });
+});

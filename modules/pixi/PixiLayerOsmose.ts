@@ -73,11 +73,12 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
     // Fetch new data, if needed..
     osmose.loadTiles();
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
     // Render the data that we have..
     const parentContainer = this._spatialContainer('qa', this.id);
-    const items = osmose.getData(frame.cullBox);
+    const items = this._gatherIn(extents, extent => osmose.getData(extent));
 
     for (const d of items) {
       const part = d.geoms.parts[0];
@@ -103,7 +104,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      this._drawInBatches(feature, parentContainer, viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
 
       this.retainFeature(feature, frame);
     }

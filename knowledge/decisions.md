@@ -111,7 +111,7 @@ each vertex for the line's width in pixels at the current zoom. Choices someone 
 
 ## Every layer that draws data draws in batches (Nov 24, 2026)
 Section 16 of `design/graphics-system-log.md`. Choices someone might undo:
-- **One way for any layer** (`AbstractPixiLayer._drawInBatches()` and `useBatches`), with each
+- **One way for any layer** (`AbstractPixiLayer.updateFeature()` with a container, and `useBatches`), with each
   kind of feature knowing which batches it takes (`placeInBatches()`), not a copy of the OSM
   layer's placement in each layer. The OSM layer still places its features in its levels and
   tiles itself, with the same `placeInBatches()`.
@@ -124,11 +124,15 @@ Section 16 of `design/graphics-system-log.md`. Choices someone might undo:
 - **More draw calls, fewer containers:** 25 → 28 in Bellevue with every layer on, since each
   layer has its own batches where Pixi merged sprites across layers. It's what took a pan's
   DRAW from 22.6 to 1.5 ms and Pixi's hit test from 1.8 to 0.006 ms.
-- **They keep their features while only the view moves, and do their whole pass for anything
-  else** (section 17 of the log): a class on their own data (a hovered photo), a zoom, data that
-  arrived, a feature waiting for a texture. The OSM layer's ways of doing those without a pass
-  (`_renderChanged()`, `_moveBox()`, `_renderArrived()`) weren't copied: the other layers' passes
-  are short, and the frame that moves the cull box is what's worth spreading next.
+- **They keep their features while only the view moves, follow the box by gathering the strips it
+  moved over** (`_gatherExtents()`, sections 17 and 18 of the log), and do their whole pass for
+  anything else: a class on their own data (a hovered photo), a zoom, data that arrived. The OSM
+  layer's ways of doing those without a pass (`_renderChanged()`, `_renderArrived()`) weren't
+  copied: the other layers' passes are short.
+- **CULL is a stage of its own, run when a frame has time** (Bryan, Nov 24): what a cull box left
+  behind is outside the view, so hiding and destroying it waits (`cullLater()`). It goes by what a
+  pass would gather (`_gatheredInBox()`), so that a pass after it changes nothing shown. The OSM
+  layer still hides what its box left at once, through its index.
 - **A service's getter takes an extent** (`getData(…, extent)`), not a box the graphics system
   sets for the frame somewhere the services read: what a layer gathers by is in its own code.
 

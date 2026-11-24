@@ -5,7 +5,7 @@ import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 
@@ -91,8 +91,9 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
    * Renders the Mapillary traffic-sign markers for this frame.
    * @param  frame     The frame being rendered
    * @param  viewport  Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const context = this.context;
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
@@ -100,7 +101,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     const container = context.container();
     const parentContainer = this._spatialContainer('qa', this.id);
 
-    let markers = mapillary.getData('signs', frame.cullBox);
+    let markers = this._gatherIn(extents, extent => mapillary.getData('signs', extent));
     markers = this.filterMarkers(markers);
 
     for (const d of markers) {
@@ -139,7 +140,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      this._drawInBatches(feature, parentContainer, viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
       this.retainFeature(feature, frame);
     }
   }
@@ -156,8 +157,9 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;
 
     mapillary.loadTiles('signs');
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
-    this.renderMarkers(frame, viewport);
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+    this.renderMarkers(frame, viewport, extents);
   }
 
 }

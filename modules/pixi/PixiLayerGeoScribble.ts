@@ -91,9 +91,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     const service = this.context.services.geoscribble;
     if (!service) return;
     service.loadTiles();
-    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
-    const geoData: GeoJSONData[] = service.getData(frame.cullBox);
+    const geoData: GeoJSONData[] = this._gatherIn(extents, extent => service.getData(extent));
 
     // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.
@@ -178,7 +179,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }
@@ -234,7 +235,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        this._drawInBatches(feature, parentContainer, viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }

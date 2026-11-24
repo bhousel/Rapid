@@ -118,15 +118,16 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **Every layer that draws data draws it in batches,** not only OSM: the Rapid datasets, custom
   data, the photo, detection and QA layers, GeoScribble.
   - **Set `this.useBatches = true` in the constructor, and draw with
-    `this._drawInBatches(feature, container, viewport)`** where you'd call `feature.update(viewport)`,
-    with the container you'd have put the feature in. It gives the feature that container's
-    batches (`feature.placeInBatches()`), draws it, and puts it in the container only if it draws
+    `this.updateFeature(feature, frame, viewport, container)`** where you'd call
+    `feature.update(viewport)`, with the container you'd have put the feature in. When it's drawn
+    (now, or in a later frame if it's outside the view or past the deadline), it takes that
+    container's batches (`feature.placeInBatches()`), and goes in the container only if it draws
     something itself (`drawsInContainer()`). Don't set `feature.parentContainer` yourself.
   - **Lines, polygons and points in one container are drawn in their batches' order there**
     (see `LayerBatches`). If they share a spatial container, give each kind a child container
     (`_childContainer(parent, 'lines', 0)`, `'points', 1`) in the order you want them drawn.
   - **Such a layer finds its own features under the pointer** (`AbstractPixiLayer.hitTest()`),
-    from an index of where `_drawInBatches` drew them: a feature drawn any other way isn't found.
+    from an index of where it drew them in batches: a feature drawn any other way isn't found.
   - **Don't change a feature's sprites after it's drawn** (`feature.icon.position.set(…)`): a
     feature in a batch has none. Say it in the style, or in `PixiFeaturePoint._layout()`.
   - After converting a layer, compare it with sprites in one build: `layer.useBatches = false`
@@ -306,9 +307,15 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
   `true`. Every layer that draws data does (OSM, Rapid, custom data, photos, detections, QA,
   GeoScribble). Don't use it in a layer whose features depend on the view itself (the labels, the
   imagery tiles).
-  - **A service's getter takes the extent to look in** (`getData(…, frame.cullBox)`, passed to
-    `spatial.getVisibleItems(spatialID, extent)`). Without one it looks in the view, and a layer
-    that keeps its features would leave the padding empty.
+  - **Ask `this._gatherExtents(frame, viewport)` what to gather,** after asking the service for
+    the view's tiles, and return if it gives none. It gives the cull box for a pass, and only the
+    strips the box moved over when the view left it; gather in each with
+    `this._gatherIn(extents, extent => service.getData(…, extent))`. A service's getter takes the
+    extent to look in (passed to `spatial.getVisibleItems(spatialID, extent)`).
+  - **What the box left behind is culled later** (`cullLater()`), when a frame has time: so a
+    feature outside the box may still be visible for a frame or two. It goes by what a pass
+    would gather: if a layer draws data because of other data (the Rapid layer, the ends of its
+    roads), it says so in `_gatheredInBox()`.
   - **Whatever changes what such a layer draws must ask for a redraw naming it,** or mark its
     features dirty: data arriving, a filter (`PhotoSystem._filtersChanged()`), an issue that
     changed (the QA services' `replaceItem()`), a Rapid feature accepted (`RapidSystem`). A class

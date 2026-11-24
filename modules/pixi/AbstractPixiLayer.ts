@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import RBush from 'rbush';
 import { LayerBatches } from './lib/LayerBatches.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
-import { featureOrder } from './helpers.ts';
+import { extentMinus, featureOrder } from './helpers.ts';
 import { splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
@@ -18,6 +18,13 @@ import type { PixiScene } from './PixiScene.ts';
 
 /** How many passes a feature can go unseen before `cull()` destroys it */
 const KEEP_UNSEEN_PASSES = 20;
+
+/**
+ * How many moves of the cull box (or passes) a hidden feature is kept for before it's destroyed,
+ * in a layer that follows the box without a pass (see `_forgetHidden`). Panning back within that
+ * many finds it still made.
+ */
+const KEEP_HIDDEN_MOVES = 20;
 
 /**
  * `continueWaiting()` draws at least this many of the features that are waiting, on each call,
@@ -51,7 +58,7 @@ const DRAW_MS_PER_NEW = 0.01;
 export const HIT_REACH_MARGIN = 4;
 
 
-/** Where a feature drawn by `_drawInBatches` is, in world coordinates, for `hitTest` to find it */
+/** Where a feature drawn in the layer's batches is, in world coordinates, for `hitTest` to find it */
 interface FeatureBox extends BBox {
   feature: AbstractPixiFeature;
   /** The spatial ID of the container it's drawn for, which the mode may keep the pointer from */
@@ -141,10 +148,18 @@ export class AbstractPixiLayer {
   protected _spatialIDs: Set<SpatialID>;
   /** The spatial ID of each container from `_spatialContainer` */
   protected _spatialIDOf: Map<PIXI.Container, SpatialID>;
-  /** The features drawn by `_drawInBatches`, by where they are, for `hitTest` */
+  /** The features drawn in the layer's batches, by where they are, for `hitTest` */
   protected _featureIndex: RBush<FeatureBox>;
   /** The box of each feature in `_featureIndex` */
   protected _indexedBoxes: Map<AbstractPixiFeature, FeatureBox>;
+  /** The container that each feature is drawn for, by a layer that draws in batches (see `updateFeature`) */
+  protected _parentOf: Map<AbstractPixiFeature, PIXI.Container>;
+  /** How many times the cull box moved, or a pass was done: hidden features age by this (see `_forgetHidden`) */
+  protected _moves: number;
+  /** The features that are hidden, and the value of `_moves` when each was */
+  protected _hiddenAt: Map<FeatureID, number>;
+  /** Whether the cull box moved since what it left behind was last hidden (see `cullLater`) */
+  protected _cullDue: boolean;
 
   /**
    * Whether the layer's lines, polygons and points are drawn in batches (see `batches`), not
@@ -154,7 +169,7 @@ export class AbstractPixiLayer {
   public useBatches: boolean;
   /**
    * The batches that the layer's features are drawn in: one of each kind in a container, made
-   * when a feature first needs it (see `_drawInBatches`, `design/graphics-system.md`).
+   * when a feature first needs it (see `updateFeature`, `design/graphics-system.md`).
    */
   public batches: LayerBatches;
 
@@ -199,6 +214,10 @@ export class AbstractPixiLayer {
     this._spatialIDOf = new Map<PIXI.Container, SpatialID>();
     this._featureIndex = new RBush<FeatureBox>();
     this._indexedBoxes = new Map<AbstractPixiFeature, FeatureBox>();
+    this._parentOf = new Map<AbstractPixiFeature, PIXI.Container>();
+    this._moves = 0;
+    this._hiddenAt = new Map<FeatureID, number>();
+    this._cullDue = false;
 
     this.useBatches = false;
     this.batches = new LayerBatches(scene.batchShaders);
@@ -305,6 +324,9 @@ export class AbstractPixiLayer {
     this._spatialIDOf.clear();
     this._featureIndex.clear();
     this._indexedBoxes.clear();
+    this._parentOf.clear();
+    this._hiddenAt.clear();
+    this._cullDue = false;
     this.batches.forget();    // (they were destroyed with the containers they were in)
   }
 
@@ -401,6 +423,7 @@ export class AbstractPixiLayer {
    * @param frame - The frame being rendered
    */
   public cull(frame: RenderFrame): void {
+    this._catchingUp = false;    // (see `_gatherExtents`)
     if (this._keptFrame === frame.id) return;   // the features are as the last pass left them
 
     // If `render()` returned before `keepFeatures()` (the layer is off, or zoomed out too far),
@@ -423,7 +446,152 @@ export class AbstractPixiLayer {
       }
     }
 
+    this._cullDue = false;    // (what the box left behind is hidden now too)
     this.batches.removeEmpty();
+  }
+
+
+  /**
+   * Whether the cull box moved without a pass (see `_gatherExtents`), and what it left behind is
+   * still to be hidden (`cullLater`).
+   * @return `true` if there's culling to do
+   */
+  public get cullDue(): boolean {
+    return this._cullDue;
+  }
+
+
+  /**
+   * Culls what the cull box left behind when it moved without a pass: hides the features that
+   * aren't in the box anymore, and destroys the ones that have been hidden for a while
+   * (`_forgetHidden`). They're outside the view, so nobody sees them meanwhile: the scene calls
+   * this when a frame has time to spare, after every layer has rendered, and not on a frame that
+   * was busy making what's in view. (SGI Performer's CULL, as a stage of its own.)
+   */
+  public cullLater(): void {
+    const box = this._currentBox;
+    this._cullDue = false;
+    if (!box) return;    // a pass is coming, and culls everything
+
+    // A feature stays while any feature of its data reaches into the box (`_gatheredInBox`): a pass
+    // gathers data by its whole shape, and keeps every part of a long line (a photo sequence) that
+    // reaches in anywhere.
+    const reaches = (feature: AbstractPixiFeature): boolean => !!feature.geometry?.world?.extent.intersects(box);
+    const dataReaches = new Map<DataID, boolean>();
+    const anyReaches = (dataID: DataID): boolean => {
+      let any = dataReaches.get(dataID);
+      if (any === undefined) {
+        any = false;
+        for (const featureID of this._dataHasFeature.get(dataID) ?? []) {
+          const other = this.features.get(featureID);
+          if (other && reaches(other)) {
+            any = true;
+            break;
+          }
+        }
+        dataReaches.set(dataID, any);
+      }
+      return any;
+    };
+
+    for (const feature of this.features.values()) {
+      if (!feature.visible || reaches(feature)) continue;
+
+      const dataID = this._featureHasData.get(feature.id);
+      if (dataID && this._gatheredInBox(dataID, anyReaches)) continue;
+
+      feature.visible = false;
+      this._waitingInView.delete(feature);   // (drawing it again could show it)
+      this._waitingOutside.delete(feature);
+    }
+    this._forgetHidden();
+    this.batches.removeEmpty();
+  }
+
+
+  /**
+   * Whether a pass would gather some data in the cull box (see `cullLater`): here, if any of its
+   * features reaches into the box. A layer that draws data because of other data overrides
+   * this (the Rapid layer draws the ends of the roads it gathers).
+   * @param dataID - The data
+   * @param anyReaches - Whether any feature of some data reaches into the box
+   * @return `true` if the data's features belong in the box
+   */
+  protected _gatheredInBox(dataID: DataID, anyReaches: (dataID: DataID) => boolean): boolean {
+    return anyReaches(dataID);
+  }
+
+
+  /**
+   * Destroys the features that have been hidden for more than `KEEP_HIDDEN_MOVES` moves of the
+   * cull box (or passes). A pass does this for what it hasn't seen in a while (`cull()`), but
+   * while the view only moves there are no passes, and what the box leaves behind would pile up.
+   */
+  protected _forgetHidden(): void {
+    for (const [featureID, hiddenAt] of this._hiddenAt) {
+      if (this._moves - hiddenAt <= KEEP_HIDDEN_MOVES) continue;
+      this._hiddenAt.delete(featureID);    // (deleting from a Map while iterating over it is safe)
+      this.features.get(featureID)?.destroy();
+    }
+  }
+
+
+  /**
+   * Says what a layer that draws data should gather on this frame, for a layer that gets its data
+   * from a service by extent (photos, QA, Rapid datasets, custom data). Call it from `render()`,
+   * after asking the service for the tiles that cover the view, and gather in the extents it
+   * returns:
+   * - **None,** when only the view moved inside the cull box (`keepFeatures`). Then it goes on
+   *   drawing what waited, in view (`continueWaiting`).
+   * - **The parts of the cull box that the last one didn't cover,** when only the view moved, out
+   *   of the box. The features in both boxes stay as they are, and what the box left behind is
+   *   hidden later, when a frame has time (`cullLater`). There's no pass: `cull()` leaves the
+   *   features alone, and what's gathered belongs to the last pass (`retainFeature`).
+   * - **The cull box,** for a pass: anything else changed (a redraw request, a zoom, a class
+   *   on the layer's own data), or there's no box yet.
+   * @param frame - The frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @return The extents to gather data in, in world coordinates
+   */
+  protected _gatherExtents(frame: RenderFrame, viewport: Viewport): Extent[] {
+    const prevBox = this._currentBox;
+    if (this.keepFeatures(frame)) {
+      this.continueWaiting(frame, viewport);
+      return [];
+    }
+
+    // (`keepFeatures()` took the new box, and expects a pass.)
+    if (prevBox && !frame.changedFor(this.id)) {
+      this._keptFrame = frame.id;     // no pass: `cull()` leaves the features alone
+      this._catchingUp = true;        // what's gathered belongs to the last pass (`cull()` ends this)
+      this._cullDue = true;
+      this._moves++;
+      this.continueWaiting(frame, viewport);
+      return extentMinus(frame.cullBox, prevBox);
+    }
+
+    this._moves++;
+    this._forgetHidden();
+    return [frame.cullBox];
+  }
+
+
+  /**
+   * Gathers data in some extents, each item once.
+   * @param extents - The extents (see `_gatherExtents`)
+   * @param get - What gets the data in one extent (a service's getter)
+   * @return The data, in the order found
+   */
+  protected _gatherIn<T>(extents: Extent[], get: (extent: Extent) => T[]): T[] {
+    if (extents.length === 1) return get(extents[0]);
+
+    const found = new Set<T>();
+    for (const extent of extents) {
+      for (const item of get(extent)) {
+        found.add(item);
+      }
+    }
+    return [...found];
   }
 
 
@@ -467,6 +635,7 @@ export class AbstractPixiLayer {
    */
   public addFeature(feature: AbstractPixiFeature): void {
     this.features.set(feature.id, feature);
+    this._hiddenAt.delete(feature.id);   // (a new feature is visible, whatever became of an earlier one with its ID)
     this.work.created++;
     if (feature.visible) {
       this._numVisible++;
@@ -488,6 +657,9 @@ export class AbstractPixiLayer {
     this._waitingOutside.delete(feature);
     this._waitingForTexture.delete(feature);
     this.work.destroyed++;
+
+    this._hiddenAt.delete(feature.id);
+    this._parentOf.delete(feature);
 
     const box = this._indexedBoxes.get(feature);
     if (box) {
@@ -555,7 +727,7 @@ export class AbstractPixiLayer {
    * The scene asks this of a layer that said it finds its own (`PixiScene.setHitTester`, which
    * a layer that draws in batches does: see `useBatches`), in place of Pixi's hit test.
    *
-   * This one asks the visible features near the pointer that `_drawInBatches` drew (it keeps
+   * This one asks the visible features near the pointer that it drew in batches (it keeps
    * an index of where they are), of the spatial IDs that the mode lets the pointer reach. Each
    * answers for itself (`AbstractPixiFeature.hitTest`), and the winner is the one drawn on top
    * (`featureOrder`). The OSM layer asks the editor's index instead (`PixiLayerOsm.hitTest`).
@@ -585,44 +757,6 @@ export class AbstractPixiLayer {
       }
     }
     return best;
-  }
-
-
-  /**
-   * Draws a dirty feature in the layer's batches, if it uses them (`useBatches`), in those of
-   * the given container. A feature that draws something itself (`drawsInContainer()`: markers
-   * a batch has no shape for, a picture from another texture, or everything, without batches)
-   * is put in that container; one that its batches draw alone isn't in the scene.
-   *
-   * A layer that draws its features with `feature.update()` calls this in its place, with the
-   * container it would have put the feature in. Like `update()`, it does nothing for a feature
-   * that isn't dirty. (The OSM layer places its features itself.)
-   *
-   * Lines, polygons and points that a layer draws in one container are drawn in the order of
-   * their batches there (see `LayerBatches`): give each kind a child container of its own
-   * (`_childContainer`) to draw them in another order.
-   * @param feature - The feature to draw
-   * @param parent - The container whose batches it's drawn in, and where it goes if it draws itself
-   * @param viewport - Pixi viewport to use for rendering
-   */
-  protected _drawInBatches(feature: AbstractPixiFeature, parent: PIXI.Container, viewport: Viewport): void {
-    if (!feature.dirty) return;
-
-    feature.placeInBatches(this.useBatches ? this.batches : null, parent);
-    feature.update(viewport);
-    feature.parentContainer = feature.drawsInContainer() ? parent : null;   // (a point finds out as it's drawn)
-
-    // Still dirty? Then it's drawn without a texture that hasn't loaded yet (an icon). The scene
-    // asks for a frame when one arrives (`texturesLoaded`), and the layer's pass draws it again.
-    if (feature.dirty) {
-      this._currentBox = null;
-    }
-
-    if (feature.hitReach > this._hitReach) {
-      this._hitReach = feature.hitReach;
-    }
-
-    this._indexFeature(feature, parent);
   }
 
 
@@ -666,17 +800,20 @@ export class AbstractPixiLayer {
 
   /**
    * Counts a feature of this layer being shown or hidden. `AbstractPixiFeature` calls this when
-   * its `visible` changes, so the layer knows how many are visible without walking them all.
-   * @param _feature - The feature
+   * its `visible` changes, so the layer knows how many are visible without walking them all,
+   * and since when a hidden one is hidden (see `_forgetHidden`).
+   * @param feature - The feature
    * @param visible - Whether the feature is visible now
    */
-  public visibilityChanged(_feature: AbstractPixiFeature, visible: boolean): void {
+  public visibilityChanged(feature: AbstractPixiFeature, visible: boolean): void {
     if (visible) {
       this._numVisible++;
       this.work.shown++;
+      this._hiddenAt.delete(feature.id);
     } else {
       this._numVisible--;
       this.work.hidden++;
+      this._hiddenAt.set(feature.id, this._moves);   // (see `_forgetHidden`)
     }
   }
 
@@ -702,14 +839,26 @@ export class AbstractPixiLayer {
    * - A feature outside the view, in the cull box's padding, always waits: nobody sees it yet.
    *
    * `continueWaiting()` draws the ones that waited. A layer that calls this must call that too,
-   * on the frames where it keeps its features (see `keepFeatures`). The scene calls it once more
-   * after every layer has rendered, for the features outside the view.
+   * on the frames where it keeps its features (see `keepFeatures`; `_gatherExtents` does). The
+   * scene calls it once more after every layer has rendered, for the features outside the view.
    * (See "A deadline on the frame" in `design/graphics-system.md`.)
+   *
+   * A layer that draws in batches (`useBatches`) gives the container it would put the feature
+   * in. When the feature is drawn, it takes that container's batches (`placeInBatches()`), and
+   * goes in the container only if it draws something itself (`drawsInContainer()`: markers a
+   * batch has no shape for, a picture from another texture). Don't set `parentContainer` then.
+   * Lines, polygons and points in one container are drawn in the order of their batches there
+   * (see `LayerBatches`): give each kind a child container of its own (`_childContainer`) to draw
+   * them in another order. (The OSM layer places its features itself, and gives none.)
    * @param feature - The feature to draw again
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
+   * @param parent - The container whose batches it's drawn in, and where it goes if it draws itself
    */
-  public updateFeature(feature: AbstractPixiFeature, frame: RenderFrame, viewport: Viewport): void {
+  public updateFeature(feature: AbstractPixiFeature, frame: RenderFrame, viewport: Viewport, parent?: PIXI.Container): void {
+    if (parent) {
+      this._parentOf.set(feature, parent);
+    }
     if (!feature.dirty) return;
 
     const extent = feature.geometry?.world?.extent;
@@ -800,10 +949,19 @@ export class AbstractPixiLayer {
    */
   protected _drawFeature(feature: AbstractPixiFeature, frame: RenderFrame, viewport: Viewport): void {
     const drawMs = feature.onlyTransformDirty ? DRAW_MS_PER_REDRAW : DRAW_MS_PER_NEW;
+    const parent = this._parentOf.get(feature);    // (for a layer that draws in batches, see `updateFeature`)
+
+    if (parent) {
+      feature.placeInBatches(this.useBatches ? this.batches : null, parent);
+    }
     feature.update(viewport);
     frame.drawDebt += drawMs;
     if (feature.hitReach > this._hitReach) {
       this._hitReach = feature.hitReach;
+    }
+    if (parent) {
+      feature.parentContainer = feature.drawsInContainer() ? parent : null;   // (a point finds out as it's drawn)
+      this._indexFeature(feature, parent);
     }
 
     // Still dirty? Then it's drawn without a texture that hasn't loaded yet (an icon, see
@@ -865,6 +1023,9 @@ export class AbstractPixiLayer {
     // For example points when zoomed out far.
     // (A feature made after the pass, by a layer catching up on what waited, belongs to that pass.)
     this.retained.set(feature.id, this._catchingUp ? this._pass - 1 : this._pass);
+    if (this._hiddenAt.size) {
+      this._hiddenAt.delete(feature.id);   // wanted, even if it isn't shown at this zoom
+    }
   }
 
 

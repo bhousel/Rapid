@@ -31,6 +31,7 @@ the numbers, and what they say. Then change `graphics-system.md` to say what's t
 | 15 | Where this could go: what other map renderers do, two tiers, and the line builder, steps 1 to 10 (Nov 22 to 24) |
 | 16 | The other layers in batches (Nov 24) |
 | 17 | The other layers keep their features (Nov 24) |
+| 18 | The other layers follow the cull box, and cull later (Nov 24) |
 
 ## 1. How a frame is made
 
@@ -3656,3 +3657,59 @@ of 30, the other being the pass for a new box), turning panoramas off and on hid
 at once (25,549 photos, 10,918 without panoramas), and the e2e test that adds a Rapid feature
 checks that the Rapid layer keeps its features on a small pan and stops drawing the feature once
 it's accepted.
+
+## 18. The other layers follow the cull box, and cull later (Nov 24)
+
+Section 17 left a frame that every data layer did its pass in, when the view left the cull box:
+47 ms at the median in Bellevue, up to 90. Split by what each layer did in it:
+
+| Bellevue, frames where the view left the box | Mapillary: render + cull | Detections | Streetside | Rapid |
+|---|---|---|---|---|
+| Over photos already made (made 0) | 20 to 34 + 1 to 5 ms | 7 to 12 + 1 to 2 | 1.5 to 2 | |
+| Over new ones (made 100 to 300) | 22 to 27 + 2 to 5 | 9 to 10 + 1 to 2 | 4 to 5 | 2.6 to 3.6 |
+
+So it wasn't making features, and only a little the cull: Mapillary's render took 20 to 34 ms with
+nothing to make or draw. That's walking and filtering every photo in the box again (and a date
+parsed for each, in `filterMarkers()`).
+
+**Following the box.** A data layer now asks `_gatherExtents()` what to gather: nothing while the
+view is inside the box, the strips the new box covers that the old one didn't when it leaves
+(`extentMinus()`, moved here from the OSM layer), and the whole box for a pass. What it gathers
+in the strips belongs to the last pass, and `cull()` leaves the features alone on that frame.
+Features are drawn with `updateFeature()` (with the container they're drawn for), so what's
+outside the view waits for later frames.
+
+**Culling later** (Bryan's idea: CULL as a phase of its own, done when there's time). What the
+box left behind is outside the view. A layer that followed its box notes a cull as due, and after
+every layer has rendered, a frame with time left hides what's outside the box and destroys what's
+been hidden for 20 moves of the box (`cullLater()`; the aging by moves came from the OSM layer).
+Without time, another frame follows. The OSM layer's `_moveBox()` still hides at once, by its
+index.
+
+| Bellevue, the same layers, M4 | Section 17 | Now |
+|---|---|---|
+| 12 pans of 300 px, out and back: the worst frame's APP | 47 (median of the box moves), 90 | 26 ms |
+| ..a frame that follows the box: Mapillary, detections | a pass, 20 to 34, 7 to 12 ms | 7 to 11, 3 to 5 ms |
+| Glide (240 ticks): the longest frame | 89, 90 ms | 25, 27, 35 ms |
+| Glide: ticks over 25 ms | 12 | 10, 11 |
+| Glide: median frame | 2.1 to 2.6 ms | 2.1 to 2.4 ms |
+
+The longest tick of a glide was 83 ms in one run of three, with no frame over 27 ms in it.
+
+**Checked against a pass:** after six pans out of the box in all directions, and again after six
+more, a full pass of each data layer (`gfx.immediateRedraw(layerID)`) changed nothing that was
+shown: no feature hidden, shown, or drawn in another order, for 28,000 photos, 14,500 detections,
+2,000 Streetside photos, the Rapid buildings and roads, and the QA markers. Getting there took two
+fixes to the deferred cull:
+
+- **It hid by each feature's own shape,** and a photo sequence is a feature for each of its parts:
+  281 parts outside the box were hidden that a pass keeps, because the sequence reaches in. It
+  keeps a feature while any feature of its data reaches in now.
+- **The Rapid layer draws the ends of the roads it gathers,** whatever box the ends are in: 3 were
+  hidden that a pass shows. Which data a layer draws because of other data is the layer's to say
+  (`_gatheredInBox()`). The first try used the layers' parent and child data instead, which hid
+  3,245 Mapillary photos too few: their sequence is their parent, but a pass gathers each photo by
+  its own place.
+
+What's left is in "Where it's heading": a tile that arrives is still a pass of its layer, and so is
+a hovered photo.
