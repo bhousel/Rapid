@@ -3,6 +3,7 @@ import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
 import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+import { LayerBatches } from '../../../modules/pixi/lib/LayerBatches.ts';
 
 // The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
 const batchShaders = new BatchShaders();
@@ -1332,6 +1333,59 @@ describe('PixiFeatureLine', () => {
       feature.unsetClass('select');
       drawAt(17);
       assert.lengthOf(feature.haloItems, 0);
+    });
+  });
+
+
+  // A layer gives a line the batches of the container it's drawn for (`AbstractPixiLayer._drawInBatches`)
+  describe('placeInBatches', () => {
+    let batches, parent, other;
+    beforeEach(() => {
+      batches = new LayerBatches(batchShaders);
+      parent = new PIXI.Container();
+      other = new PIXI.Container();
+    });
+    afterEach(() => {
+      parent.destroy({ children: true });
+      other.destroy({ children: true });
+    });
+
+    it('takes the container\'s batches for casings and strokes, and keeps them', () => {
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.batch, batches.lineBatch(parent, false, [0, 0]));
+      assert.strictEqual(feature.casingBatch, batches.lineBatch(parent, true, [0, 0]));
+
+      const batch = feature.batch;
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.batch, batch);
+      assert.strictEqual(batch.users, 1);
+      assert.isFalse(feature.drawsInContainer());
+    });
+
+    it('takes another container\'s when it\'s drawn for that one', () => {
+      feature.placeInBatches(batches, parent);
+      const old = feature.batch;
+      feature.placeInBatches(batches, other);
+      assert.strictEqual(feature.batch.parent, other);
+      assert.strictEqual(feature.casingBatch.parent, other);
+      assert.strictEqual(old.users, 0);
+    });
+
+    it('takes new ones when the old were destroyed', () => {
+      feature.placeInBatches(batches, parent);
+      feature.batch.destroy();
+      batches.removeEmpty();
+      feature.placeInBatches(batches, parent);
+      assert.isFalse(feature.batch.destroyed);
+      assert.strictEqual(feature.batch.parent, parent);
+    });
+
+    it('gives them back, and draws itself, without the layer\'s batches', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(null, parent);
+      assert.isNull(feature.batch);
+      assert.isNull(feature.casingBatch);
+      assert.isTrue(feature.drawsInContainer());
     });
   });
 });

@@ -20,6 +20,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osm-notes';
+    this.useBatches = true;
   }
 
 
@@ -83,7 +84,6 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       // Create feature if necessary..
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       // If data has changed, replace it.. (Changed data is a new object: data isn't changed in place.)
@@ -115,7 +115,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this._drawInBatches(feature, parentContainer, viewport);
       this.retainFeature(feature, frame);
     }
   }

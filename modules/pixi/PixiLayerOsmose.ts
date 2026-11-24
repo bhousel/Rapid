@@ -20,6 +20,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osmose';
+    this.useBatches = true;
   }
 
 
@@ -93,7 +94,6 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -102,10 +102,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
-      if (!feature.props.isCircular) {  // offset the icon to fit better in the "osmose" pin
-        feature.icon?.position.set(0, -17);
-      }
+      this._drawInBatches(feature, parentContainer, viewport);
 
       this.retainFeature(feature, frame);
     }

@@ -1,9 +1,14 @@
 import * as PIXI from 'pixi.js';
+import RBush from 'rbush';
+import { LayerBatches } from './lib/LayerBatches.ts';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
+import { featureOrder } from './helpers.ts';
 import { splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
 import type { Extent, Viewport } from '@rapid-sdk/math';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
@@ -37,6 +42,21 @@ const SORT_WAITING_MS = 100;
  */
 const DRAW_MS_PER_REDRAW = 0.004;
 const DRAW_MS_PER_NEW = 0.01;
+
+/**
+ * Pixels added to the furthest a feature can be hit from the box of its geometry (`hitReach`),
+ * when a layer looks for the features near the pointer (see `hitTest`). The pointer and the
+ * features are placed by the frame that was drawn.
+ */
+export const HIT_REACH_MARGIN = 4;
+
+
+/** Where a feature drawn by `_drawInBatches` is, in world coordinates, for `hitTest` to find it */
+interface FeatureBox extends BBox {
+  feature: AbstractPixiFeature;
+  /** The spatial ID of the container it's drawn for, which the mode may keep the pointer from */
+  spatialID: SpatialID;
+}
 
 
 /**
@@ -119,6 +139,24 @@ export class AbstractPixiLayer {
   protected _childHasParents: Map<DataID, Set<DataID>>;
   /** Spatial IDs this layer has containers for (see `_spatialContainer`) */
   protected _spatialIDs: Set<SpatialID>;
+  /** The spatial ID of each container from `_spatialContainer` */
+  protected _spatialIDOf: Map<PIXI.Container, SpatialID>;
+  /** The features drawn by `_drawInBatches`, by where they are, for `hitTest` */
+  protected _featureIndex: RBush<FeatureBox>;
+  /** The box of each feature in `_featureIndex` */
+  protected _indexedBoxes: Map<AbstractPixiFeature, FeatureBox>;
+
+  /**
+   * Whether the layer's lines, polygons and points are drawn in batches (see `batches`), not
+   * by display objects of their own. A layer that sets it finds its own features under the
+   * pointer (`hitTest`): Pixi can't see what a batch draws. Set it in the constructor.
+   */
+  public useBatches: boolean;
+  /**
+   * The batches that the layer's features are drawn in: one of each kind in a container, made
+   * when a feature first needs it (see `_drawInBatches`, `design/graphics-system.md`).
+   */
+  public batches: LayerBatches;
 
 
   /**
@@ -158,6 +196,12 @@ export class AbstractPixiLayer {
 
     // The spatial IDs this layer has asked the scene for containers for (released in `reset()`)
     this._spatialIDs = new Set<SpatialID>();
+    this._spatialIDOf = new Map<PIXI.Container, SpatialID>();
+    this._featureIndex = new RBush<FeatureBox>();
+    this._indexedBoxes = new Map<AbstractPixiFeature, FeatureBox>();
+
+    this.useBatches = false;
+    this.batches = new LayerBatches(scene.batchShaders);
 
     // Parent Data <-> Child Data
     // We establish a parent-child data hierarchy (like what the DOM used to do for us)
@@ -258,6 +302,10 @@ export class AbstractPixiLayer {
       this.scene.releaseSpatialContainers(spatialID);
     }
     this._spatialIDs.clear();
+    this._spatialIDOf.clear();
+    this._featureIndex.clear();
+    this._indexedBoxes.clear();
+    this.batches.forget();    // (they were destroyed with the containers they were in)
   }
 
 
@@ -270,8 +318,17 @@ export class AbstractPixiLayer {
    * @return The container
    */
   protected _spatialContainer(groupID: GroupID, spatialID: SpatialID): PIXI.Container {
-    this._spatialIDs.add(spatialID);
-    return this.scene.getSpatialContainer(groupID, spatialID);
+    const scene = this.scene;
+
+    if (!this._spatialIDs.has(spatialID)) {
+      this._spatialIDs.add(spatialID);
+      if (this.useBatches) {
+        scene.setHitTester(spatialID, this);    // Pixi can't see what a batch draws (see `hitTest`)
+      }
+    }
+    const container = scene.getSpatialContainer(groupID, spatialID);
+    this._spatialIDOf.set(container, spatialID);
+    return container;
   }
 
 
@@ -365,6 +422,8 @@ export class AbstractPixiLayer {
         feature.destroy();
       }
     }
+
+    this.batches.removeEmpty();
   }
 
 
@@ -429,6 +488,12 @@ export class AbstractPixiLayer {
     this._waitingOutside.delete(feature);
     this._waitingForTexture.delete(feature);
     this.work.destroyed++;
+
+    const box = this._indexedBoxes.get(feature);
+    if (box) {
+      this._featureIndex.remove(box);
+      this._indexedBoxes.delete(feature);
+    }
   }
 
 
@@ -485,14 +550,109 @@ export class AbstractPixiLayer {
 
   /**
    * Finds the layer's feature under the pointer, the one drawn on top if there are several.
-   * The scene asks this of a layer that said it finds its own (`PixiScene.setHitTester`), in
-   * place of Pixi's hit test. Override it in such a layer; this one finds nothing.
-   * @param _point - The pointer's place in the stage's coordinates (a pointer event's `global`)
-   * @param _world - The same place in world coordinates
+   * The scene asks this of a layer that said it finds its own (`PixiScene.setHitTester`, which
+   * a layer that draws in batches does: see `useBatches`), in place of Pixi's hit test.
+   *
+   * This one asks the visible features near the pointer that `_drawInBatches` drew (it keeps
+   * an index of where they are), of the spatial IDs that the mode lets the pointer reach. Each
+   * answers for itself (`AbstractPixiFeature.hitTest`), and the winner is the one drawn on top
+   * (`featureOrder`). The OSM layer asks the editor's index instead (`PixiLayerOsm.hitTest`).
+   * @param point - The pointer's place in the stage's coordinates (a pointer event's `global`)
+   * @param world - The same place in world coordinates
    * @return The feature, or `null` if the pointer is over none of the layer's
    */
-  public hitTest(_point: PIXI.PointData, _world: PIXI.PointData): AbstractPixiFeature | null {
-    return null;
+  public hitTest(point: PIXI.PointData, world: PIXI.PointData): AbstractPixiFeature | null {
+    const context = this.context;
+    const scene = this.scene;
+    const viewport = context.viewport;
+
+    if (!this._numVisible) return null;
+
+    // How far from the box of its geometry a feature can be hit, in world coordinates
+    const reach = (this._hitReach + HIT_REACH_MARGIN) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
+    const box = { minX: world.x - reach, minY: world.y - reach, maxX: world.x + reach, maxY: world.y + reach };
+
+    let best: AbstractPixiFeature | null = null;
+    for (const found of this._featureIndex.search(box)) {
+      const feature = found.feature;
+      if (!feature.visible || !feature.allowInteraction) continue;
+      if (!scene.isInteractive(found.spatialID)) continue;
+      if (!feature.hitTest(point, world)) continue;
+      if (!best || featureOrder(feature, best) > 0) {
+        best = feature;
+      }
+    }
+    return best;
+  }
+
+
+  /**
+   * Draws a dirty feature in the layer's batches, if it uses them (`useBatches`), in those of
+   * the given container. A feature that draws something itself (`drawsInContainer()`: markers
+   * a batch has no shape for, a picture from another texture, or everything, without batches)
+   * is put in that container; one that its batches draw alone isn't in the scene.
+   *
+   * A layer that draws its features with `feature.update()` calls this in its place, with the
+   * container it would have put the feature in. Like `update()`, it does nothing for a feature
+   * that isn't dirty. (The OSM layer places its features itself.)
+   *
+   * Lines, polygons and points that a layer draws in one container are drawn in the order of
+   * their batches there (see `LayerBatches`): give each kind a child container of its own
+   * (`_childContainer`) to draw them in another order.
+   * @param feature - The feature to draw
+   * @param parent - The container whose batches it's drawn in, and where it goes if it draws itself
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  protected _drawInBatches(feature: AbstractPixiFeature, parent: PIXI.Container, viewport: Viewport): void {
+    if (!feature.dirty) return;
+
+    feature.placeInBatches(this.useBatches ? this.batches : null, parent);
+    feature.update(viewport);
+    feature.parentContainer = feature.drawsInContainer() ? parent : null;   // (a point finds out as it's drawn)
+
+    if (feature.hitReach > this._hitReach) {
+      this._hitReach = feature.hitReach;
+    }
+
+    this._indexFeature(feature, parent);
+  }
+
+
+  /**
+   * Keeps a feature's place in `_featureIndex`, for `hitTest`: its geometry's box, and the
+   * spatial ID of the container it's drawn for. Nothing is written when neither changed (a
+   * hover, a restyle). A feature with no geometry, or drawn for no spatial ID, isn't in it.
+   * @param feature - The feature, just drawn
+   * @param parent - The container it's drawn for
+   */
+  protected _indexFeature(feature: AbstractPixiFeature, parent: PIXI.Container): void {
+    const index = this._featureIndex;
+    const boxes = this._indexedBoxes;
+
+    // The spatial ID: the one of the nearest container above `parent` that has one
+    let spatialID: SpatialID | undefined;
+    for (let c: PIXI.Container | null = parent; c && !spatialID; c = c.parent) {
+      spatialID = this._spatialIDOf.get(c);
+    }
+
+    const extent = feature.geometry?.world?.extent;
+    const old = boxes.get(feature);
+    if (old && extent && old.spatialID === spatialID &&
+      old.minX === extent.min[0] && old.minY === extent.min[1] && old.maxX === extent.max[0] && old.maxY === extent.max[1]
+    ) return;   // where it was
+
+    if (old) {
+      index.remove(old);
+      boxes.delete(feature);
+    }
+    if (extent && spatialID) {
+      const box = {
+        minX: extent.min[0], minY: extent.min[1], maxX: extent.max[0], maxY: extent.max[1],
+        feature: feature, spatialID: spatialID
+      };
+      index.insert(box);
+      boxes.set(feature, box);
+    }
   }
 
 

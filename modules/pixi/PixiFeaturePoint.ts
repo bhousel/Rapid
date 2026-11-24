@@ -5,6 +5,8 @@ import { glowColor } from './helpers.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BatchMeshItem } from './lib/BatchMesh.ts';
+import type { LayerBatches } from './lib/LayerBatches.ts';
 import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
 import type { PointBatchMeshItem, PointBatchMeshQuad } from './lib/PointBatchMesh.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
@@ -15,8 +17,9 @@ const HALO_CIRCLE_POINTS = 20;
 // The markers that are pins: anchored at their tip, with the icon up in their head
 const PINS = ['pin', 'boldPin', 'osmose'];
 
-// Where a pin's icon goes, in pixels above its tip. (The middle of a pin is 15 above it; this looks nicer.)
-const PIN_ICON_Y = -14;
+// Where a pin's icon goes, in pixels above its tip. (The middle of a pin is 15 above it; this looks nicer.
+// The `osmose` pin is taller, with its head higher.)
+const PIN_ICON_Y: Record<string, number> = { pin: -14, boldPin: -14, osmose: -17 };
 
 // A point can be hit at least this close to it, in pixels across, and this much beyond its marker
 const HIT_MINSIZE = 20;
@@ -25,6 +28,8 @@ const HIT_PAD = 4;
 // In a batch, a point with viewfields is drawn over every point without (see `sceneOrder`).
 // (Points are ordered by their place in the world, which is under 2^24.)
 const VIEWFIELDS_ABOVE = 2 ** 25;
+// ..and the photo that's selected or highlighted over every other (see `sceneOrder`)
+const ACTIVE_PHOTO_ABOVE = 2 ** 26;
 
 
 /** Scratch space for `PixiFeaturePoint.updateAvoid` */
@@ -244,6 +249,22 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
+   * Gives this point its batch: the one for points in the container (see
+   * `LayerBatches.pointBatch`). A point already in that container's batch keeps it.
+   * @param batches - The layer's batches, or `null` to draw the point with sprites
+   * @param parent - The container whose batch to draw in
+   */
+  public override placeInBatches(batches: LayerBatches | null, parent: PIXI.Container): void {
+    const origin = this._geom?.world?.origin;
+    if (!batches || !origin) {
+      this.batch = null;
+    } else if (this._batch?.parent !== parent) {   // (a destroyed batch has no parent)
+      this.batch = batches.pointBatch(parent, origin);
+    }
+  }
+
+
+  /**
    * Whether this point draws something in its own container, and so has to be in the scene (the
    * layer asks before `update()`, to know whether to give it a place there).
    * A point that a batch draws has nothing in its container, unless the batch couldn't draw
@@ -252,7 +273,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * `update()`.
    * @return `true` if its container has to be in the scene
    */
-  public drawsInContainer(): boolean {
+  public override drawsInContainer(): boolean {
     const batch = this._batch;
     if (!batch || batch.destroyed) return true;
     return this._unbatchable;
@@ -301,6 +322,16 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public override get sceneOrder(): number {
     const item = this._item;
     return (item?.batch && item.visible) ? item.order : 0;
+  }
+
+
+  /**
+   * Its item in the batch that draws it (see `sceneItem`)
+   * @return The item, or `null` if no batch draws it
+   */
+  public override get sceneItem(): BatchMeshItem | null {
+    const item = this._item;
+    return (item?.batch && item.visible) ? item : null;
   }
 
 
@@ -671,7 +702,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         const quad = quadAt(count);
         quad.texture = texture;
         quad.x = 0;
-        quad.y = isPinned ? PIN_ICON_Y : 0;   // in the pin's head, or in the middle
+        quad.y = isPinned ? (PIN_ICON_Y[markerID] ?? -14) : 0;   // in the pin's head, or in the middle
         quad.anchorX = anchorX!;
         quad.anchorY = anchorY!;
         setSize(quad, style.icon.size || 11, style.icon.scale, 11);   // default to 11px to fit within the marker
@@ -765,9 +796,11 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const y = position.y - batch.position.y;
     const scale = this._screenScale;
 
-    // From north to south, so that each pin overlaps the ones above it on the map, and the
-    // ones with viewfields over the ones without.
-    const order = position.y + (hasViewfields ? VIEWFIELDS_ABOVE : 0);
+    // From north to south, so that each pin overlaps the ones above it on the map, the ones
+    // with viewfields over the ones without, and the photo that's selected or highlighted over
+    // them all (as its container's `zIndex` says when it draws itself).
+    const isActivePhoto = this._classes.has('selectphoto') || this._classes.has('highlightphoto');
+    const order = position.y + (hasViewfields ? VIEWFIELDS_ABOVE : 0) + (isActivePhoto ? ACTIVE_PHOTO_ABOVE : 0);
 
     let item = this._item;
     if (item && item.batch !== batch) {

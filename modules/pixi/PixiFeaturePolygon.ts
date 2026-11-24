@@ -8,9 +8,11 @@ import { geomAreaBand, geomStrokeContains, geomStrokeMesh, geomStrokeOutline } f
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BatchMeshItem } from './lib/BatchMesh.ts';
 import type { BandPolygon } from '../geo/band.ts';
 import type { FillBatchMesh, FillBatchMeshItem } from './lib/FillBatchMesh.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
+import type { LayerBatches } from './lib/LayerBatches.ts';
 import type { LineBatchMeshItem } from './lib/LineBatchMesh.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -291,13 +293,32 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
   /**
+   * Gives this polygon its batches: the ones for fills and outlines in the container (see
+   * `LayerBatches.fillBatch`, `outlineBatch`). A polygon already in that container's batches
+   * keeps them.
+   * @param batches - The layer's batches, or `null` to draw the polygon with objects of its own
+   * @param parent - The container whose batches to draw in
+   */
+  public override placeInBatches(batches: LayerBatches | null, parent: PIXI.Container): void {
+    const origin = this._geom?.world?.origin;
+    if (!batches || !origin) {
+      this.fillBatch = null;
+      this.strokeBatch = null;
+    } else if (this._fillBatch?.parent !== parent || this._strokeBatch?.parent !== parent) {   // (a destroyed batch has no parent)
+      this.fillBatch = batches.fillBatch(parent, origin);
+      this.strokeBatch = batches.outlineBatch(parent, origin);
+    }
+  }
+
+
+  /**
    * Whether this polygon draws something in its own container, and so has to be in the scene
    * (the layer asks before `update()`, to know whether to give it a place there).
    * A polygon whose fill and outlines are in batches draws nothing itself: its glow, when
    * it's hovered or highlighted, is in the outlines' batch too.
    * @return `true` if its container has to be in the scene
    */
-  public drawsInContainer(): boolean {
+  public override drawsInContainer(): boolean {
     return !this._isBatched();
   }
 
@@ -360,6 +381,16 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   public override get sceneOrder(): number {
     const item = this._fillItem;
     return (item?.batch && item.visible) ? item.order : 0;
+  }
+
+
+  /**
+   * Its item in the batch that draws it (see `sceneItem`)
+   * @return The item, or `null` if no batch draws it
+   */
+  public override get sceneItem(): BatchMeshItem | null {
+    const item = this._fillItem;
+    return (item?.batch && item.visible) ? item : null;
   }
 
 

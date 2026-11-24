@@ -50,6 +50,10 @@ no PR yet). Done, a commit each:
   (`LayerBatches`) and label space (`LabelSpace`).
 - Redraw requests name their layer when only one layer's drawing changed (39 of 53).
 - The design doc split into how it works now and a log (Nov 24).
+- Every layer that draws data draws in batches, and finds its own features under the pointer
+  (`AbstractPixiLayer._drawInBatches()`, `hitTest()`; the log's section 16). With photos and
+  detections on in Bellevue, a pan's DRAW went from 22.6 to 1.5 ms. Their APP is still their
+  passes on every frame (`keepFeatures()` for them is next on the backlog).
 
 Left from the review, for Bryan to pick: the features' two ways of drawing (batch or own
 objects), the near-duplicate QA and photo layers, label rasterization out of `PixiLayerLabels`,

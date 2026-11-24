@@ -27,6 +27,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'geoscribble';
+    this.useBatches = true;
 
     this.scribblesContainer = null;
   }
@@ -138,7 +139,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param lines - Array of line data
    */
   public renderLines(frame: RenderFrame, viewport: Viewport, lines: GeoJSONData[]): void {
-    const parentContainer = this.scribblesContainer;
+    const scribblesContainer = this.scribblesContainer;
+    if (!scribblesContainer) return;   // (made in `reset()`)
+
+    // (Lines under points: each kind in a container of its own, so their batches are in that order)
+    const parentContainer = this._childContainer(scribblesContainer, 'lines', 0);
 
     for (const d of lines) {
       const lineStyle = this.getLineStyle(d.properties);
@@ -162,7 +167,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
           feature.style = lineStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -173,7 +177,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -187,7 +191,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param points - Array of point data
    */
   public renderPoints(frame: RenderFrame, viewport: Viewport, points: GeoJSONData[]): void {
-    const parentContainer = this.scribblesContainer;
+    const scribblesContainer = this.scribblesContainer;
+    if (!scribblesContainer) return;   // (made in `reset()`)
+
+    const parentContainer = this._childContainer(scribblesContainer, 'points', 1);
 
     const pointStyle: Partial<MatchedStyle> = {
       marker: { color: CUSTOM_COLOR, image: 'largeCircle' },
@@ -216,7 +223,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeaturePoint(this, featureID);
           feature.style = pointStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -227,7 +233,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
         this.retainFeature(feature, frame);
       }
     }

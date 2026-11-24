@@ -1,7 +1,6 @@
 import * as PIXI from 'pixi.js';
-import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { AbstractPixiLayer, HIT_REACH_MARGIN } from './AbstractPixiLayer.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
-import { LayerBatches } from './lib/LayerBatches.ts';
 import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
@@ -158,12 +157,6 @@ const ARRIVED_CHUNK = 1000;
  */
 const KEEP_HIDDEN_MOVES = 20;
 
-/**
- * Pixels added to the furthest a feature can be hit from the box of its entity (`hitReach`),
- * when the layer asks the spatial index for the entities near the pointer (see `hitTest`).
- * The pointer and the features are placed by the frame that was drawn, the index isn't.
- */
-const HIT_REACH_MARGIN = 4;
 
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
@@ -292,18 +285,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /** Container for points, vertices and virtual POI pins (`points/osm`, split by tile) */
   public pointContainer: PIXI.Container | null;
 
-  /**
-   * Whether lines, polygons and points are drawn in batches (see `batches`), not by display
-   * objects of each feature's own. Change it and `reset()` the layer to compare the two.
-   */
-  public useBatches: boolean;
-  /**
-   * The batches that the features are drawn in: for each level of lines, one for the casings
-   * and one for the strokes; one for the polygons' fills and one for their outlines; one for
-   * the points, vertices and virtual pins.
-   */
-  public batches: LayerBatches;
-
   /** The containers that features are split into, by parent and label (see `_tileContainer`) */
   protected _tileContainers: Map<PIXI.Container, Map<string, PIXI.Container>>;
   /** collection of calculated midpoints */
@@ -354,8 +335,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.lineContainer = null;
     this.pointContainer = null;
 
+    // Lines, polygons and points are drawn in batches (`batches`): for each level of lines, one
+    // for the casings and one for the strokes; one for the polygons' fills and one for their
+    // outlines; one for the points, vertices and virtual pins. Change it and `reset()` the
+    // layer to compare with display objects of each feature's own.
     this.useBatches = true;
-    this.batches = new LayerBatches(scene.batchShaders);
 
     this._tileContainers = new Map<PIXI.Container, Map<string, PIXI.Container>>();
     this._midpoints = new Map<DataID, Midpoint>();
@@ -422,7 +406,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     super.reset();
 
     this._tileContainers.clear();
-    this.batches.forget();    // (`super.reset()` destroyed them, with the containers they were in)
     this._oldTiles.clear();
     this._midpoints.clear();
     this._unmadeInView = this._newUnmade();
@@ -465,6 +448,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const viewport = context.viewport;
 
     if (!this._numVisible) return null;   // disabled, or zoomed out too far to draw
+    if (!this.scene.isInteractive('osm')) return null;   // the mode keeps the pointer from it
 
     // How far from the box of an entity one of its features can be hit, in world coordinates:
     // a line a few pixels from it, a pin above its point (the furthest of any feature drawn so far).
@@ -519,9 +503,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    // (The scene has told the batches' shaders about the view: see `PixiScene.setBatchViews`.)
+    // (The scene has told the batches' shaders about the view, and the batches have followed it:
+    // see `PixiScene.setBatchViews`.)
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
-    this.batches.followView(viewport);
 
     const showsVertices = styleZoom >= MIN_VERTEX_ZOOM;
 
@@ -1584,13 +1568,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         // The batches that draw its fill and its outlines
         if (feature.dirty) {
-          if (!this.useBatches) {
-            feature.fillBatch = null;
-            feature.strokeBatch = null;
-          } else if (!feature.fillBatch || feature.fillBatch.destroyed || !feature.strokeBatch || feature.strokeBatch.destroyed) {
-            feature.fillBatch = this.batches.fillBatch(this.polygonContainer!, part.world!.origin!);
-            feature.strokeBatch = this.batches.outlineBatch(this.polygonContainer!, part.world!.origin!);
-          }
+          feature.placeInBatches(this.useBatches ? this.batches : null, this.polygonContainer!);
         }
 
         // (Not after a change of zoom alone: what it is hasn't changed, see `needsStyle`)
@@ -2051,13 +2029,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (feature.dirty) {
           // Its level's batches. (A new level puts it in others.)
-          if (!this.useBatches) {
-            feature.batch = null;
-            feature.casingBatch = null;
-          } else if (feature.batch?.parent !== levelContainer || feature.casingBatch?.parent !== levelContainer) {
-            feature.batch = this.batches.lineBatch(levelContainer, false, part.world!.origin!);
-            feature.casingBatch = this.batches.lineBatch(levelContainer, true, part.world!.origin!);
-          }
+          feature.placeInBatches(this.useBatches ? this.batches : null, levelContainer);
         }
 
         if (feature.needsStyle) {
@@ -2258,7 +2230,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const part = feature.geometry;
     if (!part?.world?.origin) return;
 
-    feature.batch = this.useBatches ? this.batches.pointBatch(this.pointContainer!, part.world.origin) : null;
+    feature.placeInBatches(this.useBatches ? this.batches : null, this.pointContainer!);
 
     if (feature.drawsInContainer()) {
       const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;

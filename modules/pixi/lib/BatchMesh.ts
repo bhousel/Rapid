@@ -285,6 +285,22 @@ export abstract class BatchMesh extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
 
 
   /**
+   * Where something is in the order the batch draws in: of two things with the same `order`,
+   * the one added later is drawn later.
+   * @param item - The thing
+   * @return Its place (higher is drawn later), or -1 if it isn't in this batch
+   */
+  public drawIndex(item: BatchMeshItem): number {
+    if (item.batch !== this) return -1;
+    if (this._sortDirty) {
+      this._items.sort((a, b) => a.order - b.order);   // (as `_buildIndices` will, which builds the index buffer in this order)
+      this._sortDirty = false;
+    }
+    return this._items.indexOf(item);
+  }
+
+
+  /**
    * Changes where something is drawn among the others.
    * @param item - The thing
    * @param order - Higher is on top

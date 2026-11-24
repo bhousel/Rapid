@@ -54,8 +54,10 @@ said otherwise. Biggest or most wanted first.
   'pin'`), so sharing needs frozen styles with overrides built apart, or a cache of the finished style
   per kind of feature.
 - **The other layers still do a pass on every frame** (Bryan: worth doing). Only the OSM layer keeps its
-  features (`keepFeatures()`), follows the cull box, and takes arrivals and edits without a pass. The
-  Rapid layer first: it draws the same kinds of feature with the same classes.
+  features (`keepFeatures()`), follows the cull box, and takes arrivals and edits without a pass. They
+  draw in batches since Nov 24 (section 16), so their DRAW is small, but in Bellevue with photos on a
+  pan frame is still 22 ms of APP: Mapillary's pass 15 ms, the detections' 4 to 8. The photo layers
+  first, then the Rapid layer: it draws the same kinds of feature with the same classes.
 - **What still asks for the OSM layer's pass** (section 12): a filter and the styles. The pass is 134 ms:
   71 of looking at each shown feature and finding nothing to do, 30 of vertices in the spatial index,
   30 of sorting, plus asking each entity for its geometry twice (`FilterSystem.filterScene()`, then to
@@ -86,8 +88,7 @@ said otherwise. Biggest or most wanted first.
 - **How hovers and selections look, now that a shader draws them.** The first version is a
   soft yellow glow that breathes and yellow dashes that march over a dark line. Open: more
   than color and movement for a colorblind user (a pattern in the glow, a second color in the
-  dashes), a glow that shows on a yellow road, and the other layers' lines and areas, which
-  still glow by `GlowFilter`.
+  dashes), and a glow that shows on a yellow road.
 - **A small area's edge, drawn by the fills' shader.** An area under 20 pixels is its fill
   alone since step 9 (Bryan: a grey block is fine, something is drawn; a hover shows its
   outline). Section 15 ("A lower level of detail for small areas") has a way to give it back
@@ -97,12 +98,6 @@ said otherwise. Biggest or most wanted first.
   show on any. The lines' batch makes its dashes in the shader from the distance along the
   line, so a second color for the gaps is 4 more bytes a vertex and a line of the fragment
   shader. (`LineMesh`es dash with a texture, which could hold two colors as it is.)
-- **The other layers' features in batches.** Only the OSM layer's are (section 15, steps 6 to 9).
-  The photo layers draw thousands of markers with viewfields, and the Rapid layer draws lines
-  with oneway arrows, areas and vertices like OSM's; each layer would give its features
-  batches from a `LayerBatches` of its own (`lib/LayerBatches.ts`), as `PixiLayerOsm` does
-  (`layer.batches`, `_placePoint()`), and find its features through its spatial cache
-  (`scene.setHitTester()`): a batched feature isn't in the scene for Pixi's hit test.
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
   `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, chunk sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another
@@ -148,8 +143,8 @@ said otherwise. Biggest or most wanted first.
 - **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 4): reordering spatial IDs (lift
   OSM while drawing, or a layer-order UI); snapping by distance instead of by what's drawn on top, so
   it doesn't depend on stroke width and z-order (the OSM layer's features are found through the
-  spatial index since Nov 23, with the answer Pixi gave); the other layers' features through an
-  index too (`scene.setHitTester()`), which a dataset of buildings would need.
+  spatial index since Nov 23, with the answer Pixi gave, and every other layer's that draws data
+  through an index of its own since Nov 24).
 - **Text rasterization without `Pixi.Text`**: canvas2D on the main thread first, or an `OffscreenCanvas`
   worker, fed to `PixiTextures.allocate('text', …)`; avoids nested `renderer.generateTexture()` and
   `readPixels`. A worker needs the same fonts (`FontFace` and a transferable `ArrayBuffer`).

@@ -257,7 +257,16 @@ export function featureOrder(a: AbstractPixiFeature, b: AbstractPixiFeature): nu
   const containerA = a.sceneContainer;
   const containerB = b.sceneContainer;
   if (containerA !== containerB) return drawOrder(containerA, containerB);
-  return a.sceneOrder - b.sceneOrder;
+
+  const byOrder = a.sceneOrder - b.sceneOrder;
+  if (byOrder) return byOrder;
+
+  // The same order in one batch (photos taken at one place): it draws the one it was given last on top
+  const itemA = a.sceneItem;
+  const itemB = b.sceneItem;
+  const batch = itemA?.batch;
+  if (!batch || itemB?.batch !== batch) return 0;
+  return batch.drawIndex(itemA) - batch.drawIndex(itemB);
 }
 
 

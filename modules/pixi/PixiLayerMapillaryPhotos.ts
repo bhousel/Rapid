@@ -46,6 +46,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary';
+    this.useBatches = true;
 
     this._viewerBearing = null;
     this._viewerFov = 55;
@@ -221,7 +222,10 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const mapillary = this.context.services.mapillary;
     if (!mapillary?.started) return;
 
+    // Sequences under the markers: each kind in a container of its own, so their batches are in that order
     const parentContainer = this._spatialContainer('streetview', this.id);
+    const sequencesContainer = this._childContainer(parentContainer, 'sequences', 0);
+    const markersContainer = this._childContainer(parentContainer, 'markers', 1);
     let sequences = mapillary.getSequences();
     let markers = mapillary.getData('images');
 
@@ -244,8 +248,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
           feature.style = LINESTYLE;
-          feature.parentContainer = parentContainer;
-          feature.container.zIndex = -100;  // beneath the markers (which should be [-90..90])
         }
 
         // If data has changed.. Replace it.
@@ -255,7 +257,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this._drawInBatches(feature, sequencesContainer, viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -273,7 +275,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -316,7 +317,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this._drawInBatches(feature, markersContainer, viewport);
       this.retainFeature(feature, frame);
     }
 

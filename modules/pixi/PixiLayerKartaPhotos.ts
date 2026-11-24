@@ -37,6 +37,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'kartaview';
+    this.useBatches = true;
   }
 
 
@@ -178,7 +179,10 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
+    // Sequences under the markers: each kind in a container of its own, so their batches are in that order
     const parentContainer = this._spatialContainer('streetview', this.id);
+    const sequencesContainer = this._childContainer(parentContainer, 'sequences', 0);
+    const markersContainer = this._childContainer(parentContainer, 'markers', 1);
     let markers = kartaview.getImages();
     let sequences = kartaview.getSequences();
 
@@ -199,8 +203,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeatureLine(this, featureID);
         feature.style = LINESTYLE;
-        feature.parentContainer = parentContainer;
-        feature.container.zIndex = -100;  // beneath the markers (which should be [-90..90])
       }
 
       // If sequence data has changed, replace it.
@@ -210,7 +212,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
+      this._drawInBatches(feature, sequencesContainer, viewport);
       this.retainFeature(feature, frame);
     }
 
@@ -227,7 +229,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -269,7 +270,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this._drawInBatches(feature, markersContainer, viewport);
       this.retainFeature(feature, frame);
     }
   }

@@ -127,11 +127,11 @@ pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer'
 - **Batch:** one of our `BatchMesh`es (`LineBatchMesh`, `FillBatchMesh`, `PointBatchMesh`): a Pixi
   `Mesh` with a shader of our own, holding many features' vertices, kept from frame to frame and
   drawn in one draw call. A feature is an **item** in it, a run of its vertices. Not part of
-  Pixi's batches. A layer keeps its batches in a `LayerBatches` (the OSM layer's `batches`), and
+  Pixi's batches. A layer keeps its batches in a `LayerBatches` (`layer.batches`), and
   every batch of a kind draws with its scene's shader for that kind (`scene.batchShaders`), which
   the scene tells the view and the clock.
-- **`LineMesh`:** one line drawn from its stroke mesh, for what isn't in a batch (the lasso, the
-  lines of layers without batches).
+- **`LineMesh`:** one line drawn from its stroke mesh, for what isn't in a batch (the lasso, and
+  a line whose dashes a batch can't draw).
 - **Stroke mesh:** the triangles that draw a line at any width, built once
   (`geomStrokeMesh()`; "The line builder").
 - **Render:** a method name on both sides (a layer's `render()` is APP work, `pixi.render()` is
@@ -156,13 +156,18 @@ on.
 | A hover on a road, APP + DRAW | | | 1.3 + 0.8 ms |
 | A hit test for one pointer event | 0.02 ms | | 0.07 ms |
 
+With the other layers on too (Bellevue at z17.5, Nov 24: 13,000 Mapillary photos, 6,400
+detections, a buildings dataset and the QA layers), a frame that only moves the view is about 22
+ms of APP (their passes) and 1.5 ms of DRAW, in 28 draw calls (the log's section 16).
+
 Where the time goes:
 
 - **The GPU's time is mostly fixed costs** (the log's section 6): clearing and resolving a 4×
   MSAA canvas at ratio 2, and `multiView`'s copy of every frame onto the visible canvas (1.5 to
   2 ms, there for the minimap). What Rapid draws is a few ms of it, more only in Užice.
 - **A pass is what's expensive,** and the OSM layer rarely does one now: not for a pan, a zoom,
-  a hover, an edit, a change of mode or data that arrives.
+  a hover, an edit, a change of mode or data that arrives. The other layers still do theirs on
+  every frame.
 - **Garbage collection** was the longest stall after the pass was gone (the log's section 13).
   Batches took most of the garbage away: sixteen zooms in Užice allocate 2.9 GB, where they
   allocated 18.1 GB, and the heap after a load there is 1.37 GB, where it was 2.27.
@@ -182,8 +187,9 @@ Where the time goes:
   shaders every batch draws with (`scene.batchShaders`); the hit test (`scene.hitTest()`); and the
   clock (`scene.animate()`).
 - **Layers** (`AbstractPixiLayer`): each owns its features, and its `render()` and `cull()` are
-  its pass. The OSM layer is the one that keeps its features, takes changes without a pass,
-  finds its own features under the pointer, and draws in batches (`layer.batches`).
+  its pass. Every layer that draws data draws it in batches (`layer.batches`) and finds its own
+  features under the pointer. The OSM layer is the one that keeps its features and takes changes
+  without a pass.
 - **Features** (`AbstractPixiFeature`, with `PixiFeatureLine`, `PixiFeaturePolygon`,
   `PixiFeaturePoint` and `PixiFeatureLabel`): one for each thing drawn. A feature holds its data,
   its style and its classes, and draws itself into items in batches, or into Pixi objects of its
@@ -602,7 +608,7 @@ are drawn, which depends on when frames had time.
 
 What made the renderer slow wasn't the frame or the GPU. It was one JavaScript object and one Pixi
 object for every feature: a `Container` is 0.7 KB before it draws anything, Pixi built every line
-and fill again at every zoom, and its DRAW phase walked every object. So the OSM layer draws its
+and fill again at every zoom, and its DRAW phase walked every object. So the layers draw their
 features into a few batches with shaders of our own, and a feature that a batch draws has no Pixi
 object in the scene. The design behind it is two tiers (the log's section 15):
 
@@ -643,8 +649,19 @@ in GLSL and in WGSL, and WebGL 2, WebGL 1 and WebGPU all draw it.
 **A layer keeps its batches in a `LayerBatches`** (`layer.batches`): at most one of each kind in
 each container, made when a feature first needs it, with a small batch beside it for the glows of
 hovered things. It places them by `zIndex` under the containers of features that draw themselves,
-keeps their places near the view, and destroys the ones that empty. A layer gives each feature the
-batch it should draw in (`feature.batch = batches.lineBatch(…)`), and the feature does the rest.
+keeps their places near the view (the scene has each layer's follow the view before it renders),
+and destroys the ones that empty (`cull()`).
+
+**A layer that draws data says `useBatches`,** and draws each dirty feature with
+`_drawInBatches(feature, container, viewport)` where it called `feature.update(viewport)`, giving
+the container it would have put the feature in. The feature takes that container's batches
+(`placeInBatches()`, which each kind of feature knows its own of), is drawn, and goes in the
+container only if it draws something itself. Lines, polygons and points in one container are
+drawn in the order of their batches there (casings and fills, then strokes and outlines, with
+points among them), so a layer gives each kind a child container of its own when it wants them in
+another order: the photo layers draw their sequences in one and their markers in another, above.
+The OSM layer places its features itself, in its levels and tiles, with the same
+`placeInBatches()`.
 
 ### Lines
 
@@ -698,7 +715,9 @@ Nov 23: fine).
 ### Points
 
 **One batch** (`PointBatchMesh`) for the points, the vertices and the pins of areas, from north to
-south (a pin overlaps the pins above it), with the points that have viewfields over the others.
+south (a pin overlaps the pins above it), with the points that have viewfields over the others,
+and the photo that's selected or highlighted over them all. (A photo layer's markers are a batch
+of their own, as are a QA layer's.)
 
 - **A point is a few pictures:** its viewfields, its marker, its icon, in that order. A picture is
   four vertices of 32 bytes: where the point is in the world, where the corner is in pixels from
@@ -706,7 +725,8 @@ south (a pin overlaps the pins above it), with the points that have viewfields o
   pictures their size and upright; a viewfield points somewhere on the ground, and turns with the
   map.
 - **What a point is drawn with is worked out in one place,** `PixiFeaturePoint._layout()`, for
-  the batch and for sprites alike. Below zoom 16 points aren't drawn; up to 17, and in wireframe,
+  the batch and for sprites alike. A layer can't move a sprite after the point is drawn (a batch
+  has none): where an icon goes in a pin's head is in `_layout()`, for each kind of pin. Below zoom 16 points aren't drawn; up to 17, and in wireframe,
   they're smaller, pins are circles, and there are no viewfields. Crossing 17 writes every point
   again, once.
 - **One texture:** every marker, icon, viewfield and glow is in the symbol atlas. An icon that
@@ -718,16 +738,18 @@ south (a pin overlaps the pins above it), with the points that have viewfields o
 ### What draws itself
 
 A feature that its batches draw isn't in the scene: its `Container` has no parent, and holds its
-position and its order only. The layer asks a feature before it draws (`drawsInContainer()`), and
-puts it in its tile's container only if it will draw something there:
+position and its order only. A feature that draws something itself (`drawsInContainer()`) goes in
+its container (for OSM, its tile's):
 
 - **The vertices and midpoints of what's hovered or selected,** above everything in the map UI
   layer's `selected` container, where Pixi's hit test finds them first.
 - **Markers that the shader has no shape for,** and pictures from another texture (none of Rapid's
   styles has either).
-- **The features of layers that give no batches:** their lines and outlines are `LineMesh`es, their
-  points sprites, and their hovered lines and areas glow with a `GlowFilter`. Only the OSM layer
-  has batches so far.
+- **A line whose dashes a batch can't draw** (more than two dashes and two gaps, or longer than 255
+  pixels): it draws itself with `LineMesh`es.
+- **The layers that don't draw data in batches:** the labels, the imagery, the map UI's lasso, the
+  debug layer, and the edit blocks (which draw into a group, never interactive, and seldom have
+  anything to draw).
 
 Where a feature is drawn among the others is asked of the feature (`sceneContainer`, `sceneOrder`,
 `featureOrder()` in `helpers.ts`): for a line, its strokes' batch and its order there.
@@ -746,8 +768,14 @@ pointer on each pointer event, before the behaviors hear of it, and puts the ans
   from the pointer (`LineHitArea`), an area by that distance from its rings or by being in its fill
   (the band's polygons for a partial fill), a point by its hit area in pixels. The one drawn on top
   wins (`drawOrder()`), also against what Pixi found in the other layers.
-- **The other layers are found by Pixi's walk.** A layer takes its own with `scene.setHitTester()`
-  and a `hitTest()` like the OSM layer's.
+- **The other layers that draw in batches find theirs too** (`AbstractPixiLayer.hitTest()`): a
+  layer keeps an index of where the features it drew are (`_featureIndex`, an R-tree written when
+  a feature's box changes, not for a hover or a restyle), and asks the ones near the pointer.
+  Each answers only for the spatial IDs the mode lets the pointer reach (`scene.isInteractive()`),
+  and the scene asks each layer once. 0.04 ms for a pointer event with 21,000 photo and QA
+  markers on, where Pixi's walk was 1.8.
+- **Of two drawn at the same order in one batch,** the one it was given later is drawn on top,
+  and is what's hit (`BatchMesh.drawIndex()`): photos taken at one place have the same order.
 - **Pixi's `globalMove` and `wheel` events are off** (`eventFeatures`), and so is its events ticker.
   With `globalMove` on, every pointer move visited every interactive object in the scene.
 - **The hover is as of the last pointer event.** Nothing is tested again when the scene changes
@@ -755,6 +783,8 @@ pointer on each pointer event, before the behaviors hear of it, and puts the ans
   hovered).
 
 The e2e tests check that the index finds what asking every feature does, at every point of a grid.
+Pixi's walk is left for what draws itself in a layer that doesn't find its own: the selected
+vertices and midpoints in the map UI layer.
 
 ## Hovers, selections and animation draws
 
@@ -843,7 +873,7 @@ Seattle's draw calls.
   cost of relaxing the CSP (`'wasm-unsafe-eval'`) now.
 
 **`LineMesh`** draws one stroke mesh at a width, for the lines that aren't in a batch: the lasso, and
-the layers without batches. `setStroke()` works out a new width in the array it has; dashes are a
+a line whose dashes a batch can't draw. `setStroke()` works out a new width in the array it has; dashes are a
 texture that repeats along the line (`PixiTextures.getDashTexture()`). It's always batched by Pixi
 (a fixed `batchMode`: a mesh that crosses 100 vertices in `'auto'` mode can crash Pixi,
 pixijs#12437).
@@ -947,10 +977,9 @@ What's bitten before:
 What's left, biggest first, is in `knowledge/backlog.md`, "Pixi rendering follow-ups". The
 direction, from the log's section 15:
 
-- **The other layers' features in batches,** each layer with a `LayerBatches` of its own and its
-  features found through its spatial cache (`scene.setHitTester()`): the photo layers draw
-  thousands of markers with viewfields, and the Rapid layer draws what OSM does. And the other
-  layers keeping their features (`keepFeatures()`), the Rapid layer first.
+- **The other layers keeping their features** (`keepFeatures()`). They draw in batches now, but
+  still do their pass on every frame: with photos and detections on in Bellevue, that's 15 ms of
+  Mapillary's and 4 to 8 of the detections' on every frame of a pan (the log's section 16).
 - **A feature without a display object.** A feature in a batch needs a position and an order, not a
   `Container` (0.7 KB each); `AbstractPixiFeature` assumes one.
 - **Animation draws that don't draw the whole scene:** what's still drawn to a texture once, and an

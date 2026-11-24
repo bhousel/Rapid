@@ -4,6 +4,7 @@ import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
 import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeaturePolygon } from '../../../modules/pixi/PixiFeaturePolygon.ts';
 import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+import { LayerBatches } from '../../../modules/pixi/lib/LayerBatches.ts';
 
 // The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
 const batchShaders = new BatchShaders();
@@ -1183,5 +1184,47 @@ describe('PixiFeaturePolygon', () => {
     feature.destroy();
     assert.isTrue(fill.destroyed);
     assert.isNull(feature.fill);
+  });
+
+
+  // A layer gives a polygon the batches of the container it's drawn for (`AbstractPixiLayer._drawInBatches`)
+  describe('placeInBatches', () => {
+    let batches, parent, other;
+    beforeEach(() => {
+      batches = new LayerBatches(batchShaders);
+      parent = new PIXI.Container();
+      other = new PIXI.Container();
+    });
+    afterEach(() => {
+      parent.destroy({ children: true });
+      other.destroy({ children: true });
+    });
+
+    it('takes the container\'s batches for fills and outlines, and keeps them', () => {
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.fillBatch, batches.fillBatch(parent, [0, 0]));
+      assert.strictEqual(feature.strokeBatch, batches.outlineBatch(parent, [0, 0]));
+
+      const fillBatch = feature.fillBatch;
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.fillBatch, fillBatch);
+      assert.strictEqual(fillBatch.users, 1);
+      assert.isFalse(feature.drawsInContainer());
+    });
+
+    it('takes another container\'s when it\'s drawn for that one', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(batches, other);
+      assert.strictEqual(feature.fillBatch.parent, other);
+      assert.strictEqual(feature.strokeBatch.parent, other);
+    });
+
+    it('gives them back, and draws itself, without the layer\'s batches', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(null, parent);
+      assert.isNull(feature.fillBatch);
+      assert.isNull(feature.strokeBatch);
+      assert.isTrue(feature.drawsInContainer());
+    });
   });
 });

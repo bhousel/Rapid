@@ -20,6 +20,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'keepright';
+    this.useBatches = true;
   }
 
 
@@ -92,7 +93,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -101,7 +101,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
+      this._drawInBatches(feature, parentContainer, viewport);
       this.retainFeature(feature, frame);
     }
   }

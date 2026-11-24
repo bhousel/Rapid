@@ -57,6 +57,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'custom-data';
+    this.useBatches = true;
 
     this._dataUsed = null;
     this._fileList = null;
@@ -231,7 +232,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderPolygons(frame: RenderFrame, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    // (Polygons under lines: each kind in a container of its own, so their batches are in that order)
+    const basemapContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    const parentContainer = this._childContainer(basemapContainer, 'polygons', 0);
 
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR },
@@ -260,7 +263,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
           feature.style = polygonStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -271,7 +273,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -287,7 +289,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderLines(frame: RenderFrame, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    const basemapContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    const parentContainer = this._childContainer(basemapContainer, 'lines', 1);
 
     const lineStyle = styleOverride ?? {
       stroke: { color: CUSTOM_COLOR },
@@ -315,7 +318,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
           feature.style = lineStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -326,7 +328,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -412,7 +414,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
           feature = new PixiFeaturePoint(this, featureID);
           feature.labelAvoid = true;   // labels keep clear of it
           feature.style = pointStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -423,7 +424,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
         this.retainFeature(feature, frame);
       }
     }

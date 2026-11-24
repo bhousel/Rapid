@@ -81,7 +81,7 @@ describe('PixiLayerOsm', () => {
           entitiesInBox: box => { boxes.push(box); return nearby.map(id => ({ dataID: id })); }
         }
       };
-      layer = new PixiLayerOsm({ context: context, gfx: {}, layers: new Map() });
+      layer = new PixiLayerOsm({ context: context, gfx: {}, layers: new Map(), isInteractive: () => true });
       stage = new PIXI.Container();
     });
 
@@ -95,6 +95,14 @@ describe('PixiLayerOsm', () => {
       assert.lengthOf(boxes, 1);
       const reach = (28 + 4) / 4;   // that and a margin, in pixels, at two zooms above the world's
       assert.deepEqual(boxes[0], { minX: 1000 - reach, minY: 2000 - reach, maxX: 1000 + reach, maxY: 2000 + reach });
+    });
+
+    it('finds nothing, and asks nothing, while the mode keeps the pointer from OSM data', () => {
+      addFeature('osm-w1-0', 'w1', true);
+      nearby = ['w1'];
+      layer.scene.isInteractive = spatialID => spatialID !== 'osm';
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: 0 }));
+      assert.lengthOf(boxes, 0);
     });
 
     it('asks only the features of those entities, and returns the one that\'s hit', () => {

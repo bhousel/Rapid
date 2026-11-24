@@ -109,12 +109,29 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
     for), the order, the origin that follows the view. A new kind of batch says what a vertex
     holds, and writes it.
-  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): the lasso, and the lines and
-    outlines of layers that give no batch. Call `setStroke()` for a new width: it
+  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): the lasso, and a line whose dashes
+    a batch can't draw. Call `setStroke()` for a new width: it
     moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
     are the mesh's `tint` and `alpha`.
   - **A line feature may have no `stroke` or `casing` mesh** (`null` while a batch draws it).
     To know what's drawn, read `strokeItem`, `casingItem`, `arrowItem`, `sidedItem` and `glowItem`.
+- **Every layer that draws data draws it in batches,** not only OSM: the Rapid datasets, custom
+  data, the photo, detection and QA layers, GeoScribble.
+  - **Set `this.useBatches = true` in the constructor, and draw with
+    `this._drawInBatches(feature, container, viewport)`** where you'd call `feature.update(viewport)`,
+    with the container you'd have put the feature in. It gives the feature that container's
+    batches (`feature.placeInBatches()`), draws it, and puts it in the container only if it draws
+    something itself (`drawsInContainer()`). Don't set `feature.parentContainer` yourself.
+  - **Lines, polygons and points in one container are drawn in their batches' order there**
+    (see `LayerBatches`). If they share a spatial container, give each kind a child container
+    (`_childContainer(parent, 'lines', 0)`, `'points', 1`) in the order you want them drawn.
+  - **Such a layer finds its own features under the pointer** (`AbstractPixiLayer.hitTest()`),
+    from an index of where `_drawInBatches` drew them: a feature drawn any other way isn't found.
+  - **Don't change a feature's sprites after it's drawn** (`feature.icon.position.set(…)`): a
+    feature in a batch has none. Say it in the style, or in `PixiFeaturePoint._layout()`.
+  - After converting a layer, compare it with sprites in one build: `layer.useBatches = false`
+    and `layer.reset()`, then the same with `true`, for the map's pixels and for what
+    `scene.hitTest()` finds on a grid of points.
 - **The lasso is `LineMesh`es too,** drawn with `drawRings()` (`helpers.ts`) into a container
   that keeps its meshes from one call to the next. There's
   no `DashLine` anymore, and nothing of ours calls Pixi's `buildLine`. Don't use Pixi's
@@ -155,9 +172,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   Don't add pointer listeners to features, and don't listen for `globalpointermove`: with
   `globalMove` on, every pointer move visits every interactive object in the scene.
 - **The feature under the pointer is `scene.hitTest()`'s answer, not `e.target`.** Pixi's hit
-  test doesn't look at the OSM layer's features: the layer finds them through the editor's
-  spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in Užice where Pixi's
-  walk took 8). `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
+  test doesn't look at the features of layers that draw in batches: the OSM layer finds them
+  through the editor's spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in
+  Užice where Pixi's walk took 8), and the others through an index of their own
+  (`AbstractPixiLayer.hitTest()`). Each checks `scene.isInteractive()` for the spatial IDs it finds. `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
   `AbstractBehavior._getEventData()` reads it. Rules that follow:
   - A point is hit in its `hitArea`, a shape in pixels around where the point is on screen
     (`PixiFeaturePoint.hitTest()`; one that draws itself is asked as Pixi would,

@@ -1,6 +1,6 @@
 # GraphicsSystem: the log
 
-How the renderer got to where it is, Nov 18 to 24, 2026: what was measured, what was tried, what
+How the renderer got to where it is, from Nov 18, 2026: what was measured, what was tried, what
 was built in which order, and why. How it works now is in
 [`graphics-system.md`](graphics-system.md), with the words used here ("Words used here").
 
@@ -29,6 +29,7 @@ the numbers, and what they say. Then change `graphics-system.md` to say what's t
 | 13 | Garbage collection (Nov 19) |
 | 14 | Label placement (Nov 20) |
 | 15 | Where this could go: what other map renderers do, two tiers, and the line builder, steps 1 to 10 (Nov 22 to 24) |
+| 16 | The other layers in batches (Nov 24) |
 
 ## 1. How a frame is made
 
@@ -3532,3 +3533,69 @@ settles how typed arrays reach Pixi before the hard geometry starts.
   with 83 batches; there are 16 now).
 - **Where a worker gets coordinates from.** Packed by the main thread and transferred, or built
   where the OSM data is parsed.
+
+## 16. The other layers in batches (Nov 24)
+
+Until now only the OSM layer drew in batches. The photo layers (Mapillary, KartaView, Streetside),
+Mapillary's detections and signs, the QA layers (KeepRight, Osmose, MapRoulette, OSM notes), the
+Rapid datasets, custom data and GeoScribble drew a display object for each feature, and Pixi's
+hit test walked all of them. They draw in batches now, through two shared pieces:
+`AbstractPixiLayer._drawInBatches()` (in place of `feature.update()`: the feature takes its
+container's batches with `placeInBatches()`, and goes in the scene only if it draws something
+itself) and a hit test for any layer, from an R-tree of where its features are
+(`AbstractPixiLayer.hitTest()`). The edit blocks were left: they draw into a group, are never
+interactive, and seldom have anything.
+
+**Where they cost, first.** Bellevue at z17.5 (`map=17.5/47.6155/-122.2005`), live, with
+Mapillary's photos and detections and signs, Streetside, the QA layers and the City of Bellevue's
+buildings on (KartaView had nothing there): 13,093 photos, 6,389 detections, 964 Streetside
+photos, 107 buildings, about 100 QA markers. M4, Chrome, medians.
+
+| | Before | Mapillary photos in batches | All of them |
+|---|---|---|---|
+| Draw calls | 25 | 26 | 28 |
+| Render groups | 51 | 51 | 55 |
+| Containers in the scene | 87,121 | 29,339 | 413 |
+| A pan frame (20 px a tick, inside the cull box): APP | 29.9 ms | 20.8 ms | 22.1 ms |
+| ..DRAW | 22.6 ms | 5.8 ms | 1.5 ms |
+| A redraw frame: DRAW | 1.2 ms | 0.5 ms | 0.2 ms |
+| A pointer event: Pixi's hit test | 1.79 ms | 0.36 ms | 0.006 ms |
+| ..the layers' own | 0.02 ms | 0.03 ms | 0.04 ms |
+
+- **Draw calls weren't the problem here, and went up by 3.** Pixi merged the photo and QA
+  markers into a few batches of its own, across layers. Each layer has its own batches now: a
+  photo layer one for its sequences and one for its markers, a QA layer one for its markers.
+- **A pan's DRAW was the markers at the edges** being shown and hidden: each made Pixi collect its
+  layer's render group again, 13,000 containers and their sprites for Mapillary. In a batch,
+  showing or hiding a marker is a byte in its vertices.
+- **The APP phase didn't move:** those layers still do their pass on every frame (Mapillary 15 ms,
+  the detections 4 to 8). That's `keepFeatures()`, the next thing for them.
+- **The first version of the layers' hit test asked every feature** whose box the pointer was near,
+  by walking them all: 0.46 ms for Mapillary's 13,000. The R-tree, written only when a feature's box
+  changes, takes it to 0.03.
+
+**Checked against sprites,** one layer at a time in one build (`layer.useBatches`), the others
+on: the map's pixels, and the feature that the scene's hit test finds at 4,800 points.
+
+| Layer | Pixels that differ (of 6 million) | Points where the hit differs |
+|---|---|---|
+| Mapillary photos | 7 | 31, then 0 (below) |
+| Mapillary detections | 50 | 0 |
+| Mapillary signs, MapRoulette, KeepRight, Streetside | 0 or 1 | 0 |
+| Osmose | 2,312, then 0 (below) | 0 |
+| The Bellevue buildings | 883 | 2 |
+
+- **Photos taken at one place have the same order in the batch,** and the hit test took whichever
+  the R-tree found first, where the batch draws the one it was given last on top. `featureOrder()`
+  now asks the batch which it draws later (`BatchMesh.drawIndex()`), so the feature that's hit is
+  the one that's seen. (The OSM layer's points at one place were the same.)
+- **The Osmose layer moved its icons after drawing** (`feature.icon?.position.set(0, -17)`), into
+  the head of its taller pin, and a batch has no icon sprite. The height is in
+  `PixiFeaturePoint._layout()` now, for each kind of pin; MapRoulette had the same line.
+- **The buildings that differ are the ones under 20 pixels:** in a batch an area that small is its
+  fill alone (section 15, step 9), and those fills are what's hit at the 2 points.
+- **A photo that's selected or highlighted** was drawn over the others by its container's
+  `zIndex`. In the batch it has an order above every other photo's.
+
+Clicking a photo with the real mouse hovers it, selects it and opens the viewer, and its yellow
+viewfield is drawn over the rest.

@@ -5,10 +5,12 @@ import { styleDefaults } from '../lib/Style.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BatchMeshItem } from './lib/BatchMesh.ts';
 import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { LayerBatches } from './lib/LayerBatches.ts';
 import type { LineBatchMeshItem } from './lib/LineBatchMesh.ts';
 import type { MinimalStyleProps, StyleProps } from '../lib/Style.ts';
 import type { OneOrMore } from '../util/iterable.ts';
@@ -296,6 +298,27 @@ export class AbstractPixiFeature {
 
 
   /**
+   * Gives this Feature the batches it should draw in, from its layer's (see `LayerBatches`), or
+   * takes them away. A kind of Feature that batches can draw overrides this; this one draws
+   * itself, always. Call it before `update()`.
+   * @param _batches - The layer's batches, or `null` to draw without them
+   * @param _parent - The container whose batches to draw in
+   */
+  public placeInBatches(_batches: LayerBatches | null, _parent: PIXI.Container): void {
+  }
+
+
+  /**
+   * Whether this Feature draws something in its own container, and so has to be in the scene.
+   * A kind of Feature that batches can draw overrides this; this one always does.
+   * @return `true` if its container has to be in the scene
+   */
+  public drawsInContainer(): boolean {
+    return true;
+  }
+
+
+  /**
    * The container in the scene that says where this Feature is drawn among the others: the one
    * drawn later is on top, and is what the pointer hits (`featureOrder()` in `helpers.ts`).
    * It's the Feature's own container, unless something else draws the Feature.
@@ -313,6 +336,16 @@ export class AbstractPixiFeature {
    */
   public get sceneOrder(): number {
     return 0;
+  }
+
+
+  /**
+   * What says where this Feature is drawn in its `sceneContainer`, if that's a batch: its item
+   * there. Of two with the same `sceneOrder`, the batch draws the item it was given later on top.
+   * @return The batch's item, or `null` if no batch draws the Feature
+   */
+  public get sceneItem(): BatchMeshItem | null {
+    return null;
   }
 
 

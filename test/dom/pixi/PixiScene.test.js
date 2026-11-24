@@ -124,7 +124,7 @@ describe('PixiScene', () => {
         gfx: { origin: new PIXI.Container() }
       };
       const names = [
-        'getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged',
+        'getSpatialContainer', 'releaseSpatialContainers', 'isInteractive', '_modeChanged',
         '_eventMode', 'setHitTester', 'hitTest',
         'worldContainer', 'worldContainersIn', 'destroyWorldContainer', 'setAnchor'
       ];
@@ -292,16 +292,23 @@ describe('PixiScene', () => {
         assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), rapidLine);
       });
 
-      it('doesn\'t ask a layer whose data the mode keeps from the pointer', () => {
+      it('asks a layer once, whatever spatial IDs it finds the features of', () => {
         let asked = 0;
-        scene.setHitTester('fbRoads', { hitTest: () => { asked++; return null; } });
-        scene._modeChanged({ interactiveSpatialIDs: new Set(['osm']) });
+        const layer = { hitTest: () => { asked++; return null; } };
+        scene.setHitTester('fbRoads', layer);
+        scene.setHitTester('msBuildings', layer);
         assert.isNull(scene.hitTest({ x: 0, y: 0 }, null));
-        assert.strictEqual(asked, 0);
+        assert.strictEqual(asked, 1);
+      });
+
+      // (A layer asks `isInteractive()` of each spatial ID whose features it looks at.)
+      it('says which spatial IDs the mode lets the pointer reach', () => {
+        scene._modeChanged({ interactiveSpatialIDs: new Set(['osm']) });
+        assert.isTrue(scene.isInteractive('osm'));
+        assert.isFalse(scene.isInteractive('fbRoads'));
 
         scene._modeChanged({ interactiveSpatialIDs: null });
-        scene.hitTest({ x: 0, y: 0 }, null);
-        assert.strictEqual(asked, 1);
+        assert.isTrue(scene.isInteractive('fbRoads'));
       });
     });
 
@@ -414,6 +421,7 @@ describe('PixiScene', () => {
         enabled: enabled,
         features: new Map(visibility.map((visible, i) => [`${id}-${i}`, { visible: visible }])),
         numVisible: visibility.filter(Boolean).length,
+        batches: { followView: viewport => calls.push(`follow ${id} ${viewport}`) },
         render: (frame, viewport) => calls.push(`render ${id} ${frame.id} ${viewport}`),
         cull: frame => calls.push(`cull ${id} ${frame.id}`),
         keptFeatures: () => kept,
@@ -434,10 +442,12 @@ describe('PixiScene', () => {
 
       PixiScene.prototype.render.call(scene, frame, 'viewport');
 
-      // (The batches' shaders hear about the view before any layer draws into a batch.)
+      // (The batches' shaders hear about the view before any layer draws into a batch, and each
+      // layer's batches follow the view before it draws.)
       assert.deepEqual(calls, [
         'label space origin viewport', 'batch views viewport',
-        'render osm 7 viewport', 'cull osm 7', 'render keepright 7 viewport', 'cull keepright 7'
+        'follow osm viewport', 'render osm 7 viewport', 'cull osm 7',
+        'follow keepright viewport', 'render keepright 7 viewport', 'cull keepright 7'
       ]);
       const osm = frame.layers.get('osm');
       assert.include(osm, { enabled: true, kept: true, features: 3, visible: 2, created: 1, updated: 2 });
@@ -455,6 +465,7 @@ describe('PixiScene', () => {
           id: id,
           enabled: true,
           features: new Map(),
+          batches: { followView: () => {} },
           numWaiting: waitingInView + waitingOutside,
           numWaitingInView: waitingInView,
           render: frame => {

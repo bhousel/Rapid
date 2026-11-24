@@ -5,7 +5,7 @@ mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines a
 tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
 two batches a level, every casing and then every stroke, its areas in two, every fill and
 then every outline, and its points in one; a feature that its batches draw isn't in the scene
-(Nov 23). Section 4 is ideas with nothing built.
+(Nov 23). Every other layer that draws data does the same since Nov 24. Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -16,8 +16,8 @@ then every outline, and its points in one; a feature that its batches draw isn't
   over everything.
 - **Hit-testing.** Pixi tests the tree top-down and stops at the first container with
   `eventMode: 'static'`. A container with `eventMode: 'none'` is skipped along with its whole subtree.
-  (The OSM layer's features are found through the spatial index instead, with the same answer:
-  "Who finds the feature under the pointer", below.)
+  (The features of layers that draw in batches, OSM's and every other data layer's, are found
+  through an index instead, with the same answer: "Who finds the feature under the pointer", below.)
   Whatever draws on top takes the pointer, which is right for selecting and wrong for drawing: a muted
   "already mapped" Rapid line lies exactly on the OSM sidewalk it matched, so a line started on that
   sidewalk ended up as a loose node (pre.4 release check, Nov 2026). Photo markers and QA items over
@@ -144,13 +144,15 @@ index can ask the few features near the pointer instead, so a layer can take its
 testing from Pixi:
 
 - **The layer says so:** `scene.setHitTester('osm', layer)`. The scene then gives that spatial
-  ID's containers `eventMode: 'none'` whatever the mode, and Pixi's walk skips them.
+  ID's containers `eventMode: 'none'` whatever the mode, and Pixi's walk skips them. A layer that
+  draws in batches (`useBatches`) says so for every spatial ID it makes containers for.
 - **`PixiEvents` asks the scene for the feature on every pointer event** (`scene.hitTest()`), and
   puts it on the event (`_feature`). `AbstractBehavior._getEventData()` reads it from there; the
   behaviors and modes are unchanged.
 - **The scene takes whichever is drawn on top:** the feature that Pixi's own target belongs to, or
-  the one a layer found (`drawOrder()` in `helpers.ts` compares their places in the tree). A layer
-  whose spatial ID the mode keeps from the pointer isn't asked.
+  the one a layer found (`drawOrder()` in `helpers.ts` compares their places in the tree). Each
+  layer is asked once, and looks only at the spatial IDs the mode lets the pointer reach
+  (`scene.isInteractive()`).
 - **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
   within reach of the pointer (the furthest any feature drawn so far can be hit from its
   geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
@@ -159,9 +161,13 @@ testing from Pixi:
   from its rings or by being in its fill. None of that is Pixi's: a feature that its batches
   draw isn't in the scene. (One that draws itself, like a vertex of what's selected, answers by
   the rules Pixi has for one container: `containerHit()`.)
+- **The other layers' `hitTest()`** (`AbstractPixiLayer.hitTest()`, Nov 24) asks an R-tree of
+  where the features it drew are (written when a feature's box changes), and the same
+  `AbstractPixiFeature.hitTest()` of each near the pointer.
 - **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
   what draws each (`sceneContainer`: a feature's own container, a line's strokes' batch, an
-  area's fills' batch, the points' batch), and in one batch by the feature's order there.
+  area's fills' batch, the points' batch), in one batch by the feature's order there, and of two
+  with the same order by which the batch draws later (`BatchMesh.drawIndex()`).
 - **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
   spatial container: Pixi still finds those.
 

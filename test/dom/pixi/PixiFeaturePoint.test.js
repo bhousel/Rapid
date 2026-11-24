@@ -5,6 +5,7 @@ import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
 import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+import { LayerBatches } from '../../../modules/pixi/lib/LayerBatches.ts';
 
 // The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
 const batchShaders = new BatchShaders();
@@ -614,6 +615,31 @@ describe('PixiFeaturePoint', () => {
       assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25);
     });
 
+    it('draws the photo that\'s selected or highlighted over every other', () => {
+      feature.style = { marker: { image: 'largeCircle' }, viewfield: { angles: [0], image: 'viewfield' } };
+      feature.setClass('selectphoto');
+      drawAt(17);
+      assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25 + 2 ** 26);
+
+      feature.unsetClass('selectphoto');
+      feature.setClass('highlightphoto');
+      drawAt(17);
+      assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25 + 2 ** 26);
+
+      feature.unsetClass('highlightphoto');
+      drawAt(17);
+      assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25);
+    });
+
+    it('puts the icon higher in the head of the taller `osmose` pin', () => {
+      TEXTURES.osmose = new PIXI.Texture({ source: source, frame: new PIXI.Rectangle(0, 0, 20, 26) });
+      feature.style = { marker: { image: 'osmose' }, icon: { image: 'maki-cafe' } };
+      drawAt(17);
+      closeTo(cornersOf(0), [[-10, -26], [10, -26], [10, 0], [-10, 0]]);
+      closeTo(cornersOf(1), [[-5.5, -22.5], [5.5, -22.5], [5.5, -11.5], [-5.5, -11.5]]);
+      delete TEXTURES.osmose;
+    });
+
     it('draws a pin as a circle below zoom 17, everything smaller, without viewfields', () => {
       feature.style = { ...PIN, viewfield: { angles: [0], image: 'viewfield' } };
       drawAt(16.5);
@@ -1186,5 +1212,42 @@ describe('PixiFeaturePoint', () => {
     assert.strictEqual(other.style, feature.style);
     draw({ marker: { image: 'pin' } });
     assert.notStrictEqual(other.style, feature.style);
+  });
+
+
+  // A layer gives a point the batch of the container it's drawn for (`AbstractPixiLayer._drawInBatches`)
+  describe('placeInBatches', () => {
+    let batches, parent, other;
+    beforeEach(() => {
+      batches = new LayerBatches(batchShaders);
+      parent = new PIXI.Container();
+      other = new PIXI.Container();
+    });
+    afterEach(() => {
+      parent.destroy({ children: true });
+      other.destroy({ children: true });
+    });
+
+    it('takes the container\'s batch for points, and keeps it', () => {
+      feature.placeInBatches(batches, parent);
+      const batch = feature.batch;
+      assert.strictEqual(batch, batches.pointBatch(parent, [0, 0]));
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.batch, batch);
+      assert.strictEqual(batch.users, 1);
+    });
+
+    it('takes another container\'s when it\'s drawn for that one', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(batches, other);
+      assert.strictEqual(feature.batch.parent, other);
+    });
+
+    it('gives it back, and draws itself, without the layer\'s batches', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(null, parent);
+      assert.isNull(feature.batch);
+      assert.isTrue(feature.drawsInContainer());
+    });
   });
 });

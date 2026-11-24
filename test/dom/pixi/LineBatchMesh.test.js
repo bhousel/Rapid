@@ -112,6 +112,19 @@ describe('LineBatchMesh', () => {
     assert.deepEqual(drawn().slice(2 * n), Array.from(straight.indices, index => index + bottom.first));
   });
 
+  it('says where a line is in the order it draws in, before that order is built', () => {
+    const top = batch.add(straight, 0, 0, STYLE, 2);
+    const bottom = batch.add(straight, 0, 0, STYLE, 1);
+    const alsoTop = batch.add(straight, 0, 0, STYLE, 2);
+    assert.deepEqual([bottom, top, alsoTop].map(item => batch.drawIndex(item)), [0, 1, 2]);
+
+    batch.setOrder(bottom, 3);
+    assert.strictEqual(batch.drawIndex(bottom), 2);
+
+    batch.remove(top);
+    assert.strictEqual(batch.drawIndex(top), -1);
+  });
+
   it('hides a line by the opacity in its vertices, and builds nothing', () => {
     const a = batch.add(straight, 0, 0, STYLE);
     const b = batch.add(corner, 0, 0, STYLE);

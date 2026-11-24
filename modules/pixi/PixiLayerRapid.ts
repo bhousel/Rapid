@@ -55,6 +55,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'rapid';
+    this.useBatches = true;
     this._enabled = true;     // Rapid features should be enabled by default
     this._drawnFrom = new WeakMap<AbstractPixiFeature, ConflationResult | LineRun | null>();
 
@@ -433,7 +434,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
-          feature.parentContainer = parentContainer;
         }
 
         // Changed data is a new object, with a new shape (a split way's survivor gains nodes)
@@ -456,7 +456,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           const tags = this._getTags(d);
           feature.style = style;
           feature.label = l10n.displayName(tags);
-          feature.update(viewport);
+          this._drawInBatches(feature, parentContainer, viewport);
         }
 
         this.retainFeature(feature, frame);
@@ -514,7 +514,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
-          feature.parentContainer = parentContainer;
         }
 
         // Changed data is a new object, with a new shape (a split way's survivor gains nodes)
@@ -559,7 +558,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
           feature.style = style;
           feature.label = l10n.displayName(tags);
-          feature.update(viewport);
+          this._drawInBatches(feature, parentContainer, viewport);
         }
 
         this.retainFeature(feature, frame);
@@ -604,7 +603,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeatureLine(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       // Results are recomputed after edits, so the run at this index may have changed.
@@ -623,7 +621,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (feature.dirty) {
         feature.style = this._lineStyle(colorNum, run.status);
         feature.label = l10n.displayName(this._getTags(d));
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
       }
 
       this.retainFeature(feature, frame);
@@ -693,7 +691,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.labelAvoid = true;   // labels keep clear of it
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -715,7 +712,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.label = housenumber;
         }
 
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
       }
 
       this.retainFeature(feature, frame);
@@ -731,7 +728,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.labelAvoid = true;   // labels keep clear of it
-        feature.parentContainer = parentContainer;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
       }
 
@@ -752,7 +748,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (!feature.label && housenumber) {
           feature.label = housenumber;
         }
-        feature.update(viewport);
+        this._drawInBatches(feature, parentContainer, viewport);
       }
 
       this.retainFeature(feature, frame);

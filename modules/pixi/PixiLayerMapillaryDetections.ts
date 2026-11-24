@@ -23,6 +23,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary-detections';
+    this.useBatches = true;
   }
 
 
@@ -117,7 +118,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -148,7 +148,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this._drawInBatches(feature, parentContainer, viewport);
       this.retainFeature(feature, frame);
     }
   }

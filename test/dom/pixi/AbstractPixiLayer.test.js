@@ -1,3 +1,4 @@
+import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
 
@@ -487,6 +488,158 @@ describe('AbstractPixiLayer', () => {
       assert.include(work, { created: 2, destroyed: 1, updated: 0 });
       assert.isAtLeast(work.steps.gather, 5);
       assert.deepEqual(layer.takeWork(), { created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} });
+    });
+  });
+
+
+  // A layer that draws in batches (`useBatches`) gives each feature the batches of the container it's
+  // drawn for, puts it in the scene only if it draws something itself, and finds its features under
+  // the pointer itself: Pixi can't see what a batch draws.
+  describe('batches', () => {
+    let layer, scene, spatial, child, testers, interactive;
+
+    // A stand-in feature: what `_drawInBatches` and `hitTest` use of one
+    function makeFeature(id, extent, { drawsItself = false, hit = true } = {}) {
+      const feature = {
+        id: id, dirty: true, visible: true, allowInteraction: true, hitReach: 0,
+        geometry: { world: { extent: { min: extent.slice(0, 2), max: extent.slice(2) } } },
+        container: new PIXI.Container(), placed: [], asked: 0,
+        placeInBatches: (batches, parent) => feature.placed.push([batches, parent]),
+        update: () => { feature.dirty = false; },
+        drawsInContainer: () => drawsItself,
+        hitTest: () => { feature.asked++; return hit; },
+        sceneContainer: null, sceneOrder: 0, sceneItem: null
+      };
+      Object.defineProperty(feature, 'parentContainer', {
+        get: () => feature.container.parent,
+        set: val => {
+          if (val) {
+            val.addChild(feature.container);
+          } else {
+            feature.container.parent?.removeChild(feature.container);
+          }
+        }
+      });
+      feature.sceneContainer = feature.container;
+      layer.features.set(id, feature);
+      layer._numVisible++;
+      return feature;
+    }
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      context.viewport.transform = { x: 0, y: 0, z: 16 };    // a pixel is a world unit
+      spatial = new PIXI.Container();
+      child = new PIXI.Container();
+      spatial.addChild(child);
+      testers = new Map();
+      interactive = new Set(['fbRoads']);
+      scene = {
+        context: context, gfx: {},
+        getSpatialContainer: () => spatial,
+        releaseSpatialContainers: () => {},
+        setHitTester: (spatialID, l) => testers.set(spatialID, l),
+        isInteractive: spatialID => interactive.has(spatialID)
+      };
+      layer = new AbstractPixiLayer(scene);
+      layer.useBatches = true;
+      layer._spatialContainer('basemap', 'fbRoads');
+    });
+
+    it('says it finds its own features, for each spatial ID it draws', () => {
+      assert.strictEqual(testers.get('fbRoads'), layer);
+
+      const other = new AbstractPixiLayer(scene);    // one that doesn't draw in batches
+      other._spatialContainer('basemap', 'custom');
+      assert.isFalse(testers.has('custom'));
+    });
+
+    it('gives a dirty feature the layer\'s batches in the container, and draws it', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer._drawInBatches(feature, child, {});
+      assert.deepEqual(feature.placed, [[layer.batches, child]]);
+      assert.isFalse(feature.dirty);
+      assert.isNull(feature.parentContainer, 'its batches draw it: it isn\'t in the scene');
+
+      layer._drawInBatches(feature, child, {});    // not dirty: nothing to do
+      assert.lengthOf(feature.placed, 1);
+    });
+
+    it('puts a feature that draws something itself in the container', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10], { drawsItself: true });
+      layer._drawInBatches(feature, child, {});
+      assert.strictEqual(feature.parentContainer, child);
+    });
+
+    it('gives no batches without `useBatches`', () => {
+      layer.useBatches = false;
+      const feature = makeFeature('a', [0, 0, 10, 10], { drawsItself: true });
+      layer._drawInBatches(feature, child, {});
+      assert.deepEqual(feature.placed, [[null, child]]);
+      assert.strictEqual(feature.parentContainer, child);
+    });
+
+    it('finds the features near the pointer through its index, the one drawn on top first', () => {
+      const under = makeFeature('under', [0, 0, 10, 10]);
+      const over = makeFeature('over', [5, 5, 15, 15]);
+      const far = makeFeature('far', [500, 500, 510, 510]);
+      for (const feature of [under, over, far]) {
+        layer._drawInBatches(feature, child, {});
+        child.addChild(feature.container);    // (where each is drawn, for `featureOrder`)
+      }
+
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 7, y: 7 }), over);
+      assert.strictEqual(far.asked, 0, 'a feature far from the pointer isn\'t asked');
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0.5, y: 0.5 }), under);    // (more than the margin of 4 from `over`)
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 100, y: 100 }));
+    });
+
+    it('finds no feature that\'s hidden, not interactive, or of data the mode keeps from the pointer', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer._drawInBatches(feature, child, {});
+
+      feature.visible = false;
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      feature.visible = true;
+      feature.allowInteraction = false;
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      feature.allowInteraction = true;
+      interactive.clear();
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      interactive.add('fbRoads');
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }), feature);
+    });
+
+    it('finds a feature that moved where it is now, and no feature that\'s gone', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer._drawInBatches(feature, child, {});
+
+      feature.geometry = { world: { extent: { min: [100, 100], max: [110, 110] } } };
+      feature.dirty = true;
+      layer._drawInBatches(feature, child, {});
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 105, y: 105 }), feature);
+
+      layer.removeFeature(feature);
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 105, y: 105 }));
+    });
+
+    it('looks as far around the pointer as the furthest a feature it drew can be hit', () => {
+      const feature = makeFeature('pin', [0, 0, 0, 0]);    // a point
+      feature.hitReach = 30;                                // a pin, hit up to its top
+      layer._drawInBatches(feature, child, {});
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: -28 }), feature);
+    });
+
+    it('forgets its batches and its index in a reset', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer._drawInBatches(feature, child, {});
+      let forgot = 0;
+      layer.batches.forget = () => forgot++;
+      feature.destroy = () => layer.removeFeature(feature);
+      layer.reset();
+      assert.strictEqual(forgot, 1);
+      assert.strictEqual(layer._featureIndex.all().length, 0);
     });
   });
 });

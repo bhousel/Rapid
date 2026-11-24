@@ -471,7 +471,7 @@ export class PixiScene extends EventEmitter {
    * @param spatialID - The spatial ID, e.g. 'osm' or 'fbRoads'
    * @return `true` if that data's features can be hovered and clicked
    */
-  protected _isInteractive(spatialID: SpatialID): boolean {
+  public isInteractive(spatialID: SpatialID): boolean {
     return this._interactiveSpatialIDs === null || this._interactiveSpatialIDs.has(spatialID);
   }
 
@@ -484,7 +484,7 @@ export class PixiScene extends EventEmitter {
    * @return The `eventMode` for that spatial ID's containers
    */
   protected _eventMode(spatialID: SpatialID): PIXI.EventMode {
-    return (this._isInteractive(spatialID) && !this._hitTesters.has(spatialID)) ? 'passive' : 'none';
+    return (this.isInteractive(spatialID) && !this._hitTesters.has(spatialID)) ? 'passive' : 'none';
   }
 
 
@@ -514,9 +514,9 @@ export class PixiScene extends EventEmitter {
    * Finds the feature under the pointer.
    *
    * Pixi's hit test has an answer already (a pointer event's `target`), for everything except
-   * the spatial IDs whose layers find their own (`setHitTester`). Those layers are asked here,
-   * if the mode lets the pointer reach their data, and the answer is whichever feature is drawn
-   * on top, as it would be if Pixi had tested them all.
+   * the spatial IDs whose layers find their own (`setHitTester`). Those layers are asked here
+   * (each looks only at the spatial IDs that the mode lets the pointer reach, `isInteractive`),
+   * and the answer is whichever feature is drawn on top, as it would be if Pixi had tested them all.
    * @param point - The pointer's place in the stage's coordinates (a pointer event's `global`)
    * @param target - What Pixi's hit test found there (a pointer event's `target`), if anything
    * @return The feature, or `null` if the pointer is over none
@@ -538,8 +538,8 @@ export class PixiScene extends EventEmitter {
     // Features are positioned in world coordinates under `origin`, as it was last drawn.
     const world = origin.worldTransform.applyInverse(point, this._hitWorld);
 
-    for (const [spatialID, layer] of this._hitTesters) {
-      if (!this._isInteractive(spatialID)) continue;
+    // (A layer may find the features of several spatial IDs, and checks which the mode lets the pointer reach.)
+    for (const layer of new Set(this._hitTesters.values())) {
       const hit = layer.hitTest(point, world);
       if (hit && (!best || featureOrder(hit, best) > 0)) {
         best = hit;
@@ -602,6 +602,7 @@ export class PixiScene extends EventEmitter {
     const times = new Map<LayerID, { renderMs: number, cullMs: number }>();
     for (const layer of this.layers.values()) {
       const t0 = performance.now();
+      layer.batches.followView(viewport);   // (keeps their coordinates fine enough for the view's zoom)
       layer.render(frame, viewport);
       const t1 = performance.now();
       layer.cull(frame);

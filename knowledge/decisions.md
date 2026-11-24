@@ -109,6 +109,22 @@ each vertex for the line's width in pixels at the current zoom. Choices someone 
 - **Dashes the vertex can't hold** (more than four numbers, fractions, over 255 pixels) fall back
   to `LineMesh`es with a dash texture. None of Rapid's styles has one.
 
+## Every layer that draws data draws in batches (Nov 24, 2026)
+Section 16 of `design/graphics-system-log.md`. Choices someone might undo:
+- **One way for any layer** (`AbstractPixiLayer._drawInBatches()` and `useBatches`), with each
+  kind of feature knowing which batches it takes (`placeInBatches()`), not a copy of the OSM
+  layer's placement in each layer. The OSM layer still places its features in its levels and
+  tiles itself, with the same `placeInBatches()`.
+- **A layer's own hit test is an R-tree of what it drew** (`_featureIndex`), written when a
+  feature's box changes. Not the data's spatial caches: the Rapid layer draws data from
+  services' graphs and line pieces that aren't in one, and a feature's box is what it's hit by.
+- **The edit blocks are left out:** they draw into a group (no spatial container, so no anchor
+  near the view for a batch's floats, and no spatial ID to hit-test by), are never interactive,
+  and are seldom there.
+- **More draw calls, fewer containers:** 25 → 28 in Bellevue with every layer on, since each
+  layer has its own batches where Pixi merged sprites across layers. It's what took a pan's
+  DRAW from 22.6 to 1.5 ms and Pixi's hit test from 1.8 to 0.006 ms.
+
 ## Areas are drawn in two batches: fills, then outlines (Nov 2026)
 Step 8 of section 15, the first part. Choices someone might undo:
 - **Every outline is over every fill** (as iD draws areas). Before, a small area's fill covered
@@ -216,8 +232,9 @@ on color alone, with frames at regular intervals). Choices someone might undo:
 - **Rejected for now: drawing the still scene to a texture,** and animating over it. It would
   make an animation draw nearly free and allow 60 a second. It's a change to how every frame
   is drawn, and wants numbers from weak hardware first.
-- **`GlowFilter` stays for features that draw themselves** in layers without batches (Rapid's
-  and custom data's lines and areas). Every layer's points have the new glow.
+- **`GlowFilter` stays for features that draw themselves** in layers without batches. Since Nov 24
+  every layer that draws data draws in batches, so that's next to nothing (a line whose dashes a
+  batch can't draw).
 
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 

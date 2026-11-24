@@ -42,6 +42,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'streetside';
+    this.useBatches = true;
 
     // Make sure the event handlers have `this` bound correctly
     this._dirtyCurrentPhoto = this._dirtyCurrentPhoto.bind(this);
@@ -189,7 +190,10 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const streetside = this.context.services.streetside;
     if (!streetside?.started) return;
 
+    // Sequences under the markers: each kind in a container of its own, so their batches are in that order
     const parentContainer = this._spatialContainer('streetview', this.id);
+    const sequencesContainer = this._childContainer(parentContainer, 'sequences', 0);
+    const markersContainer = this._childContainer(parentContainer, 'markers', 1);
     let markers = streetside.getImages();
     let sequences = streetside.getSequences();
 
@@ -210,8 +214,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeatureLine(this, featureID);
         feature.style = LINESTYLE;
-        feature.parentContainer = parentContainer;
-        feature.container.zIndex = -100;  // beneath the markers (which should be [-90..90])
       }
 
       // If sequence has changed, update data and coordinates.
@@ -223,7 +225,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
+      this._drawInBatches(feature, sequencesContainer, viewport);
       this.retainFeature(feature, frame);
     }
 
@@ -240,7 +242,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -283,7 +284,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this._drawInBatches(feature, markersContainer, viewport);
       this.retainFeature(feature, frame);
     }
   }

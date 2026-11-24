@@ -26,7 +26,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 
 | File | Description |
 |------|-------------|
-| `AbstractPixiLayer.ts` | Base class for all rendering layers |
+| `AbstractPixiLayer.ts` | Base class for all rendering layers: features and their data, passes, waiting work, drawing in the layer's batches, and finding its features under the pointer |
 | `AbstractPixiFeature.ts` | Base class for all renderable features |
 
 ### Feature Types

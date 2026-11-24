@@ -8,7 +8,9 @@ import { geomLineSegments, geomStrokeMesh } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BatchMeshItem } from './lib/BatchMesh.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
+import type { LayerBatches } from './lib/LayerBatches.ts';
 import type { LineBatchMeshGlow, LineBatchMeshItem, LineBatchMeshMarkers, LineBatchMeshStyle, LineMarkerKind } from './lib/LineBatchMesh.ts';
 import type { LineStyleProps } from '../lib/Style.ts';
 import type { StrokeMesh, StrokeOptions } from '../geo/stroke.ts';
@@ -266,6 +268,24 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
+   * Gives this line its batches: the ones for casings and strokes in the container (see
+   * `LayerBatches.lineBatch`). A line already in that container's batches keeps them.
+   * @param batches - The layer's batches, or `null` to draw the line with meshes of its own
+   * @param parent - The container whose batches to draw in (for OSM, a level of lines)
+   */
+  public override placeInBatches(batches: LayerBatches | null, parent: PIXI.Container): void {
+    const origin = this._geom?.world?.origin;
+    if (!batches || !origin) {
+      this.batch = null;
+      this.casingBatch = null;
+    } else if (this._batch?.parent !== parent || this._casingBatch?.parent !== parent) {   // (a destroyed batch has no parent)
+      this.batch = batches.lineBatch(parent, false, origin);
+      this.casingBatch = batches.lineBatch(parent, true, origin);
+    }
+  }
+
+
+  /**
    * Whether this line draws something in its own container, and so has to be in the scene (the
    * layer asks before `update()`, to know whether to give it a place there).
    * A line whose casing and stroke are in batches draws nothing itself (its glow, when it's
@@ -273,7 +293,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * has no shape for (none of Rapid's styles has): those are sprites in the container.
    * @return `true` if its container has to be in the scene
    */
-  public drawsInContainer(): boolean {
+  public override drawsInContainer(): boolean {
     if (!this._batchesFor()) return true;
     return !this._markersBatchable();
   }
@@ -323,6 +343,16 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   public override get sceneOrder(): number {
     const item = this._strokeItem ?? this._casingItem;
     return (item?.batch && item.visible) ? item.order : 0;
+  }
+
+
+  /**
+   * Its item in the batch that draws it (see `sceneItem`)
+   * @return The item, or `null` if no batch draws it
+   */
+  public override get sceneItem(): BatchMeshItem | null {
+    const item = this._strokeItem ?? this._casingItem;
+    return (item?.batch && item.visible) ? item : null;
   }
 
 
