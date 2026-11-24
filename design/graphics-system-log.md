@@ -1,152 +1,34 @@
-# GraphicsSystem: making a frame, and measuring it
+# GraphicsSystem: the log
 
-How `GraphicsSystem` turns the map into a frame, what we know about what a frame costs, and the
-explorations planned to make frames cheaper. Rendering performance is where Rapid has the most room to
-improve, and until now we've had no way to see it except spot checks in Spector.
+How the renderer got to where it is, Nov 18 to 24, 2026: what was measured, what was tried, what
+was built in which order, and why. How it works now is in
+[`graphics-system.md`](graphics-system.md), with the words used here ("Words used here").
 
-> **Status:** In progress (Nov 2026). Merged to `main` with `pixi-8.23` (PR #10) and `label-avoids`
-> (PR #11), Nov 20. Built: steps 1 to 5 of the plan (frame stats, `bun run measure` over a set of
-> difficult places, where the GPU time goes, the rendering info card, the `RenderFrame` passed to the
-> layers), the cull box (section 8), frame pacing (section 9), a deadline on the frame (section 10),
-> fewer passes (section 12), less garbage (section 13) and label placement (section 14). Section 11
-> compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
-> without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
-> rendering follow-ups". The plan is in section 7. Section 15 is where the renderer could go from
-> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 5 are built on
-> `linebuilder_refactor`: lines, the outlines of areas, halos and the lasso are drawn from stroke
-> meshes (`modules/geo/stroke.ts`, `modules/pixi/lib/LineMesh.ts`), a line is hit by its distance
-> from the pointer, `lineToPoly()` and `DashLine` are gone, and a partial fill is a band of real
-> geometry with no stencil mask (`modules/geo/band.ts`, with Clipper2 for the offsetting). Of step
-> 6: the OSM layer finds its features under the pointer through the spatial index, and draws its
-> lines in two batches per level with a shader of our own (`modules/pixi/lib/LineBatchMesh.ts`): every
-> casing, then every stroke. A line that its batches draw isn't in Pixi's scene. Of step 8: areas
-> are in two batches too (`FillBatchMesh` for every fill, a `LineBatchMesh` for every outline). Points are in
-> one (`PointBatchMesh`), the markers along lines are drawn by the lines' shader (step 9), and a
-> hover's glow and a selection's halo are in batches whose shaders move them (step 10), with
-> animation draws at intervals while they do. All of section 15 was merged with PR #12 (Nov 24).
+This file is a record, and isn't kept up to date. What it says about the code was true on the
+date it gives, and a lot has changed since: classes were renamed, steps were done another way,
+and "today" means the day it was written. Numbers are from an M4 Mac in Chrome, at a device
+pixel ratio of 2, unless they say otherwise. Section numbers are the ones this had when it was
+the design doc, so "section N" here means a section of this file.
 
-Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
-[`scheduler-system.md`](scheduler-system.md) (the game loop, its ticks and their budget),
-[`profiling.md`](profiling.md) (memory and leaks), [`style-system.md`](style-system.md).
+**Add to it** when you measure or try something: a dated section at the end, with what you did,
+the numbers, and what they say. Then change `graphics-system.md` to say what's true now.
 
-## Words used here
-
-These are the words for the frame loop everywhere: in this doc, in the code and in the other docs.
-A frame is made in **phases** (APP, then DRAW); a **pass** is a walk over a layer's data, and an
-APP phase may have one or not.
-
-```
-tick (a requestAnimationFrame callback): SchedulerSystem._onTick
- ├ GraphicsSystem._tick
- │  ├ a DRAW left over from the last tick? → DRAW phase, and nothing else
- │  ├ _updateTransform()
- │  ├ a frame wanted? → APP phase: _app(mayPass)        ← starts a frame (a RenderFrame)
- │  │    ├ may a pass happen? (FramePacer's gap) → new cull box; the frame's deadline
- │  │    ├ scene.render(): each layer's render() (a pass, or kept), then cull()
- │  │    │    (the labels layer places labels from its queue until the deadline)
- │  │    ├ time left → features put off outside the view
- │  │    └ APP took under 8 ms? → DRAW phase in this tick too
- │  ├ no frame drawn? → the CSS transform follows the view
- │  └ nothing pending, something moves by itself, AnimationPacer due → an animation draw
- └ the scheduler's tasks (a share of every tick)
-
-pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer's hitTest()
-```
-
-**The loop**
-- **Tick:** one `requestAnimationFrame` callback. `SchedulerSystem` runs the loop
-  (`addTickCallback()`), and `GraphicsSystem._tick()` decides what this tick does: an APP phase, a
-  DRAW phase, both, an animation draw, or nothing.
-- **Frame:** everything needed to draw the map once: an APP phase and the DRAW phase that shows
-  it (`RenderFrame`, numbered, kept in `gfx.renderFrames`). Rapid keeps one frame in flight, and
-  its work may be spread over more than one tick.
-- **APP phase:** Rapid's half of a frame (`GraphicsSystem._app()` → `PixiScene.render()` → each
-  layer's `render()` and `cull()`). It places the stage, picks the cull box and the deadline, and
-  brings the scene up to date.
-- **DRAW phase:** Pixi's half (`GraphicsSystem._draw()` → `pixi.render()`). Pixi walks the render
-  groups, builds the instruction lists of those that changed, uploads what changed in our
-  batches, and issues the draw calls. Then the `draw` event.
-- **Animation draw:** the scene drawn again as the last frame left it, because something in it
-  moves by itself (a hover's glow, a selection's dashes). A DRAW with no APP: not a frame, not in
-  `renderFrames`, no `draw` event (`_drawAnimation()`, `AnimationPacer`, `gfx.animationDraws`).
-
-**In the APP phase**
-- **Pass (of a layer):** a layer's walk over its data: gather what's in the cull box, update its
-  features and mark them seen, then `cull()` hides the ones it didn't see. It's the expensive
-  part, and an APP phase may have none.
-- **Pass frame:** a frame in which layers had a pass to do: a redraw was requested, or the view
-  needed a new cull box. A frame that only moves the view isn't one. (The OSM layer follows a cull
-  box that moves without a pass since section 12; a new zoom or rotation still needs one.)
-- **Gap:** how long a pass frame waits after the one before it. It grows with what that one cost
-  (`FramePacer`, section 9).
-- **Held frame:** a frame made while a pass frame waits for its gap. It moves the view, and every
-  layer that can keeps its features.
-- **Cull box:** the part of the world a frame wants features ready for: the view, and padding
-  around it. While the view moves inside it, a layer needs no pass (section 8).
-- **Cull:** a layer hiding the features its pass didn't see, and destroying the ones it hasn't
-  seen for a while (`cull()`).
-- **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view
-  had moved, inside the cull box it already had everything for (section 8). The OSM layer also
-  keeps them when it's told which data changed, or follows the cull box when that moves
-  (section 12).
-- **Deadline:** the time in a frame's APP phase after which work that can wait is put off to a
-  later frame: making features, drawing them again after a zoom, placing labels (section 10).
-- **Waiting:** a feature is waiting when it's dirty and its layer put off drawing it again. It's
-  shown as it was last drawn, or not at all if it's new. A frame that leaves work waiting is
-  **unfinished**, and another frame follows.
-- **Chunk:** a few entities taken at a time when a layer makes or draws features that waited or
-  arrived (`MAKE_CHUNK`, `ARRIVED_CHUNK`), with a look at the deadline between chunks.
-- **Draw (a feature):** a feature is drawn (again) when its `update()` runs in the APP phase. A
-  feature **draws itself** when it has Pixi objects of its own in the scene, not only items in
-  batches (`drawsInContainer()`).
-- **Label placement:** the labels layer's part of the APP phase. It places labels from a queue,
-  those in view first, until the deadline, and not while the zoom or rotation is changing
-  (section 14).
-- **Label space:** the screen minus an offset that moves with every pan, so a pan changes nothing
-  in it: what labels are placed in, and what the avoid grid covers. `scene.labelSpace` works it
-  out at the start of each APP phase, and carries what features tell the labels layer (what
-  changed, what was drawn over a label or left a place).
-
-**Asking for a frame**
-- **Redraw request:** a call to `deferredRedraw()` or `immediateRedraw()`. It says that something
-  the map draws has changed, so layers need a pass: it asks for APP work, not only a DRAW. Moving
-  the view isn't one.
-- **`requestFrame()`:** asks for a frame without saying anything changed, after the layers were
-  told some other way. The scene calls it when a class changes, when it's told of data that
-  changed or arrived (`dataChanged()`, `dataArrived()`), and when textures arrive, so callers of
-  those don't.
-
-**Outside the frame**
-- **Hit test:** finding what's under the pointer. It runs on each pointer event, not in a frame:
-  `PixiEvents` asks `PixiScene.hitTest()`, which asks the layers that find their own features
-  through a spatial index (`setHitTester()`), and Pixi's walk for the rest.
-
-**Pixi's words**
-- **Render group:** a container that keeps its own instruction list, which Pixi builds again only
-  when something in it changed.
-- **Instruction:** one entry in a render group's instruction list. Each names the pipe that runs
-  it: `batch`, `graphics` (a `Graphics` drawn on its own), `mesh`, `stencilMask`, `filter`.
-- **Draw call:** one `drawElements`/`drawArrays` (WebGL), or `draw`/`drawIndexed` (WebGPU).
-- **Pixi's batch:** consecutive drawables that Pixi merges into one draw call, copying their
-  vertices into a buffer of its own. It ends when the next drawable can't join it (a different
-  blend mode, too many textures, a mask, a filter, or something that isn't batchable). Always
-  say "Pixi's" for this one.
-
-**Our words**
-- **Batch:** one of our `BatchMesh`es (`LineBatchMesh`, `FillBatchMesh`, `PointBatchMesh`): a Pixi
-  `Mesh` with a shader of our own, holding many features' vertices, kept from frame to frame and
-  drawn in one draw call. A feature is an **item** in it, a run of its vertices. Not part of
-  Pixi's batches. A layer keeps its batches in a `LayerBatches` (the OSM layer's `batches`), and
-  every batch of a kind draws with its scene's shader for that kind (`scene.batchShaders`), which
-  the scene tells the view and the clock.
-- **`LineMesh`:** one line drawn from its stroke mesh, for what isn't in a batch (the lasso, the
-  lines of layers without batches).
-- **Stroke mesh:** the triangles that draw a line at any width, built once
-  (`geomStrokeMesh()`); see section 15.
-- **Render:** a method name on both sides (a layer's `render()` is APP work, `pixi.render()` is
-  DRAW), so it's not the name of a phase.
-- **Partial fill:** the default area style. Only a band 32 px wide inside the outline is filled
-  (`PARTIALFILLWIDTH` in `PixiFeaturePolygon`); the `map.areaFill` setting can make it full.
+| Section | What it is |
+|---|---|
+| 1 | How a frame was made (Nov 19) |
+| 2 | The first measurements, and the difficult places (Nov 18) |
+| 3 | Frame stats: the design, and the decisions about it (Nov 18 and 19) |
+| 4, 5 | Partial fills without a stencil mask, and dashed lines: the reasoning before section 15 built them |
+| 6 | Where the GPU time goes (Nov 18) |
+| 7 | The first plan, steps 1 to 7 |
+| 8 | The cull box (Nov 19) |
+| 9 | Frame pacing (Nov 19) |
+| 10 | A deadline on the frame, and what a frame costs when little is done in it (Nov 19) |
+| 11 | Against `main`, Rapid 2.5 and iD (Nov 19 and 20) |
+| 12 | The pass, and the work done without one (Nov 19 and 20) |
+| 13 | Garbage collection (Nov 19) |
+| 14 | Label placement (Nov 20) |
+| 15 | Where this could go: what other map renderers do, two tiers, and the line builder, steps 1 to 10 (Nov 22 to 24) |
 
 ## 1. How a frame is made
 
