@@ -10,6 +10,7 @@ import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } 
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { Difference } from '../lib/Difference.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
@@ -319,6 +320,49 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._tileFloor = 0;
     this._tilePlace = new WeakMap<PIXI.Container, TilePlace>();
     this._oldTiles = new Set<PIXI.Container>();
+
+    // The data comes from the editor: what arrived from the OSM API (`merge`), and what an edit
+    // changed (`stagingchange`). The layer draws just that, without its pass, when its frames
+    // have time (`dataArrived`, `dataChanged`).
+    this._merged = this._merged.bind(this);
+    this._stagingChanged = this._stagingChanged.bind(this);
+    const editor = this.context.systems.editor;    // (not in some tests)
+    editor?.on('merge', this._merged);
+    editor?.on('stagingchange', this._stagingChanged);
+  }
+
+
+  /**
+   * OSM data arrived from the API, and `EditSystem` merged it (`merge`). The layer makes and draws
+   * what arrived as its frames have time (see `dataArrived`), and the scene asks for a frame, not a
+   * redraw. (`entityIDs` is everything on the tile, also what we had already, and what the new data
+   * reshaped.) Without a list, it's a redraw of the layer.
+   * @param entityIDs - What arrived, or `undefined` if that isn't known
+   */
+  protected _merged(entityIDs?: Iterable<EntityID>): void {
+    const gfx = this.gfx;
+    const scene = this.scene;
+
+    if (entityIDs) {
+      scene.dataArrived(this.id, [...entityIDs]);
+    } else {
+      gfx.deferredRedraw(this.id);
+    }
+  }
+
+
+  /**
+   * An edit changed staging (`stagingchange`). The layer draws again what it affects, without
+   * its pass (see `dataChanged`, `_renderChanged`): a drag makes an edit on every pointer move.
+   * `EditSystem` emits with staging's geometry already current. The renderer binds each feature to
+   * its entity and its part of staging's geometry, and binds again when either is a different
+   * object; these are marked dirty to restyle them, since what changed may be only their topology
+   * (a vertex that's now shared).
+   * @param difference - What the edit changed
+   */
+  protected _stagingChanged(difference: Difference): void {
+    const scene = this.scene;
+    scene.dataChanged(this.id, [...difference.complete().keys()]);
   }
 
 

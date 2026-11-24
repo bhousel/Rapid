@@ -1102,6 +1102,37 @@ describe('FilterSystem', () => {
   });
 
 
+  // What's matched for an entity can change when data arrives (a relation gains members) and when
+  // it's edited, so the cache forgets it then (`EditSystem`'s `merge` and `stagingchange`).
+  describe('the cache, when data arrives or is edited', () => {
+    let ctx, editor, filters, n1, graph;
+    beforeEach(async () => {
+      ctx = new Rapid.MockContext();
+      editor = new Rapid.MockSystem(ctx);
+      ctx.systems = { editor: editor };
+      filters = new Rapid.FilterSystem(ctx);
+      n1 = new Rapid.OsmNode(ctx, { id: 'n1', loc: [0, 0], tags: { amenity: 'bench' } });
+      graph = new Rapid.Graph(ctx, [n1]);
+      editor.staging = { graph: graph };
+      await filters.initAsync();
+      filters.getMatches(n1, graph, 'point');
+      assert.isTrue(filters._cache.has(n1));
+    });
+
+    it('forgets what was matched for what arrived', () => {
+      editor.emit('merge', new Set(['n1', 'n2']));   // (`n2` isn't in this graph: a deleted node, say)
+      assert.isFalse(filters._cache.has(n1));
+    });
+
+    it('forgets what was matched for what an edit changed, without changing the entity', () => {
+      const oldKey = n1.key;
+      editor.emit('stagingchange', { complete: () => new Map([['n1', n1]]), didChange: {} });
+      assert.isFalse(filters._cache.has(n1));
+      assert.strictEqual(n1.key, oldKey);   // other graphs share the object, so it isn't touched
+    });
+  });
+
+
   describe('settings', () => {
     class MockUrlHashSystem extends Rapid.MockSystem {
       constructor(context, params = {}) {

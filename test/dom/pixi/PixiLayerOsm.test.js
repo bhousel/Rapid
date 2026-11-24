@@ -12,6 +12,44 @@ const batchShaders = new BatchShaders();
 
 describe('PixiLayerOsm', () => {
 
+  // The layer hears from the editor what arrived from the OSM API, and what an edit changed, and
+  // draws just that, without its pass: the scene asks for a frame, not a redraw.
+  describe('what the editor says', () => {
+    let editor, told, redraws;
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      editor = new Rapid.MockSystem(context);
+      context.systems = { editor: editor };
+      told = [];
+      redraws = [];
+      const scene = {
+        context: context, layers: new Map(),
+        gfx: { deferredRedraw: layerID => redraws.push(layerID), immediateRedraw: layerID => redraws.push(layerID) },
+        dataArrived: (layerID, dataIDs) => told.push(['arrived', layerID, ...dataIDs]),
+        dataChanged: (layerID, dataIDs) => told.push(['changed', layerID, ...dataIDs])
+      };
+      scene.layers.set('osm', new PixiLayerOsm(scene));    // (it listens to the editor)
+    });
+
+    it('draws what arrived (everything on the tile, and what it reshaped)', () => {
+      editor.emit('merge', new Set(['n1', 'w1']));
+      assert.deepEqual(told, [['arrived', 'osm', 'n1', 'w1']]);
+      assert.deepEqual(redraws, []);
+    });
+
+    it('draws what an edit affects', () => {
+      editor.emit('stagingchange', { complete: () => new Map([['n1', {}], ['w1', {}]]) });
+      assert.deepEqual(told, [['changed', 'osm', 'n1', 'w1']]);
+      assert.deepEqual(redraws, []);
+    });
+
+    it('does its pass when it isn\'t told what arrived', () => {
+      editor.emit('merge');
+      assert.deepEqual(redraws, ['osm']);
+    });
+  });
+
+
   // Rendering needs WebGL, so this drives `renderMidpoints` on a layer with stubbed Pixi parts:
   // the features already exist, and `_gatherMidpoints` returns the midpoints for each frame.
   function makeLayer(context, framesOfMidpoints) {
@@ -77,6 +115,7 @@ describe('PixiLayerOsm', () => {
       nearby = [];
       context.systems = {
         editor: {
+          on: () => {},
           staging: { graph: {} },
           entitiesInBox: box => { boxes.push(box); return nearby.map(id => ({ dataID: id })); }
         }
@@ -165,7 +204,7 @@ describe('PixiLayerOsm', () => {
       const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [0.001, -0.001] });
       const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: tags });
       const graph = new Rapid.Graph(context, [n1, n2, n3, way]);
-      context.systems.editor = { staging: { graph: graph } };
+      context.systems.editor = { staging: { graph: graph }, on: () => {} };
 
       const layer = new PixiLayerOsm({ context: context, gfx: {}, layers: new Map() });
       const data = { lines: new Map([['w1', way]]), polygons: new Map() };
@@ -198,7 +237,7 @@ describe('PixiLayerOsm', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0.001, 0] });
       const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
-      context.systems.editor = { staging: { graph: new Rapid.Graph(context, [n1, n2, way]) } };
+      context.systems.editor = { staging: { graph: new Rapid.Graph(context, [n1, n2, way]) }, on: () => {} };
       const layer = new PixiLayerOsm({ context: context, gfx: {}, layers: new Map() });
       const none = { descendantIDs: new Set(), siblingIDs: new Set(), handleIDs: new Set() };
       assert.lengthOf(layer._gatherMidpoints({}, { lines: new Map([['w1', way]]), polygons: new Map() }, none), 0);
@@ -931,7 +970,7 @@ describe('PixiLayerOsm', () => {
         hasEntity: id => entities.get(id),
         geometry: entity => ({ world: { extent: entity.extent } })
       };
-      context.systems.editor = { staging: { graph: graph } };
+      context.systems.editor = { staging: { graph: graph }, on: () => {} };
 
       layer = new PixiLayerOsm({ context: context, gfx: {} });
 
@@ -1181,7 +1220,7 @@ describe('PixiLayerOsm', () => {
         geometry: entity => ({ world: { extent: entity.extent } }),
         parentWays: () => []
       };
-      context.systems.editor = { staging: { graph: graph } };
+      context.systems.editor = { staging: { graph: graph }, on: () => {} };
       context.systems.filters = { isHidden: entity => (hidden.has(entity.id) ? 'hidden' : null) };
       context.mode = { id: 'browse' };
 
