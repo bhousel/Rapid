@@ -124,6 +124,15 @@ export class LabelSpace {
 
 
   /**
+   * How many features changed since the labels layer last took them (see `featureChanged`).
+   * @return The number of features waiting to be looked at
+   */
+  public get numChangedFeatures(): number {
+    return this._changedFeatureIDs.size;
+  }
+
+
+  /**
    * Returns the features that changed since the last call (see `featureChanged`), and forgets them.
    * @return Their IDs. A feature may be gone by now.
    */

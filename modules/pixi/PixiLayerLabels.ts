@@ -376,11 +376,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /**
    * The labels layer has no features of its own to draw again later. It reports 1 while placing
    * labels is waiting for a later frame, so that the frame comes (see `render`): placement was
-   * put off, or something was drawn over a label after this frame's placement.
+   * put off, something was drawn over a label after this frame's placement, or a feature changed
+   * after this frame's placement (drawn in the scene's catch-up after every layer, or hidden by a
+   * deferred cull) and the layer hasn't looked at it.
    * @return 1 if placement is waiting, otherwise 0
    */
   public override get numWaiting(): number {
-    if (this._placementWaiting || this.scene.labelSpace.numAvoidHits > 0) return 1;
+    const labelSpace = this.scene.labelSpace;
+    if (this._placementWaiting || labelSpace.numAvoidHits > 0 || labelSpace.numChangedFeatures > 0) return 1;
     // Room was made, and something is waiting for room
     if (this._unplaced.size > 0 && (this._freed.length > 0 || this.scene.labelSpace.numAvoidFrees > 0)) return 1;
     return 0;
@@ -413,6 +416,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
       this.scene.labelSpace.takeAvoidHits();
       this.scene.labelSpace.takeAvoidFrees();
+      this.scene.labelSpace.takeChangedFeatures();    // (all are looked at when labels are back, `_placeAll`)
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
       this._placementWaiting = false;
