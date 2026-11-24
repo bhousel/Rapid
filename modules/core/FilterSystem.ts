@@ -821,7 +821,7 @@ export class FilterSystem extends AbstractSystem {
       settings?.set('filters.disabledFilters', this._knownSaved);
     }
 
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('osm');   // (only the OSM layer is filtered)
     this.emit('filterchange');
   }
 

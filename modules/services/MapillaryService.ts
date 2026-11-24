@@ -1041,7 +1041,7 @@ export class MapillaryService extends AbstractSystem {
           object_type:        type
         });
 
-        gfx?.immediateRedraw();
+        gfx?.immediateRedraw(type === 'traffic_sign' ? 'mapillary-signs' : 'mapillary-detections');
         return detection;
       })
       .catch(err => {

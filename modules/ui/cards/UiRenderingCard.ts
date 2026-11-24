@@ -435,7 +435,7 @@ export class UiRenderingCard extends AbstractUiCard {
     const enable = !gfx.detailedStats;
     gfx.enableDetailedStats(enable);
     this._turnedDetailsOn = enable && gfx.detailedStats;   // it stays off with a renderer that isn't WebGL
-    gfx.immediateRedraw();   // draw a frame that has them (or doesn't)
+    gfx.requestFrame();   // draw a frame that has them (or doesn't): nothing on the map changed
     this.render();
   }
 

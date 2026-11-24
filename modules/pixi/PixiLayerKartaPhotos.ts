@@ -72,7 +72,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const kartaview = context.services.kartaview;
     if (val && kartaview) {
       kartaview.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
@@ -89,7 +89,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
 
     this.dirtyData(currPhotoID);
-    this.gfx.immediateRedraw();
+    this.gfx.immediateRedraw(this.id);
   }
 
 

@@ -144,7 +144,7 @@ export class LassoBehavior extends AbstractBehavior {
         // Update the lasso data and schedule a redraw.
         const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
         mapUILayer.lassoData = this._coords;
-        gfx.immediateRedraw();
+        gfx.immediateRedraw('map-ui');
       }
     }
   }
@@ -167,7 +167,7 @@ export class LassoBehavior extends AbstractBehavior {
     // Clear the lasso and schedule a redraw.
     const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
     mapUILayer.lassoData = null;
-    gfx.immediateRedraw();
+    gfx.immediateRedraw('map-ui');
 
     const ids = this._lassoed();
     this._extent = null;
@@ -191,7 +191,7 @@ export class LassoBehavior extends AbstractBehavior {
     // Clear the lasso and schedule a redraw.
     const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
     mapUILayer.lassoData = null;
-    gfx.immediateRedraw();
+    gfx.immediateRedraw('map-ui');
 
     this._extent = null;
     this._coords = [];

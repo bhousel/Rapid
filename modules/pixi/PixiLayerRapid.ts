@@ -185,7 +185,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     if (val && services.length) {
       Promise.all(services.map(service => service.startAsync()))
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 

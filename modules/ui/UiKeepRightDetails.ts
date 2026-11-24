@@ -144,8 +144,7 @@ export class UiKeepRightDetails {
 
 
     // Don't hide entities related to this issue - iD#5880
-    filters.forceVisible(relatedEntities);
-    gfx.immediateRedraw();
+    filters.forceVisible(relatedEntities);   // (it tells the map, if that changes what's shown)
   }
 
 

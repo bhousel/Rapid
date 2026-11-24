@@ -58,7 +58,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 

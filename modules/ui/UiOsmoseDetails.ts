@@ -225,8 +225,7 @@ export class UiOsmoseDetails {
           });
 
         // Don't hide entities related to this issue - iD#5880
-        filters.forceVisible(issue.props.elems);
-        gfx.immediateRedraw();
+        filters.forceVisible(issue.props.elems);   // (it tells the map, if that changes what's shown)
       })
       .catch((e: unknown) => console.error(e));  // eslint-disable-line
   }

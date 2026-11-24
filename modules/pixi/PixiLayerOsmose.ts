@@ -55,7 +55,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     const osmose = context.services.osmose;
     if (val && osmose) {
       osmose.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 

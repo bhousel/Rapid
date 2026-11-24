@@ -132,7 +132,7 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
         } else {
           this._mapDataContainer.filters = [];
         }
-        gfx.immediateRedraw();
+        gfx.requestFrame();   // (a filter on the map's container: nothing in the scene changed)
       });
 
     this._colorblindCombo.data(this._comboData);

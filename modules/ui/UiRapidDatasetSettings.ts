@@ -1331,7 +1331,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // need some more things to happen here to trigger redraws..
     // see also UiRapidDatasetToggle changeColor()
     scene.dirtyLayers('rapid');
-    gfx.immediateRedraw();
+    gfx.immediateRedraw('rapid');
     this.render();
 
     // In case a Rapid feature is already selected, reselect it to update sidebar too.

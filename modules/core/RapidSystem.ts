@@ -1240,7 +1240,7 @@ export class RapidSystem extends AbstractSystem {
         });
     }
 
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('rapid');
     this.emit('datasetchange');
   }
 

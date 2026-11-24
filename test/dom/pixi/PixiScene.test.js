@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { PixiLayerKeepRight } from '../../../modules/pixi/PixiLayerKeepRight.ts';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
@@ -19,11 +20,12 @@ describe('PixiScene', () => {
 
   // A real scene needs WebGL, so `showData` runs on a stand-in scene that has real layers.
   describe('showData', () => {
-    let context, scene, changes, enabledDatasetIDs;
+    let context, scene, changes, changedIDs, enabledDatasetIDs;
 
     beforeEach(() => {
       context = new Rapid.MockContext();
       changes = 0;
+      changedIDs = [];
       enabledDatasetIDs = [];
 
       const startAsync = () => Promise.resolve();
@@ -39,7 +41,12 @@ describe('PixiScene', () => {
       context.systems = { rapid: rapid };
 
       const gfx = { immediateRedraw: () => {} };
-      scene = { context: context, gfx: gfx, layers: new Map(), _layerChanged: () => changes++ };
+      scene = {
+        context: context, gfx: gfx, layers: new Map(),
+        _layerChanged: layerIDs => { changes++; changedIDs.push(...layerIDs); },
+        _enabledLayerIDs: PixiScene.prototype._enabledLayerIDs,
+        _changedLayerIDs: PixiScene.prototype._changedLayerIDs
+      };
       for (const Layer of [PixiLayerOsm, PixiLayerRapid, PixiLayerOsmNotes, PixiLayerKeepRight]) {
         const layer = new Layer(scene);
         layer.enabled = false;
@@ -53,6 +60,7 @@ describe('PixiScene', () => {
       PixiScene.prototype.showData.call(scene, ['w1', 'osm-notes:123', 'keepright:4']);
       assert.sameMembers(enabledLayerIDs(), ['osm', 'osm-notes', 'keepright']);
       assert.strictEqual(changes, 1);
+      assert.sameMembers(changedIDs, ['osm', 'osm-notes', 'keepright'], 'the layers that were turned on, and no others');
     });
 
     it('turns on a Rapid dataset along with its layer, for its data or a piece of one of its lines', () => {
@@ -68,6 +76,28 @@ describe('PixiScene', () => {
       PixiScene.prototype.showData.call(scene, ['nowhere:1']);
       assert.deepEqual(enabledLayerIDs(), []);
       assert.strictEqual(changes, 0);
+    });
+  });
+
+
+  // A layer that's turned on or off has something to draw or hide; the others don't, and a layer
+  // that keeps its features (OSM) shouldn't do its pass for another layer's change.
+  describe('_layerChanged', () => {
+    it('asks for a redraw of the layers it is given, each by name, and says the layers changed', () => {
+      const asked = [];
+      const scene = new EventEmitter();
+      scene.gfx = { immediateRedraw: layerID => asked.push(layerID ?? 'everything') };
+      let emitted = 0;
+      scene.on('layerchange', () => emitted++);
+
+      PixiScene.prototype._layerChanged.call(scene, ['osm-notes', 'keepright']);
+      assert.deepEqual(asked, ['osm-notes', 'keepright']);
+      assert.strictEqual(emitted, 1);
+
+      asked.length = 0;
+      PixiScene.prototype._layerChanged.call(scene);    // a reset: everything
+      assert.deepEqual(asked, ['everything']);
+      assert.strictEqual(emitted, 2);
     });
   });
 

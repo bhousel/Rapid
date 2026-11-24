@@ -97,7 +97,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
 
     this.dirtyData(currPhotoID);
-    this.gfx.immediateRedraw();
+    this.gfx.immediateRedraw(this.id);
   }
 
 
@@ -133,7 +133,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 

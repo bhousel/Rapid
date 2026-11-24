@@ -215,7 +215,7 @@ export class MapRouletteService extends AbstractSystem {
       }
     }
     const gfx = this.context.systems.gfx;
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('maproulette');
     this._mapRouletteChanged();
   }
 
@@ -684,7 +684,7 @@ export class MapRouletteService extends AbstractSystem {
     if (ids.size || utilExtractValues(newVal).includes('true')) {
       scene.enableLayers('maproulette');   // will trigger 'layerchange'
     }
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('maproulette');
   }
 
 

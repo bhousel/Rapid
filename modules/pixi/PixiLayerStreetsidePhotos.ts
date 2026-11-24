@@ -66,7 +66,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
 
     this.dirtyData(currPhotoID);
-    this.gfx.immediateRedraw();
+    this.gfx.immediateRedraw(this.id);
   }
 
 
@@ -102,7 +102,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const streetside = context.services.streetside;
     if (val && streetside) {
       streetside.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 

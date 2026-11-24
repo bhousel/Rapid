@@ -272,7 +272,12 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
   `gfx.deferredRedraw()` and `gfx.immediateRedraw()` make every layer do its whole pass on the next
   frame. When what changed is drawn by one layer only (a tile of imagery arrived, a label texture
   was made, a dataset's data loaded), pass that layer's ID: `gfx.deferredRedraw(this.id)`. Then
-  layers like OSM can keep their features as they are.
+  layers like OSM can keep their features as they are. Turning a layer on or off asks for a
+  redraw of that layer alone (`scene.enableLayers()` and the others). The requests left without
+  a layer are for changes that reach every layer: the styles, the locale, the schema, the area
+  fill, the color scheme, debug flags, a reset, another OSM connection or user. Nothing on the
+  map changed (a filter on a container, frame stats turned on)? Ask for a frame:
+  `gfx.requestFrame()`.
 - **Every change to what a layer draws needs a redraw request.** Moving the view doesn't make one,
   and the OSM layer skips its pass on frames that come only from a move. Marking features dirty
   (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their layer do its next pass, but doesn't

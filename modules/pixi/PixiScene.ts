@@ -645,13 +645,14 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to enable
    */
   public enableLayers(layerIDs: OneOrMore<LayerID>): void {
-    for (const layerID of utilIterable(layerIDs)) {
+    const asked = [...utilIterable(layerIDs)];
+    for (const layerID of asked) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = true;
       }
     }
-    this._layerChanged();
+    this._layerChanged(asked);
   }
 
 
@@ -660,13 +661,14 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to disable
    */
   public disableLayers(layerIDs: OneOrMore<LayerID>): void {
-    for (const layerID of utilIterable(layerIDs)) {
+    const asked = [...utilIterable(layerIDs)];
+    for (const layerID of asked) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = false;
       }
     }
-    this._layerChanged();
+    this._layerChanged(asked);
   }
 
 
@@ -675,13 +677,14 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to toggle
    */
   public toggleLayers(layerIDs: OneOrMore<LayerID>): void {
-    for (const layerID of utilIterable(layerIDs)) {
+    const asked = [...utilIterable(layerIDs)];
+    for (const layerID of asked) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = !layer.enabled;
       }
     }
-    this._layerChanged();
+    this._layerChanged(asked);
   }
 
 
@@ -691,7 +694,7 @@ export class PixiScene extends EventEmitter {
    * @param dataIDs - The data IDs, e.g. `['w1', 'osm-notes:123']`
    */
   public showData(dataIDs: OneOrMore<DataID>): void {
-    const wasEnabled = new Set<LayerID>([...this.layers.values()].filter(layer => layer.enabled).map(layer => layer.id));
+    const wasEnabled = this._enabledLayerIDs();
 
     for (const dataID of utilIterable(dataIDs)) {
       for (const layer of this.layers.values()) {
@@ -702,11 +705,9 @@ export class PixiScene extends EventEmitter {
       }
     }
 
-    for (const layer of this.layers.values()) {
-      if (layer.enabled !== wasEnabled.has(layer.id)) {
-        this._layerChanged();
-        break;
-      }
+    const changed = this._changedLayerIDs(wasEnabled);
+    if (changed.length) {
+      this._layerChanged(changed);
     }
   }
 
@@ -716,11 +717,12 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to keep enabled
    */
   public onlyLayers(layerIDs: OneOrMore<LayerID>): void {
+    const wasEnabled = this._enabledLayerIDs();
     const toEnable = new Set<LayerID>(utilIterable(layerIDs));
     for (const layer of this.layers.values()) {
       layer.enabled = toEnable.has(layer.id);
     }
-    this._layerChanged();
+    this._layerChanged(this._changedLayerIDs(wasEnabled));
   }
 
 
@@ -1038,11 +1040,43 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Called whenever the enabled layers change.
-   * This will trigger a redraw and emit a 'layerchange' event.
+   * Returns the layers that are enabled now, to compare with later (see `_layerChanged`).
+   * @return Their IDs
    */
-  protected _layerChanged(): void {
-    this.gfx.immediateRedraw();
+  protected _enabledLayerIDs(): Set<LayerID> {
+    const layerIDs = new Set<LayerID>();
+    for (const layer of this.layers.values()) {
+      if (layer.enabled) layerIDs.add(layer.id);
+    }
+    return layerIDs;
+  }
+
+
+  /**
+   * Returns the layers that were turned on or off since `wasEnabled` was taken.
+   * @param wasEnabled - The layers that were enabled before (see `_enabledLayerIDs`)
+   * @return Their IDs
+   */
+  protected _changedLayerIDs(wasEnabled: Set<LayerID>): LayerID[] {
+    return [...this.layers.values()].filter(layer => layer.enabled !== wasEnabled.has(layer.id)).map(layer => layer.id);
+  }
+
+
+  /**
+   * Called whenever the enabled layers change: asks for a redraw of the layers concerned (the
+   * others have nothing new to draw), and emits a 'layerchange' event.
+   * @param layerIDs - The layers that were turned on or off, or asked to be; nothing for all of them (a reset)
+   */
+  protected _layerChanged(layerIDs?: Iterable<LayerID>): void {
+    const gfx = this.gfx;
+
+    if (layerIDs) {
+      for (const layerID of layerIDs) {
+        gfx.immediateRedraw(layerID);
+      }
+    } else {
+      gfx.immediateRedraw();
+    }
     this.emit('layerchange');
   }
 

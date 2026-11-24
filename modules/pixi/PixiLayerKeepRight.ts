@@ -55,7 +55,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
     const keepRight = context.services.keepright;
     if (val && keepRight) {
       keepRight.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 

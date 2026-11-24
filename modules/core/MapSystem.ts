@@ -149,7 +149,7 @@ export class MapSystem extends AbstractSystem {
               // already, and what the new data reshaped. See `PixiLayerOsm.dataArrived`.)
               scene.dataArrived('osm', entityIDs);
             } else {
-              gfx.deferredRedraw();
+              gfx.deferredRedraw('osm');
             }
           })
           .on('stagingchange', (difference: Difference) => {
@@ -1309,8 +1309,8 @@ export class MapSystem extends AbstractSystem {
     this._highlightEdits = val;
 
     const gfx = this.context.systems.gfx!;
-    gfx.scene!.dirtyScene();
-    gfx.immediateRedraw();
+    gfx.scene!.dirtyLayers('osm');   // (what's edited is OSM data)
+    gfx.immediateRedraw('osm');
     this.emit('mapchange');
   }
 

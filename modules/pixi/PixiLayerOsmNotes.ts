@@ -55,7 +55,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
