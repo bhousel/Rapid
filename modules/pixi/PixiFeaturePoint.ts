@@ -331,7 +331,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * The box of everything this point draws, in label space (see `PixiScene.updateLabelSpace`),
+   * The box of everything this point draws, in label space (see `LabelSpace.update`),
    * as the point was last drawn. Labels are placed around it, and keep clear of it.
    * @param out - Where to put the result
    * @return `out`, as `[minX, minY, maxX, maxY]`, or `null` if the point draws nothing
@@ -341,7 +341,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const origin = this._geom?.world?.origin;
     if (!origin || box[2] < box[0]) return null;
 
-    const [x, y] = this.scene.worldToLabel(origin[0], origin[1], TEMP);
+    const [x, y] = this.scene.labelSpace.worldToLabel(origin[0], origin[1], TEMP);
     out[0] = x + box[0];
     out[1] = y + box[1];
     out[2] = x + box[2];
@@ -413,7 +413,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.updateHitArea();
     this.updateHalo();
     this.updateAvoid();
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 
@@ -427,7 +427,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    */
   public override updateAvoid(): void {
     const scene = this.scene;
-    if (!this.labelAvoid || !this.container?.visible || !scene?.avoidGrid) {
+    if (!this.labelAvoid || !this.container?.visible || !scene?.labelSpace?.avoidGrid) {
       this._setAvoid(null);
       return;
     }
@@ -525,7 +525,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // A batch draws the point if every picture is in the batch's texture.
     let inBatch = !!batch;
     for (let i = 0; inBatch && i < count; i++) {
-      inBatch = PointBatchMesh.canDraw(QUADS[i].texture);
+      inBatch = batch!.canDraw(QUADS[i].texture);
     }
 
     this._ownDraw = !inBatch;

@@ -11,8 +11,6 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const LASSO_DASH = [6, 3];
 
-// How fine the halos' coordinates stay, in pixels (see `render`)
-const HALO_PRECISION = 1 / 32;
 
 
 /**
@@ -94,7 +92,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
     if (existing && !existing.destroyed) return existing;
     if (!this.halo) return null;
 
-    const batch = new LineBatchMesh();
+    const batch = new LineBatchMesh(this.scene.batchShaders.lines);
     batch.label = 'halos';
     batch.position.set(x, y);
     this.halo.addChild(batch);
@@ -255,25 +253,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       this.renderLasso(frame, viewport);
     }
 
-    this._moveHaloOrigin(viewport);
-  }
-
-
-  /**
-   * Keeps the halos' coordinates fine enough for the view's zoom: they're 32-bit floats from
-   * the batch's place in the world, which moves to the view when the view has gone far from
-   * it (as `PixiLayerOsm._moveBatchOrigins` does for its batches).
-   * @param viewport - The viewport that's being drawn
-   */
-  protected _moveHaloOrigin(viewport: Viewport): void {
-    const haloBatch = this._haloBatch;
-    if (!haloBatch || haloBatch.destroyed) return;
-
-    const reach = HALO_PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
-    const [x, y] = viewport.screenToWorld(viewport.center());
-    if (Math.abs(haloBatch.position.x - x) > reach || Math.abs(haloBatch.position.y - y) > reach) {
-      haloBatch.moveOrigin(Math.round(x), Math.round(y));
-    }
+    this._haloBatch?.followView(viewport);   // (32-bit floats from its place: see `BatchMesh.followView`)
   }
 
 

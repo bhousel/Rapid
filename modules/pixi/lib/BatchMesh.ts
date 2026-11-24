@@ -1,4 +1,7 @@
 import * as PIXI from 'pixi.js';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
+
+import type { Viewport } from '@rapid-sdk/math';
 
 
 /**
@@ -72,6 +75,14 @@ const MAX_FILL = 0.75;
 
 /** A batch with less than this part of its buffers in use gets smaller ones (when it's flushed) */
 const MIN_FILL = 0.3;
+
+/**
+ * A batch's vertices are 32-bit floats, relative to a place in the world near what's in it.
+ * `followView()` moves that place to the view's center when it's so far from it that a float
+ * could be off by this much of a pixel at the view's zoom. At zoom 16 that's 260,000 pixels
+ * away, at zoom 19 32,000 world units, at zoom 22 4,000.
+ */
+const PRECISION = 1 / 32;
 
 // A mesh with a shader of its own is never batched by Pixi, and never reads more of its `State`.
 const _state = PIXI.State.for2d();
@@ -331,6 +342,25 @@ export abstract class BatchMesh extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
     if (this._end > 0) {
       this._dirtyFirst = 0;
       this._dirtyEnd = this._end;
+    }
+  }
+
+
+  /**
+   * Keeps the batch's coordinates fine enough for the view's zoom: when the view is far from
+   * the batch's place in the world (after a long pan), and zoomed in enough for it to show,
+   * the place moves to the view's center (see `moveOrigin`). Call it on every frame; it does
+   * nothing while the view is near.
+   * @param viewport - The viewport that's being drawn
+   */
+  public followView(viewport: Viewport): void {
+    if (this.destroyed) return;
+
+    // How far from its place the batch's floats are still good to a part of a pixel, at this zoom
+    const reach = PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
+    const [x, y] = viewport.screenToWorld(viewport.center());
+    if (Math.abs(this.position.x - x) > reach || Math.abs(this.position.y - y) > reach) {
+      this.moveOrigin(Math.round(x), Math.round(y));
     }
   }
 

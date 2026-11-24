@@ -547,7 +547,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this._styleDirty = false;
 
     this.updateHalo(viewport);
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 

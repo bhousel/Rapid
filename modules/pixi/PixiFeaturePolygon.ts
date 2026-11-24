@@ -551,7 +551,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._geomDirty = false;
     this._styleDirty = false;
     this.updateHalo(viewport);
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 

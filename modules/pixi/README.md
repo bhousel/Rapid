@@ -15,7 +15,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 
 | File | Description |
 |------|-------------|
-| `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph; finds the feature under the pointer (`hitTest()`) |
+| `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph; finds the feature under the pointer (`hitTest()`). Owns the batches' shaders (`batchShaders`) and label space (`labelSpace`), in `lib/` |
 | `PixiEvents.ts` | Binds pointer/keyboard/wheel events once and re-dispatches them to other code, with the feature under the pointer on each pointer event |
 | `PixiTextures.ts` | Texture atlas management and sprite generation |
 | `RenderFrame.ts` | One frame of the map, with the stats gathered while it's made (see `design/graphics-system.md`) |

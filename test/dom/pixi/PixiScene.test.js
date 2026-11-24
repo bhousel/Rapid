@@ -4,12 +4,15 @@ import { PixiLayerKeepRight } from '../../../modules/pixi/PixiLayerKeepRight.ts'
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
 import { PixiLayerRapid } from '../../../modules/pixi/PixiLayerRapid.ts';
-import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
 import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
 import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 describe('PixiScene', () => {
@@ -359,91 +362,16 @@ describe('PixiScene', () => {
   });
 
 
-  // Label space is the screen minus an offset that moves with the map, so a pan changes nothing
-  // in it. The scene works it out once a frame, and owns the grid of what labels avoid.
-  describe('label space', () => {
-    function makeScene() {
-      const stage = new PIXI.Container();
-      const origin = new PIXI.Container();
-      stage.addChild(origin);
+  // Label space is the scene's (`scene.labelSpace`, see `LabelSpace.test.js`): it's a new one for
+  // a new zoom or rotation.
+  describe('dirtyTransform', () => {
+    it('starts a new label space, and tells every layer', () => {
+      const told = [];
       const scene = Object.create(PixiScene.prototype);
-      scene.gfx = { origin: origin };
-      scene.layers = new Map();
-      scene.labelOffset = new PIXI.Point();
-      scene._toScreen = new PIXI.Matrix();
-      scene._avoidHits = [];
-      scene._avoidFrees = [];
-      scene._changedFeatureIDs = new Set();
-      scene.avoidGrid = new AvoidGrid(2);
-      return { scene, stage, origin };
-    }
-    const viewportAt = (x, y) => ({ transform: { translation: [x, y] } });
-
-    it('gives a world coordinate the same label coordinates however the map is panned', () => {
-      const { scene, origin } = makeScene();
-      origin.scale.set(2, 2);
-      origin.position.set(-1000, -500);
-      scene.updateLabelSpace(viewportAt(300, 200));
-      const before = scene.worldToLabel(600, 400, [0, 0]).slice();
-
-      origin.position.set(-1000 + 37, -500 - 12);       // a pan moves `origin`, and nothing else
-      scene.updateLabelSpace(viewportAt(300, 200));
-      const after = scene.worldToLabel(600, 400, [0, 0]);
-      assert.closeTo(after[0], before[0], 1e-6);
-      assert.closeTo(after[1], before[1], 1e-6);
-    });
-
-    it('puts two world coordinates as far apart as they are on screen, also when the map is turned', () => {
-      const { scene, stage, origin } = makeScene();
-      origin.scale.set(2, 2);
-      stage.rotation = Math.PI / 2;
-      scene.updateLabelSpace(viewportAt(0, 0));
-      const a = scene.worldToLabel(100, 100, [0, 0]).slice();
-      const b = scene.worldToLabel(110, 100, [0, 0]);     // 10 world units east, 20 px on screen
-      assert.closeTo(b[0] - a[0], 0, 1e-6);               // which is down, a quarter turn on
-      assert.closeTo(b[1] - a[1], 20, 1e-6);
-    });
-
-    it('empties the avoid grid for a new zoom or rotation', () => {
-      const { scene } = makeScene();
-      const cells = scene.avoidGrid.cellsOf(0, 0, 10, 10);
-      scene.avoidGrid.mark('avoid', cells);
-      scene.avoidHit(cells);
-      const generation = scene.avoidGrid.generation;
-
+      scene.labelSpace = { reset: () => told.push('label space') };
+      scene.layers = new Map([['osm', { dirtyTransform: () => told.push('osm') }]]);
       scene.dirtyTransform();
-      assert.isFalse(scene.avoidGrid.isTaken('avoid', cells));
-      assert.isAbove(scene.avoidGrid.generation, generation);
-      assert.strictEqual(scene.numAvoidHits, 0);
-    });
-
-    it('hands over where something was drawn over a label, once', () => {
-      const { scene } = makeScene();
-      scene.avoidHit([1, 2, 3, 4]);
-      assert.strictEqual(scene.numAvoidHits, 1);
-      assert.deepEqual(scene.takeAvoidHits(), [[1, 2, 3, 4]]);
-      assert.deepEqual(scene.takeAvoidHits(), []);
-    });
-
-    it('hands over where something to avoid has left, once, and forgets it when label space changes', () => {
-      const { scene } = makeScene();
-      scene.avoidFreed([1, 2, 3, 4]);
-      assert.strictEqual(scene.numAvoidFrees, 1);
-      assert.deepEqual(scene.takeAvoidFrees(), [[1, 2, 3, 4]]);
-      assert.deepEqual(scene.takeAvoidFrees(), []);
-
-      scene.avoidFreed([1, 2, 3, 4]);
-      scene.dirtyTransform();
-      assert.strictEqual(scene.numAvoidFrees, 0);
-    });
-
-    it('hands over the features that changed, each once', () => {
-      const { scene } = makeScene();
-      scene.featureChanged({ id: 'osm-w1' });
-      scene.featureChanged({ id: 'osm-n1' });
-      scene.featureChanged({ id: 'osm-w1' });
-      assert.deepEqual([...scene.takeChangedFeatures()], ['osm-w1', 'osm-n1']);
-      assert.strictEqual(scene.takeChangedFeatures().size, 0);
+      assert.deepEqual(told, ['label space', 'osm']);
     });
   });
 
@@ -464,7 +392,8 @@ describe('PixiScene', () => {
         takeWork: () => ({ created: 1, destroyed: 0, updated: 2, shown: 0, hidden: 0, steps: { gather: 0.5 } })
       });
       const scene = {
-        updateLabelSpace: viewport => calls.push(`label space ${viewport}`),
+        gfx: { origin: 'origin' },
+        labelSpace: { update: (origin, viewport) => calls.push(`label space ${origin} ${viewport}`) },
         setBatchViews: viewport => calls.push(`batch views ${viewport}`),
         layers: new Map([
           ['osm', makeLayer('osm', true, [true, true, false], true)],
@@ -477,7 +406,7 @@ describe('PixiScene', () => {
 
       // (The batches' shaders hear about the view before any layer draws into a batch.)
       assert.deepEqual(calls, [
-        'label space viewport', 'batch views viewport',
+        'label space origin viewport', 'batch views viewport',
         'render osm 7 viewport', 'cull osm 7', 'render keepright 7 viewport', 'cull keepright 7'
       ]);
       const osm = frame.layers.get('osm');
@@ -514,7 +443,8 @@ describe('PixiScene', () => {
       };
 
       const scene = {
-        updateLabelSpace: () => {},
+        gfx: { origin: null },
+        labelSpace: { update: () => {} },
         setBatchViews: () => {},
         layers: new Map([
           ['osm', makeLayer('osm', 40, 100, 60)],
@@ -552,16 +482,16 @@ describe('PixiScene', () => {
     const lineView = () => [lines.uPixel, lines.uNarrow, lines.uWireframe, lines.uCasing, lines.uMarkers];
 
     beforeEach(() => {
-      lineBatch = new LineBatchMesh();
-      fillBatch = new FillBatchMesh();
+      lineBatch = new LineBatchMesh(batchShaders.lines);
+      fillBatch = new FillBatchMesh(batchShaders.fills);
       lines = lineBatch.shader.resources.lineUniforms.uniforms;
       fills = fillBatch.shader.resources.fillUniforms.uniforms;
       map = { wireframeMode: false, effectiveZoom: () => 17 };
-      scene = { context: { systems: { map: map } } };
+      scene = { context: { systems: { map: map } }, batchShaders: batchShaders };
     });
     afterEach(() => {
-      LineBatchMesh.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
-      FillBatchMesh.setView({ pixel: 1, rotation: 0, wireframe: false });
+      batchShaders.lines.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+      batchShaders.fills.setView({ pixel: 1, rotation: 0, wireframe: false });
       lineBatch.destroy();
       fillBatch.destroy();
     });
@@ -638,8 +568,8 @@ describe('PixiScene', () => {
     let lineBatch, pointBatch, lines, points, scene;
 
     beforeEach(() => {
-      lineBatch = new LineBatchMesh();
-      pointBatch = new PointBatchMesh();
+      lineBatch = new LineBatchMesh(batchShaders.lines);
+      pointBatch = new PointBatchMesh(batchShaders.points);
       lines = lineBatch.shader.resources.lineUniforms.uniforms;
       points = pointBatch.shader.resources.pointUniforms.uniforms;
       scene = {
@@ -648,7 +578,8 @@ describe('PixiScene', () => {
         _pulsing: new Map(),
         _reducedMotion: { matches: false },
         layers: new Map(),
-        gfx: { requestFrame: () => {} }
+        gfx: { requestFrame: () => {} },
+        batchShaders: batchShaders
       };
       const names = ['setClass', 'unsetClass', 'clearClass', '_classChanged', 'animate', 'addPulsing', 'removePulsing'];
       for (const name of names) {
@@ -657,8 +588,8 @@ describe('PixiScene', () => {
       Object.defineProperty(scene, 'animated', Object.getOwnPropertyDescriptor(PixiScene.prototype, 'animated'));
     });
     afterEach(() => {
-      LineBatchMesh.setTime({ pulse: 1, shift: 0 });
-      PointBatchMesh.setTime(1);
+      batchShaders.lines.setTime({ pulse: 1, shift: 0 });
+      batchShaders.points.setTime(1);
       lineBatch.destroy();
       pointBatch.destroy();
     });

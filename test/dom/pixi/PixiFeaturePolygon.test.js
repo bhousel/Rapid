@@ -3,6 +3,10 @@ import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
 import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeaturePolygon } from '../../../modules/pixi/PixiFeaturePolygon.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 // A polygon is drawn at one of three levels of detail, by its size on screen: not at all, as a
@@ -53,9 +57,9 @@ describe('PixiFeaturePolygon', () => {
       },
       pixi: { renderer: { type: 0 } }
     };
-    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, labelSpace: { featureChanged: () => {}, avoidFreed: () => {} } };
     // The map UI layer has the batch that draws every halo. (Its place in the world isn't the polygon's.)
-    halos = new LineBatchMesh();
+    halos = new LineBatchMesh(batchShaders.lines);
     halos.position.set(8388600, 8388590);
     scene.layers.set('map-ui', { haloBatchAt: () => halos });
     layer = new AbstractPixiLayer(scene);
@@ -542,8 +546,8 @@ describe('PixiFeaturePolygon', () => {
     beforeEach(() => {
       context = layer.context;
       context.viewport = { transform: { rotation: 0, zoom: 16 } };
-      fills = new FillBatchMesh();
-      outlines = new LineBatchMesh();
+      fills = new FillBatchMesh(batchShaders.fills);
+      outlines = new LineBatchMesh(batchShaders.lines);
       for (const each of [fills, outlines]) {
         each.position.set(8388608, 8388608);    // the world's middle, where the polygon is
       }
@@ -836,7 +840,7 @@ describe('PixiFeaturePolygon', () => {
       // A layer with many polygons gives the outlines' batch a small batch for the glows: one
       // that comes or goes doesn't have the outlines' index buffer built again.
       it('has its glows in the batch that the outlines\' batch has for glows, and leaves the outlines\' batch as it is', () => {
-        const glows = new LineBatchMesh();
+        const glows = new LineBatchMesh(batchShaders.lines);
         outlines.glows = glows;
         setShape(BIG);
         drawAt(16);

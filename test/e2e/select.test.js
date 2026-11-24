@@ -18,8 +18,8 @@ async function glowPixels(page, featureID, withPoints = true) {
     const layer = gfx.scene.layers.get('osm');
     const feature = layer.features.get(featureID);
     const canvas = gfx.pixi.canvas;
-    const lines = layer.lineBatches[0].shader.resources.lineUniforms.uniforms;
-    const points = layer.pointBatch.shader.resources.pointUniforms.uniforms;
+    const lines = layer.batches.lines[0].shader.resources.lineUniforms.uniforms;
+    const points = layer.batches.points[0].shader.resources.pointUniforms.uniforms;
     const pixels = glow => {
       lines.uGlow = glow;
       points.uPulse = withPoints ? glow : 1;
@@ -710,7 +710,7 @@ test('draws a hovered point in its batch, over a glow, and a selected one inside
     const layer = gfx.scene.layers.get('osm');
     const feature = layer.features.get(featureID);
     const item = feature.item;
-    const batch = layer.pointBatch;
+    const batch = layer.batches.points[0];
     // (A vertex of a point in a batch is 8 bytes: the seventh says whether its picture pulses.)
     const glow = feature.glowItem;
     return {

@@ -8,7 +8,7 @@ import type { StrokeMesh } from '../../geo/stroke.ts';
 
 /** How one line of a batch is drawn: a casing or a stroke */
 export interface LineBatchMeshStyle {
-  /** The width, in pixels, at zoom 17 and above (it's narrower below, see `LineBatchMesh.setView`) */
+  /** The width, in pixels, at zoom 17 and above (it's narrower below, see `LineBatchShader.setView`) */
   width: number;
   /** The narrowest it's drawn, in pixels */
   minWidth: number;
@@ -18,10 +18,10 @@ export interface LineBatchMeshStyle {
   alpha: number;
   /** The dash pattern in pixels, on and off, as two or four whole numbers up to 255 (see `LineBatchMesh.canDraw`) */
   dash?: number[] | null;
-  /** Whether it's a casing: those aren't drawn at every zoom (see `LineBatchMesh.setView`) */
+  /** Whether it's a casing: those aren't drawn at every zoom (see `LineBatchShader.setView`) */
   isCasing?: boolean;
   /**
-   * Whether it marches: its dashes move along it (see `LineBatchMesh.setTime`), and it's drawn as
+   * Whether it marches: its dashes move along it (see `LineBatchShader.setTime`), and it's drawn as
    * wide as `width` says at every zoom and in wireframe mode. The halo of a selection does.
    */
   marches?: boolean;
@@ -39,8 +39,8 @@ export interface LineBatchMeshGlow {
   alpha: number;
 }
 
-/** What the clock says about how the things that move in every batch are drawn (see `LineBatchMesh.setTime`) */
-export interface LineBatchMeshTime {
+/** What the clock says about how the things that move in every batch are drawn (see `LineBatchShader.setTime`) */
+export interface LineBatchShaderTime {
   /** How bright a glow is now, from 0 to 1: it breathes */
   pulse: number;
   /** How far the dashes of a line that marches have moved along it, in pixels */
@@ -101,8 +101,8 @@ export const LINE_GLOW = 12;
  */
 export type LineBatchMeshItem = BatchMeshItem;
 
-/** What the view says about how the lines of every batch are drawn (see `LineBatchMesh.setView`) */
-export interface LineBatchMeshView {
+/** What the view says about how the lines of every batch are drawn (see `LineBatchShader.setView`) */
+export interface LineBatchShaderView {
   /** How many units of the lines' coordinates a pixel is */
   pixel: number;
   /** How many pixels narrower every line is drawn at this zoom, down to its `minWidth` */
@@ -454,41 +454,62 @@ fn mainFrag(
 `;
 
 
-// Every batch draws with the same shader, and the same numbers about the view.
-let _shader: PIXI.Shader | null = null;
-let _uniforms: PIXI.UniformGroup | null = null;
-
 /**
- * Returns the uniforms that say how the lines of every batch are drawn for the current view.
- * @return The uniform group
+ * The shader that every `LineBatchMesh` of a scene draws with (see `BatchShaders`). Its uniforms
+ * say how lines are drawn for the current view, and where the things that move are at this
+ * moment: a zoom or a rotation changes them, and nothing in any batch.
  */
-function lineUniforms(): PIXI.UniformGroup {
-  _uniforms ??= new PIXI.UniformGroup({
-    uPixel: { value: 1, type: 'f32' },
-    uNarrow: { value: 0, type: 'f32' },
-    uWireframe: { value: 0, type: 'f32' },
-    uCasing: { value: 1, type: 'f32' },
-    uMarkers: { value: 1, type: 'f32' },
-    uGlow: { value: 1, type: 'f32' },
-    uShift: { value: 0, type: 'f32' }
-  });
-  return _uniforms;
-}
+export class LineBatchShader extends PIXI.Shader {
 
-/**
- * Returns the shader that every batch draws with, making it the first time.
- * @return The shader
- */
-function lineShader(): PIXI.Shader {
-  _shader ??= PIXI.Shader.from({
-    gl: { vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'line-batch' },
-    gpu: {
-      vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
-      fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
-    },
-    resources: { lineUniforms: lineUniforms() }
-  });
-  return _shader;
+  /** Makes the shader, with lines drawn as at zoom 17 until it's told about a view. */
+  public constructor() {
+    super({
+      glProgram: PIXI.GlProgram.from({ vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'line-batch' }),
+      gpuProgram: PIXI.GpuProgram.from({
+        vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
+        fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
+      }),
+      resources: {
+        lineUniforms: new PIXI.UniformGroup({
+          uPixel: { value: 1, type: 'f32' },
+          uNarrow: { value: 0, type: 'f32' },
+          uWireframe: { value: 0, type: 'f32' },
+          uCasing: { value: 1, type: 'f32' },
+          uMarkers: { value: 1, type: 'f32' },
+          uGlow: { value: 1, type: 'f32' },
+          uShift: { value: 0, type: 'f32' }
+        })
+      }
+    });
+  }
+
+
+  /**
+   * Says how the lines of every batch are drawn for the current view. Call it when the zoom or
+   * the fill mode changes: nothing else has to be done to a batch for those.
+   * @param view - What a pixel is in the lines' coordinates, and what the zoom does to widths and casings
+   */
+  public setView(view: LineBatchShaderView): void {
+    const uniforms = this.resources.lineUniforms.uniforms;
+    uniforms.uPixel = view.pixel;
+    uniforms.uNarrow = view.narrow;
+    uniforms.uWireframe = view.wireframe ? 1 : 0;
+    uniforms.uCasing = view.casing ? 1 : 0;
+    uniforms.uMarkers = view.markers ? 1 : 0;
+  }
+
+
+  /**
+   * Says how the things that move are drawn at this moment, in every batch: how bright the
+   * glows are, and how far the dashes of the lines that march have moved. Call it before a
+   * frame is drawn; nothing in any batch changes for it.
+   * @param time - What the clock says
+   */
+  public setTime(time: LineBatchShaderTime): void {
+    const uniforms = this.resources.lineUniforms.uniforms;
+    uniforms.uGlow = time.pulse;
+    uniforms.uShift = time.shift;
+  }
 }
 
 
@@ -499,8 +520,8 @@ function lineShader(): PIXI.Shader {
  * color, opacity and dashes) in every vertex.
  *
  * The shader puts each vertex where the line's width at the current zoom says, so a zoom changes
- * five numbers (`LineBatchMesh.setView()`) and nothing in any batch. Two more numbers follow the
- * clock (`LineBatchMesh.setTime()`): they make the glow around a hovered line breathe
+ * five numbers (`LineBatchShader.setView()`) and nothing in any batch. Two more numbers follow the
+ * clock (`LineBatchShader.setTime()`): they make the glow around a hovered line breathe
  * (`addGlow()`), and move the dashes of a line that marches, like a selection's halo. The markers along a line (oneway
  * arrows, the triangles of a line with sides) are a strip in the batch too, and the shader
  * draws them in it (`addMarkers()`). What the batch does with its
@@ -520,9 +541,12 @@ export class LineBatchMesh extends BatchMesh {
    */
   public glows: LineBatchMesh | null;
 
-  /** Makes a batch with no lines in it. It draws nothing until one is added. */
-  public constructor() {
-    super(LAYOUT, lineShader());
+  /**
+   * Makes a batch with no lines in it. It draws nothing until one is added.
+   * @param shader - The shader it draws with: its scene's, which every line batch there shares (`BatchShaders.lines`)
+   */
+  public constructor(shader: LineBatchShader) {
+    super(LAYOUT, shader);
     this.glows = null;
   }
 
@@ -536,34 +560,6 @@ export class LineBatchMesh extends BatchMesh {
     this.glows = null;
     if (glows && !glows.destroyed) glows.destroy(options);
     super.destroy(options);
-  }
-
-
-  /**
-   * Says how the lines of every batch are drawn for the current view. Call it when the zoom or
-   * the fill mode changes: nothing else has to be done to a batch for those.
-   * @param view - What a pixel is in the lines' coordinates, and what the zoom does to widths and casings
-   */
-  public static setView(view: LineBatchMeshView): void {
-    const uniforms = lineUniforms().uniforms;
-    uniforms.uPixel = view.pixel;
-    uniforms.uNarrow = view.narrow;
-    uniforms.uWireframe = view.wireframe ? 1 : 0;
-    uniforms.uCasing = view.casing ? 1 : 0;
-    uniforms.uMarkers = view.markers ? 1 : 0;
-  }
-
-
-  /**
-   * Says how the things that move are drawn at this moment, in every batch: how bright the
-   * glows are, and how far the dashes of the lines that march have moved. Call it before a
-   * frame is drawn; nothing in any batch changes for it.
-   * @param time - What the clock says
-   */
-  public static setTime(time: LineBatchMeshTime): void {
-    const uniforms = lineUniforms().uniforms;
-    uniforms.uGlow = time.pulse;
-    uniforms.uShift = time.shift;
   }
 
 
@@ -687,7 +683,7 @@ export class LineBatchMesh extends BatchMesh {
    * the line, as wide as the line and `LINE_GLOW` pixels more on each side, in which the shader
    * draws a color that's brightest at the line's edge and fades out. Give it a stroke mesh
    * with round caps and joins, so that the glow goes around the line's ends and corners.
-   * How bright every glow is changes with the clock (`LineBatchMesh.setTime`).
+   * How bright every glow is changes with the clock (`LineBatchShader.setTime`).
    * @param stroke - The line's stroke mesh. Its vertices are copied; its `indices` are kept, and must not change.
    * @param dx - Where the line's coordinates start, in the batch's
    * @param dy - The same, for y

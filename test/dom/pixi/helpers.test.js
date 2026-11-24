@@ -7,6 +7,10 @@ import {
   containerHit, drawHalo, drawOrder, drawRings, featureOrder, glowColor, ringsContain, setGlowFilter, triangulate,
   HIGHLIGHT_COLOR, HOVER_COLOR
 } from '../../../modules/pixi/helpers.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 describe('pixi helpers', () => {
@@ -74,7 +78,7 @@ describe('pixi helpers', () => {
     let batch;
 
     beforeEach(() => {
-      batch = new LineBatchMesh();
+      batch = new LineBatchMesh(batchShaders.lines);
     });
     afterEach(() => {
       if (!batch.destroyed) batch.destroy();
@@ -185,7 +189,7 @@ describe('pixi helpers', () => {
     });
 
     it('moves a halo that was in another batch into this one', () => {
-      const other = new LineBatchMesh();
+      const other = new LineBatchMesh(batchShaders.lines);
       const items = [];
       drawHalo(other, items, [square], 0, 0);
       assert.strictEqual(other.size, 2);

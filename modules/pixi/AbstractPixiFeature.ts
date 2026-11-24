@@ -164,7 +164,7 @@ export class AbstractPixiFeature {
    */
   public destroy(): void {
     this._setAvoid(null);
-    this.scene.featureChanged(this);    // (its label goes with it)
+    this.scene.labelSpace.featureChanged(this);    // (its label goes with it)
     this.layer.removeFeature(this);
     this.scene.removeFeature(this);
 
@@ -205,7 +205,7 @@ export class AbstractPixiFeature {
     this.layer.work.updated++;
     this._geomDirty = false;
     this._styleDirty = false;
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 
@@ -382,7 +382,7 @@ export class AbstractPixiFeature {
     } else if (!this.dirty) {
       this.updateAvoid();
     }
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 
@@ -402,7 +402,7 @@ export class AbstractPixiFeature {
    * @return The cells, or `null`
    */
   public get avoidCells(): CellRect | null {
-    const grid = this.scene?.avoidGrid;
+    const grid = this.scene?.labelSpace?.avoidGrid;
     return (grid && this._avoidGeneration === grid.generation) ? this._avoidCells : null;
   }
 
@@ -413,9 +413,9 @@ export class AbstractPixiFeature {
    * @param box - What the Feature covers, `[minX, minY, maxX, maxY]` in label space, or `null` for nothing
    */
   protected _setAvoid(box: [number, number, number, number] | null): void {
-    const scene = this.scene;
-    const grid = scene?.avoidGrid;
-    if (!grid) return;
+    const labelSpace = this.scene?.labelSpace;
+    const grid = labelSpace?.avoidGrid;
+    if (!labelSpace || !grid) return;
 
     const old = (this._avoidGeneration === grid.generation) ? this._avoidCells : null;   // (else: cleared since)
     const cells = box && grid.cellsOf(box[0], box[1], box[2], box[3]);
@@ -423,12 +423,12 @@ export class AbstractPixiFeature {
 
     if (old) {
       grid.unmark('avoid', old);
-      scene.avoidFreed(old);
+      labelSpace.avoidFreed(old);
     }
     if (cells) {
       grid.mark('avoid', cells);
       if (grid.isTaken('label', cells)) {
-        scene.avoidHit(cells);
+        labelSpace.avoidHit(cells);
       }
     }
     this._avoidCells = cells;
@@ -463,7 +463,7 @@ export class AbstractPixiFeature {
    * Whether the Feature's label has to be placed again: its shape, its label or its visibility
    * changed since the label was placed. (Not for a hover or a selection: see `setClass`.)
    * The labels layer reads this when the Feature tells the scene it changed
-   * (`PixiScene.featureChanged`), and clears it with `labelPlaced()`.
+   * (`LabelSpace.featureChanged`), and clears it with `labelPlaced()`.
    * @return `true` if the label is out of date
    */
   public get labelDirty(): boolean {
@@ -608,7 +608,7 @@ export class AbstractPixiFeature {
     if (str === this._label) return;  // no change
     this._label = str;
     this._labelDirty = true;
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 

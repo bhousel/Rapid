@@ -32,7 +32,7 @@ export interface PointBatchMeshQuad {
   alpha: number;
   /** Whether it turns with the map (a viewfield: it points somewhere on the ground), not staying upright on screen */
   turns: boolean;
-  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatchMesh.setTime`) */
+  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatchShader.setTime`) */
   pulses?: boolean;
 }
 
@@ -47,7 +47,7 @@ export type PointBatchMeshItem = BatchMeshItem;
 //   bytes   0 - 3   aColor     red, green, blue, opacity
 //           4       aFlags.x   255 if the picture turns with the map
 //           5       aFlags.y   255 if the point is shown, 0 if it's hidden
-//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatchMesh.setTime`)
+//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatchShader.setTime`)
 //           7                  not used
 const FLOATS = 6;
 const BYTES = 8;
@@ -195,40 +195,69 @@ fn mainFrag(
 `;
 
 
-// Every batch draws with the same shader, from the same texture, at the same moment.
-let _shader: PIXI.Shader | null = null;
-let _source: PIXI.TextureSource | null = null;
-let _uniforms: PIXI.UniformGroup | null = null;
-
 /**
- * Returns the uniforms that say how the pictures that pulse are drawn at this moment.
- * @return The uniform group
+ * The shader that every `PointBatchMesh` of a scene draws with (see `BatchShaders`). It holds the
+ * texture that the points' pictures are in, and a uniform for how bright the pictures that pulse
+ * are at this moment.
  */
-function pointUniforms(): PIXI.UniformGroup {
-  _uniforms ??= new PIXI.UniformGroup({
-    uPulse: { value: 1, type: 'f32' }
-  });
-  return _uniforms;
-}
+export class PointBatchShader extends PIXI.Shader {
 
-/**
- * Returns the shader that every batch draws with, making it the first time.
- * @return The shader
- */
-function pointShader(): PIXI.Shader {
-  _shader ??= PIXI.Shader.from({
-    gl: { vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'point-batch' },
-    gpu: {
-      vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
-      fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
-    },
-    resources: {
-      uTexture: PIXI.Texture.WHITE.source,
-      uSampler: PIXI.Texture.WHITE.source.style,
-      pointUniforms: pointUniforms()
-    }
-  });
-  return _shader;
+  /** The texture that the batches draw from, or `null` before there's one (see `setTexture`) */
+  protected _source: PIXI.TextureSource | null;
+
+
+  /** Makes the shader, with no texture: a batch can draw nothing until it has one. */
+  public constructor() {
+    super({
+      glProgram: PIXI.GlProgram.from({ vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'point-batch' }),
+      gpuProgram: PIXI.GpuProgram.from({
+        vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
+        fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
+      }),
+      resources: {
+        uTexture: PIXI.Texture.WHITE.source,
+        uSampler: PIXI.Texture.WHITE.source.style,
+        pointUniforms: new PIXI.UniformGroup({
+          uPulse: { value: 1, type: 'f32' }
+        })
+      }
+    });
+    this._source = null;
+  }
+
+
+  /**
+   * Gives every batch the texture that the points' pictures are in. A batch can draw only
+   * what's in that one.
+   * @param source - The texture, or `null` for none
+   */
+  public setTexture(source: PIXI.TextureSource | null): void {
+    const used = source ?? PIXI.Texture.WHITE.source;
+    this.resources.uTexture = used;
+    this.resources.uSampler = used.style;
+    this._source = source;
+  }
+
+
+  /**
+   * Says how bright the pictures that pulse are at this moment, in every batch (a glow
+   * breathes). Call it before a frame is drawn; nothing in any batch changes for it.
+   * @param pulse - How bright, from 0 to 1
+   */
+  public setTime(pulse: number): void {
+    this.resources.pointUniforms.uniforms.uPulse = pulse;
+  }
+
+
+  /**
+   * Whether a batch can draw a picture: it has to be in the texture that the batches draw from.
+   * (An icon that hasn't loaded isn't, nor is anything in a second slab of the atlas.)
+   * @param texture - The picture
+   * @return `true` if a batch can draw it
+   */
+  public canDraw(texture: PIXI.Texture): boolean {
+    return !!this._source && texture.source === this._source;
+  }
 }
 
 
@@ -258,7 +287,7 @@ function quadIndices(count: number): Uint16Array {
 /**
  * A `PointBatchMesh` draws many points as one mesh, in one draw call. A point is a few pictures
  * (a marker, perhaps an icon over it and viewfields under it), each a rectangle of one texture
- * that holds them all: the symbol atlas of `PixiTextures` (`PointBatchMesh.setTexture()`).
+ * that holds them all: the symbol atlas of `PixiTextures` (`PointBatchShader.setTexture()`).
  *
  * The shader puts each picture a number of pixels from where its point is on screen. So the
  * pictures are the same size at every zoom and stay upright when the map is turned (or turn
@@ -279,10 +308,17 @@ export class PointBatchMesh extends BatchMesh {
    */
   public glows: PointBatchMesh | null;
 
+  /** The shader it draws with (the same object as `shader`, with its own type) */
+  protected _pointShader: PointBatchShader;
 
-  /** Makes a batch with no points in it. It draws nothing until one is added. */
-  public constructor() {
-    super(LAYOUT, pointShader());
+
+  /**
+   * Makes a batch with no points in it. It draws nothing until one is added.
+   * @param shader - The shader it draws with: its scene's, which every point batch there shares (`BatchShaders.points`)
+   */
+  public constructor(shader: PointBatchShader) {
+    super(LAYOUT, shader);
+    this._pointShader = shader;
     this.glows = null;
   }
 
@@ -300,37 +336,13 @@ export class PointBatchMesh extends BatchMesh {
 
 
   /**
-   * Gives every batch the texture that the points' pictures are in. A batch can draw only
-   * what's in that one.
-   * @param source - The texture, or `null` for none
-   */
-  public static setTexture(source: PIXI.TextureSource | null): void {
-    const shader = pointShader();
-    const used = source ?? PIXI.Texture.WHITE.source;
-    shader.resources.uTexture = used;
-    shader.resources.uSampler = used.style;
-    _source = source;
-  }
-
-
-  /**
-   * Says how bright the pictures that pulse are at this moment, in every batch (a glow
-   * breathes). Call it before a frame is drawn; nothing in any batch changes for it.
-   * @param pulse - How bright, from 0 to 1
-   */
-  public static setTime(pulse: number): void {
-    pointUniforms().uniforms.uPulse = pulse;
-  }
-
-
-  /**
-   * Whether a batch can draw a picture: it has to be in the texture that the batches draw from.
-   * (An icon that hasn't loaded isn't, nor is anything in a second slab of the atlas.)
+   * Whether the batch can draw a picture: it has to be in the texture that its shader draws
+   * from (see `PointBatchShader.canDraw`).
    * @param texture - The picture
-   * @return `true` if a batch can draw it
+   * @return `true` if the batch can draw it
    */
-  public static canDraw(texture: PIXI.Texture): boolean {
-    return !!_source && texture.source === _source;
+  public canDraw(texture: PIXI.Texture): boolean {
+    return this._pointShader.canDraw(texture);
   }
 
 

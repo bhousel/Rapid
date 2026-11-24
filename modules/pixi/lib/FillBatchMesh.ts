@@ -10,15 +10,15 @@ export interface FillBatchMeshStyle {
   color: number;
   /** The opacity, from 0 to 1 */
   alpha: number;
-  /** Which pattern it's filled with: its number in the pattern atlas (`FillBatchMesh.setPatterns`), or 0 for none */
+  /** Which pattern it's filled with: its number in the pattern atlas (`FillBatchShader.setPatterns`), or 0 for none */
   pattern?: number;
 }
 
 /** One fill in a batch. `FillBatchMesh.add()` returns it, and the caller keeps it to change the fill or take it out. */
 export type FillBatchMeshItem = BatchMeshItem;
 
-/** What the view says about how the fills of every batch are drawn (see `FillBatchMesh.setView`) */
-export interface FillBatchMeshView {
+/** What the view says about how the fills of every batch are drawn (see `FillBatchShader.setView`) */
+export interface FillBatchShaderView {
   /** How many units of the fills' coordinates a pixel is */
   pixel: number;
   /** The map's rotation, in radians: patterns stay upright on screen */
@@ -27,7 +27,7 @@ export interface FillBatchMeshView {
   wireframe: boolean;
 }
 
-/** The patterns that fills can have, as one texture (see `FillBatchMesh.setPatterns`) */
+/** The patterns that fills can have, as one texture (see `FillBatchShader.setPatterns`) */
 export interface FillPatternAtlas {
   /** The texture: a grid of cells, each a pattern's tile with a border of the texels that wrap around to it */
   texture: PIXI.Texture;
@@ -200,47 +200,67 @@ fn mainFrag(
 `;
 
 
-// Every batch draws with the same shader, the same numbers about the view, and the same patterns.
-let _shader: PIXI.Shader | null = null;
-let _uniforms: PIXI.UniformGroup | null = null;
-const _atlas = new Float32Array([1, 1, 1, 0]);    // columns, a cell's size, a tile's size (in texels), not used
-const _atlasSize = new Float32Array([1, 1]);      // the atlas texture's size, in texels
-const _rotation = new Float32Array([1, 0]);       // the cosine and the sine of the map's rotation
-
 /**
- * Returns the uniforms that say how the fills of every batch are drawn for the current view.
- * (In the order of the shader's `FillUniforms`.)
- * @return The uniform group
+ * The shader that every `FillBatchMesh` of a scene draws with (see `BatchShaders`). Its uniforms
+ * say how fills are drawn for the current view, and it holds the texture of every pattern.
  */
-function fillUniforms(): PIXI.UniformGroup {
-  _uniforms ??= new PIXI.UniformGroup({
-    uAtlas: { value: _atlas, type: 'vec4<f32>' },
-    uRotation: { value: _rotation, type: 'vec2<f32>' },
-    uAtlasSize: { value: _atlasSize, type: 'vec2<f32>' },
-    uPixel: { value: 1, type: 'f32' },
-    uWireframe: { value: 0, type: 'f32' }
-  });
-  return _uniforms;
-}
+export class FillBatchShader extends PIXI.Shader {
 
-/**
- * Returns the shader that every batch draws with, making it the first time.
- * @return The shader
- */
-function fillShader(): PIXI.Shader {
-  _shader ??= PIXI.Shader.from({
-    gl: { vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'fill-batch' },
-    gpu: {
-      vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
-      fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
-    },
-    resources: {
-      fillUniforms: fillUniforms(),
-      uPatterns: PIXI.Texture.WHITE.source,
-      uPatternsSampler: PIXI.Texture.WHITE.source.style
-    }
-  });
-  return _shader;
+  /** Makes the shader, with no patterns (a fill with one is drawn in its plain color until it has them). */
+  public constructor() {
+    super({
+      glProgram: PIXI.GlProgram.from({ vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'fill-batch' }),
+      gpuProgram: PIXI.GpuProgram.from({
+        vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
+        fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
+      }),
+      resources: {
+        // (In the order of the shader's `FillUniforms`.)
+        fillUniforms: new PIXI.UniformGroup({
+          uAtlas: { value: new Float32Array([1, 1, 1, 0]), type: 'vec4<f32>' },   // columns, a cell's size, a tile's size (in texels), not used
+          uRotation: { value: new Float32Array([1, 0]), type: 'vec2<f32>' },      // the cosine and the sine of the map's rotation
+          uAtlasSize: { value: new Float32Array([1, 1]), type: 'vec2<f32>' },     // the atlas texture's size, in texels
+          uPixel: { value: 1, type: 'f32' },
+          uWireframe: { value: 0, type: 'f32' }
+        }),
+        uPatterns: PIXI.Texture.WHITE.source,
+        uPatternsSampler: PIXI.Texture.WHITE.source.style
+      }
+    });
+  }
+
+
+  /**
+   * Says how the fills of every batch are drawn for the current view. Call it when the zoom,
+   * the rotation or the fill mode changes: nothing else has to be done to a batch for those.
+   * @param view - What a pixel is in the fills' coordinates, how the map is turned, and whether fills are drawn
+   */
+  public setView(view: FillBatchShaderView): void {
+    const uniforms = this.resources.fillUniforms.uniforms;
+    uniforms.uPixel = view.pixel;
+    uniforms.uWireframe = view.wireframe ? 1 : 0;
+    uniforms.uRotation[0] = Math.cos(view.rotation);
+    uniforms.uRotation[1] = Math.sin(view.rotation);
+  }
+
+
+  /**
+   * Gives every batch the patterns that fills can have. Until then, a fill with a pattern is
+   * drawn in its plain color.
+   * @param atlas - The patterns in one texture, and how they're laid out in it
+   */
+  public setPatterns(atlas: FillPatternAtlas): void {
+    const source = atlas.texture.source;
+    this.resources.uPatterns = source;
+    this.resources.uPatternsSampler = source.style;
+
+    const uniforms = this.resources.fillUniforms.uniforms;
+    uniforms.uAtlas[0] = atlas.columns;
+    uniforms.uAtlas[1] = atlas.cell;
+    uniforms.uAtlas[2] = atlas.tile;
+    uniforms.uAtlasSize[0] = source.pixelWidth;
+    uniforms.uAtlasSize[1] = source.pixelHeight;
+  }
 }
 
 
@@ -251,50 +271,20 @@ function fillShader(): PIXI.Shader {
  *
  * A fill's triangles are worked out once, for any zoom. Its pattern is laid out by the shader:
  * tiles of the same size on screen at every zoom, upright however the map is turned, from one
- * texture that holds every pattern (`FillBatchMesh.setPatterns()`). So a zoom changes a few numbers
- * (`FillBatchMesh.setView()`) and nothing in any batch. What the batch does with its buffers (a
+ * texture that holds every pattern (`FillBatchShader.setPatterns()`). So a zoom changes a few numbers
+ * (`FillBatchShader.setView()`) and nothing in any batch. What the batch does with its buffers (a
  * fill that changes, hiding, order, the place its coordinates start at) is `BatchMesh`'s.
  *
  * See `design/graphics-system.md` section 15.
  */
 export class FillBatchMesh extends BatchMesh {
 
-  /** Makes a batch with no fills in it. It draws nothing until one is added. */
-  public constructor() {
-    super(LAYOUT, fillShader());
-  }
-
-
   /**
-   * Says how the fills of every batch are drawn for the current view. Call it when the zoom,
-   * the rotation or the fill mode changes: nothing else has to be done to a batch for those.
-   * @param view - What a pixel is in the fills' coordinates, how the map is turned, and whether fills are drawn
+   * Makes a batch with no fills in it. It draws nothing until one is added.
+   * @param shader - The shader it draws with: its scene's, which every fill batch there shares (`BatchShaders.fills`)
    */
-  public static setView(view: FillBatchMeshView): void {
-    const uniforms = fillUniforms().uniforms;
-    uniforms.uPixel = view.pixel;
-    uniforms.uWireframe = view.wireframe ? 1 : 0;
-    _rotation[0] = Math.cos(view.rotation);
-    _rotation[1] = Math.sin(view.rotation);
-  }
-
-
-  /**
-   * Gives every batch the patterns that fills can have. Until then, a fill with a pattern is
-   * drawn in its plain color.
-   * @param atlas - The patterns in one texture, and how they're laid out in it
-   */
-  public static setPatterns(atlas: FillPatternAtlas): void {
-    const shader = fillShader();
-    const source = atlas.texture.source;
-    shader.resources.uPatterns = source;
-    shader.resources.uPatternsSampler = source.style;
-
-    _atlas[0] = atlas.columns;
-    _atlas[1] = atlas.cell;
-    _atlas[2] = atlas.tile;
-    _atlasSize[0] = source.pixelWidth;
-    _atlasSize[1] = source.pixelHeight;
+  public constructor(shader: FillBatchShader) {
+    super(LAYOUT, shader);
   }
 
 

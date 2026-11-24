@@ -298,7 +298,7 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
     // What the points' batch holds: its arrays, and a sum of everything in them except the
     // byte that says whether a point is shown (the sixth of a vertex's eight).
     const pointBatch = () => {
-      const batch = layer.pointBatch;
+      const batch = layer.batches.points[0];
       let sum = 0;
       for (const n of batch._floats) {
         sum += n;
@@ -313,7 +313,7 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
     // (A hidden line has an opacity of 0 in its vertices, and that's all that changes when it's hidden.)
     const batches = () => {
       const found = new Map();
-      for (const batch of layer.lineBatches) {
+      for (const batch of layer.batches.lines) {
         let sum = 0;
         let hiddenVertices = 0;
         for (const n of batch._floats) {
@@ -436,7 +436,7 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
       dashed: dashed.length,
       batches: batchesBefore.size,
       levels: new Set([...batchesBefore.keys()].map(batch => batch.parent)).size,
-      polygonBatches: layer.polygonBatches.map(batch => batch.label).sort(),
+      polygonBatches: layer.batches.polygons.map(batch => batch.label).sort(),
       // A line that its batches draw isn't in the scene: none is, oneway arrows and all
       oneways: oneways.length,
       arrowsWrong: arrowsWrong,
@@ -606,8 +606,8 @@ test('marks every point in view for labels to avoid, and puts no label over a po
   const check = () => page.evaluate(() => {
     const { gfx, spatial } = rapidContext.systems;
     const scene = gfx.scene;
-    const grid = scene.avoidGrid;
-    const offset = scene.labelOffset;
+    const grid = scene.labelSpace.avoidGrid;
+    const offset = scene.labelSpace.offset;
     const screen = gfx.pixi.screen;
 
     const labelBoxes = spatial.getCache('labels').rbush.all().filter(item => item.contents.labelID).length;
@@ -893,7 +893,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
 
     // In a batch: by road class, then by the way's ID, which is the feature's `zIndex`.
     let batchesOutOfOrder = 0;
-    for (const batch of layer.lineBatches) {
+    for (const batch of layer.batches.lines) {
       const orders = batch._items.map(item => item.order);
       if (orders.some((order, i) => i > 0 && order < orders[i - 1])) batchesOutOfOrder++;
     }
@@ -910,7 +910,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
     }
 
     // The points are in one batch, from north to south, the ones with viewfields after the others.
-    const pointOrders = layer.pointBatch._items.map(item => item.order);
+    const pointOrders = layer.batches.points[0]._items.map(item => item.order);
     const expectedOrder = feature => feature.geometry.world.origin[1] + (feature.style.viewfield.angles.length ? 2 ** 25 : 0);
 
     return {
@@ -929,7 +929,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
       pointsOrderedOtherwise: points.filter(feature => feature.item?.order !== expectedOrder(feature)).length,
       pointsWithViewfields: points.filter(feature => feature.style.viewfield.angles.length).length,
       pointBatchOutOfOrder: pointOrders.some((order, i) => i > 0 && order < pointOrders[i - 1]),
-      pointBatchFirst: layer.pointContainer.children[0] === layer.pointBatch.glows && layer.pointContainer.children[1] === layer.pointBatch,
+      pointBatchFirst: layer.pointContainer.children[0] === layer.batches.points[0].glows && layer.pointContainer.children[1] === layer.batches.points[0],
       outOfOrder: outOfOrder
     };
   });
@@ -986,7 +986,7 @@ test('draws oneway arrows from the lines\' shader, where sprites would draw them
     const drawn = pixels();
 
     // Without: the shader leaves the markers out, or the sprites are hidden
-    const uniforms = layer.lineBatches[0].shader.resources.lineUniforms.uniforms;
+    const uniforms = layer.batches.lines[0].shader.resources.lineUniforms.uniforms;
     uniforms.uMarkers = 0;
     sprites.forEach(container => { container.visible = false; });
     const without = pixels();
@@ -1032,7 +1032,7 @@ test('draws oneway arrows from the lines\' shader, where sprites would draw them
   // (The zoom that counts is the map's effective one. Saying it's lower loads no other tiles.)
   const lowZoom = await page.evaluate(async () => {
     const { gfx, map } = rapidContext.systems;
-    const uniforms = gfx.scene.layers.get('osm').lineBatches[0].shader.resources.lineUniforms.uniforms;
+    const uniforms = gfx.scene.layers.get('osm').batches.lines[0].shader.resources.lineUniforms.uniforms;
     const drawn = async () => {
       const startID = gfx.lastRenderFrame.id;
       gfx.immediateRedraw();
@@ -1152,7 +1152,7 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 
     const state = () => {
       const found = { filled: 0, banded: 0, whole: 0, masked: 0, wrong: [] };
-      const fills = layer.polygonBatches.find(batch => batch.label === 'fills');
+      const fills = layer.batches.polygons.find(batch => batch.label === 'fills');
       const drawsFills = !!fills && fills.shader.resources.fillUniforms.uniforms.uWireframe === 0;
 
       for (const feature of layer.features.values()) {

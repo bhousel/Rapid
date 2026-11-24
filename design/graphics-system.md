@@ -102,6 +102,10 @@ pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer'
 - **Label placement:** the labels layer's part of the APP phase. It places labels from a queue,
   those in view first, until the deadline, and not while the zoom or rotation is changing
   (section 14).
+- **Label space:** the screen minus an offset that moves with every pan, so a pan changes nothing
+  in it: what labels are placed in, and what the avoid grid covers. `scene.labelSpace` works it
+  out at the start of each APP phase, and carries what features tell the labels layer (what
+  changed, what was drawn over a label or left a place).
 
 **Asking for a frame**
 - **Redraw request:** a call to `deferredRedraw()` or `immediateRedraw()`. It says that something
@@ -132,7 +136,9 @@ pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer'
 - **Batch:** one of our `BatchMesh`es (`LineBatchMesh`, `FillBatchMesh`, `PointBatchMesh`): a Pixi
   `Mesh` with a shader of our own, holding many features' vertices, kept from frame to frame and
   drawn in one draw call. A feature is an **item** in it, a run of its vertices. Not part of
-  Pixi's batches.
+  Pixi's batches. A layer keeps its batches in a `LayerBatches` (the OSM layer's `batches`), and
+  every batch of a kind draws with its scene's shader for that kind (`scene.batchShaders`), which
+  the scene tells the view and the clock.
 - **`LineMesh`:** one line drawn from its stroke mesh, for what isn't in a batch (the lasso, the
   lines of layers without batches).
 - **Stroke mesh:** the triangles that draw a line at any width, built once
@@ -2734,7 +2740,7 @@ the batch's buffers, copied from its stroke mesh.
   the distance along the line, and how the line is drawn: width in pixels, color, opacity,
   dashes.
 - **The shader does the sum that `LineMesh` does on the CPU** (`point + offset × half width`),
-  from four numbers the layer sets on every frame (`LineBatchMesh.setView()`): what a pixel is in
+  from four numbers the layer sets on every frame (`LineBatchShader.setView()`): what a pixel is in
   world units, how much narrower lines are at this zoom, whether casings are drawn, wireframe.
   So a zoom changes nothing in any batch, and every line gets its new width in the same frame.
   (Before, each line was drawn again over the frames after a zoom.)
@@ -3110,7 +3116,7 @@ draws has no sprites, nothing in its container and no place in the scene, like a
   every point again, once, where it was. (Hiding is a byte.)
 - **One texture.** Every marker, icon and viewfield is in the symbol atlas of `PixiTextures`,
   which has only ever had one texture (8192 pixels across; 2048 without `highQuality`). The
-  batches draw from that one (`PointBatchMesh.setTexture()`). An icon that hasn't loaded is left
+  batches draw from that one (`PointBatchShader.setTexture()`). An icon that hasn't loaded is left
   out, and the point is written again when it arrives. A picture from any other texture makes
   its point draw itself with sprites; nothing does today.
 - **What a point is drawn with is worked out once,** for the batch and for sprites alike
@@ -3431,7 +3437,7 @@ its outlines there. A halo was a `LineMesh` for each ring, with a dash texture. 
   in the batch. `GlowFilter` is left for the lines and areas of layers without batches.
 
 **The clock.** Two numbers move everything, and they're uniforms that every batch shares
-(`LineBatchMesh.setTime()`, `PointBatchMesh.setTime()`): how bright a glow is (it breathes: down to
+(`LineBatchShader.setTime()`, `PointBatchShader.setTime()`): how bright a glow is (it breathes: down to
 55% and back in 1.6 seconds) and how far the dashes have marched (20 pixels a second).
 `PixiScene.animate(now)` sets them before each frame is drawn, and the opacity of the sprites
 that pulse. Nothing in a batch is written, and no feature is drawn again. (The view's uniforms

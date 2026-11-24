@@ -2,6 +2,10 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 // A line always has a stroke. Its casing is drawn from zoom 16, if the style has one that can
@@ -28,14 +32,14 @@ describe('PixiFeatureLine', () => {
     effectiveZoom = 17;
     context.systems.map = { effectiveZoom: () => effectiveZoom, wireframeMode: false };
     const gfx = { textureManager: { getTexture: () => null, getDashTexture: () => dashTexture } };
-    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, labelSpace: { featureChanged: () => {}, avoidFreed: () => {} } };
 
     // The map UI layer makes its batch of halos where the first halo is, as the real one does.
     haloBatch = null;
     scene.layers.set('map-ui', {
       haloBatchAt: (x, y) => {
         if (!haloBatch) {
-          haloBatch = new LineBatchMesh();
+          haloBatch = new LineBatchMesh(batchShaders.lines);
           haloBatch.position.set(x, y);
         }
         return haloBatch;
@@ -230,8 +234,8 @@ describe('PixiFeatureLine', () => {
     }
 
     beforeEach(() => {
-      batch = new LineBatchMesh();
-      casingBatch = new LineBatchMesh();
+      batch = new LineBatchMesh(batchShaders.lines);
+      casingBatch = new LineBatchMesh(batchShaders.lines);
       for (const each of [batch, casingBatch]) {
         each.position.set(8388608, 8388608);    // the world's middle, where the line is
       }
@@ -356,8 +360,8 @@ describe('PixiFeatureLine', () => {
 
     it('moves to other batches when the layer gives it others', () => {
       drawAt(17, style);
-      const other = new LineBatchMesh();
-      const otherCasings = new LineBatchMesh();
+      const other = new LineBatchMesh(batchShaders.lines);
+      const otherCasings = new LineBatchMesh(batchShaders.lines);
       feature.batch = other;
       feature.casingBatch = otherCasings;
       drawAt(17);
@@ -407,7 +411,7 @@ describe('PixiFeatureLine', () => {
       assert.strictEqual(casingBatch.users, 1);
       assert.strictEqual(batch.size, 0);
 
-      const other = new LineBatchMesh();
+      const other = new LineBatchMesh(batchShaders.lines);
       feature.batch = other;
       assert.strictEqual(batch.users, 0);
       assert.strictEqual(other.users, 1);
@@ -444,7 +448,7 @@ describe('PixiFeatureLine', () => {
       // A layer with many lines gives the strokes' batch a small batch for the glows: one that
       // comes or goes doesn't have the strokes' index buffer built again.
       it('has its glow in the batch that the strokes\' batch has for glows, and leaves the strokes\' batch as it is', () => {
-        const glows = new LineBatchMesh();
+        const glows = new LineBatchMesh(batchShaders.lines);
         batch.glows = glows;
         feature.container.zIndex = 4.25;
         drawAt(17, style);
@@ -666,8 +670,8 @@ describe('PixiFeatureLine', () => {
         drawAt(17, style);
         glow();
         const item = feature.glowItem;
-        const other = new LineBatchMesh();
-        const otherCasings = new LineBatchMesh();
+        const other = new LineBatchMesh(batchShaders.lines);
+        const otherCasings = new LineBatchMesh(batchShaders.lines);
         feature.batch = other;
         feature.casingBatch = otherCasings;
         drawAt(17);
@@ -907,8 +911,8 @@ describe('PixiFeatureLine', () => {
       it('go to the batch that the line was given since, though only the zoom changed', () => {
         drawAt(17, oneway);
         const item = feature.arrowItem;
-        const other = new LineBatchMesh();
-        const otherCasings = new LineBatchMesh();
+        const other = new LineBatchMesh(batchShaders.lines);
+        const otherCasings = new LineBatchMesh(batchShaders.lines);
         other.position.set(8388608, 8388608);
         otherCasings.position.set(8388608, 8388608);
 

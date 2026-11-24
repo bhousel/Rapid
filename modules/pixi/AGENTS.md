@@ -37,10 +37,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   - **The OSM layer's lines are in batches** (`lib/LineBatchMesh.ts`, a `Mesh` with our own shader):
     two for each level, one for every casing and one for every stroke, drawn in that order.
     The layer gives each line feature its two (`feature.casingBatch` and `feature.batch`, from
-    `_lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
+    `layer.batches.lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
     its own. The shader works out widths, the narrowing below zoom 17, the casing's absence
     below 16, wireframe and dashes from five numbers the layer sets on every frame
-    (`LineBatchMesh.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
+    (`LineBatchShader.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
     on the zoom out of the vertices. Don't split the batches (by road class, by tile) without
     counting the draw calls: fewer is the point, and the order of the classes is in the batch.
   - **The markers along a line are in the strokes' batch too** (`feature.arrowItem`,
@@ -54,7 +54,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     their pixels: run it after touching either.
   - **The OSM layer's areas are in batches too:** every fill in a `FillBatchMesh`
     (`lib/FillBatchMesh.ts`), then every outline in a `LineBatchMesh`, in the order of their size
-    (`feature.fillBatch` and `feature.strokeBatch`, from `_polygonBatch()`). A fill's triangles
+    (`feature.fillBatch` and `feature.strokeBatch`, from `layer.batches.fillBatch()` and `outlineBatch()`). A fill's triangles
     are worked out once (`triangulate()` in `helpers.ts`); a partial fill's band is triangles
     in the same batch, worked out again when the zoom changes its width. Patterns come from
     the atlas that `PixiTextures` builds (`getPatternNumber()`), and the shader lays them out.
@@ -77,7 +77,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
       for the batch and for sprites alike. A new picture, size or anchor goes there.
     - **Where a point is on screen is `feature.labelBox()`,** from arithmetic. Labels and the
       avoid grid use it.
-    - **A batch draws from one texture,** the symbol atlas's first (`PointBatchMesh.setTexture()`,
+    - **A batch draws from one texture,** the symbol atlas's first (`PointBatchShader.setTexture()`,
       from `PixiTextures.reset()`). A point with a picture from anywhere else draws itself with
       sprites, and finds that out as it's drawn: `PixiLayerOsm._drawFeature()` gives it its
       place in the scene then.
@@ -120,8 +120,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   no `DashLine` anymore, and nothing of ours calls Pixi's `buildLine`. Don't use Pixi's
   `DashLineShader`: it needs `SmoothGraphics`, and a context with it is never batched.
 - **What moves by itself is moved by a shader, from the clock.** A glow breathes and a halo's
-  dashes march because of two uniforms that every batch shares (`LineBatchMesh.setTime()`,
-  `PointBatchMesh.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
+  dashes march because of two uniforms that every batch shares (`LineBatchShader.setTime()`,
+  `PointBatchShader.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
   - **Don't write to a batch, or draw a feature again, to animate something.** Give the
     shader what it needs in the vertices once, and a uniform for the moment.
   - **`PixiScene.animated` says whether frames should keep coming** (something has the
@@ -209,13 +209,13 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   (`design/graphics-system.md` section 13).
 - **A point that labels should keep clear of gets `feature.labelAvoid = true` from its layer**
   (OSM, Rapid and custom data points do; photo and QA markers don't). It then marks where it's
-  drawn in `scene.avoidGrid` at the end of its `update()` (`updateAvoid()`), and unmarks when
+  drawn in `scene.labelSpace.avoidGrid` at the end of its `update()` (`updateAvoid()`), and unmarks when
   it's hidden or destroyed. Nothing gathers avoids from containers anymore. A new kind of
   feature that labels should avoid overrides `updateAvoid()` and calls `_setAvoid()` with its
-  box in label space (`scene.worldToLabel()`).
+  box in label space (`scene.labelSpace.worldToLabel()`).
   Vertices and midpoints that are only drawn because their way is hovered aren't avoids
   (`related.handleIDs` in `PixiLayerOsm`): a hover must leave every label where it is.
-- **A feature's `update()` ends with `this.scene.featureChanged(this)`.** That's how the labels
+- **A feature's `update()` ends with `this.scene.labelSpace.featureChanged(this)`.** That's how the labels
   layer knows which features to look at; it doesn't walk the scene. Setting `visible` or
   `label`, and `destroy()`, say so themselves. A class (`setClass()`) doesn't mark the label
   out of date, so don't make a hover or a selection set `dirty = true` on a feature.

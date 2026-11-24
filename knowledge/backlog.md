@@ -98,8 +98,9 @@ said otherwise. Biggest or most wanted first.
 - **The other layers' features in batches.** Only the OSM layer's are (section 15, steps 6 to 9).
   The photo layers draw thousands of markers with viewfields, and the Rapid layer draws lines
   with oneway arrows, areas and vertices like OSM's; each layer would give its features
-  batches of its own, as `PixiLayerOsm` does (`_lineBatch()`, `_polygonBatch()`,
-  `_placePoint()`).
+  batches from a `LayerBatches` of its own (`lib/LayerBatches.ts`), as `PixiLayerOsm` does
+  (`layer.batches`, `_placePoint()`), and find its features through its spatial cache
+  (`scene.setHitTester()`): a batched feature isn't in the scene for Pixi's hit test.
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
   `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, chunk sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another
