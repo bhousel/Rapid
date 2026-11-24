@@ -194,8 +194,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const parentContainer = this._spatialContainer('streetview', this.id);
     const sequencesContainer = this._childContainer(parentContainer, 'sequences', 0);
     const markersContainer = this._childContainer(parentContainer, 'markers', 1);
-    let markers = streetside.getImages();
-    let sequences = streetside.getSequences();
+    let markers = streetside.getImages(frame.cullBox);
+    let sequences = streetside.getSequences(frame.cullBox);
 
     sequences = this.filterSequences(sequences);
     markers = this.filterMarkers(markers);
@@ -301,6 +301,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     if (!this.enabled || !streetside?.started || viewZoom < MINZOOM) return;
 
     streetside.loadTiles();
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
     this.renderMarkers(frame, viewport);
   }
 

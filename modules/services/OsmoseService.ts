@@ -7,7 +7,7 @@ import { marked } from 'marked';
 
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
-import type { Tile } from '@rapid-sdk/math';
+import type { Extent, Tile } from '@rapid-sdk/math';
 
 
 /** Properties for Osmose issue markers */
@@ -152,11 +152,12 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * Get already loaded data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(): MarkerData[] {
+  public getData(extent?: Extent): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('osmose').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('osmose', extent).map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -384,8 +385,10 @@ export class OsmoseService extends AbstractSystem {
   public replaceItem(item: MarkerData): MarkerData | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
+    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('osmose', item);
+    gfx?.immediateRedraw('osmose');   // (its layer keeps its features while only the view moves)
     return item;
   }
 
@@ -397,8 +400,10 @@ export class OsmoseService extends AbstractSystem {
   public removeItem(item: MarkerData): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
+    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.removeItems('osmose', item.id);
+    gfx?.immediateRedraw('osmose');   // (its layer keeps its features while only the view moves)
   }
 
 

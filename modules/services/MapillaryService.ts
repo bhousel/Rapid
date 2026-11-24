@@ -16,7 +16,7 @@ import type {
   OutlineTag, OutlineTagOptions, PolygonGeometry, SequenceComponent, TagComponent, Viewer,
   ViewerBearingEvent, ViewerImageEvent, ViewerOptions, ViewerStateEvent
 } from 'mapillary-js';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /** Mapillary API access token */
@@ -401,18 +401,19 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Get already loaded data that appears in the current map view
    * @param  datasetID - one of 'images', 'signs', or 'detections'
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of Markers
    */
-  public getData(datasetID: MapillaryDatasetID): MarkerData[] {
+  public getData(datasetID: MapillaryDatasetID, extent?: Extent): MarkerData[] {
     const spatial = this.context.systems.spatial!;
 
     if (datasetID === 'images') {
-      return spatial.getVisibleItems('mapillary-images')
+      return spatial.getVisibleItems('mapillary-images', extent)
         .map(hit => hit.contents) as MarkerData[];
 
     } else {   // traffic signs and the other detections each have their own cache
       const cacheID = (datasetID === 'signs') ? 'mapillary-signs' : 'mapillary-detections';
-      return spatial.getVisibleItems(cacheID)
+      return spatial.getVisibleItems(cacheID, extent)
         .map(hit => hit.contents) as MarkerData[];
     }
   }
@@ -420,11 +421,12 @@ export class MapillaryService extends AbstractSystem {
 
   /**
    * Get already loaded sequence data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of GeoJSONData sequences
    */
-  public getSequences(): GeoJSONData[] {
+  public getSequences(extent?: Extent): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('mapillary-sequences')
+    return spatial.getVisibleItems('mapillary-sequences', extent)
       .map(hit => hit.contents) as GeoJSONData[];
   }
 

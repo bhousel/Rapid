@@ -73,9 +73,10 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
     if (!this.enabled || !keepRight?.started || viewZoom < MINZOOM) return;
 
     keepRight.loadTiles();
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
 
     const parentContainer = this._spatialContainer('qa', this.id);
-    const data = keepRight.getData();
+    const data = keepRight.getData(frame.cullBox);
 
     for (const d of data) {
       const part = d.geoms.parts[0];

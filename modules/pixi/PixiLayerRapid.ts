@@ -257,15 +257,37 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 //this._uniforms.translationMatrix = transform.clone().translate(-offset.x, -offset.y);
 //this._uniforms.u_time = frame/10;
 
-    for (const ds of rapid.datasets.values()) {
-      if (!rapid.enabledDatasetIDs.has(ds.id)) continue;  // on menu but not checked
+    const datasets = [...rapid.datasets.values()].filter(ds => rapid.enabledDatasetIDs.has(ds.id));   // (on the menu, and checked)
+    for (const ds of datasets) {
+      this._loadTiles(ds, viewZoom);
+    }
+
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
+
+    for (const ds of datasets) {
       this.renderDataset(ds, frame, viewport);
     }
   }
 
 
   /**
-   * Render any data we have, and schedule fetching more of it to cover the view.
+   * Asks a dataset's service for the tiles of data that cover the view (on every frame).
+   * @param ds - RapidDataset Object
+   * @param viewZoom - The view's zoom
+   */
+  protected _loadTiles(ds: RapidDataset, viewZoom: number): void {
+    const context = this.context;
+    const service = context.services[ds.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
+    if (!ds.serviceID || !service?.started) return;
+
+    if (viewZoom >= 15) {  // avoid firing off too many API requests
+      service.loadTiles(ds.id);
+    }
+  }
+
+
+  /**
+   * Render any data we have in the frame's cull box (`_loadTiles` asks for more).
    * @param ds - RapidDataset Object
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -274,7 +296,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const context = this.context;
     const conflation = context.systems.conflation;   // optional
     const rapid = context.systems.rapid!;
-    const viewZoom = viewport.transform.zoom;
 
     const service = context.services[ds.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
     if (ds.serviceID && !service?.started) return;
@@ -290,13 +311,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* Facebook MapWithAI */
     if (ds.serviceID === 'mapwithai') {
       const mapwithai = context.services.mapwithai!;
-      if (viewZoom >= 15) {  // avoid firing off too many API requests
-        mapwithai.loadTiles(ds.id);
-      }
 
-      // Gather data in view - we only want OsmWays here
+      // Gather data in the cull box - we only want OsmWays here
       const dsGraph = mapwithai.graph(ds.id);
-      const entities = mapwithai.getData(ds.id)
+      const entities = mapwithai.getData(ds.id, frame.cullBox)
         .filter((entity: OsmEntity) => entity.type === 'way' && !rapid.isAcceptedOrIgnored(entity.dataID)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
@@ -319,12 +337,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* ESRI ArcGIS */
     } else if (ds.serviceID === 'esri') {
       const esri = context.services.esri!;
-      if (viewZoom >= 15) {  // avoid firing off too many API requests
-        esri.loadTiles(ds.id);
-      }
 
-      // Gather data in view
-      for (const d of esri.getData(ds.id)) {   // GeoJSONData, one geometry each
+      // Gather data in the cull box
+      for (const d of esri.getData(ds.id, frame.cullBox)) {   // GeoJSONData, one geometry each
         if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
         const type = d.geoms.parts[0]?.type;
@@ -340,11 +355,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* Overture */
     } else if (ds.serviceID === 'overture') {
       const overture = context.services.overture!;
-      if (viewZoom >= 15) {  // avoid firing off too many API requests
-        overture.loadTiles(ds.id);
-      }
-
-      const data = overture.getData(ds.id);   // GeoJSONData from the VectorTileService
+      const data = overture.getData(ds.id, frame.cullBox);   // GeoJSONData from the VectorTileService
       for (const d of data) {
         if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
@@ -369,7 +380,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* (this includes datasets from asset files without a serviceID) */
     } else if (!ds.serviceID) {
       const spatial = this.context.systems.spatial!;
-      const data = spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
+      const data = spatial.getVisibleItems(ds.spatialID, frame.cullBox).map(hit => hit.contents as GeoJSONData);
       for (const d of data) {
         if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 

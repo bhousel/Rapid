@@ -103,7 +103,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
     const parentContainer = this._spatialContainer('qa', this.id);
 
-    let markers = mapillary.getData('detections');
+    let markers = mapillary.getData('detections', frame.cullBox);
     markers = this.filterMarkers(markers);
 
     for (const d of markers) {
@@ -165,6 +165,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;
 
     mapillary.loadTiles('detections');
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
     this.renderMarkers(frame, viewport);
   }
 

@@ -273,14 +273,15 @@ export class EsriService extends AbstractSystem {
   /**
    * Get already loaded data that appears in the current map view.
    * @param datasetID - datasetID to get data for
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(datasetID: DatasetID): GeoJSONData[] {
+  public getData(datasetID: DatasetID, extent?: Extent): GeoJSONData[] {
     const ds = this._datasets.get(datasetID);
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
+    return spatial.getVisibleItems(ds.spatialID, extent).map(hit => hit.contents as GeoJSONData);
  }
 
 

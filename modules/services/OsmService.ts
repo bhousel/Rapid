@@ -2268,11 +2268,12 @@ export class OsmService extends AbstractSystem {
 
 
   /** Returns all cached notes that are visible in the current viewport
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of visible OSM notes
    */
-  public getNotes(): OsmNote[] {
+  public getNotes(extent?: Extent): OsmNote[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('osm-notes').map(hit => hit.contents) as OsmNote[];
+    return spatial.getVisibleItems('osm-notes', extent).map(hit => hit.contents) as OsmNote[];
   }
 
 

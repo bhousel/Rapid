@@ -295,6 +295,23 @@ describe('OsmoseService', () => {
         });
       });
 
+      // The layer keeps its features while only the view moves, so a change to an issue asks it to draw again
+      describe('replaceItem, removeItem', () => {
+        it('change the issue in the cache, and ask the Osmose layer for a redraw', () => {
+          const item = _osmose.getData()[0];
+          spyRedraw.mockClear();
+
+          const updated = item.update({ props: { ...item.props, newStatus: 'done' } });
+          assert.strictEqual(_osmose.replaceItem(updated), updated);
+          assert.strictEqual(_osmose.getData().find(d => d.id === item.id), updated);
+          assert.deepEqual(spyRedraw.mock.calls, [['osmose']]);
+
+          _osmose.removeItem(updated);
+          assert.isUndefined(_osmose.getData().find(d => d.id === item.id));
+          assert.deepEqual(spyRedraw.mock.calls, [['osmose'], ['osmose']]);
+        });
+      });
+
     });
 
   });

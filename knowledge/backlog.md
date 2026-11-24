@@ -53,11 +53,13 @@ said otherwise. Biggest or most wanted first.
   rendering changed it by accident; the layers still change what they get (`markerStyle.marker.image =
   'pin'`), so sharing needs frozen styles with overrides built apart, or a cache of the finished style
   per kind of feature.
-- **The other layers still do a pass on every frame** (Bryan: worth doing). Only the OSM layer keeps its
-  features (`keepFeatures()`), follows the cull box, and takes arrivals and edits without a pass. They
-  draw in batches since Nov 24 (section 16), so their DRAW is small, but in Bellevue with photos on a
-  pan frame is still 22 ms of APP: Mapillary's pass 15 ms, the detections' 4 to 8. The photo layers
-  first, then the Rapid layer: it draws the same kinds of feature with the same classes.
+- **The other data layers' passes, spread or skipped as OSM's are.** They keep their features while
+  the view moves inside the cull box since Nov 24 (section 17), but do their pass for a new box, a
+  zoom, a class on their own data and arriving data. When the view leaves the box they all do it in
+  one frame, over twice what the view shows: up to 90 ms in Bellevue with photos and detections on
+  (it was 22 ms on every frame). Following the box (`_moveBox()`) and putting off what's outside the
+  view (`updateFeature()`) would fix that frame; the photo layers first, then the Rapid layer (it
+  draws the same kinds of feature with the same classes as OSM).
 - **What still asks for the OSM layer's pass** (section 12): a filter and the styles. The pass is 134 ms:
   71 of looking at each shown feature and finding nothing to do, 30 of vertices in the spatial index,
   30 of sorting, plus asking each entity for its geometry twice (`FilterSystem.filterScene()`, then to

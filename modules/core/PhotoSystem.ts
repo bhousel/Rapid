@@ -284,6 +284,20 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
+   * Called when a filter changed (the dates, the usernames, the kinds of photo): the layers that
+   * draw photos and detections draw again what they show. They keep their features while only
+   * the view moves, so each has to be told.
+   */
+  protected _filtersChanged(): void {
+    const gfx = this.context.systems.gfx;   // optional
+
+    for (const layerID of this.layerIDs) {
+      gfx?.immediateRedraw(layerID);
+    }
+  }
+
+
+  /**
    * Called by the EditSystem to gather the sources being used to make an edit.
    * We can return the English names of:
    *  - current photo layer (if showing a photo)
@@ -623,6 +637,7 @@ export class PhotoSystem extends AbstractSystem {
 
     if (didChange) {
       this._photoChanged();
+      this._filtersChanged();
     }
   }
 
@@ -642,6 +657,7 @@ export class PhotoSystem extends AbstractSystem {
     const usernames = [...utilIterable(val)];
     this._filterUsernames = usernames.length ? usernames : null;
     this._photoChanged();
+    this._filtersChanged();
   }
 
 
@@ -658,6 +674,7 @@ export class PhotoSystem extends AbstractSystem {
       this._filterPhotoTypes.add(which);
     }
     this._photoChanged();
+    this._filtersChanged();
   }
 
 

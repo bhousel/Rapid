@@ -178,4 +178,36 @@ describe('PhotoSystem', () => {
     });
   });
 
+
+  // The layers that draw photos keep their features while only the view moves, so a filter
+  // that changes what they show has to ask each of them for a redraw.
+  describe('filters', () => {
+    let photos, redrawn;
+    beforeEach(() => {
+      const ctx = new Rapid.MockContext();
+      redrawn = [];
+      ctx.systems = { gfx: { immediateRedraw: layerID => redrawn.push(layerID) } };
+      photos = new Rapid.PhotoSystem(ctx);
+    });
+
+    it('asks every photo and detection layer for a redraw when a filter changes', () => {
+      const layerIDs = ['streetside', 'mapillary', 'mapillary-detections', 'mapillary-signs', 'kartaview'];
+      photos.setDateFilter('fromDate', '2018-01-01');
+      assert.sameMembers(redrawn, layerIDs);
+
+      redrawn.length = 0;
+      photos.setUsernameFilter(['carol']);
+      assert.sameMembers(redrawn, layerIDs);
+
+      redrawn.length = 0;
+      photos.togglePhotoType('panoramic');
+      assert.sameMembers(redrawn, layerIDs);
+    });
+
+    it('asks for nothing when the photo changes, which reaches the map as classes', () => {
+      photos.selectPhoto();
+      assert.deepEqual(redrawn, []);
+    });
+  });
+
 });

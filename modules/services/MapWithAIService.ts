@@ -4,7 +4,7 @@ import { Tiler } from '@rapid-sdk/math';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { Tile } from '@rapid-sdk/math';
+import type { Extent, Tile } from '@rapid-sdk/math';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { ParserResult, ParsedWay } from '../data/parsers/types.ts';
 
@@ -224,14 +224,15 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * Get already loaded data that appears in the current map view
    * @param datasetID - datasetID to get data for
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data (OSM Entities)
    */
-  public getData(datasetID: DatasetID): OsmEntity[] {
+  public getData(datasetID: DatasetID, extent?: Extent): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as OsmEntity);
+    return spatial.getVisibleItems(ds.spatialID, extent).map(hit => hit.contents as OsmEntity);
   }
 
 

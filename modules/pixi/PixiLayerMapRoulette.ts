@@ -73,10 +73,11 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
 
     // Fetch new data, if needed..
     maproulette.loadTiles();
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
 
     // Render the data that we have..
     const parentContainer = this._spatialContainer('qa', this.id);
-    const data = maproulette.getData();
+    const data = maproulette.getData(frame.cullBox);
 
     for (const d of data) {
       const part = d.geoms.parts[0];

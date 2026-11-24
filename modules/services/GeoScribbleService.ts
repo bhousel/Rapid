@@ -5,6 +5,7 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
+import type { Extent } from '@rapid-sdk/math';
 
 
 /** Zoom level used for tiling GeoScribble data requests */
@@ -84,11 +85,12 @@ export class GeoScribbleService extends AbstractSystem {
 
   /**
    * Get already loaded data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of data
    */
-  public getData(): GeoJSONData[] {
+  public getData(extent?: Extent): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('geoscribble').map(hit => hit.contents as GeoJSONData);
+    return spatial.getVisibleItems('geoscribble', extent).map(hit => hit.contents as GeoJSONData);
   }
 
 

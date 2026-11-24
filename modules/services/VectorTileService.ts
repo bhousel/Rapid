@@ -156,9 +156,10 @@ export class VectorTileService extends AbstractSystem {
   /**
    * Get already loaded data that appears in the current map view
    * @param  template - template to get data for
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(template: string): GeoJSONData[] {
+  public getData(template: string, extent?: Extent): GeoJSONData[] {
     const source = this._sources.get(template);
     if (!source) return [];
 
@@ -166,7 +167,7 @@ export class VectorTileService extends AbstractSystem {
 
     const cache = this._zoomCachesNearest(source)[0];
     if (!cache) return [];
-    return spatial.getVisibleItems(cache.spatialID).map(hit => hit.contents as GeoJSONData);
+    return spatial.getVisibleItems(cache.spatialID, extent).map(hit => hit.contents as GeoJSONData);
   }
 
 

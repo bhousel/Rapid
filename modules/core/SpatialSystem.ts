@@ -10,7 +10,7 @@ import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -487,14 +487,16 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Returns all items in the current viewport.
+   * Returns all items in the current viewport, or in a part of the world that's given (a map
+   * layer gives its frame's cull box, which has the view and some padding around it).
    * Note that this assumes that the items in the given spatialID cache are stored in world coordinates.
    * @param  spatialID - spatialID of the cache to search
+   * @param  extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of boxes at the given location
    */
-  public getVisibleItems(spatialID: SpatialID): SpatialItem[] {
+  public getVisibleItems(spatialID: SpatialID, extent?: Extent): SpatialItem[] {
     const context = this.context;
-    const box = context.viewport.visibleWorldExtent().bbox();
+    const box = (extent ?? context.viewport.visibleWorldExtent()).bbox();
     return this.getItemsAtBox(spatialID, box);
   }
 

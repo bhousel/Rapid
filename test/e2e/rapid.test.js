@@ -51,6 +51,17 @@ test('shows a Rapid dataset, and adds a feature from it to OSM', async ({ page, 
   expect(drawn.length).toBeGreaterThan(0);
   expect(drawn.every(f => f.batched && !f.inScene)).toBe(true);
 
+  // A frame that only moves the view a little, inside the cull box, leaves the layer's features as they are
+  const kept = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const before = gfx.lastRenderFrame.id;
+    map.pan([20, 0]);
+    while (gfx.lastRenderFrame.id === before) await new Promise(resolve => { requestAnimationFrame(resolve); });
+    return gfx.lastRenderFrame.layers.get('rapid').kept;
+  });
+  expect(kept).toBe(true);
+  await waitForIdle(page);
+
   // Clicking it selects it, and the sidebar offers to add it
   const point = await locToPage(page, SIDEWALK_MIDDLE);
   await page.mouse.click(point.x, point.y);
@@ -66,6 +77,13 @@ test('shows a Rapid dataset, and adds a feature from it to OSM', async ({ page, 
     return ways.map(way => ({ tags: way.tags, nodes: way.nodes.length }));
   });
   expect(added).toEqual([{ tags: { highway: 'footway', footway: 'sidewalk' }, nodes: 2 }]);
+
+  // ..and the Rapid layer doesn't show it anymore, though it keeps its features while the view
+  // doesn't change: accepting it asks the layer for a redraw
+  await expect.poll(() => page.evaluate(() => {
+    const layer = rapidContext.systems.gfx.scene.layers.get('rapid');
+    return [...layer.features.values()].filter(f => f.visible && f.data?.dataID === 'e2e_paths:1').length;
+  })).toBe(0);
 
   expect(consoleErrors).toEqual([]);
 });

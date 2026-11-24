@@ -528,6 +528,17 @@ describe('SpatialSystem', () => {
         assert.lengthOf(visible, 1);
         assert.strictEqual(visible[0].contents, data);
       });
+
+      it('returns the items in a part of the world that\'s given, instead of the view (a frame\'s cull box)', () => {
+        const spatialID = 'test-getVisibleItems-extent';
+        const data = createMockData('vis', [10, 0]);
+        _spatial.replaceData(spatialID, data);
+        const box = data.geoms.world.extent;    // where the item is, in world coordinates
+
+        assert.lengthOf(_spatial.getVisibleItems(spatialID, box), 1);
+        const elsewhere = new Rapid.sdk.Extent([box.min[0] - 2000, box.min[1]], [box.min[0] - 1000, box.max[1]]);
+        assert.lengthOf(_spatial.getVisibleItems(spatialID, elsewhere), 0);
+      });
     });
 
 

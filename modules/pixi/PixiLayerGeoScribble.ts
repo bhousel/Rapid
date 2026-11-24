@@ -91,8 +91,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     const service = this.context.services.geoscribble;
     if (!service) return;
     service.loadTiles();
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
 
-    const geoData: GeoJSONData[] = service.getData();
+    const geoData: GeoJSONData[] = service.getData(frame.cullBox);
 
     // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.

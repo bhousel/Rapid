@@ -157,8 +157,9 @@ on.
 | A hit test for one pointer event | 0.02 ms | | 0.07 ms |
 
 With the other layers on too (Bellevue at z17.5, Nov 24: 13,000 Mapillary photos, 6,400
-detections, a buildings dataset and the QA layers), a frame that only moves the view is about 22
-ms of APP (their passes) and 1.5 ms of DRAW, in 28 draw calls (the log's section 16).
+detections, a buildings dataset and the QA layers), a frame that only moves the view is about
+0.8 ms of APP and 0.6 of DRAW, in 28 draw calls. A frame where the view leaves the cull box is
+the layers' passes, about 50 ms there and up to 90 (the log's sections 16 and 17).
 
 Where the time goes:
 
@@ -166,8 +167,8 @@ Where the time goes:
   MSAA canvas at ratio 2, and `multiView`'s copy of every frame onto the visible canvas (1.5 to
   2 ms, there for the minimap). What Rapid draws is a few ms of it, more only in Užice.
 - **A pass is what's expensive,** and the OSM layer rarely does one now: not for a pan, a zoom,
-  a hover, an edit, a change of mode or data that arrives. The other layers still do theirs on
-  every frame.
+  a hover, an edit, a change of mode or data that arrives. The other data layers keep their
+  features while the view moves inside the cull box, and do their pass for the rest.
 - **Garbage collection** was the longest stall after the pass was gone (the log's section 13).
   Batches took most of the garbage away: sixteen zooms in Užice allocate 2.9 GB, where they
   allocated 18.1 GB, and the heap after a load there is 1.37 GB, where it was 2.27.
@@ -293,7 +294,11 @@ for one too: nothing in the scene changed.
 won't look. Marking features dirty (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their
 layer do its next pass, but doesn't ask for a frame. Every path that changes what the OSM layer
 draws was traced once (the log's section 8, "Redraw requests, checked"), and the e2e tests check
-work done without a pass against a pass ("Checked against a pass", below).
+work done without a pass against a pass ("Checked against a pass", below). So were the other data
+layers' (the log's section 17): their data arriving names the layer, and so do the photo filters
+(`PhotoSystem`, for each photo and detection layer), a QA issue that changed (`replaceItem()`,
+`removeItem()` in the services) and a Rapid feature accepted or ignored, or that stops being so
+(`RapidSystem`).
 
 ## The cull box
 
@@ -317,10 +322,17 @@ A layer doesn't need to decide what's in view on every frame.
   (`KEEP_UNSEEN_PASSES`). The OSM layer, which seldom does a pass, counts the moves of its cull box
   instead: a feature hidden for 20 moves is destroyed (`KEEP_HIDDEN_MOVES`, `_forgetHidden()`).
   Panning back within that finds it still made.
-- **Layers that don't keep their features** do their pass on every frame: the imagery tiles and
-  the labels follow the view itself, and the data layers (Rapid, photos, QA) haven't been changed
-  yet. That's cheap where it was measured (the Rapid layer 0.1 to 0.6 ms), but it's paid on
-  every tick while the view moves.
+- **Every layer that draws data keeps its features**: OSM, the Rapid datasets, custom data, the
+  photo, detection and QA layers, GeoScribble. Each asks its service for the tiles that cover the
+  view on every frame, and for its data in the cull box only on a pass (the services' getters take
+  an extent: `spatial.getVisibleItems(spatialID, frame.cullBox)`).
+- **The data layers other than OSM do their pass for whatever else changed:** a new cull box, a
+  zoom or a rotation, a class on their own data (a hovered or selected photo: `classChanged()`),
+  data that arrived, or a feature still waiting for a texture. The OSM layer does those without
+  a pass ("The pass, and what asks for it"). The others' passes are short where they've been
+  measured (Mapillary's 13,000 photos 15 ms), and they draw only what's dirty.
+- **The imagery tiles and the labels follow the view themselves,** and do their pass on every
+  frame.
 
 A pan frame that only moves the view costs 1 to 1.5 ms of APP and under 1 ms of DRAW, where every
 frame was a pass of 6 to 66 ms before the cull box (the log's sections 8, 9 and 15).
@@ -342,8 +354,8 @@ its turn, and how long depends on why it's wanted:
 | `deferredRedraw()`: data arrived | Twice what the last pass frame cost, at least 250 ms (so that arrivals batch up) and at most 1 s |
 
 So passes take at most a third of the time, and data that arrives is drawn at most four times a
-second. (Since the OSM layer follows the cull box and takes arrivals without a pass, the
-second-to-last row is for the other layers.)
+second. (The OSM layer follows the cull box and takes arrivals without a pass. The other data
+layers still do a pass for both.)
 
 **While a pass frame waits, the view doesn't have to:** a held frame is drawn on every tick that
 the view moved. It tells the layers that nothing changed and gives them the cull box they had, so
@@ -977,9 +989,12 @@ What's bitten before:
 What's left, biggest first, is in `knowledge/backlog.md`, "Pixi rendering follow-ups". The
 direction, from the log's section 15:
 
-- **The other layers keeping their features** (`keepFeatures()`). They draw in batches now, but
-  still do their pass on every frame: with photos and detections on in Bellevue, that's 15 ms of
-  Mapillary's and 4 to 8 of the detections' on every frame of a pan (the log's section 16).
+- **The other data layers' passes, spread or skipped as OSM's are.** When the view leaves the cull
+  box, every data layer does its pass in the same frame, over twice the area the view shows: up to
+  90 ms in Bellevue with photos and detections on (the log's section 17). Following the box
+  (`_moveBox()`), and putting off what's outside the view to later frames (`updateFeature()`), would
+  make that frame as cheap as it is for OSM; so would a zoom, a hover and arriving data without a
+  pass.
 - **A feature without a display object.** A feature in a batch needs a position and an order, not a
   `Container` (0.7 KB each); `AbstractPixiFeature` assumes one.
 - **Animation draws that don't draw the whole scene:** what's still drawn to a texture once, and an

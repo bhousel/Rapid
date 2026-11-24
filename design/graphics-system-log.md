@@ -30,6 +30,7 @@ the numbers, and what they say. Then change `graphics-system.md` to say what's t
 | 14 | Label placement (Nov 20) |
 | 15 | Where this could go: what other map renderers do, two tiers, and the line builder, steps 1 to 10 (Nov 22 to 24) |
 | 16 | The other layers in batches (Nov 24) |
+| 17 | The other layers keep their features (Nov 24) |
 
 ## 1. How a frame is made
 
@@ -3599,3 +3600,59 @@ on: the map's pixels, and the feature that the scene's hit test finds at 4,800 p
 
 Clicking a photo with the real mouse hovers it, selects it and opens the viewer, and its yellow
 viewfield is drawn over the rest.
+
+## 17. The other layers keep their features (Nov 24)
+
+With every data layer in batches (section 16), what was left of a pan in Bellevue was their
+passes: Mapillary's 15 ms and the detections' 4 to 8, on every frame. Now each keeps its
+features as the OSM layer did after section 8, before section 12: it asks its service for the
+tiles that cover the view on every frame, calls `keepFeatures()`, and gathers its data by the
+frame's cull box on a pass. The services' getters take an extent for that, passed to
+`spatial.getVisibleItems()`. A class on the layer's own data, a zoom, a feature still waiting
+for a texture, and anything that marks it dirty still mean a pass.
+
+**What had to ask for a redraw, and didn't.** Keeping features is safe only if every change to
+what a layer draws names it. Traced for each layer:
+
+- **Its data arriving:** every service already named its layer (section 12, and the requests
+  that name their layer, Nov 24).
+- **The photo filters** (dates, usernames, flat or panoramic) asked for nothing at all. That was a
+  bug before this: since the scene asks for a frame when a class changes, `PhotoSystem` stopped
+  asking for one in `_photoChanged()`, and a filter showed on whatever frame came next. Now the
+  filters ask each photo and detection layer for a redraw.
+- **A QA issue that changed** (`replaceItem()`, `removeItem()` in the KeepRight, Osmose and
+  MapRoulette services, called by their editors) asked for nothing; the layer's next pass picked
+  it up. Now they name their layer.
+- **Accepting or ignoring a Rapid feature** is an edit, which only the OSM layer is told of. Now
+  `RapidSystem` asks the Rapid layer for a redraw when what was accepted or ignored changes
+  (an undo too).
+- Left as they were: a photo's viewfield turning with the viewer (it names its layer), a selected
+  photo or issue (classes), custom data loaded (the layer is turned on again, which names it),
+  a dataset turned on or off, or restyled (`RapidSystem`, the dataset settings).
+
+**What it does** (Bellevue, z17.5, the same layers as section 16, M4, two runs each, old build
+then new). A glide: the view moves 6 px on every tick for 240 ticks, out and back.
+
+| | Before | After |
+|---|---|---|
+| A pan frame inside the cull box: APP + DRAW (median) | 22 + 1.5 ms | 0.8 + 0.6 ms |
+| Glide: a frame, median / 90th percentile | 22.5 / 29 ms | 2.1 to 2.6 / 3.3 ms |
+| Glide: ticks over 25 ms, of 240 | 112 | 12 |
+| Glide: ticks over 50 ms | 1 | 4, 5 |
+| Glide: the longest frame | 63, 65 ms | 89, 90 ms |
+| Features made (Mapillary's photos) | 13,093 | 25,549 |
+
+- **Nearly every frame is under 3 ms where it was over 20.**
+- **The frame where the view leaves the cull box is longer,** and there's one every 256 px of
+  pan: every data layer does its pass in that frame, over the cull box, which holds about twice
+  what the view does. 47 ms at the median, up to 90 when the box moves over photos not made yet.
+  The OSM layer had the same, until it followed the box without a pass (section 12) and put off
+  what's outside the view (section 10). The other layers can do both; not done yet.
+- **The glide drew 28 to 29 frames a second in both builds,** a frame on every other tick of the
+  script. It's the same in both, so it isn't the layers; not looked into.
+
+Checked in the browser: a pan inside the cull box keeps every data layer's features (29 frames
+of 30, the other being the pass for a new box), turning panoramas off and on hides and shows them
+at once (25,549 photos, 10,918 without panoramas), and the e2e test that adds a Rapid feature
+checks that the Rapid layer keeps its features on a small pan and stops drawing the feature once
+it's accepted.

@@ -100,7 +100,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     const container = context.container();
     const parentContainer = this._spatialContainer('qa', this.id);
 
-    let markers = mapillary.getData('signs');
+    let markers = mapillary.getData('signs', frame.cullBox);
     markers = this.filterMarkers(markers);
 
     for (const d of markers) {
@@ -156,6 +156,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;
 
     mapillary.loadTiles('signs');
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
     this.renderMarkers(frame, viewport);
   }
 

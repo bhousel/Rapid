@@ -130,14 +130,16 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const vtService = context.services.vectortile;
     const viewZoom = viewport.transform.zoom;
 
+    if (this._template && vtService && viewZoom >= 13) {   // fetch data from vector tile service (not too many requests)
+      vtService.loadTiles(this._template);
+    }
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
+
     let geoData: GeoJSONData[] = [];
-    if (this._template && vtService) {   // fetch data from vector tile service
-      if (viewZoom >= 13) {  // avoid firing off too many API requests
-        vtService.loadTiles(this._template);
-      }
-      geoData = vtService.getData(this._template);
+    if (this._template && vtService) {
+      geoData = vtService.getData(this._template, frame.cullBox);
     } else if (this._spatialID) {
-      geoData = spatial.getVisibleItems(this._spatialID).map(hit => hit.contents as GeoJSONData);
+      geoData = spatial.getVisibleItems(this._spatialID, frame.cullBox).map(hit => hit.contents as GeoJSONData);
     }
 
     // Determine which renderer(s) to use for each feature

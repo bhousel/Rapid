@@ -631,6 +631,25 @@ describe('AbstractPixiLayer', () => {
       assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: -28 }), feature);
     });
 
+    // (A layer that keeps its features does its pass when what it draws changed: see `keepFeatures`.)
+    it('does its pass on the next frame when its own data changes class, and not for another layer\'s', () => {
+      const box = {};
+      layer.bindData('a', 'fbRoads:1');
+      layer._currentBox = box;
+      layer.classChanged('osm:w1');
+      assert.strictEqual(layer._currentBox, box);
+      layer.classChanged('fbRoads:1');
+      assert.isNull(layer._currentBox);
+    });
+
+    it('does its pass again when a feature is still dirty after it\'s drawn (a texture it needs hasn\'t loaded)', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      feature.update = () => {};    // stays dirty, as a point without its icon does
+      layer._currentBox = {};
+      layer._drawInBatches(feature, child, {});
+      assert.isNull(layer._currentBox);
+    });
+
     it('forgets its batches and its index in a reset', () => {
       const feature = makeFeature('a', [0, 0, 10, 10]);
       layer._drawInBatches(feature, child, {});

@@ -919,8 +919,10 @@ export class RapidSystem extends AbstractSystem {
   protected _stablechange(): void {
     const context = this.context;
     const editor = context.systems.editor;
+    const gfx = context.systems.gfx;   // optional
     if (!editor) return;
 
+    const wasActed = new Set<DataID>([...this.acceptIDs, ...this.ignoreIDs]);
     this.acceptIDs.clear();
     this.ignoreIDs.clear();
 
@@ -959,6 +961,13 @@ export class RapidSystem extends AbstractSystem {
       const ranges = this._actedRanges.get(dataID) ?? [];
       ranges.push(piece?.range ?? [0, 1]);
       this._actedRanges.set(dataID, ranges);
+    }
+
+    // What the user accepted or ignored isn't drawn anymore (and what they undid is again). Only
+    // the Rapid layer draws it, and it keeps its features while only the view moves.
+    const isActed = new Set<DataID>([...this.acceptIDs, ...this.ignoreIDs]);
+    if (isActed.size !== wasActed.size || [...isActed].some(id => !wasActed.has(id))) {
+      gfx?.immediateRedraw('rapid');
     }
   }
 

@@ -303,8 +303,16 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
 - **A layer that can skip its pass gathers by `frame.cullBox`, not by the view.** The box is the
   view and padding around it. Call `this.keepFeatures(frame)` in `render()`, after anything that
   must happen on every frame (asking the service for the view's tiles), and return if it says
-  `true`. Only the OSM layer does this so far. Don't use it in a layer whose features depend on the
-  view itself (the labels, the imagery tiles).
+  `true`. Every layer that draws data does (OSM, Rapid, custom data, photos, detections, QA,
+  GeoScribble). Don't use it in a layer whose features depend on the view itself (the labels, the
+  imagery tiles).
+  - **A service's getter takes the extent to look in** (`getData(…, frame.cullBox)`, passed to
+    `spatial.getVisibleItems(spatialID, extent)`). Without one it looks in the view, and a layer
+    that keeps its features would leave the padding empty.
+  - **Whatever changes what such a layer draws must ask for a redraw naming it,** or mark its
+    features dirty: data arriving, a filter (`PhotoSystem._filtersChanged()`), an issue that
+    changed (the QA services' `replaceItem()`), a Rapid feature accepted (`RapidSystem`). A class
+    on the layer's own data makes it do its pass by itself (`classChanged()`). Nothing else looks.
 - **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
   it, and a layer that kept its features did no pass.
 - **Work out a feature's style when `feature.needsStyle` says so, not when it's `dirty`.** A zoom

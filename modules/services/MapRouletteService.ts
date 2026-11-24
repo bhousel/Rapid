@@ -222,12 +222,13 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * Get already loaded data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(): MapRouletteTask[] {
+  public getData(extent?: Extent): MapRouletteTask[] {
     const spatial = this.context.systems.spatial!;
 
-    return (spatial.getVisibleItems('maproulette')
+    return (spatial.getVisibleItems('maproulette', extent)
       .map(hit => hit.contents) as MapRouletteTask[])
       .filter(task => {
         if (this._challengeIDs.size) {
@@ -512,8 +513,10 @@ export class MapRouletteService extends AbstractSystem {
   public replaceItem(item: MapRouletteTask): MapRouletteTask | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
+    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('maproulette', item);
+    gfx?.immediateRedraw('maproulette');   // (its layer keeps its features while only the view moves)
     return item;
   }
 
@@ -525,8 +528,10 @@ export class MapRouletteService extends AbstractSystem {
   public removeItem(item: MapRouletteTask): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
+    const gfx = this.context.systems.gfx;   // optional
     const spatial = this.context.systems.spatial!;
     spatial.removeItems('maproulette', item.id);
+    gfx?.immediateRedraw('maproulette');   // (its layer keeps its features while only the view moves)
   }
 
 

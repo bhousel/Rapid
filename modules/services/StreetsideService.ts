@@ -323,21 +323,23 @@ export class StreetsideService extends AbstractSystem {
 
   /**
    * Get already loaded image data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of image data
    */
-  public getImages(): MarkerData[] {
+  public getImages(extent?: Extent): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('streetside-images').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('streetside-images', extent).map(hit => hit.contents) as MarkerData[];
   }
 
 
   /**
    * Get already loaded sequence data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of sequence data
    */
-  public getSequences(): GeoJSONData[] {
+  public getSequences(extent?: Extent): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('streetside-sequences').map(hit => hit.contents) as GeoJSONData[];
+    return spatial.getVisibleItems('streetside-sequences', extent).map(hit => hit.contents) as GeoJSONData[];
   }
 
 

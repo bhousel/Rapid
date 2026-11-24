@@ -71,7 +71,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     if (!osm?.started) return;
 
     const parentContainer = this._spatialContainer('qa', this.id);
-    const notes = osm.getNotes();
+    const notes = osm.getNotes(frame.cullBox);
 
     for (const d of notes) {
       const dataID = d.id;
@@ -132,6 +132,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     if (!this.enabled || !osm?.started || viewZoom < MINZOOM) return;
 
     osm.loadNotes();
+    if (this.keepFeatures(frame)) return;   // only the view moved, inside the cull box the last pass covered
     this.renderMarkers(frame, viewport);
   }
 

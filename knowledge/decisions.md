@@ -124,6 +124,13 @@ Section 16 of `design/graphics-system-log.md`. Choices someone might undo:
 - **More draw calls, fewer containers:** 25 → 28 in Bellevue with every layer on, since each
   layer has its own batches where Pixi merged sprites across layers. It's what took a pan's
   DRAW from 22.6 to 1.5 ms and Pixi's hit test from 1.8 to 0.006 ms.
+- **They keep their features while only the view moves, and do their whole pass for anything
+  else** (section 17 of the log): a class on their own data (a hovered photo), a zoom, data that
+  arrived, a feature waiting for a texture. The OSM layer's ways of doing those without a pass
+  (`_renderChanged()`, `_moveBox()`, `_renderArrived()`) weren't copied: the other layers' passes
+  are short, and the frame that moves the cull box is what's worth spreading next.
+- **A service's getter takes an extent** (`getData(…, extent)`), not a box the graphics system
+  sets for the frame somewhere the services read: what a layer gathers by is in its own code.
 
 ## Areas are drawn in two batches: fills, then outlines (Nov 2026)
 Step 8 of section 15, the first part. Choices someone might undo:

@@ -4,6 +4,7 @@ import { VectorTileService } from './VectorTileService.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONData } from '../data/GeoJSONData.ts';
+import type { Extent } from '@rapid-sdk/math';
 
 
 /**
@@ -210,25 +211,26 @@ export class OvertureService extends VectorTileService {
   /**
    * Get already loaded data that appears in the current map view
    * @param  datasetID - datasetID to get data for
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(datasetID: DatasetID): GeoJSONData[] {
+  public override getData(datasetID: DatasetID, extent?: Extent): GeoJSONData[] {
     const context = this.context;
     const zoom = context.viewport.transform.zoom;
 
     if (datasetID === 'overture-places') {
       const url = this._pmtilesUrls.get('places');
-      if (url) return super.getData(url);
+      if (url) return super.getData(url, extent);
 
     } else if (datasetID === 'overture-buildings') {
       if (zoom < MINZOOM) return [];
       const url = this._pmtilesUrls.get('buildings');
-      if (url) return super.getData(url);
+      if (url) return super.getData(url, extent);
 
     } else if (datasetID === 'overture-tomtom-roads') {
       if (zoom < MINZOOM) return [];
       const url = this._pmtilesUrls.get('transportation');
-      if (url) return super.getData(url);
+      if (url) return super.getData(url, extent);
     }
 
     return [];

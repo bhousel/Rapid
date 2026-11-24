@@ -499,16 +499,18 @@ export class AbstractPixiLayer {
 
   /**
    * A class was set or unset on some data (`PixiScene.setClass`, `unsetClass`): a hover, a
-   * selection. A layer's pass picks that up for every feature it sees (`syncFeatureClasses`), so
-   * a layer that does its pass on every frame needs nothing here.
-   * A layer that keeps its features (see `keepFeatures`) overrides this to remember the data,
-   * and draws its features again on the next frame, pass or no pass. Then a hover costs what
-   * the hovered feature costs, and the caller can ask for a frame (`gfx.requestFrame()`)
-   * instead of a redraw of everything.
-   * @param _dataID - The data whose classes changed (it may be another layer's)
+   * selection. A layer's pass picks that up for every feature it sees (`syncFeatureClasses`),
+   * so if the data is this layer's, here the layer does its pass on the next frame (the scene
+   * asks for one), though it may keep its features (`keepFeatures`). Data of another layer's
+   * changes nothing here.
+   * The OSM layer overrides this to remember the data, and draws just its features again on the
+   * next frame, with no pass: then a hover costs what the hovered feature costs.
+   * @param dataID - The data whose classes changed (it may be another layer's)
    */
-  public classChanged(_dataID: DataID): void {
-    // nothing to do here
+  public classChanged(dataID: DataID): void {
+    if (this._dataHasFeature.has(dataID)) {
+      this._currentBox = null;
+    }
   }
 
 
@@ -609,6 +611,12 @@ export class AbstractPixiLayer {
     feature.placeInBatches(this.useBatches ? this.batches : null, parent);
     feature.update(viewport);
     feature.parentContainer = feature.drawsInContainer() ? parent : null;   // (a point finds out as it's drawn)
+
+    // Still dirty? Then it's drawn without a texture that hasn't loaded yet (an icon). The scene
+    // asks for a frame when one arrives (`texturesLoaded`), and the layer's pass draws it again.
+    if (feature.dirty) {
+      this._currentBox = null;
+    }
 
     if (feature.hitReach > this._hitReach) {
       this._hitReach = feature.hitReach;

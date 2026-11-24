@@ -356,7 +356,8 @@ What it changed (dev build, from tapes; DRAW in ms):
   even a 2 px pan flipped 30 to 50 features, and a rebuild costs the same whether 1 feature changed
   or 1,800. The answer was to cull less often, not more cleverly: the OSM layer has features ready
   for a box bigger than the view, and leaves them alone while the view moves inside it. See "The
-  cull box" in `graphics-system.md`. Other layers still cull on every frame.
+  cull box" in `graphics-system.md`. Since Nov 24 every layer that draws data does; the imagery
+  and the labels still cull on every frame.
 - **Pixi's own culling doesn't help here.** `Culler` (and `CullerPlugin`) walks every `cullable`
   object on every frame, tests its bounds against the screen, and sets `culled`, which marks the
   render group changed exactly as `visible` does. We already know what's in view from the spatial
