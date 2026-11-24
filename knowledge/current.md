@@ -7,16 +7,12 @@ Follow-ups from the release check are in `backlog.md`.
 
 ## Active: dependency upgrades (from the Nov 18 and Nov 20 checkups)
 Landed (see `completed.md`): the first batch, CDN pins from `package.json`, maplibre-gl 6, the e2e tests,
-pixi.js 8.23, and Bryan's own packages (country-coder 6, location-conflation 4, osm-community-index 7,
-node-diff3 4, osm-auth 4). Careful with `cloc`: its real versions end in `-cloc`, so `bun update`
+pixi.js 8.23, Bryan's own packages (country-coder 6, location-conflation 4, osm-community-index 7,
+node-diff3 4, osm-auth 4), and id-tagging-schema 7.3 with name-suggestion-index 9 (Bryan, Nov 22;
+pinhead stays at 15). Careful with `cloc`: its real versions end in `-cloc`, so `bun update`
 "upgrades" `2.12.0-cloc` to a 2022 `2.11.0`.
 
 Still to do:
-- **id-tagging-schema 7.3 + name-suggestion-index 8, together** (NSI 8 needs schema 7; we already call
-  `buildIDPresets()`). NSI 9 (ESM-only, its own `Preset` types) is in NSI's changelog but not on npm yet.
-  **Not with pinhead 16:** schema 7.3 uses 4 icons pinhead 16 renamed (`bagel_seeded`,
-  `person_running_after_person`, `person_squatting_and_person_reaching_up`,
-  `person_wearing_martial_arts_belt_front_kicking`), and `build_data.ts` drops missing icons silently.
 - **`bunfig.toml`'s `minimumReleaseAgeExcludes`**: country-coder and location-conflation are past the
   3-day window now and can come off the list.
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
