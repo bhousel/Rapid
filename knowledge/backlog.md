@@ -57,10 +57,12 @@ said otherwise. Biggest or most wanted first.
   They keep their features, follow the cull box, cull later, and draw what arrived without a pass
   since Nov 24 (sections 17 to 19), but a hovered photo or a zoom is a pass of its layer (15 to
   34 ms for Mapillary in Bellevue), and a tile of 1,000 photos is made in one frame (13.7 ms).
-- **Destroying in bursts.** A feature hidden for 20 moves of the cull box is destroyed (a number
-  picked by feel), and everything hidden by one move becomes destroyable at once, 20 moves later:
-  thousands of photos, garbage for a major collection. Ideas (Bryan, Nov 24): a queue destroyed as
-  frames have time; reusing features' Pixi objects instead. Measure with a GC trace first.
+- **How many hidden features are kept.** A feature hidden for 20 moves of the cull box is destroyed
+  (a number picked by feel), so what's hidden stays however much it is: 79,500 features (147 MB)
+  after 50 pans in Bellevue with photos on, and if the view stops they stay (log section 20).
+  Destroying wasn't where the garbage came from (a few hundred a frame); making features was.
+  Ideas (Bryan, Nov 24): destroy the oldest hidden first as frames have time, keeping about a cull
+  box's worth; reuse features' objects (a pool per kind).
 - **Mapillary's layers in a dense city:** downtown Seattle at z17.5 has 107,000 photo features and
   295,000 detection features in the cull box, all drawn (Nov 24). A level of detail would leave
   most out at that zoom (`design/filter-system.md` section 6).

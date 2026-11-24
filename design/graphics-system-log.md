@@ -33,6 +33,7 @@ the numbers, and what they say. Then change `graphics-system.md` to say what's t
 | 17 | The other layers keep their features (Nov 24) |
 | 18 | The other layers follow the cull box, and cull later (Nov 24) |
 | 19 | Data that arrives, from `SpatialSystem` (Nov 24) |
+| 20 | What culling leaves for the collector (Nov 24) |
 
 ## 1. How a frame is made
 
@@ -3765,3 +3766,33 @@ labels are off (or they'd ask for frames forever). Four full runs passed after t
 detection features in the cull box (280,000 visible), where Bellevue has 28,000 and 14,500. After a
 load the layers spend a few seconds drawing what's outside the view, at about 20 frames a second.
 That's a question for a level of detail (`design/filter-system.md` section 6), not for this.
+
+## 20. What culling leaves for the collector (Nov 24)
+
+Bryan's worry: a feature hidden for 20 moves of the cull box is destroyed (a number picked by
+feel), so a lot may become garbage at once, and a major collection may follow. Measured in Bellevue
+with the photo, detection, QA and Rapid layers on: 50 pans of 300 px in one direction, every one
+out of the cull box, with a trace of the collector's work on the main thread.
+
+| | First run (much not loaded yet) | Second run (loaded) |
+|---|---|---|
+| Features destroyed in all / at most in a frame | 968 / 477 | 789 / 328 |
+| The collector on the main thread | 5.5 s | 3.6 s |
+| ..major collections | 2, 109 ms (longest 55) | 2, 130 ms (longest 65) |
+| ..minor collections | 1.6 s | 0.76 s |
+| Ticks over 50 / 100 ms | 26 / 14 | 21 / 10 |
+| Mapillary's features afterwards | 92,600 | 114,300 |
+
+- **Destroying isn't where the garbage comes from here.** A few hundred features in a frame, and
+  each move's are destroyed together 20 moves later, so the destroying is already spread over
+  the moves. Most of the collector's time goes with making features and gathering data: each strip
+  the box moves over makes thousands of photos.
+- **What's hidden is kept until the box has moved 20 more times, however much it is.** After the
+  pans, the layers held 79,500 hidden features (57,500 of them Mapillary's), 147 MB of a 2.76 GB
+  heap (measured by destroying them between two collections): about 1.85 KB each. If the view
+  stops, they stay. A heap that size is also what makes marking slow (section 13).
+
+So the fix is less about time-slicing the destroys than about how much is kept: destroying the
+oldest hidden features first, as frames have time, and keeping about as many as a cull box shows
+(enough to pan back), would bound it. Reusing features' objects (a pool per kind) would take away
+both the making and the destroying, and is the bigger change.

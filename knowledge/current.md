@@ -62,8 +62,9 @@ no PR yet). Done, a commit each:
 - `SpatialSystem` says what changed in its caches (`datachange`), and the layers draw what arrived
   without a pass; the services stopped asking for redraws. The OSM layer listens to the editor
   itself, and `FilterSystem` clears its own cache (the log's section 19).
-- Next, from Bryan (Nov 24): measure the garbage that destroying hidden features makes, and
-  destroy them from a queue as frames have time, or reuse their Pixi objects.
+- Measured what culling leaves for the collector (the log's section 20): the destroying is small
+  and spread out, but hidden features are kept for 20 moves however many there are (147 MB after
+  one long pan). Next, for Bryan to pick: a bounded queue destroyed as frames have time, or a pool.
 
 Left from the review, for Bryan to pick: the features' two ways of drawing (batch or own
 objects), the near-duplicate QA and photo layers, label rasterization out of `PixiLayerLabels`,
