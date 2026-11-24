@@ -1,7 +1,7 @@
 import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
 import { AbstractPixiFeature } from '../../../modules/pixi/AbstractPixiFeature.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 
 
 describe('AbstractPixiFeature', () => {
@@ -83,7 +83,7 @@ describe('AbstractPixiFeature', () => {
     const alphaOf = item => batch._bytes[item.first * BYTES + 3];
 
     beforeEach(() => {
-      batch = new LineBatch();
+      batch = new LineBatchMesh();
       asked = [];
       layer.scene.layers.set('map-ui', { haloBatchAt: (x, y) => { asked.push([x, y]); return batch; } });
     });

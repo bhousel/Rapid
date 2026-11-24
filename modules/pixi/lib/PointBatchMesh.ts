@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
-import { VertexBatch } from './VertexBatch.ts';
+import { BatchMesh } from './BatchMesh.ts';
 
-import type { BatchItem, BatchLayout } from './VertexBatch.ts';
+import type { BatchMeshItem, BatchMeshLayout } from './BatchMesh.ts';
 
 
 /**
@@ -9,8 +9,8 @@ import type { BatchItem, BatchLayout } from './VertexBatch.ts';
  * It says what a `PIXI.Sprite` would: a texture, where its anchor is, how big it is and how
  * it's turned. Everything is in pixels, whatever the zoom.
  */
-export interface PointBatchQuad {
-  /** The picture. It has to be in the texture that the batches draw from (`PointBatch.canDraw`). */
+export interface PointBatchMeshQuad {
+  /** The picture. It has to be in the texture that the batches draw from (`PointBatchMesh.canDraw`). */
   texture: PIXI.Texture;
   /** Where its anchor is, in pixels to the right of the point */
   x: number;
@@ -32,12 +32,12 @@ export interface PointBatchQuad {
   alpha: number;
   /** Whether it turns with the map (a viewfield: it points somewhere on the ground), not staying upright on screen */
   turns: boolean;
-  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatch.setTime`) */
+  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatchMesh.setTime`) */
   pulses?: boolean;
 }
 
-/** One point in a batch. `PointBatch.add()` returns it, and the caller keeps it to change the point or take it out. */
-export type PointBatchItem = BatchItem;
+/** One point in a batch. `PointBatchMesh.add()` returns it, and the caller keeps it to change the point or take it out. */
+export type PointBatchMeshItem = BatchMeshItem;
 
 
 // A vertex is 6 floats in one buffer and 8 bytes in another (32 bytes), and a picture is 4 of them:
@@ -47,13 +47,13 @@ export type PointBatchItem = BatchItem;
 //   bytes   0 - 3   aColor     red, green, blue, opacity
 //           4       aFlags.x   255 if the picture turns with the map
 //           5       aFlags.y   255 if the point is shown, 0 if it's hidden
-//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatch.setTime`)
+//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatchMesh.setTime`)
 //           7                  not used
 const FLOATS = 6;
 const BYTES = 8;
 const SHOWN_BYTE = 5;
 
-const LAYOUT: BatchLayout = {
+const LAYOUT: BatchMeshLayout = {
   floats: FLOATS,
   bytes: BYTES,
   alphaByte: SHOWN_BYTE,
@@ -256,19 +256,19 @@ function quadIndices(count: number): Uint16Array {
 
 
 /**
- * A `PointBatch` draws many points as one mesh, in one draw call. A point is a few pictures
+ * A `PointBatchMesh` draws many points as one mesh, in one draw call. A point is a few pictures
  * (a marker, perhaps an icon over it and viewfields under it), each a rectangle of one texture
- * that holds them all: the symbol atlas of `PixiTextures` (`PointBatch.setTexture()`).
+ * that holds them all: the symbol atlas of `PixiTextures` (`PointBatchMesh.setTexture()`).
  *
  * The shader puts each picture a number of pixels from where its point is on screen. So the
  * pictures are the same size at every zoom and stay upright when the map is turned (or turn
  * with it, for a viewfield), and neither a zoom nor a rotation changes anything in a batch.
  * What the batch does with its buffers (a point that changes, hiding, order, the place its
- * coordinates start at) is `VertexBatch`'s.
+ * coordinates start at) is `BatchMesh`'s.
  *
  * See `design/graphics-system.md` section 15.
  */
-export class PointBatch extends VertexBatch {
+export class PointBatchMesh extends BatchMesh {
 
   /**
    * The batch that the glows of this batch's points are drawn in, if its owner made one: a
@@ -277,7 +277,7 @@ export class PointBatch extends VertexBatch {
    * built again: 7 ms where the batch holds a town's points. It's destroyed with this batch.
    * (`null`: a point's glow is the lowest of its pictures in this batch.)
    */
-  public glows: PointBatch | null;
+  public glows: PointBatchMesh | null;
 
 
   /** Makes a batch with no points in it. It draws nothing until one is added. */
@@ -345,7 +345,7 @@ export class PointBatch extends VertexBatch {
    * @param start - Which of `quads` is the first to use
    * @return The point in the batch, to change or remove it with
    */
-  public add(quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, order: number = 0, start: number = 0): PointBatchItem {
+  public add(quads: PointBatchMeshQuad[], count: number, x: number, y: number, scale: number = 1, order: number = 0, start: number = 0): PointBatchMeshItem {
     const item = this._addItem(count * 4, quadIndices(count), order);
     this._write(item, quads, count, x, y, scale, start);
     return item;
@@ -363,7 +363,7 @@ export class PointBatch extends VertexBatch {
    * @param scale - How much larger than the pictures say everything is drawn
    * @param start - Which of `quads` is the first to use
    */
-  public set(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, start: number = 0): void {
+  public set(item: PointBatchMeshItem, quads: PointBatchMeshQuad[], count: number, x: number, y: number, scale: number = 1, start: number = 0): void {
     if (item.batch !== this) return;
     this._resizeItem(item, count * 4, quadIndices(count));
     this._write(item, quads, count, x, y, scale, start);
@@ -380,7 +380,7 @@ export class PointBatch extends VertexBatch {
    * @param scale - How much larger than the pictures say everything is drawn
    * @param start - Which of `quads` is the first of them
    */
-  protected _write(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number, start: number): void {
+  protected _write(item: PointBatchMeshItem, quads: PointBatchMeshQuad[], count: number, x: number, y: number, scale: number, start: number): void {
     const floats = this._floats;
     const bytes = this._bytes;
     const shown = item.visible ? item.alpha : 0;

@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
-import { FillBatch } from './lib/FillBatch.ts';
-import { PointBatch } from './lib/PointBatch.ts';
+import { FillBatchMesh } from './lib/FillBatchMesh.ts';
+import { PointBatchMesh } from './lib/PointBatchMesh.ts';
 
 import type { AtlasOptions } from './lib/AtlasAllocator.ts';
 import type { Context } from '../Context.ts';
@@ -162,7 +162,7 @@ export class PixiTextures {
 
     // Point batches draw from the symbol atlas: its first texture, which has the markers now,
     // and gets the icons as they load. (What a second one would hold, points draw with sprites.)
-    PointBatch.setTexture(this._atlas.symbol.slabs[0] ?? null);
+    PointBatchMesh.setTexture(this._atlas.symbol.slabs[0] ?? null);
 
     // Replace or load patterns
     Promise.resolve()
@@ -196,7 +196,7 @@ export class PixiTextures {
 
 
   /**
-   * Draws every pattern into one texture, for `FillBatch`: a batch draws fills with any mix of
+   * Draws every pattern into one texture, for `FillBatchMesh`: a batch draws fills with any mix of
    * patterns in one draw call, so they have to come from one texture. Each pattern has a cell
    * of the grid: its tile, and around it a border of one texel that repeats the tile's other
    * side, so that smoothing at the tile's edge takes the texels a repeating texture would.
@@ -230,7 +230,7 @@ export class PixiTextures {
     this._patternAtlas?.destroy(true);
     const source = new PIXI.CanvasSource({ resource: canvas, resolution: 1, addressMode: 'clamp-to-edge', scaleMode: 'linear' });
     this._patternAtlas = new PIXI.Texture({ source: source, label: 'pattern-atlas' });
-    FillBatch.setPatterns({ texture: this._patternAtlas, columns: PATTERN_COLUMNS, cell: cell, tile: PATTERN_TILE });
+    FillBatchMesh.setPatterns({ texture: this._patternAtlas, columns: PATTERN_COLUMNS, cell: cell, tile: PATTERN_TILE });
   }
 
 
@@ -260,7 +260,7 @@ export class PixiTextures {
 
 
   /**
-   * Returns a pattern's number in the pattern atlas, which is what a `FillBatch` wants to know
+   * Returns a pattern's number in the pattern atlas, which is what a `FillBatchMesh` wants to know
    * to fill an area with it.
    * @param textureID - The pattern's name, e.g. 'forest'
    * @return Its number, from 1, or 0 if there's no such pattern

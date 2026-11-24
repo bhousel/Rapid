@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
@@ -293,7 +293,7 @@ describe('PixiLayerOsm', () => {
     // A polygon's geometry, as far as `_polygonTileContainer` looks: its extent in world coordinates
     const part = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max) } });
 
-    // Polygons are drawn in two batches: every fill (`FillBatch`), then every outline (`LineBatch`).
+    // Polygons are drawn in two batches: every fill (`FillBatchMesh`), then every outline (`LineBatchMesh`).
     describe('polygon batches', () => {
       const polygonAt = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max), origin: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2] } });
 
@@ -355,7 +355,7 @@ describe('PixiLayerOsm', () => {
         const fills = layer._polygonBatch(true, polygonAt([10, 10], [20, 20]));
         const outlines = layer._polygonBatch(false, polygonAt([10, 10], [20, 20]));
         const glows = outlines.glows;
-        assert.instanceOf(glows, LineBatch);
+        assert.instanceOf(glows, LineBatchMesh);
         assert.strictEqual(glows.label, 'glows');
         assert.strictEqual(glows.parent, layer.polygonContainer);
         assert.isAbove(glows.zIndex, outlines.zIndex);
@@ -459,7 +459,7 @@ describe('PixiLayerOsm', () => {
       assert.strictEqual(residentialLong.label, '-9/large');   // below the tiles of its class, above the class below
     });
 
-    // The casings and strokes of lines are drawn in batches (`LineBatch`): for each level, one
+    // The casings and strokes of lines are drawn in batches (`LineBatchMesh`): for each level, one
     // for every casing and one for every stroke.
     describe('line batches', () => {
       const lineAt = (min, max) => ({ world: { extent: new Rapid.sdk.Extent(min, max), origin: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2] } });
@@ -538,7 +538,7 @@ describe('PixiLayerOsm', () => {
         const strokes = layer._lineBatch(level, false, lineAt([10, 10], [20, 20]));
         const casings = layer._lineBatch(level, true, lineAt([10, 10], [20, 20]));
         const glows = strokes.glows;
-        assert.instanceOf(glows, LineBatch);
+        assert.instanceOf(glows, LineBatchMesh);
         assert.strictEqual(glows.label, 'glows');
         assert.strictEqual(glows.parent, level);
         assert.isAbove(glows.zIndex, strokes.zIndex);
@@ -597,7 +597,7 @@ describe('PixiLayerOsm', () => {
       });
     });
 
-    // Points, vertices and virtual pins are drawn in one batch (`PointBatch`). The few that draw
+    // Points, vertices and virtual pins are drawn in one batch (`PointBatchMesh`). The few that draw
     // themselves (one with a picture from another texture) are in the containers of their tiles,
     // over the batch.
     describe('point batch', () => {
@@ -635,7 +635,7 @@ describe('PixiLayerOsm', () => {
         assert.isBelow(batch.zIndex, viewfields.parent.zIndex);
       });
 
-      // A hover then leaves the points' batch as it is (see `PointBatch.glows`).
+      // A hover then leaves the points' batch as it is (see `PointBatchMesh.glows`).
       it('gives the batch a small batch for its points\' glows, drawn under every point, that follows the view and goes with it', () => {
         const batch = layer._pointBatch(placed(300, 10));
         const glows = batch.glows;

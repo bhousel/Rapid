@@ -1,14 +1,14 @@
 import * as PIXI from 'pixi.js';
 import { STROKE_FALLBACK_SIZE, STROKE_VERTEX_SIZE } from '../../geo/index.ts';
-import { VertexBatch } from './VertexBatch.ts';
+import { BatchMesh } from './BatchMesh.ts';
 
-import type { BatchItem, BatchLayout } from './VertexBatch.ts';
+import type { BatchMeshItem, BatchMeshLayout } from './BatchMesh.ts';
 import type { StrokeMesh } from '../../geo/stroke.ts';
 
 
 /** How one line of a batch is drawn: a casing or a stroke */
-export interface LineBatchStyle {
-  /** The width, in pixels, at zoom 17 and above (it's narrower below, see `LineBatch.setView`) */
+export interface LineBatchMeshStyle {
+  /** The width, in pixels, at zoom 17 and above (it's narrower below, see `LineBatchMesh.setView`) */
   width: number;
   /** The narrowest it's drawn, in pixels */
   minWidth: number;
@@ -16,19 +16,19 @@ export interface LineBatchStyle {
   color: number;
   /** The opacity, from 0 to 1 */
   alpha: number;
-  /** The dash pattern in pixels, on and off, as two or four whole numbers up to 255 (see `LineBatch.canDraw`) */
+  /** The dash pattern in pixels, on and off, as two or four whole numbers up to 255 (see `LineBatchMesh.canDraw`) */
   dash?: number[] | null;
-  /** Whether it's a casing: those aren't drawn at every zoom (see `LineBatch.setView`) */
+  /** Whether it's a casing: those aren't drawn at every zoom (see `LineBatchMesh.setView`) */
   isCasing?: boolean;
   /**
-   * Whether it marches: its dashes move along it (see `LineBatch.setTime`), and it's drawn as
+   * Whether it marches: its dashes move along it (see `LineBatchMesh.setTime`), and it's drawn as
    * wide as `width` says at every zoom and in wireframe mode. The halo of a selection does.
    */
   marches?: boolean;
 }
 
-/** The glow around one line of a batch: of a hover or a highlight (see `LineBatch.addGlow`) */
-export interface LineBatchGlow {
+/** The glow around one line of a batch: of a hover or a highlight (see `LineBatchMesh.addGlow`) */
+export interface LineBatchMeshGlow {
   /** The width of the line that the glow is around, in pixels, at zoom 17 and above: the glow starts at its edge */
   width: number;
   /** The narrowest that line is drawn, in pixels */
@@ -39,19 +39,19 @@ export interface LineBatchGlow {
   alpha: number;
 }
 
-/** What the clock says about how the things that move in every batch are drawn (see `LineBatch.setTime`) */
-export interface LineBatchTime {
+/** What the clock says about how the things that move in every batch are drawn (see `LineBatchMesh.setTime`) */
+export interface LineBatchMeshTime {
   /** How bright a glow is now, from 0 to 1: it breathes */
   pulse: number;
   /** How far the dashes of a line that marches have moved along it, in pixels */
   shift: number;
 }
 
-/** The kinds of marker that a batch can draw along a line (see `LineBatch.addMarkers`) */
+/** The kinds of marker that a batch can draw along a line (see `LineBatchMesh.addMarkers`) */
 export type LineMarkerKind = 'oneway' | 'twoway' | 'sided';
 
 /** The markers drawn along one line of a batch */
-export interface LineBatchMarkers {
+export interface LineBatchMeshMarkers {
   /** Which marker: an arrow along the line, an arrow at both ends, or a triangle on the line's right side */
   kind: LineMarkerKind;
   /** The color, as 0xRRGGBB */
@@ -96,13 +96,13 @@ const GLOW_CODE = 5;
 export const LINE_GLOW = 12;
 
 /**
- * One line in a batch (a casing, a stroke, or the markers along a line). `LineBatch.add()` and
+ * One line in a batch (a casing, a stroke, or the markers along a line). `LineBatchMesh.add()` and
  * `addMarkers()` return it, and the caller keeps it to change the line or take it out.
  */
-export type LineBatchItem = BatchItem;
+export type LineBatchMeshItem = BatchMeshItem;
 
-/** What the view says about how the lines of every batch are drawn (see `LineBatch.setView`) */
-export interface LineBatchView {
+/** What the view says about how the lines of every batch are drawn (see `LineBatchMesh.setView`) */
+export interface LineBatchMeshView {
   /** How many units of the lines' coordinates a pixel is */
   pixel: number;
   /** How many pixels narrower every line is drawn at this zoom, down to its `minWidth` */
@@ -134,7 +134,7 @@ export interface LineBatchView {
 const FLOATS = 12;
 const BYTES = 8;
 
-const LAYOUT: BatchLayout = {
+const LAYOUT: BatchMeshLayout = {
   floats: FLOATS,
   bytes: BYTES,
   alphaByte: 3,
@@ -493,23 +493,23 @@ function lineShader(): PIXI.Shader {
 
 
 /**
- * A `LineBatch` draws many lines as one mesh, in one draw call: every casing of a level's lines,
+ * A `LineBatchMesh` draws many lines as one mesh, in one draw call: every casing of a level's lines,
  * for example, or every stroke. Each line is a run of vertices in the batch's buffers, copied
  * from its stroke mesh (see `geomStrokeMesh()`), with how it's drawn (its width in pixels,
  * color, opacity and dashes) in every vertex.
  *
  * The shader puts each vertex where the line's width at the current zoom says, so a zoom changes
- * five numbers (`LineBatch.setView()`) and nothing in any batch. Two more numbers follow the
- * clock (`LineBatch.setTime()`): they make the glow around a hovered line breathe
+ * five numbers (`LineBatchMesh.setView()`) and nothing in any batch. Two more numbers follow the
+ * clock (`LineBatchMesh.setTime()`): they make the glow around a hovered line breathe
  * (`addGlow()`), and move the dashes of a line that marches, like a selection's halo. The markers along a line (oneway
  * arrows, the triangles of a line with sides) are a strip in the batch too, and the shader
  * draws them in it (`addMarkers()`). What the batch does with its
  * buffers (a line that changes, hiding, order, the place its coordinates start at) is
- * `VertexBatch`'s.
+ * `BatchMesh`'s.
  *
  * See `design/graphics-system.md` section 15.
  */
-export class LineBatch extends VertexBatch {
+export class LineBatchMesh extends BatchMesh {
 
   /**
    * The batch that the glows of this batch's lines are drawn in, if its owner made one: a
@@ -518,7 +518,7 @@ export class LineBatch extends VertexBatch {
    * its vertices sent to the GPU again: 9 ms where a batch holds a town's roads. It's
    * destroyed with this batch. (`null`: glows are drawn in this batch.)
    */
-  public glows: LineBatch | null;
+  public glows: LineBatchMesh | null;
 
   /** Makes a batch with no lines in it. It draws nothing until one is added. */
   public constructor() {
@@ -544,7 +544,7 @@ export class LineBatch extends VertexBatch {
    * the fill mode changes: nothing else has to be done to a batch for those.
    * @param view - What a pixel is in the lines' coordinates, and what the zoom does to widths and casings
    */
-  public static setView(view: LineBatchView): void {
+  public static setView(view: LineBatchMeshView): void {
     const uniforms = lineUniforms().uniforms;
     uniforms.uPixel = view.pixel;
     uniforms.uNarrow = view.narrow;
@@ -560,7 +560,7 @@ export class LineBatch extends VertexBatch {
    * frame is drawn; nothing in any batch changes for it.
    * @param time - What the clock says
    */
-  public static setTime(time: LineBatchTime): void {
+  public static setTime(time: LineBatchMeshTime): void {
     const uniforms = lineUniforms().uniforms;
     uniforms.uGlow = time.pulse;
     uniforms.uShift = time.shift;
@@ -593,7 +593,7 @@ export class LineBatch extends VertexBatch {
    * @param order - Where it's drawn among the others (higher is on top; lines with the same number in the order they were added)
    * @return The line in the batch, to change or remove it with
    */
-  public add(stroke: StrokeMesh, dx: number, dy: number, style: LineBatchStyle, order: number = 0): LineBatchItem {
+  public add(stroke: StrokeMesh, dx: number, dy: number, style: LineBatchMeshStyle, order: number = 0): LineBatchMeshItem {
     const item = this._addItem(stroke.vertexCount, stroke.indices, order);
     this._writeStroke(item, stroke, dx, dy);
     this._writeStyle(item, style);
@@ -609,7 +609,7 @@ export class LineBatch extends VertexBatch {
    * @param dx - Where the line's coordinates start, in the batch's
    * @param dy - The same, for y
    */
-  public setStroke(item: LineBatchItem, stroke: StrokeMesh, dx: number, dy: number): void {
+  public setStroke(item: LineBatchMeshItem, stroke: StrokeMesh, dx: number, dy: number): void {
     if (item.batch !== this) return;
 
     // The style goes along if the line moves: it's the same in all of a line's vertices.
@@ -626,7 +626,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The line
    * @param style - How it's drawn
    */
-  public setStyle(item: LineBatchItem, style: LineBatchStyle): void {
+  public setStyle(item: LineBatchMeshItem, style: LineBatchMeshStyle): void {
     if (item.batch !== this) return;
     this._writeStyle(item, style);
   }
@@ -644,7 +644,7 @@ export class LineBatch extends VertexBatch {
    * @param order - Where they're drawn among the others (higher is on top)
    * @return The markers in the batch, to change or remove them with
    */
-  public addMarkers(stroke: StrokeMesh, dx: number, dy: number, markers: LineBatchMarkers, order: number = 0): LineBatchItem {
+  public addMarkers(stroke: StrokeMesh, dx: number, dy: number, markers: LineBatchMeshMarkers, order: number = 0): LineBatchMeshItem {
     const item = this._addItem(stroke.vertexCount, stroke.indices, order);
     this._writeStroke(item, stroke, dx, dy);
     this._writeMarkers(item, markers);
@@ -662,7 +662,7 @@ export class LineBatch extends VertexBatch {
    * @param dy - The same, for y
    * @param markers - Which markers, and their color
    */
-  public setMarkers(item: LineBatchItem, stroke: StrokeMesh, dx: number, dy: number, markers: LineBatchMarkers): void {
+  public setMarkers(item: LineBatchMeshItem, stroke: StrokeMesh, dx: number, dy: number, markers: LineBatchMeshMarkers): void {
     if (item.batch !== this) return;
     this._resizeItem(item, stroke.vertexCount, stroke.indices);
     this._writeStroke(item, stroke, dx, dy);
@@ -676,7 +676,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The markers (from `addMarkers`)
    * @param markers - Which markers, and their color
    */
-  public setMarkerStyle(item: LineBatchItem, markers: LineBatchMarkers): void {
+  public setMarkerStyle(item: LineBatchMeshItem, markers: LineBatchMeshMarkers): void {
     if (item.batch !== this) return;
     this._writeMarkers(item, markers);
   }
@@ -687,7 +687,7 @@ export class LineBatch extends VertexBatch {
    * the line, as wide as the line and `LINE_GLOW` pixels more on each side, in which the shader
    * draws a color that's brightest at the line's edge and fades out. Give it a stroke mesh
    * with round caps and joins, so that the glow goes around the line's ends and corners.
-   * How bright every glow is changes with the clock (`LineBatch.setTime`).
+   * How bright every glow is changes with the clock (`LineBatchMesh.setTime`).
    * @param stroke - The line's stroke mesh. Its vertices are copied; its `indices` are kept, and must not change.
    * @param dx - Where the line's coordinates start, in the batch's
    * @param dy - The same, for y
@@ -695,7 +695,7 @@ export class LineBatch extends VertexBatch {
    * @param order - Where it's drawn among the others (higher is on top)
    * @return The glow in the batch, to change or remove it with
    */
-  public addGlow(stroke: StrokeMesh, dx: number, dy: number, glow: LineBatchGlow, order: number = 0): LineBatchItem {
+  public addGlow(stroke: StrokeMesh, dx: number, dy: number, glow: LineBatchMeshGlow, order: number = 0): LineBatchMeshItem {
     const item = this._addItem(stroke.vertexCount, stroke.indices, order);
     this._writeStroke(item, stroke, dx, dy);
     this._writeGlow(item, glow);
@@ -713,7 +713,7 @@ export class LineBatch extends VertexBatch {
    * @param dy - The same, for y
    * @param glow - How wide the line is, and the glow's color
    */
-  public setGlow(item: LineBatchItem, stroke: StrokeMesh, dx: number, dy: number, glow: LineBatchGlow): void {
+  public setGlow(item: LineBatchMeshItem, stroke: StrokeMesh, dx: number, dy: number, glow: LineBatchMeshGlow): void {
     if (item.batch !== this) return;
     this._resizeItem(item, stroke.vertexCount, stroke.indices);
     this._writeStroke(item, stroke, dx, dy);
@@ -727,7 +727,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The glow (from `addGlow`)
    * @param glow - How wide the line is, and the glow's color
    */
-  public setGlowStyle(item: LineBatchItem, glow: LineBatchGlow): void {
+  public setGlowStyle(item: LineBatchMeshItem, glow: LineBatchMeshGlow): void {
     if (item.batch !== this) return;
     this._writeGlow(item, glow);
   }
@@ -740,7 +740,7 @@ export class LineBatch extends VertexBatch {
    * @param dx - Where the line's coordinates start, in the batch's
    * @param dy - The same, for y
    */
-  protected _writeStroke(item: LineBatchItem, stroke: StrokeMesh, dx: number, dy: number): void {
+  protected _writeStroke(item: LineBatchMeshItem, stroke: StrokeMesh, dx: number, dy: number): void {
     const floats = this._floats;
     const vertices = stroke.vertices;
     const count = item.count;
@@ -776,7 +776,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The line
    * @param style - How it's drawn
    */
-  protected _writeStyle(item: LineBatchItem, style: LineBatchStyle): void {
+  protected _writeStyle(item: LineBatchMeshItem, style: LineBatchMeshStyle): void {
     const floats = this._floats;
     const bytes = this._bytes;
     const count = item.count;
@@ -819,7 +819,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The markers
    * @param markers - Which markers, and their color
    */
-  protected _writeMarkers(item: LineBatchItem, markers: LineBatchMarkers): void {
+  protected _writeMarkers(item: LineBatchMeshItem, markers: LineBatchMeshMarkers): void {
     const floats = this._floats;
     const bytes = this._bytes;
     const count = item.count;
@@ -857,7 +857,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The markers
    * @param stroke - The stroke mesh that the strip was copied from
    */
-  protected _writeSides(item: LineBatchItem, stroke: StrokeMesh): void {
+  protected _writeSides(item: LineBatchMeshItem, stroke: StrokeMesh): void {
     const bytes = this._bytes;
     const vertices = stroke.vertices;
     const count = item.count;
@@ -882,7 +882,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The glow
    * @param glow - How wide the line is that it's around, and the glow's color
    */
-  protected _writeGlow(item: LineBatchItem, glow: LineBatchGlow): void {
+  protected _writeGlow(item: LineBatchMeshItem, glow: LineBatchMeshGlow): void {
     const floats = this._floats;
     const bytes = this._bytes;
     const count = item.count;
@@ -925,7 +925,7 @@ export class LineBatch extends VertexBatch {
    * @param item - The glow
    * @param stroke - The stroke mesh that the strip was copied from
    */
-  protected _writeAround(item: LineBatchItem, stroke: StrokeMesh): void {
+  protected _writeAround(item: LineBatchMeshItem, stroke: StrokeMesh): void {
     const floats = this._floats;
     const vertices = stroke.vertices;
     const count = item.count;
@@ -949,7 +949,7 @@ export class LineBatch extends VertexBatch {
    * @param alpha - The line's opacity when it's drawn, from 1 to 255 (a hidden line's vertices don't have it)
    * @return The style that was written there
    */
-  protected _readStyle(vertex: number, alpha: number): LineBatchStyle {
+  protected _readStyle(vertex: number, alpha: number): LineBatchMeshStyle {
     const o = vertex * FLOATS;
     const p = vertex * BYTES;
     const floats = this._floats;

@@ -36,20 +36,20 @@ origin
 ├ basemap
 │  ├ osm                 zIndex 0
 │  │  ├ polygons
-│  │  │  ├ fills         a `FillBatch`: every polygon's fill, the largest first
-│  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill (a polygon
+│  │  │  ├ fills         a `FillBatchMesh`: every polygon's fill, the largest first
+│  │  │  ├ outlines      a `LineBatchMesh`: every polygon's outlines, above every fill (a polygon
 │  │  │  │               under 20 pixels has none)
-│  │  │  ├ glows         a `LineBatch`: the glow around the outlines of a hovered polygon
+│  │  │  ├ glows         a `LineBatchMesh`: the glow around the outlines of a hovered polygon
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area).
 │  │  │                  Only the polygons that draw something themselves are in these (none,
 │  │  │                  while the layer draws in batches): the rest aren't in the scene
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
-│  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
-│  │        ├ strokes              a `LineBatch`: every stroke, above every casing, and then the
+│  │        ├ casings              a `LineBatchMesh`: every casing of the level's lines, by road class
+│  │        ├ strokes              a `LineBatchMesh`: every stroke, above every casing, and then the
 │  │        │                      markers along the lines (oneway arrows), above every stroke
-│  │        ├ glows                a `LineBatch`: the glow around a hovered line of the level
+│  │        ├ glows                a `LineBatchMesh`: the glow around a hovered line of the level
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
 │  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile.
 │  │                               Only the lines that draw themselves are in these (one with
@@ -61,8 +61,8 @@ origin
 │  └ …
 ├ points
 │  ├ osm                 OSM points, interesting vertices and the virtual POI pins
-│  │  ├ glows            a `PointBatch`: the glow behind a hovered point, under every point
-│  │  ├ points           a `PointBatch`: every one of them, from north to south, the ones with
+│  │  ├ glows            a `PointBatchMesh`: the glow behind a hovered point, under every point
+│  │  ├ points           a `PointBatchMesh`: every one of them, from north to south, the ones with
 │  │  │                  viewfields last
 │  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude. Only the
 │  │  │                  points that draw themselves are in these (one with a picture from
@@ -78,7 +78,7 @@ origin
 ├ labels                 screen-space, not interactive
 ├ blocks                 edit blocks, straight in the group: always interactive (they catch the pointer
 │                        on purpose, and show `not-allowed`)
-└ ui                     PixiLayerMapUI: lasso, geolocation, `halo` (one `LineBatch` for the halos of
+└ ui                     PixiLayerMapUI: lasso, geolocation, `halo` (one `LineBatchMesh` for the halos of
                          everything that's selected, in any layer), and `selected` (the vertices and
                          midpoints of the selected/hovered ways, so the user can grab them above
                          everything)
@@ -219,7 +219,7 @@ Rules:
   draw in screen coordinates, which are small.
 - **`origin` is not a render group**, for the reason above.
 
-What it changed (M4, `bun run measure --fresh`, DRAW pass in ms):
+What it changed (M4, `bun run measure --fresh`, DRAW phase in ms):
 
 | | Seattle | Bochum | Staten Island | Golmud |
 |---|---|---|---|---|
@@ -256,7 +256,7 @@ small over big. Now:
   building; nothing at Staten Island or Bochum. Decided with Bryan (Nov 18): try it, and watch for
   tile edges.
 
-What it changed, on top of the render groups (DRAW pass in ms; tiles at the view's zoom, then one
+What it changed, on top of the render groups (DRAW phase in ms; tiles at the view's zoom, then one
 level past it):
 
 | | Seattle | Staten Island | Golmud |
@@ -279,7 +279,7 @@ or (for a line) drawn again: 35 ms of DRAW for one changed line or one new point
 that had one. That's a hover, each frame of a drag, and every frame of a load or a pan that makes
 features (`graphics-system.md` section 10).
 
-**What a render group costs, and what it saves.** Pixi's DRAW pass does two things with a group:
+**What a render group costs, and what it saves.** Pixi's DRAW phase does two things with a group:
 - It **builds** the group's list of instructions and its vertex buffer, only when the group's
   structure changed. That walks everything in the group, so it costs what the group holds, not
   what changed.
@@ -349,8 +349,8 @@ What it changed (dev build, from tapes; DRAW in ms):
   some feature's `visible` on every frame.~~ **Done for the OSM layer (Nov 19).** At Staten Island
   even a 2 px pan flipped 30 to 50 features, and a rebuild costs the same whether 1 feature changed
   or 1,800. The answer was to cull less often, not more cleverly: the OSM layer has features ready
-  for a box bigger than the view, and leaves them alone while the view moves inside it. See "A CULL
-  pass" in `graphics-system.md`. Other layers still cull on every frame.
+  for a box bigger than the view, and leaves them alone while the view moves inside it. See "The
+  cull box" in `graphics-system.md`. Other layers still cull on every frame.
 - **Pixi's own culling doesn't help here.** `Culler` (and `CullerPlugin`) walks every `cullable`
   object on every frame, tests its bounds against the screen, and sets `culled`, which marks the
   render group changed exactly as `visible` does. We already know what's in view from the spatial

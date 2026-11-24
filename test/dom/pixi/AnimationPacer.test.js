@@ -3,9 +3,9 @@ import {
 } from '../../../modules/pixi/lib/AnimationPacer.ts';
 
 
-// An animation frame is the scene drawn again only because something in it moves by itself.
+// An animation draw is the scene drawn again only because something in it moves by itself.
 // The pacer says when one is due: `changed()` is a frame drawn for another reason, `animated()`
-// an animation frame, `tick()` each turn of the frame loop.
+// an animation draw, `tick()` each tick of the game loop.
 describe('AnimationPacer', () => {
   let pacer;
 
@@ -22,19 +22,19 @@ describe('AnimationPacer', () => {
     assert.isTrue(pacer.isDue(5000));
   });
 
-  it('draws a frame on every third tick of a screen that shows 60 a second: 20 a second', () => {
+  it('makes an animation draw on every third tick of a screen that shows 60 a second: 20 a second', () => {
     const TICK = 1000 / 60;
     pacer.changed(0);
-    let frames = 0;
+    let draws = 0;
     for (let i = 1; i <= 600; i++) {       // ten seconds, with ticks that come a little early or late
       const now = i * TICK + ((i % 2) ? 1.5 : -1.5);
       pacer.tick(TICK);
       if (pacer.isDue(now)) {
         pacer.animated(now);
-        frames++;
+        draws++;
       }
     }
-    assert.strictEqual(frames, 200);
+    assert.strictEqual(draws, 200);
   });
 
   it('draws none while other frames are drawn as often', () => {
@@ -46,7 +46,7 @@ describe('AnimationPacer', () => {
     }
   });
 
-  it('makes the gap grow with how long the browser took to come back after an animation frame', () => {
+  it('makes the gap grow with how long the browser took to come back after an animation draw', () => {
     pacer.changed(1000);
     pacer.animated(1050);
     pacer.tick(40);                // the GPU needed longer than a tick for it
@@ -68,7 +68,7 @@ describe('AnimationPacer', () => {
     assert.isTrue(pacer.isDue(1050 + MAX_ANIMATION_GAP));
   });
 
-  it('times only the tick after an animation frame', () => {
+  it('times only the tick after an animation draw', () => {
     pacer.changed(1000);
     pacer.tick(300);               // a long pass: nothing to do with animation
     assert.strictEqual(pacer.gap, ANIMATION_MS);
@@ -84,24 +84,24 @@ describe('AnimationPacer', () => {
     assert.strictEqual(pacer.gap, ANIMATION_MS);
   });
 
-  it('rests when nothing else was drawn for a while, after one last frame', () => {
+  it('rests when nothing else was drawn for a while, after one last draw', () => {
     pacer.changed(1000);
     let now = 1000;
-    let frames = 0;
+    let draws = 0;
     while (now < 1000 + ANIMATION_REST_MS - 50) {
       now += 50;
       assert.isTrue(pacer.isDue(now), `at ${now}`);
       assert.isFalse(pacer.isResting(now));
       pacer.animated(now);
       pacer.tick(16.7);
-      frames++;
+      draws++;
     }
-    assert.strictEqual(frames, ANIMATION_REST_MS / 50 - 1);
+    assert.strictEqual(draws, ANIMATION_REST_MS / 50 - 1);
     assert.isFalse(pacer.isDue(now + 10), 'not yet resting, and the gap isn\'t over');
 
     now = 1000 + ANIMATION_REST_MS;
     assert.isTrue(pacer.isResting(now));
-    assert.isTrue(pacer.isDue(now), 'the frame that settles what moves');
+    assert.isTrue(pacer.isDue(now), 'the draw that settles what moves');
     pacer.animated(now);
     pacer.tick(16.7);
 
@@ -121,14 +121,14 @@ describe('AnimationPacer', () => {
     assert.isFalse(pacer.isDue(later + 1000));
     assert.isTrue(pacer.isDue(later + 1000 + ANIMATION_MS));
 
-    // ..and rests again after as long, with a frame that settles it again
+    // ..and rests again after as long, with a draw that settles it again
     const again = later + 1000 + ANIMATION_REST_MS;
     assert.isTrue(pacer.isDue(again));
     pacer.animated(again);
     assert.isFalse(pacer.isDue(again + 50));
   });
 
-  it('settles only with a frame that was drawn while resting', () => {
+  it('settles only with a draw that was made while resting', () => {
     pacer.changed(1000);
     pacer.animated(1000 + ANIMATION_REST_MS - 10);     // the last one that moves
     assert.isTrue(pacer.isDue(1000 + ANIMATION_REST_MS), 'no gap to wait: the rest begins now');

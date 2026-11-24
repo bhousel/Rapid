@@ -104,25 +104,25 @@ describe('SchedulerSystem', () => {
       });
     });
 
-    describe('targetFrameTime', () => {
+    describe('targetTickTime', () => {
       it('defaults to ~16.7ms (60 fps)', () => {
-        assert.closeTo(_scheduler.targetFrameTime, 1000 / 60, 0.01);
+        assert.closeTo(_scheduler.targetTickTime, 1000 / 60, 0.01);
       });
 
       it('can be set to a custom value', () => {
-        const original = _scheduler.targetFrameTime;
-        _scheduler.targetFrameTime = 8;
-        assert.strictEqual(_scheduler.targetFrameTime, 8);
-        _scheduler.targetFrameTime = original;
+        const original = _scheduler.targetTickTime;
+        _scheduler.targetTickTime = 8;
+        assert.strictEqual(_scheduler.targetTickTime, 8);
+        _scheduler.targetTickTime = original;
       });
 
       it('clamps to a minimum of 1ms', () => {
-        const original = _scheduler.targetFrameTime;
-        _scheduler.targetFrameTime = 0;
-        assert.strictEqual(_scheduler.targetFrameTime, 1);
-        _scheduler.targetFrameTime = -10;
-        assert.strictEqual(_scheduler.targetFrameTime, 1);
-        _scheduler.targetFrameTime = original;
+        const original = _scheduler.targetTickTime;
+        _scheduler.targetTickTime = 0;
+        assert.strictEqual(_scheduler.targetTickTime, 1);
+        _scheduler.targetTickTime = -10;
+        assert.strictEqual(_scheduler.targetTickTime, 1);
+        _scheduler.targetTickTime = original;
       });
     });
 
@@ -358,7 +358,7 @@ describe('SchedulerSystem', () => {
         _scheduler.setTimeout('test-timeout', () => { executed = true; }, { ms: 5 });
         assert.strictEqual(_scheduler.numTimers, 1);
 
-        // Wait for timer to mature + frame to drain
+        // Wait for timer to mature + tick to drain
         await Bun.sleep(30);
         assert.isTrue(executed, 'task should have run');
         assert.strictEqual(_scheduler.numTimers, 0, 'timer entry cleaned up');
@@ -455,7 +455,7 @@ describe('SchedulerSystem', () => {
         const order = [];
         _scheduler.debounce('test-leading', () => order.push('leading'), { ms: 10, leading: true });
 
-        // Wait a couple frames for the leading enqueue to drain
+        // Wait a couple ticks for the leading enqueue to drain
         await Bun.sleep(30);
         assert.include(order, 'leading', 'should have fired on leading edge');
       });
@@ -464,7 +464,7 @@ describe('SchedulerSystem', () => {
         const order = [];
         _scheduler.debounce('test-lead-trail', () => order.push('a'), { ms: 10, leading: true });
 
-        // Wait a frame for leading to drain, then debounce again
+        // Wait a tick for leading to drain, then debounce again
         await Bun.sleep(30);
         _scheduler.debounce('test-lead-trail', () => order.push('b'), { ms: 10 });
 
@@ -682,8 +682,8 @@ describe('SchedulerSystem', () => {
     });
 
     describe('game loop', () => {
-      // Helper: returns a Promise that resolves after N requestAnimationFrame frames
-      function waitFrames(n) {
+      // Helper: returns a Promise that resolves after N requestAnimationFrame ticks
+      function waitTicks(n) {
         return new Promise(resolve => {
           let count = 0;
           function next() {
@@ -698,35 +698,35 @@ describe('SchedulerSystem', () => {
         });
       }
 
-      describe('addFrameCallback / removeFrameCallback', () => {
-        it('registers a frame callback', () => {
-          assert.strictEqual(_scheduler.numFrameCallbacks, 0);
-          _scheduler.addFrameCallback('test', () => {});
-          assert.strictEqual(_scheduler.numFrameCallbacks, 1);
-          _scheduler.removeFrameCallback('test');
+      describe('addTickCallback / removeTickCallback', () => {
+        it('registers a tick callback', () => {
+          assert.strictEqual(_scheduler.numTickCallbacks, 0);
+          _scheduler.addTickCallback('test', () => {});
+          assert.strictEqual(_scheduler.numTickCallbacks, 1);
+          _scheduler.removeTickCallback('test');
         });
 
-        it('removes a frame callback by id', () => {
-          _scheduler.addFrameCallback('test', () => {});
-          assert.strictEqual(_scheduler.numFrameCallbacks, 1);
-          _scheduler.removeFrameCallback('test');
-          assert.strictEqual(_scheduler.numFrameCallbacks, 0);
+        it('removes a tick callback by id', () => {
+          _scheduler.addTickCallback('test', () => {});
+          assert.strictEqual(_scheduler.numTickCallbacks, 1);
+          _scheduler.removeTickCallback('test');
+          assert.strictEqual(_scheduler.numTickCallbacks, 0);
         });
 
         it('replacing a callback with the same id keeps count at 1', () => {
-          _scheduler.addFrameCallback('test', () => {});
-          _scheduler.addFrameCallback('test', () => {});  // replace
-          assert.strictEqual(_scheduler.numFrameCallbacks, 1);
-          _scheduler.removeFrameCallback('test');
+          _scheduler.addTickCallback('test', () => {});
+          _scheduler.addTickCallback('test', () => {});  // replace
+          assert.strictEqual(_scheduler.numTickCallbacks, 1);
+          _scheduler.removeTickCallback('test');
         });
 
         it('removing a nonexistent id does nothing', () => {
-          _scheduler.removeFrameCallback('nope');  // should not throw
-          assert.strictEqual(_scheduler.numFrameCallbacks, 0);
+          _scheduler.removeTickCallback('nope');  // should not throw
+          assert.strictEqual(_scheduler.numTickCallbacks, 0);
         });
       });
 
-      describe('frame callback execution', () => {
+      describe('tick callback execution', () => {
         const origError = console.error;
         const spyError = mock();
 
@@ -743,46 +743,46 @@ describe('SchedulerSystem', () => {
         });
 
         afterEach(() => {
-          _scheduler._frameCallbacks.clear();  // in case a thrown error skips removal steps
+          _scheduler._tickCallbacks.clear();  // in case a thrown error skips removal steps
         });
 
 
-        it('calls registered frame callbacks each frame', async () => {
+        it('calls registered tick callbacks each tick', async () => {
           let callCount = 0;
-          _scheduler.addFrameCallback('test', () => { callCount++; });
+          _scheduler.addTickCallback('test', () => { callCount++; });
 
-          await waitFrames(3);
-          _scheduler.removeFrameCallback('test');
+          await waitTicks(3);
+          _scheduler.removeTickCallback('test');
           assert.isAbove(callCount, 0, 'callback should have been called');
         });
 
-        it('passes deltaMS to frame callbacks', async () => {
+        it('passes deltaMS to tick callbacks', async () => {
           let receivedDelta = null;
-          _scheduler.addFrameCallback('test', (deltaMS) => { receivedDelta = deltaMS; });
+          _scheduler.addTickCallback('test', (deltaMS) => { receivedDelta = deltaMS; });
 
-          await waitFrames(3);
-          _scheduler.removeFrameCallback('test');
+          await waitTicks(3);
+          _scheduler.removeTickCallback('test');
           assert.isNotNull(receivedDelta, 'callback should have received deltaMS');
           assert.isNumber(receivedDelta, 'deltaMS should be a number');
           assert.isAtLeast(receivedDelta, 0, 'deltaMS should be non-negative');
         });
 
         it('exposes deltaMS via getter', async () => {
-          _scheduler.addFrameCallback('test', () => {});
-          await waitFrames(3);
-          _scheduler.removeFrameCallback('test');
+          _scheduler.addTickCallback('test', () => {});
+          await waitTicks(3);
+          _scheduler.removeTickCallback('test');
           assert.isNumber(_scheduler.deltaMS, 'deltaMS getter should return a number');
           assert.isAtLeast(_scheduler.deltaMS, 0, 'deltaMS should be non-negative');
         });
 
-        it('calls multiple frame callbacks in registration order', async () => {
+        it('calls multiple tick callbacks in registration order', async () => {
           const order = [];
-          _scheduler.addFrameCallback('first', () => { order.push('a'); });
-          _scheduler.addFrameCallback('second', () => { order.push('b'); });
+          _scheduler.addTickCallback('first', () => { order.push('a'); });
+          _scheduler.addTickCallback('second', () => { order.push('b'); });
 
-          await waitFrames(2);
-          _scheduler.removeFrameCallback('first');
-          _scheduler.removeFrameCallback('second');
+          await waitTicks(2);
+          _scheduler.removeTickCallback('first');
+          _scheduler.removeTickCallback('second');
           // Check that both were called and 'a' always came before 'b'
           assert.include(order, 'a');
           assert.include(order, 'b');
@@ -792,61 +792,61 @@ describe('SchedulerSystem', () => {
 
         it('does not call removed callbacks', async () => {
           let called = false;
-          _scheduler.addFrameCallback('test', () => { called = true; });
-          _scheduler.removeFrameCallback('test');
+          _scheduler.addTickCallback('test', () => { called = true; });
+          _scheduler.removeTickCallback('test');
 
-          await waitFrames(2);
+          await waitTicks(2);
           assert.isFalse(called, 'removed callback should not be called');
         });
 
         it('survives a throwing callback without crashing', async () => {
           let secondCalled = false;
-          _scheduler.addFrameCallback('bad', () => { throw new Error('boom'); });
-          _scheduler.addFrameCallback('good', () => { secondCalled = true; });
+          _scheduler.addTickCallback('bad', () => { throw new Error('boom'); });
+          _scheduler.addTickCallback('good', () => { secondCalled = true; });
 
-          await waitFrames(2);
+          await waitTicks(2);
 
           assert.lengthOf(spyError.mock.calls, 2, 'console.error called twice');
-          assert.match(spyError.mock.lastCall[0], /frame callback 'bad' threw/i);
+          assert.match(spyError.mock.lastCall[0], /tick callback 'bad' threw/i);
 
-          _scheduler.removeFrameCallback('bad');
-          _scheduler.removeFrameCallback('good');
+          _scheduler.removeTickCallback('bad');
+          _scheduler.removeTickCallback('good');
           assert.isTrue(secondCalled, 'other callbacks should still run');
         });
       });
 
       describe('pause/resume stops and restarts the loop', () => {
-        it('stops calling frame callbacks while paused', async () => {
+        it('stops calling tick callbacks while paused', async () => {
           let count = 0;
-          _scheduler.addFrameCallback('test', () => { count++; });
+          _scheduler.addTickCallback('test', () => { count++; });
 
-          await waitFrames(2);
+          await waitTicks(2);
           const countBeforePause = count;
 
           const release = _scheduler.pause();
-          // Wait a bit — no frames should fire
+          // Wait a bit — no ticks should fire
           await Bun.sleep(30);
           assert.strictEqual(count, countBeforePause, 'no callbacks while paused');
 
           release();
-          await waitFrames(2);
-          _scheduler.removeFrameCallback('test');
+          await waitTicks(2);
+          _scheduler.removeTickCallback('test');
           assert.isAbove(count, countBeforePause, 'callbacks resume after unpause');
         });
       });
 
-      describe('resetAsync preserves frame callbacks', () => {
-        it('keeps frame callbacks across resetAsync', async () => {
+      describe('resetAsync preserves tick callbacks', () => {
+        it('keeps tick callbacks across resetAsync', async () => {
           let count = 0;
-          _scheduler.addFrameCallback('test', () => { count++; });
+          _scheduler.addTickCallback('test', () => { count++; });
 
-          await waitFrames(2);
+          await waitTicks(2);
           const countBeforeReset = count;
 
           await _scheduler.resetAsync();
 
-          await waitFrames(2);
-          _scheduler.removeFrameCallback('test');
+          await waitTicks(2);
+          _scheduler.removeTickCallback('test');
           assert.isAbove(count, countBeforeReset, 'callback should still fire after reset');
         });
       });
@@ -855,20 +855,20 @@ describe('SchedulerSystem', () => {
         describe('metrics getter', () => {
           it('returns the expected shape', () => {
             const m = _scheduler.metrics;
-            assert.isNumber(m.avgFrameTime);
+            assert.isNumber(m.avgTickTime);
             assert.isNumber(m.avgRenderTime);
             assert.isNumber(m.avgIdleTime);
-            assert.isNumber(m.droppedFrames);
-            assert.isNumber(m.targetFrameTime);
+            assert.isNumber(m.longTicks);
+            assert.isNumber(m.targetTickTime);
             assert.isString(m.pressure);
           });
 
           it('starts with zeroed averages and pressure "none"', () => {
             const m = _scheduler.metrics;
-            assert.strictEqual(m.avgFrameTime, 0);
+            assert.strictEqual(m.avgTickTime, 0);
             assert.strictEqual(m.avgRenderTime, 0);
             assert.strictEqual(m.avgIdleTime, 0);
-            assert.strictEqual(m.droppedFrames, 0);
+            assert.strictEqual(m.longTicks, 0);
             assert.strictEqual(m.pressure, 'none');
           });
         });
@@ -879,25 +879,25 @@ describe('SchedulerSystem', () => {
           });
         });
 
-        describe('metrics update after frames', () => {
-          it('updates avgFrameTime after frames run', async () => {
-            // Register a lightweight callback so frames have measurable work
-            _scheduler.addFrameCallback('test', () => {});
-            await waitFrames(5);
-            _scheduler.removeFrameCallback('test');
+        describe('metrics update after ticks', () => {
+          it('updates avgTickTime after ticks run', async () => {
+            // Register a lightweight callback so ticks have measurable work
+            _scheduler.addTickCallback('test', () => {});
+            await waitTicks(5);
+            _scheduler.removeTickCallback('test');
 
             const m = _scheduler.metrics;
-            assert.isAbove(m.avgFrameTime, 0, 'avgFrameTime should be positive after frames');
+            assert.isAbove(m.avgTickTime, 0, 'avgTickTime should be positive after ticks');
           });
 
-          it('tracks render time from frame callbacks', async () => {
+          it('tracks render time from tick callbacks', async () => {
             // Register a callback that does a little work
-            _scheduler.addFrameCallback('test', () => {
+            _scheduler.addTickCallback('test', () => {
               let _sum = 0;
               for (let i = 0; i < 100; i++) _sum += i;
             });
-            await waitFrames(5);
-            _scheduler.removeFrameCallback('test');
+            await waitTicks(5);
+            _scheduler.removeTickCallback('test');
 
             const m = _scheduler.metrics;
             assert.isAtLeast(m.avgRenderTime, 0, 'avgRenderTime should be non-negative');
@@ -905,10 +905,10 @@ describe('SchedulerSystem', () => {
         });
 
         describe('pressure escalation via _updateMetrics', () => {
-          it('escalates to "light" when many frames are dropped', () => {
-            // Directly invoke _updateMetrics to simulate over-budget frames
-            // without waiting for real rAF frames
-            const budget = _scheduler.targetFrameTime;
+          it('escalates to "light" when many ticks are long', () => {
+            // Directly invoke _updateMetrics to simulate over-budget ticks
+            // without waiting for real rAF ticks
+            const budget = _scheduler.targetTickTime;
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 1.5, budget * 0.5);
             }
@@ -916,30 +916,30 @@ describe('SchedulerSystem', () => {
           });
 
           it('escalates through light → moderate → heavy', () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             const overBudget = budget * 2;
 
             // Fill ring buffer partially — should reach at least "light"
             for (let i = 0; i < 10; i++) {
               _scheduler._updateMetrics(overBudget, overBudget, 0);
             }
-            assert.strictEqual(_scheduler.pressure, 'light', 'should be light after 10/60 dropped');
+            assert.strictEqual(_scheduler.pressure, 'light', 'should be light after 10/60 long');
 
             // More drops — should reach "moderate"
             for (let i = 0; i < 12; i++) {
               _scheduler._updateMetrics(overBudget, overBudget, 0);
             }
-            assert.strictEqual(_scheduler.pressure, 'moderate', 'should be moderate after 22/60 dropped');
+            assert.strictEqual(_scheduler.pressure, 'moderate', 'should be moderate after 22/60 long');
 
             // More drops — should reach "heavy"
             for (let i = 0; i < 18; i++) {
               _scheduler._updateMetrics(overBudget, overBudget, 0);
             }
-            assert.strictEqual(_scheduler.pressure, 'heavy', 'should be heavy after 40/60 dropped');
+            assert.strictEqual(_scheduler.pressure, 'heavy', 'should be heavy after 40/60 long');
           });
 
-          it('stays "none" when frames are under budget', () => {
-            const budget = _scheduler.targetFrameTime;
+          it('stays "none" when ticks are under budget', () => {
+            const budget = _scheduler.targetTickTime;
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 0.5, budget * 0.3, budget * 0.2);
             }
@@ -949,7 +949,7 @@ describe('SchedulerSystem', () => {
 
         describe('pressure recovery with hysteresis', () => {
           it('recovers from heavy → moderate → light → none', () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             const overBudget = budget * 2;
             const underBudget = budget * 0.5;
 
@@ -959,21 +959,21 @@ describe('SchedulerSystem', () => {
             }
             assert.strictEqual(_scheduler.pressure, 'heavy');
 
-            // Add under-budget frames to start recovery.
-            // Ring buffer wraps, replacing dropped frames with good ones.
-            // Need enough good frames to drop ratio below 0.40 (heavy→moderate).
+            // Add under-budget ticks to start recovery.
+            // Ring buffer wraps, replacing long ticks with good ones.
+            // Need enough good ticks to drop ratio below 0.40 (heavy→moderate).
             for (let i = 0; i < 37; i++) {
               _scheduler._updateMetrics(underBudget, underBudget, 0);
             }
             assert.strictEqual(_scheduler.pressure, 'moderate', 'should recover to moderate');
 
-            // More good frames — ratio drops below 0.20 (moderate→light)
+            // More good ticks — ratio drops below 0.20 (moderate→light)
             for (let i = 0; i < 13; i++) {
               _scheduler._updateMetrics(underBudget, underBudget, 0);
             }
             assert.strictEqual(_scheduler.pressure, 'light', 'should recover to light');
 
-            // More good frames — ratio drops below 0.05 (light→none)
+            // More good ticks — ratio drops below 0.05 (light→none)
             for (let i = 0; i < 10; i++) {
               _scheduler._updateMetrics(underBudget, underBudget, 0);
             }
@@ -981,11 +981,11 @@ describe('SchedulerSystem', () => {
           });
 
           it('does not oscillate near thresholds', () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             const overBudget = budget * 2;
             const underBudget = budget * 0.5;
 
-            // Fill to just above light escalation (10 dropped = 16.7%)
+            // Fill to just above light escalation (10 long = 16.7%)
             for (let i = 0; i < 10; i++) {
               _scheduler._updateMetrics(overBudget, overBudget, 0);
             }
@@ -995,7 +995,7 @@ describe('SchedulerSystem', () => {
             assert.strictEqual(_scheduler.pressure, 'light', 'should be light at ~16.7%');
 
             // Recovery threshold for light is 0.05 (3 of 60).
-            // Still at 10 dropped in the window — should stay light.
+            // Still at 10 long in the window — should stay light.
             _scheduler._updateMetrics(underBudget, underBudget, 0);
             assert.strictEqual(_scheduler.pressure, 'light', 'should not oscillate back to none');
           });
@@ -1006,7 +1006,7 @@ describe('SchedulerSystem', () => {
             const levels = [];
             _scheduler.on('pressurechange', (level) => levels.push(level));
 
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
             }
@@ -1024,8 +1024,8 @@ describe('SchedulerSystem', () => {
             const levels = [];
             _scheduler.on('pressurechange', (level) => levels.push(level));
 
-            const budget = _scheduler.targetFrameTime;
-            // Two consecutive under-budget frames — both 'none', no event
+            const budget = _scheduler.targetTickTime;
+            // Two consecutive under-budget ticks — both 'none', no event
             _scheduler._updateMetrics(budget * 0.5, budget * 0.3, 0);
             _scheduler._updateMetrics(budget * 0.5, budget * 0.3, 0);
 
@@ -1044,7 +1044,7 @@ describe('SchedulerSystem', () => {
           });
 
           it('skips idle tasks under "moderate" pressure', async () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             // Drive to moderate
             for (let i = 0; i < 25; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
@@ -1054,8 +1054,8 @@ describe('SchedulerSystem', () => {
             let executed = false;
             _scheduler.scheduleIdleTask(() => { executed = true; }).catch(() => {});
 
-            // Wait a few frames — idle task should NOT drain
-            await waitFrames(3);
+            // Wait a few ticks — idle task should NOT drain
+            await waitTicks(3);
             assert.isFalse(executed, 'idle task should be skipped under moderate pressure');
 
             // Clean up: reset to recover pressure and drain
@@ -1063,7 +1063,7 @@ describe('SchedulerSystem', () => {
           });
 
           it('skips idle tasks under "heavy" pressure', async () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             // Drive to heavy
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
@@ -1073,15 +1073,15 @@ describe('SchedulerSystem', () => {
             let executed = false;
             _scheduler.scheduleIdleTask(() => { executed = true; }).catch(() => {});
 
-            await waitFrames(3);
+            await waitTicks(3);
             assert.isFalse(executed, 'idle task should be skipped under heavy pressure');
 
             await _scheduler.resetAsync();
           });
         });
 
-        describe('a tick that the frame callbacks used up', () => {
-          // The deadline has passed before any task runs, as after a long frame.
+        describe('a tick that the tick callbacks used up', () => {
+          // The deadline has passed before any task runs, as after a long tick.
           const past = () => performance.now() - 100;
 
           it('still runs normal tasks, for a minimum share of the tick', () => {
@@ -1127,7 +1127,7 @@ describe('SchedulerSystem', () => {
 
         describe('resetAsync resets metrics', () => {
           it('resets all metrics and pressure to initial state', async () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             // Drive to heavy
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
@@ -1137,16 +1137,16 @@ describe('SchedulerSystem', () => {
             await _scheduler.resetAsync();
 
             const m = _scheduler.metrics;
-            assert.strictEqual(m.avgFrameTime, 0);
+            assert.strictEqual(m.avgTickTime, 0);
             assert.strictEqual(m.avgRenderTime, 0);
             assert.strictEqual(m.avgIdleTime, 0);
-            assert.strictEqual(m.droppedFrames, 0);
+            assert.strictEqual(m.longTicks, 0);
             assert.strictEqual(m.pressure, 'none');
             assert.strictEqual(_scheduler.pressure, 'none');
           });
 
           it('emits pressurechange "none" on resetAsync if system was pressured', async () => {
-            const budget = _scheduler.targetFrameTime;
+            const budget = _scheduler.targetTickTime;
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
             }

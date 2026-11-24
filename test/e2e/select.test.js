@@ -231,11 +231,11 @@ test('selects a road by a click beside it, and draws a dashed halo as far out as
   const clip = { x: middle.x - 40, y: middle.y - 40, width: 80, height: 80 };
   const counts = () => page.evaluate(() => {
     const gfx = rapidContext.systems.gfx;
-    return { animated: gfx.scene.animated, animationFrames: gfx.animationFrames, frames: gfx.renderFrames.length, lastFrame: gfx.renderFrames.at(-1)?.frame };
+    return { animated: gfx.scene.animated, animationDraws: gfx.animationDraws, frames: gfx.renderFrames.length, lastFrame: gfx.renderFrames.at(-1)?.frame };
   });
   const before = await counts();
   const shot1 = await page.screenshot({ clip: clip });
-  await expect.poll(async () => (await counts()).animationFrames).toBeGreaterThan(before.animationFrames + 5);
+  await expect.poll(async () => (await counts()).animationDraws).toBeGreaterThan(before.animationDraws + 5);
   const shot2 = await page.screenshot({ clip: clip });
   const after = await counts();
   expect(before.animated).toBe(true);
@@ -248,7 +248,7 @@ test('selects a road by a click beside it, and draws a dashed halo as far out as
   const still = await counts();
   const shot3 = await page.screenshot({ clip: clip });
   const shot4 = await page.screenshot({ clip: clip });
-  expect((await counts()).animationFrames).toBe(still.animationFrames);
+  expect((await counts()).animationDraws).toBe(still.animationDraws);
   expect(shot3.equals(shot4)).toBe(true);
 
   // A halo's lines are as wide as they say whatever the map does to the lines of the roads:
@@ -284,7 +284,7 @@ test('selects a road by a click beside it, and draws a dashed halo as far out as
   await waitForIdle(page);
 
   await page.emulateMedia({ reducedMotion: null });
-  await expect.poll(async () => (await counts()).animationFrames).toBeGreaterThan(still.animationFrames);
+  await expect.poll(async () => (await counts()).animationDraws).toBeGreaterThan(still.animationDraws);
 
   // Escape takes the halo away, its lines out of the batch, and the animation stops
   await page.keyboard.press('Escape');
@@ -296,7 +296,7 @@ test('selects a road by a click beside it, and draws a dashed halo as far out as
   expect(idle.animated).toBe(false);
   const shot5 = await page.screenshot({ clip: clip });
   const shot6 = await page.screenshot({ clip: clip });
-  expect((await counts()).animationFrames).toBe(idle.animationFrames);
+  expect((await counts()).animationDraws).toBe(idle.animationDraws);
   expect(shot5.equals(shot6)).toBe(true);
   expect(consoleErrors).toEqual([]);
 });
@@ -519,7 +519,7 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   };
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect.poll(() => page.evaluate(() => rapidContext.systems.gfx.scene.animated)).toBe(false);
-  const animationFrames = await page.evaluate(() => rapidContext.systems.gfx.animationFrames);
+  const animationDraws = await page.evaluate(() => rapidContext.systems.gfx.animationDraws);
   expect(await yellowBeside()).toBe(0);
 
   // (The class is set here, not by the pointer: what follows a real hover asks for more
@@ -544,7 +544,7 @@ test('hovering a road highlights it and shows its vertices, without a pass', asy
   expect(await yellowBeside()).toBeGreaterThan(40);     // of 64
   expect(await framesAfter('unset')).toBe(1);
   expect(await yellowBeside()).toBe(0);
-  expect(await page.evaluate(() => rapidContext.systems.gfx.animationFrames)).toBe(animationFrames);
+  expect(await page.evaluate(() => rapidContext.systems.gfx.animationDraws)).toBe(animationDraws);
   await page.emulateMedia({ reducedMotion: null });
 
   // Pixi isn't asked to tell every object about every pointer move
@@ -771,9 +771,9 @@ test('draws a hovered point in its batch, over a glow, and a selected one inside
   expect(glow.furthest).toBeLessThan(30);
 
   // ..and it breathes: frames are drawn though nothing changes
-  const animationFrames = () => page.evaluate(() => rapidContext.systems.gfx.animationFrames);
-  const drawn = await animationFrames();
-  await expect.poll(animationFrames).toBeGreaterThan(drawn + 5);
+  const animationDraws = () => page.evaluate(() => rapidContext.systems.gfx.animationDraws);
+  const drawn = await animationDraws();
+  await expect.poll(animationDraws).toBeGreaterThan(drawn + 5);
 
   // Selected, and still hovered
   await page.mouse.click(point.x, point.y - 12);

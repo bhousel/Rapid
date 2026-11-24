@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiLayerMapUI } from '../../../modules/pixi/PixiLayerMapUI.ts';
 import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
 
@@ -33,7 +33,7 @@ describe('PixiLayerMapUI', () => {
   describe('haloBatchAt', () => {
     it('makes one batch in the halo container, where the first halo is', () => {
       const batch = haloBatchAt(10000, 20000);
-      assert.instanceOf(batch, LineBatch);
+      assert.instanceOf(batch, LineBatchMesh);
       assert.strictEqual(batch.parent, layer.halo);
       assert.deepEqual([batch.position.x, batch.position.y], [10000, 20000]);
       assert.strictEqual(layer._haloBatch, batch);

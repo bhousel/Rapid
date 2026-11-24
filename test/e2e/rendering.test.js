@@ -23,7 +23,7 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
     return rapidContext.systems.gfx.renderFrames.find(frame => frame.time >= since).toJSON();
   }, since);
 
-  // From the APP pass: each layer's time and features
+  // From the APP phase: each layer's time and features
   expect(frame.appMs).toBeGreaterThan(0);
   expect(frame.layers.osm.enabled).toBe(true);
   expect(frame.layers.osm.visible).toBeGreaterThan(50);
@@ -32,7 +32,7 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
   expect(frame.layers.osm.steps).toHaveProperty('gather');    // ..and timed its steps (a step can take 0 ms)
   expect(frame.layers.osm.steps).toHaveProperty('vertices');
 
-  // From the DRAW pass: Pixi's instructions, read from its internals
+  // From the DRAW phase: Pixi's instructions, read from its internals
   expect(frame.draw.ms).toBeGreaterThan(0);
   expect(frame.draw.renderGroups).toBeGreaterThan(5);   // the scene's containers are render groups
   expect(frame.draw.rebuiltGroups).toBeLessThanOrEqual(frame.draw.renderGroups);
@@ -49,8 +49,8 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
 });
 
 
-// The CULL pass: a layer has features ready for more than the view, so that a frame where only the
-// view moved has nothing to do (see "A CULL pass" in `design/graphics-system.md`).
+// The cull box: a layer has features ready for more than the view, so that a frame where only the
+// view moved has nothing to do (see "The cull box" in `design/graphics-system.md`).
 test('keeps the OSM features as they are while only the view moves, and does the work when something changes', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -121,7 +121,7 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
   await waitForOsmData(page);
   await waitForIdle(page);
 
-  // Move the view a little on every animation frame, staying inside the cull box.
+  // Move the view a little on every tick, staying inside the cull box.
   const panned = await page.evaluate(async () => {
     const { gfx, map } = rapidContext.systems;
     const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
@@ -264,10 +264,10 @@ test('after a zoom, draws the features again over the following frames, with the
 
 // A line's casing and stroke, and each ring of an area's outline, are drawn from a stroke mesh
 // that's built once, for any width (see `design/graphics-system.md`, section 15).
-// - The lines are in batches (`LineBatch`), one for the casings and one for the strokes of each
+// - The lines are in batches (`LineBatchMesh`), one for the casings and one for the strokes of each
 //   level: a line is a run of vertices in its batches' buffers, and the shader works out its
 //   width. A zoom changes four numbers, and nothing in a batch. The line's feature isn't in the scene.
-// - Areas are in two batches too: every fill (`FillBatch`), then every outline. A zoom changes
+// - Areas are in two batches too: every fill (`FillBatchMesh`), then every outline. A zoom changes
 //   nothing in the outlines' batch, and in the fills' batch only the areas whose band changed.
 test('draws lines, areas and points in batches that a zoom leaves alone', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
@@ -1229,7 +1229,7 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 // something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
 // always batched, so crossing the line changes nothing. (The lasso and the lines of the other
 // layers are `LineMesh`es. The OSM layer's lines and outlines are in
-// `LineBatch`es, which have a shader of their own and are never batched by Pixi: the test
+// `LineBatchMesh`es, which have a shader of their own and are never batched by Pixi: the test
 // turns those off to get an outline's `LineMesh` in a tile.)
 test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);

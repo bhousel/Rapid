@@ -3,7 +3,7 @@ import { PixiTextures } from '../../../modules/pixi/PixiTextures.ts';
 
 // The texture manager needs a renderer, so these call the methods that don't.
 describe('PixiTextures', () => {
-  // A `FillBatch` draws fills with any mix of patterns from one atlas texture, and a fill says
+  // A `FillBatchMesh` draws fills with any mix of patterns from one atlas texture, and a fill says
   // which pattern it has by the pattern's number there.
   describe('getPatternNumber', () => {
     const numberOf = name => PixiTextures.prototype.getPatternNumber.call({}, name);

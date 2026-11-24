@@ -5,9 +5,9 @@ import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
 import { PixiLayerRapid } from '../../../modules/pixi/PixiLayerRapid.ts';
 import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
-import { FillBatch } from '../../../modules/pixi/lib/FillBatch.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
-import { PointBatch } from '../../../modules/pixi/lib/PointBatch.ts';
+import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
+import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
 
@@ -552,16 +552,16 @@ describe('PixiScene', () => {
     const lineView = () => [lines.uPixel, lines.uNarrow, lines.uWireframe, lines.uCasing, lines.uMarkers];
 
     beforeEach(() => {
-      lineBatch = new LineBatch();
-      fillBatch = new FillBatch();
+      lineBatch = new LineBatchMesh();
+      fillBatch = new FillBatchMesh();
       lines = lineBatch.shader.resources.lineUniforms.uniforms;
       fills = fillBatch.shader.resources.fillUniforms.uniforms;
       map = { wireframeMode: false, effectiveZoom: () => 17 };
       scene = { context: { systems: { map: map } } };
     });
     afterEach(() => {
-      LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
-      FillBatch.setView({ pixel: 1, rotation: 0, wireframe: false });
+      LineBatchMesh.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+      FillBatchMesh.setView({ pixel: 1, rotation: 0, wireframe: false });
       lineBatch.destroy();
       fillBatch.destroy();
     });
@@ -638,8 +638,8 @@ describe('PixiScene', () => {
     let lineBatch, pointBatch, lines, points, scene;
 
     beforeEach(() => {
-      lineBatch = new LineBatch();
-      pointBatch = new PointBatch();
+      lineBatch = new LineBatchMesh();
+      pointBatch = new PointBatchMesh();
       lines = lineBatch.shader.resources.lineUniforms.uniforms;
       points = pointBatch.shader.resources.pointUniforms.uniforms;
       scene = {
@@ -656,8 +656,8 @@ describe('PixiScene', () => {
       Object.defineProperty(scene, 'animated', Object.getOwnPropertyDescriptor(PixiScene.prototype, 'animated'));
     });
     afterEach(() => {
-      LineBatch.setTime({ pulse: 1, shift: 0 });
-      PointBatch.setTime(1);
+      LineBatchMesh.setTime({ pulse: 1, shift: 0 });
+      PointBatchMesh.setTime(1);
       lineBatch.destroy();
       pointBatch.destroy();
     });
@@ -915,7 +915,7 @@ describe('PixiScene', () => {
 
 
   // The part of the world layers have features ready for: the view and some padding, kept while
-  // the view stays inside it (see "A CULL pass" in `design/graphics-system.md`).
+  // the view stays inside it (see "The cull box" in `design/graphics-system.md`).
   describe('updateCullBox', () => {
     let scene;
 

@@ -27,7 +27,7 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 
 ## Pixi rendering follow-ups
 The plans and measurements are in [`design/graphics-system.md`](../design/graphics-system.md) (frame
-stats, partial fills without stencil masks, our own line builder, dashes, GPU time, the CULL pass,
+stats, partial fills without stencil masks, our own line builder, dashes, GPU time, the cull box,
 frame pacing, the frame's deadline, the pass, garbage, labels). Numbers below are Užice at z16 unless
 said otherwise. Biggest or most wanted first.
 
@@ -68,17 +68,17 @@ said otherwise. Biggest or most wanted first.
   task: the longest gaps of a pan. Not looked into: where the time goes, and whether a tile can merge
   in parts.
 - **The first pass and the first DRAW after a load** (section 8): `FilterSystem` matches every entity
-  for the first time (87 ms at Staten Island), and the first DRAW pass with anything in it costs 76 to
+  for the first time (87 ms at Staten Island), and the first DRAW phase with anything in it costs 76 to
   128 ms.
 - **Every render group costs a few microseconds on every frame** (Bryan: backlog). The split of lines
   and points by tile added 1 to 2 ms to a frame that only moves the view (580 groups). Ideas: no
   container per tile for a class of lines with few members; hide the tiles outside the view so Pixi
   skips them. Watch for: wrong overlaps at tile edges (polygons; pins side by side across a tile edge
   are ordered by tile, 1% of overlapping pairs).
-- **Animation frames that don't draw the whole scene.** A glow breathes and a halo marches
+- **Animation draws that don't draw the whole scene.** A glow breathes and a halo marches
   (step 10 of section 15) by drawing every batch again 20 times a second: 13 ms of GPU a frame
   in Užice on an M4. Drawing what's still into a texture once, and then that texture with what
-  moves over it, would make an animation frame two draw calls, and 60 a second affordable.
+  moves over it, would make an animation draw two draw calls, and 60 a second affordable.
   Wants numbers from weak hardware first: `AnimationPacer` slows the animation down there, and
   nobody has seen it do so.
 - **How hovers and selections look, now that a shader draws them.** The first version is a
@@ -101,13 +101,13 @@ said otherwise. Biggest or most wanted first.
   batches of its own, as `PixiLayerOsm` does (`_lineBatch()`, `_polygonBatch()`,
   `_placePoint()`).
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
-  `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, batch sizes 64/1,000/4). A load's frames at 24 + 9 ms land
+  `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, chunk sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another
   machine (Bryan will try other hardware). The same run should say what draw calls cost there:
   on the M4 they cost next to nothing, and Bryan counts every one saved as a win for weaker
   devices (Nov 23).
 - **Budget frames by the display's refresh, and show the misses** (Bryan, Nov 20). The gaps between
-  animation frame timestamps give the refresh interval and the missed refreshes. `SchedulerSystem`
+  tick timestamps give the refresh interval and the missed refreshes. `SchedulerSystem`
   could set a frame's budget so APP plus the expected DRAW ends just before a refresh, and the
   Rendering card could draw a bar per refresh with the misses marked (SGI Performer's statistics).
 - **Labels: what's left** (section 14, "Open questions"): a selected way often has no room for its own
@@ -117,7 +117,7 @@ said otherwise. Biggest or most wanted first.
   `placeRopeLabel()`).
 - **GPU time is mostly fixed costs** (section 6): render without `multiView` and give the minimap its
   own copy (1.5 to 2 ms); decide whether device pixel ratio 2 needs MSAA (4 ms; compare screenshots).
-- **Small things from the CULL pass** (section 8): vertices appear at effective zoom 16, which depends on
+- **Small things from the cull box** (section 8): vertices appear at effective zoom 16, which depends on
   latitude, so a north-south pan across that line shows them up to 256 px late; a held frame during a
   zoom could be drawn at the new zoom in place of the CSS transform.
 - **The footer's count of hidden features is stale.** It's counted in the OSM layer's pass, which pans,
@@ -226,7 +226,7 @@ its harnesses lived in a session's scratch folder and are gone. Make it a suite:
 - Count operations where we can (copies per derive, recomputes per merge, O(L) scans per event), and
   keep wall-clock numbers for reports: timing limits in CI are flaky.
 - A baseline to compare a branch against, and a plan for which numbers each design doc tracks.
-- A drag frame, not only a full APP pass: a full pass is mostly restyling, which hides per-frame costs
+- A drag frame, not only a full pass: a full pass is mostly restyling, which hides per-frame costs
   (graph step 7 measured 5.7 vs 9.4 ms per drag frame where the full pass showed no difference).
 
 ## Renderer: keep the node answers in the layer, not in graph memos

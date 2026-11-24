@@ -1,10 +1,10 @@
-import { FillBatch } from '../../../modules/pixi/lib/FillBatch.ts';
+import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
 
 
 // A batch draws the fills of many areas as one mesh. Each vertex is 2 floats (where it is) and
-// 8 bytes (color, opacity, pattern). What a batch does with its buffers is `VertexBatch`'s,
-// which `LineBatch.test.js` covers.
-describe('FillBatch', () => {
+// 8 bytes (color, opacity, pattern). What a batch does with its buffers is `BatchMesh`'s,
+// which `LineBatchMesh.test.js` covers.
+describe('FillBatchMesh', () => {
   const BYTES = 8;
   const STYLE = { color: 0x336699, alpha: 0.5 };
 
@@ -15,7 +15,7 @@ describe('FillBatch', () => {
 
   let batch;
   beforeEach(() => {
-    batch = new FillBatch();
+    batch = new FillBatchMesh();
   });
   afterEach(() => {
     if (!batch.destroyed) batch.destroy();
@@ -110,24 +110,24 @@ describe('FillBatch', () => {
   });
 
   it('draws every batch with one shader, which gets the view\'s numbers', () => {
-    const other = new FillBatch();
+    const other = new FillBatchMesh();
     assert.strictEqual(other.shader, batch.shader);
     other.destroy();
 
-    FillBatch.setView({ pixel: 0.25, rotation: Math.PI / 2, wireframe: true });
+    FillBatchMesh.setView({ pixel: 0.25, rotation: Math.PI / 2, wireframe: true });
     const uniforms = batch.shader.resources.fillUniforms.uniforms;
     assert.strictEqual(uniforms.uPixel, 0.25);
     assert.strictEqual(uniforms.uWireframe, 1);
     assert.closeTo(uniforms.uRotation[0], 0, 1e-6);    // the cosine and the sine of the map's rotation
     assert.closeTo(uniforms.uRotation[1], 1, 1e-6);
 
-    FillBatch.setView({ pixel: 1, rotation: 0, wireframe: false });
+    FillBatchMesh.setView({ pixel: 1, rotation: 0, wireframe: false });
     assert.deepEqual([uniforms.uPixel, uniforms.uWireframe, uniforms.uRotation[0], uniforms.uRotation[1]], [1, 0, 1, 0]);
   });
 
   it('takes its patterns from one texture, and says how they\'re laid out in it', () => {
     const source = { pixelWidth: 272, pixelHeight: 136, style: { label: 'style' } };
-    FillBatch.setPatterns({ texture: { source: source }, columns: 8, cell: 34, tile: 32 });
+    FillBatchMesh.setPatterns({ texture: { source: source }, columns: 8, cell: 34, tile: 32 });
     const resources = batch.shader.resources;
     assert.strictEqual(resources.uPatterns, source);
     assert.strictEqual(resources.uPatternsSampler, source.style);

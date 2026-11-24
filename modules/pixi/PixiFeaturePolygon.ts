@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { LineBatch } from './lib/LineBatch.ts';
+import { LineBatchMesh } from './lib/LineBatchMesh.ts';
 import { LineHitArea } from './lib/LineHitArea.ts';
 import { LineMesh } from './lib/LineMesh.ts';
 import { glowColor, ringsContain, setGlowFilter, triangulate } from './helpers.ts';
@@ -9,9 +9,9 @@ import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { BandPolygon } from '../geo/band.ts';
-import type { FillBatch, FillBatchItem } from './lib/FillBatch.ts';
+import type { FillBatchMesh, FillBatchMeshItem } from './lib/FillBatchMesh.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
-import type { LineBatchItem } from './lib/LineBatch.ts';
+import type { LineBatchMeshItem } from './lib/LineBatchMesh.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
@@ -55,8 +55,8 @@ function mixColors(a: number, b: number, t: number): number {
  * There's no stencil mask. Most polygons are too narrow to have a middle that the band leaves
  * empty, and are filled whole (see `_bandFor`, and `design/graphics-system.md` section 15).
  *
- * A layer that draws many polygons gives the feature two batches: a `FillBatch` for its fill and
- * a `LineBatch` for its outlines (the layer draws every fill, then every outline). The fill is
+ * A layer that draws many polygons gives the feature two batches: a `FillBatchMesh` for its fill and
+ * a `LineBatchMesh` for its outlines (the layer draws every fill, then every outline). The fill is
  * then a run of triangles in its batch, worked out once, and each ring's outline a run of
  * vertices in the other. The feature has nothing in its container, and needn't be in the scene
  * (`drawsInContainer()`). A zoom changes nothing in a batch, unless the polygon gets or loses
@@ -65,8 +65,8 @@ function mixColors(a: number, b: number, t: number): number {
  * (`glowItems`).
  *
  * Properties available:
- * - `fillBatch`   - `FillBatch` that draws the fill, if the layer gave it one
- * - `strokeBatch` - `LineBatch` that draws the outlines, if the layer gave it one
+ * - `fillBatch`   - `FillBatchMesh` that draws the fill, if the layer gave it one
+ * - `strokeBatch` - `LineBatchMesh` that draws the outlines, if the layer gave it one
  * - `lowRes`     - `PIXI.Sprite` for a replacement graphic to display at low resolution
  * - `fill`       - `PIXI.Graphic` for the fill Graphics (below)
  * - `strokes`    - `PIXI.Container` for the outlines (above): a `LineMesh` for each ring
@@ -94,15 +94,15 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   /** The polygon that the stroke meshes of the outlines were built from */
   protected _meshPart: GeometryPart | null;
   /** The batch that the layer gave this feature to draw its fill in (see `fillBatch`) */
-  protected _fillBatch: FillBatch | null;
+  protected _fillBatch: FillBatchMesh | null;
   /** The batch that the layer gave this feature to draw its outlines in (see `strokeBatch`) */
-  protected _strokeBatch: LineBatch | null;
+  protected _strokeBatch: LineBatchMesh | null;
   /** The fill in its batch, if a batch draws it */
-  protected _fillItem: FillBatchItem | null;
+  protected _fillItem: FillBatchMeshItem | null;
   /** The outlines in their batch, one for each ring, if a batch draws them */
-  protected _ringItems: LineBatchItem[];
+  protected _ringItems: LineBatchMeshItem[];
   /** The glow around each ring in the outlines' batch, while the polygon is hovered or highlighted and batches draw it */
-  protected _glowItems: LineBatchItem[];
+  protected _glowItems: LineBatchMeshItem[];
   /** The polygon that the fill and the outlines in the batches were built from */
   protected _batchPart: GeometryPart | null;
   /** The band that the fill in the batch is (see `_bandFor`), or `null` if it's the whole polygon */
@@ -189,13 +189,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * feature may be drawn some frames later, so a batch counts the features it was given to.
    * @return The batch, or `null`
    */
-  public get fillBatch(): FillBatch | null {
+  public get fillBatch(): FillBatchMesh | null {
     return this._fillBatch;
   }
   /**
    * @param val - The batch to draw the fill in from the next `update()`, or `null` for none
    */
-  public set fillBatch(val: FillBatch | null) {
+  public set fillBatch(val: FillBatchMesh | null) {
     if (val === this._fillBatch) return;
     if (this._fillBatch) this._fillBatch.users--;
     if (val) val.users++;
@@ -208,13 +208,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * after its fills' batch, so every outline is over every fill.
    * @return The batch, or `null`
    */
-  public get strokeBatch(): LineBatch | null {
+  public get strokeBatch(): LineBatchMesh | null {
     return this._strokeBatch;
   }
   /**
    * @param val - The batch to draw the outlines in from the next `update()`, or `null` for none
    */
-  public set strokeBatch(val: LineBatch | null) {
+  public set strokeBatch(val: LineBatchMesh | null) {
     if (val === this._strokeBatch) return;
     if (this._strokeBatch) this._strokeBatch.users--;
     if (val) val.users++;
@@ -227,7 +227,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @return The batch's item, or `null`
    * @readonly
    */
-  public get fillItem(): FillBatchItem | null {
+  public get fillItem(): FillBatchMeshItem | null {
     return this._fillItem;
   }
 
@@ -237,7 +237,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @return The batch's items
    * @readonly
    */
-  public get ringItems(): readonly LineBatchItem[] {
+  public get ringItems(): readonly LineBatchMeshItem[] {
     return this._ringItems;
   }
 
@@ -275,7 +275,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const fillBatch = this._fillBatch;
     const strokeBatch = this._strokeBatch;
     if (!fillBatch || fillBatch.destroyed || !strokeBatch || strokeBatch.destroyed) return false;
-    return LineBatch.canDraw(this._style.stroke?.dash);
+    return LineBatchMesh.canDraw(this._style.stroke?.dash);
   }
 
 
@@ -285,7 +285,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @return The batch's items (none if the polygon doesn't glow, or draws itself)
    * @readonly
    */
-  public get glowItems(): readonly LineBatchItem[] {
+  public get glowItems(): readonly LineBatchMeshItem[] {
     return this._glowItems;
   }
 
@@ -662,7 +662,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param lineWidth - The outline's width, in pixels
    * @param isSame - Whether the polygon is the one that was last drawn in the batches
    */
-  protected _drawBatchedGlow(glowBatch: LineBatch, flat: number[][], color: number | null, lineWidth: number, isSame: boolean): void {
+  protected _drawBatchedGlow(glowBatch: LineBatchMesh, flat: number[][], color: number | null, lineWidth: number, isSame: boolean): void {
     const origin = this.container.position;
     const glowItems = this._glowItems;
     const numGlows = (color !== null) ? flat.length : 0;

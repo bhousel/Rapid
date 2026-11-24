@@ -12,7 +12,7 @@ import { parseArgs, styleText } from 'node:util';
 // `bun run measure` reads Rapid's own frame stats, which older versions and iD don't have. This
 // measures from outside: it opens the page in a new tab of the Chrome started with
 // `bun run start:chrome` (so, on the real GPU), waits for the OSM data to be drawn, then pans and
-// zooms with real wheel and key events and watches the page's animation frames.
+// zooms with real wheel and key events and watches the page's ticks.
 //
 //   bun run compare <label> <url> <place> [place…]
 //   bun run compare branch http://127.0.0.1:8080/dist/index.html seattle staten-island
@@ -27,13 +27,13 @@ import { parseArgs, styleText } from 'node:util';
 //   bun run compare branch http://127.0.0.1:8080/dist/index.html uzice --tape ../uzice.tape.json
 //
 // For each gesture it reports:
-// - fps:      animation frames a second while the gesture's events were being sent
-// - longest:  the longest gap between two animation frames, in ms, until 2.5 s after the gesture
+// - fps:      ticks a second while the gesture's events were being sent
+// - longest:  the longest gap between two ticks, in ms, until 2.5 s after the gesture
 // - >100ms:   how many such gaps were longer than 100 ms
 // - took:     how long the gesture's events took to send. Each event waits for the page to take
 //             it, so a page that can't keep up takes longer. (About 35 ms an event at best.)
 // - redraws:  how often the map's content was drawn again. Rapid says so itself (`gfx`'s `draw`
-//             event). For iD, it's the animation frames in which the OSM layer's elements changed.
+//             event). For iD, it's the ticks in which the OSM layer's elements changed.
 // - main:     main-thread time during the gesture and the 2.5 s after it, in ms
 //
 // Feature filters: only boundaries are hidden, in every editor. (The other filters don't mean the
@@ -74,7 +74,7 @@ const browser = await chromium.connectOverCDP(cdpURL).catch(() => {
 const context = browser.contexts()[0];
 
 
-// Runs in the page: says what's on the map, and starts recording animation frames, long tasks and redraws.
+// Runs in the page: says what's on the map, and starts recording ticks, long tasks and redraws.
 function startRecording() {
   const g = globalThis as any;
   const rapid = g.rapidContext;
@@ -119,7 +119,7 @@ function startRecording() {
     gfx.on('draw', () => rec.redraws++);
     scene.redrawsBy = 'draw event';
   } else {
-    // iD: count the animation frames in which the OSM layer's elements changed
+    // iD: count the ticks in which the OSM layer's elements changed
     const target = document.querySelector('.data-layer.osm') ?? document.querySelector('.main-map');
     let counted = false;
     const observer = new MutationObserver(() => {
@@ -188,7 +188,7 @@ for (const place of places) {
   const opened = Date.now();
   try {
     await page.goto(`${baseURL}#map=${place.map}&disable_features=${HIDDEN_FEATURES}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.bringToFront();   // a tab in the background gets few animation frames
+    await page.bringToFront();   // a tab in the background gets few ticks
 
     // Close whatever opens at startup: a restore prompt ("Skip" keeps the saved session), a welcome screen.
     for (let i = 0; i < 40; i++) {

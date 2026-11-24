@@ -76,7 +76,7 @@ describe('FramePacer', () => {
 
   it('keeps a request made while a pass is under way for the pass after it', () => {
     pacer.begin();
-    pacer.hurry();   // e.g. the user clicked between the APP and DRAW passes
+    pacer.hurry();   // e.g. the user clicked between the APP and DRAW phases
     pacer.passed(1040, 20);
     assert.strictEqual(pacer.wait(1041, true), 0);
   });

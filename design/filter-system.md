@@ -137,7 +137,7 @@ remembered answers equal answers worked out from an empty cache.
 | Užice | 106 → 39.4 | 211 → 144 |
 
 (Medians of redraw frames from `bun run measure --fresh`, in two sessions. In one session at
-Staten Island, old build then new: the frame's APP pass 57.1 → 34.5 ms, and a pan frame that does
+Staten Island, old build then new: the frame's APP phase 57.1 → 34.5 ms, and a pan frame that does
 the pass 100 → 72 ms.)
 
 **What's left of it** (Staten Island, 8.4 ms for `filterScene()` on its own):

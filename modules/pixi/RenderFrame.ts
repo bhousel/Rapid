@@ -20,13 +20,13 @@ export interface LayerWork {
   steps: Record<string, number>;
 }
 
-/** What one layer cost during a frame's APP pass */
+/** What one layer cost during a frame's APP phase */
 export interface LayerFrameStats extends LayerWork {
   /** Whether the layer was enabled (disabled layers still cull their features) */
   enabled: boolean;
   /**
    * Whether the layer left its features as the last frame had them, because only the view moved,
-   * within the frame's cull box (see "A CULL pass" in `design/graphics-system.md`)
+   * within the frame's cull box (see "The cull box" in `design/graphics-system.md`)
    */
   kept: boolean;
   /** Milliseconds spent in the layer's `render()` */
@@ -44,7 +44,7 @@ export interface LayerFrameStats extends LayerWork {
   waiting: number;
 }
 
-/** A `Graphics` that Pixi drew on its own instead of in a batch */
+/** A `Graphics` that Pixi drew on its own instead of in one of its batches */
 export interface UnbatchedGraphic {
   /** The `Graphics`' label, after its parent's (e.g. `osm-w123-0/casing`) */
   label: string;
@@ -60,7 +60,7 @@ export interface UnbatchedGraphic {
   floats: number;
 }
 
-/** What a frame's DRAW pass cost, and what Pixi drew */
+/** What a frame's DRAW phase cost, and what Pixi drew */
 export interface DrawFrameStats {
   /** Milliseconds spent in `pixi.render()` (CPU) */
   ms: number;
@@ -75,7 +75,7 @@ export interface DrawFrameStats {
   /** Drawables merged into `batch` instructions, by how many textures their batch used */
   batchTextures: Record<number, number>;
   /**
-   * Triangles in Pixi's instruction lists: everything in a batch, and each `Graphics` and `Mesh`
+   * Triangles in Pixi's instruction lists: everything in Pixi's batches, and each `Graphics` and `Mesh`
    * drawn on its own. (Also what's in a render group that's outside the view.)
    */
   triangles: number;
@@ -87,7 +87,7 @@ export interface DrawFrameStats {
   gpuMs?: number;
 }
 
-/** WebGL calls counted during a DRAW pass */
+/** WebGL calls counted during a DRAW phase */
 export interface GLCallCounts {
   /** `drawElements`, `drawArrays` and their instanced versions */
   draws: number;
@@ -102,7 +102,7 @@ export interface GLCallCounts {
 
 /**
  * A `RenderFrame` is one frame of the map: its number, and what we learn about it while it is made.
- * The APP pass fills in what Rapid did (time per layer, feature counts), and the DRAW pass fills in what
+ * The APP phase fills in what Rapid did (time per layer, feature counts), and the DRAW phase fills in what
  * Pixi did (its instructions, and with detailed stats on, WebGL calls and GPU time).
  * `GraphicsSystem` keeps the last few, so scripts and the UI can ask what recent frames cost.
  * See "Frame stats" in `design/graphics-system.md`.
@@ -110,7 +110,7 @@ export interface GLCallCounts {
 export class RenderFrame {
   /** The frame number */
   public id: number;
-  /** When the APP pass started (`performance.now()`) */
+  /** When the APP phase started (`performance.now()`) */
   public time: number;
   /** The map zoom the frame was drawn at */
   public zoom: number;
@@ -144,7 +144,7 @@ export class RenderFrame {
   /** The part of the world in view, in world coordinates: the cull box without its padding */
   public viewBox: Extent;
   /**
-   * When the APP pass should stop taking on work that can wait (`performance.now()`). Layers ask
+   * When the APP phase should stop taking on work that can wait (`performance.now()`). Layers ask
    * `hasTime()`. What can wait: drawing a feature again that isn't in view, or that is but isn't
    * needed at once (see `urgent`), and placing labels.
    */
@@ -155,9 +155,9 @@ export class RenderFrame {
    */
   public urgent: boolean;
   /**
-   * Milliseconds that the DRAW pass is expected to spend on the features drawn in this APP pass
-   * so far. Drawing a feature costs little in the APP pass: Pixi builds its geometry in the DRAW
-   * pass, where a feature drawn for the first time costs about ten times one drawn again. Layers
+   * Milliseconds that the DRAW phase is expected to spend on the features drawn in this APP phase
+   * so far. Drawing a feature costs little in the APP phase: Pixi builds its geometry in the DRAW
+   * phase, where a feature drawn for the first time costs about ten times one drawn again. Layers
    * add to this as they draw (see `AbstractPixiLayer.updateFeature`), and `hasTime()` counts it.
    */
   public drawDebt: number;
@@ -165,11 +165,11 @@ export class RenderFrame {
   public waitingInView: number;
   /** Whether a layer put work off to a later frame, so that another frame should follow this one */
   public unfinished: boolean;
-  /** Milliseconds spent in the APP pass */
+  /** Milliseconds spent in the APP phase */
   public appMs: number;
-  /** What each layer cost during the APP pass */
+  /** What each layer cost during the APP phase */
   public layers: Map<LayerID, LayerFrameStats>;
-  /** What the DRAW pass cost, or `null` until it has run */
+  /** What the DRAW phase cost, or `null` until it has run */
   public draw: DrawFrameStats | null;
 
 
@@ -223,8 +223,8 @@ export class RenderFrame {
 
 
   /**
-   * Whether the APP pass still has time for work that can wait (see `deadline`).
-   * The DRAW pass's share counts too: what the features drawn so far will cost there (`drawDebt`)
+   * Whether the APP phase still has time for work that can wait (see `deadline`).
+   * The DRAW phase's share counts too: what the features drawn so far will cost there (`drawDebt`)
    * is time this frame has already spent.
    * @return `true` if the deadline hasn't passed
    */
@@ -234,8 +234,8 @@ export class RenderFrame {
 
 
   /**
-   * Milliseconds the frame spent on the CPU: its APP pass plus its DRAW pass.
-   * (The two passes run in the same animation frame when the APP pass was quick, or else in two.)
+   * Milliseconds the frame spent on the CPU: its APP phase plus its DRAW phase.
+   * (The two phases run in the same tick when the APP phase was quick, or else in two.)
    * @return Total CPU milliseconds
    */
   public get cpuMs(): number {

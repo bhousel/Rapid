@@ -53,7 +53,7 @@ describe('AbstractPixiLayer', () => {
 
   // A layer's work for a frame is a pass: `render()` marks the features it sees, `cull()` hides the
   // rest. A layer that asks `keepFeatures()` skips the pass when only the view moved inside the
-  // frame's cull box (see "A CULL pass" in `design/graphics-system.md`).
+  // frame's cull box (see "The cull box" in `design/graphics-system.md`).
   describe('passes', () => {
     let layer, nextFrameID, box;
 
@@ -403,7 +403,7 @@ describe('AbstractPixiLayer', () => {
         assert.strictEqual(layer.numWaiting, 0);
       });
 
-      it('counts what each feature it draws will cost in the DRAW pass against the frame\'s time', () => {
+      it('counts what each feature it draws will cost in the DRAW phase against the frame\'s time', () => {
         const changed = addDirtyFeature('changed', 10);
         const zoomed = addDirtyFeature('zoomed', 20, { onlyTransformDirty: true });
         const frame = makeTimedFrame(true, { contentChanged: true });

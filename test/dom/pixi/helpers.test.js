@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode` and `interactiveChildren`, as a renderer does in the app
 import { GlowFilter } from 'pixi-filters';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { LineMesh } from '../../../modules/pixi/lib/LineMesh.ts';
 import {
   containerHit, drawHalo, drawOrder, drawRings, featureOrder, glowColor, ringsContain, setGlowFilter, triangulate,
@@ -74,7 +74,7 @@ describe('pixi helpers', () => {
     let batch;
 
     beforeEach(() => {
-      batch = new LineBatch();
+      batch = new LineBatchMesh();
     });
     afterEach(() => {
       if (!batch.destroyed) batch.destroy();
@@ -185,7 +185,7 @@ describe('pixi helpers', () => {
     });
 
     it('moves a halo that was in another batch into this one', () => {
-      const other = new LineBatch();
+      const other = new LineBatchMesh();
       const items = [];
       drawHalo(other, items, [square], 0, 0);
       assert.strictEqual(other.size, 2);
@@ -406,7 +406,7 @@ describe('pixi helpers', () => {
     });
   });
 
-  // The triangles that fill polygons, for a `FillBatch`
+  // The triangles that fill polygons, for a `FillBatchMesh`
   describe('triangulate', () => {
     // The area that triangles cover
     function areaOf({ positions, indices }) {

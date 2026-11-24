@@ -7,7 +7,7 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > **Status:** In progress (Nov 2026). Merged to `main` with `pixi-8.23` (PR #10) and `label-avoids`
 > (PR #11), Nov 20. Built: steps 1 to 5 of the plan (frame stats, `bun run measure` over a set of
 > difficult places, where the GPU time goes, the rendering info card, the `RenderFrame` passed to the
-> layers), the CULL pass (section 8), frame pacing (section 9), a deadline on the frame (section 10),
+> layers), the cull box (section 8), frame pacing (section 9), a deadline on the frame (section 10),
 > fewer passes (section 12), less garbage (section 13) and label placement (section 14). Section 11
 > compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
 > without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
@@ -18,58 +18,134 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > from the pointer, `lineToPoly()` and `DashLine` are gone, and a partial fill is a band of real
 > geometry with no stencil mask (`modules/geo/band.ts`, with Clipper2 for the offsetting). Of step
 > 6: the OSM layer finds its features under the pointer through the spatial index, and draws its
-> lines in two batches per level with a shader of our own (`modules/pixi/lib/LineBatch.ts`): every
+> lines in two batches per level with a shader of our own (`modules/pixi/lib/LineBatchMesh.ts`): every
 > casing, then every stroke. A line that its batches draw isn't in Pixi's scene. Of step 8: areas
-> are in two batches too (`FillBatch` for every fill, a `LineBatch` for every outline). Points are in
-> one (`PointBatch`), the markers along lines are drawn by the lines' shader (step 9), and a
+> are in two batches too (`FillBatchMesh` for every fill, a `LineBatchMesh` for every outline). Points are in
+> one (`PointBatchMesh`), the markers along lines are drawn by the lines' shader (step 9), and a
 > hover's glow and a selection's halo are in batches whose shaders move them (step 10), with
-> frames drawn at intervals while they do.
+> animation draws at intervals while they do. All of section 15 was merged with PR #12 (Nov 24).
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
-[`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
+[`scheduler-system.md`](scheduler-system.md) (the game loop, its ticks and their budget),
 [`profiling.md`](profiling.md) (memory and leaks), [`style-system.md`](style-system.md).
 
 ## Words used here
 
-- **APP pass:** Rapid's half of a frame. Layers decide which features are in view, rebuild the ones that
-  are dirty, and cull the rest (`GraphicsSystem._app()` → `PixiScene.render()` → each layer's `render()`
-  and `cull()`).
-- **Pass (of a layer):** one layer's work in an APP pass: gather its data, update its features and mark
-  them seen, hide the ones it didn't see.
-- **Redraw request:** a call to `deferredRedraw()` or `immediateRedraw()`. It says that something the
-  map draws has changed. Moving the view isn't one.
-- **Cull box:** the part of the world a frame wants features ready for: the view, and padding around it.
-- **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view had
-  moved, inside the cull box it already had everything for (section 8). The OSM layer also keeps
-  them when it's told which data changed, or follows the cull box when that moves (section 12).
-- **Pass frame:** a frame in which layers had a pass to do: a redraw was requested, or the view needed
-  a new cull box. A frame that only moves the view isn't one. (The OSM layer follows a cull box
-  that moves without a pass since section 12; a new zoom or rotation still needs one.)
+These are the words for the frame loop everywhere: in this doc, in the code and in the other docs.
+A frame is made in **phases** (APP, then DRAW); a **pass** is a walk over a layer's data, and an
+APP phase may have one or not.
+
+```
+tick (a requestAnimationFrame callback): SchedulerSystem._onTick
+ ├ GraphicsSystem._tick
+ │  ├ a DRAW left over from the last tick? → DRAW phase, and nothing else
+ │  ├ _updateTransform()
+ │  ├ a frame wanted? → APP phase: _app(mayPass)        ← starts a frame (a RenderFrame)
+ │  │    ├ may a pass happen? (FramePacer's gap) → new cull box; the frame's deadline
+ │  │    ├ scene.render(): each layer's render() (a pass, or kept), then cull()
+ │  │    │    (the labels layer places labels from its queue until the deadline)
+ │  │    ├ time left → features put off outside the view
+ │  │    └ APP took under 8 ms? → DRAW phase in this tick too
+ │  ├ no frame drawn? → the CSS transform follows the view
+ │  └ nothing pending, something moves by itself, AnimationPacer due → an animation draw
+ └ the scheduler's tasks (a share of every tick)
+
+pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer's hitTest()
+```
+
+**The loop**
+- **Tick:** one `requestAnimationFrame` callback. `SchedulerSystem` runs the loop
+  (`addTickCallback()`), and `GraphicsSystem._tick()` decides what this tick does: an APP phase, a
+  DRAW phase, both, an animation draw, or nothing.
+- **Frame:** everything needed to draw the map once: an APP phase and the DRAW phase that shows
+  it (`RenderFrame`, numbered, kept in `gfx.renderFrames`). Rapid keeps one frame in flight, and
+  its work may be spread over more than one tick.
+- **APP phase:** Rapid's half of a frame (`GraphicsSystem._app()` → `PixiScene.render()` → each
+  layer's `render()` and `cull()`). It places the stage, picks the cull box and the deadline, and
+  brings the scene up to date.
+- **DRAW phase:** Pixi's half (`GraphicsSystem._draw()` → `pixi.render()`). Pixi walks the render
+  groups, builds the instruction lists of those that changed, uploads what changed in our
+  batches, and issues the draw calls. Then the `draw` event.
+- **Animation draw:** the scene drawn again as the last frame left it, because something in it
+  moves by itself (a hover's glow, a selection's dashes). A DRAW with no APP: not a frame, not in
+  `renderFrames`, no `draw` event (`_drawAnimation()`, `AnimationPacer`, `gfx.animationDraws`).
+
+**In the APP phase**
+- **Pass (of a layer):** a layer's walk over its data: gather what's in the cull box, update its
+  features and mark them seen, then `cull()` hides the ones it didn't see. It's the expensive
+  part, and an APP phase may have none.
+- **Pass frame:** a frame in which layers had a pass to do: a redraw was requested, or the view
+  needed a new cull box. A frame that only moves the view isn't one. (The OSM layer follows a cull
+  box that moves without a pass since section 12; a new zoom or rotation still needs one.)
 - **Gap:** how long a pass frame waits after the one before it. It grows with what that one cost
-  (section 9).
-- **Held frame:** a frame drawn while a pass frame waits for its gap. It moves the view, and every
+  (`FramePacer`, section 9).
+- **Held frame:** a frame made while a pass frame waits for its gap. It moves the view, and every
   layer that can keeps its features.
-- **Deadline:** the time in a frame's APP pass after which work that can wait is put off to the
-  next frame (section 10).
+- **Cull box:** the part of the world a frame wants features ready for: the view, and padding
+  around it. While the view moves inside it, a layer needs no pass (section 8).
+- **Cull:** a layer hiding the features its pass didn't see, and destroying the ones it hasn't
+  seen for a while (`cull()`).
+- **Kept:** a layer kept its features in a frame when it skipped its pass, because only the view
+  had moved, inside the cull box it already had everything for (section 8). The OSM layer also
+  keeps them when it's told which data changed, or follows the cull box when that moves
+  (section 12).
+- **Deadline:** the time in a frame's APP phase after which work that can wait is put off to a
+  later frame: making features, drawing them again after a zoom, placing labels (section 10).
 - **Waiting:** a feature is waiting when it's dirty and its layer put off drawing it again. It's
-  shown as it was last drawn, or not at all if it's new.
-- **DRAW pass:** Pixi's half. `pixi.render()` walks the display tree, builds its instruction list, and
-  issues the GPU calls (`GraphicsSystem._draw()`).
-- **Instruction:** one entry in a Pixi render group's instruction list. Each names the pipe that runs it:
-  `batch`, `graphics` (a `Graphics` drawn on its own), `mesh`, `stencilMask`, `filter`.
+  shown as it was last drawn, or not at all if it's new. A frame that leaves work waiting is
+  **unfinished**, and another frame follows.
+- **Chunk:** a few entities taken at a time when a layer makes or draws features that waited or
+  arrived (`MAKE_CHUNK`, `ARRIVED_CHUNK`), with a look at the deadline between chunks.
+- **Draw (a feature):** a feature is drawn (again) when its `update()` runs in the APP phase. A
+  feature **draws itself** when it has Pixi objects of its own in the scene, not only items in
+  batches (`drawsInContainer()`).
+- **Label placement:** the labels layer's part of the APP phase. It places labels from a queue,
+  those in view first, until the deadline, and not while the zoom or rotation is changing
+  (section 14).
+
+**Asking for a frame**
+- **Redraw request:** a call to `deferredRedraw()` or `immediateRedraw()`. It says that something
+  the map draws has changed, so layers need a pass: it asks for APP work, not only a DRAW. Moving
+  the view isn't one.
+- **`requestFrame()`:** asks for a frame without saying anything changed, after the layers were
+  told some other way (a class was set, a texture arrived).
+
+**Outside the frame**
+- **Hit test:** finding what's under the pointer. It runs on each pointer event, not in a frame:
+  `PixiEvents` asks `PixiScene.hitTest()`, which asks the layers that find their own features
+  through a spatial index (`setHitTester()`), and Pixi's walk for the rest.
+
+**Pixi's words**
+- **Render group:** a container that keeps its own instruction list, which Pixi builds again only
+  when something in it changed.
+- **Instruction:** one entry in a render group's instruction list. Each names the pipe that runs
+  it: `batch`, `graphics` (a `Graphics` drawn on its own), `mesh`, `stencilMask`, `filter`.
 - **Draw call:** one `drawElements`/`drawArrays` (WebGL), or `draw`/`drawIndexed` (WebGPU).
-- **Batch:** consecutive drawables that Pixi merges into one draw call. A batch ends when the next
-  drawable can't join it (different blend mode, too many textures, a mask, a filter, or something that
-  isn't batchable).
+- **Pixi's batch:** consecutive drawables that Pixi merges into one draw call, copying their
+  vertices into a buffer of its own. It ends when the next drawable can't join it (a different
+  blend mode, too many textures, a mask, a filter, or something that isn't batchable). Always
+  say "Pixi's" for this one.
+
+**Our words**
+- **Batch:** one of our `BatchMesh`es (`LineBatchMesh`, `FillBatchMesh`, `PointBatchMesh`): a Pixi
+  `Mesh` with a shader of our own, holding many features' vertices, kept from frame to frame and
+  drawn in one draw call. A feature is an **item** in it, a run of its vertices. Not part of
+  Pixi's batches.
+- **`LineMesh`:** one line drawn from its stroke mesh, for what isn't in a batch (the lasso, the
+  lines of layers without batches).
+- **Stroke mesh:** the triangles that draw a line at any width, built once
+  (`geomStrokeMesh()`); see section 15.
+- **Render:** a method name on both sides (a layer's `render()` is APP work, `pixi.render()` is
+  DRAW), so it's not the name of a phase.
 - **Partial fill:** the default area style. Only a band 32 px wide inside the outline is filled
   (`PARTIALFILLWIDTH` in `PixiFeaturePolygon`); the `map.areaFill` setting can make it full.
 
-## 1. How a frame is made today
+## 1. How a frame is made
 
 `SchedulerSystem` owns the `requestAnimationFrame` loop and calls `GraphicsSystem._tick(deltaMS)` once
-per animation frame. A tick does this:
+per tick. A tick does this:
 
-1. **DRAW**, if an APP pass from the tick before is waiting for it, and nothing else.
+1. **DRAW**, if an APP phase from the tick before is waiting for it, and nothing else.
 2. Otherwise `_updateTransform()` moves an eased transform along and takes up a change of the map's
    size.
 3. **APP**, if a frame is wanted: the view moved, or a redraw was requested. `_passAllowed()` asks the
@@ -90,16 +166,18 @@ per animation frame. A tick does this:
    the map is somewhere new on screen (the edit menu follows it) and `draw`, and counts the frame.
 5. On a tick that drew nothing, `_followTransform()` follows the map's transform with a CSS
    transform on the `supersurface`, so a zoom still looks smooth while its pass waits.
+6. **An animation draw**, on a tick with no frame to make or draw, when something shown moves by
+   itself and `AnimationPacer` says one is due (section 15, step 10).
 
-Both passes leave performance measures (`app-N`, `draw-N`) in a DevTools recording. The minimap renders
+Both phases leave performance measures (`app-N`, `draw-N`) in a DevTools recording. The minimap renders
 the same stage a second time into its own canvas (`UiMinimap`), which is why the renderer has
 `multiView` on.
 
-Until Nov 19 a tick did one pass or the other, and an APP pass waited 250 ms after the last DRAW
+Until Nov 19 a tick did one phase or the other, and an APP phase waited 250 ms after the last DRAW
 (`THROTTLE`) unless `immediateRedraw()` asked for one now, with the CSS transform carrying the view in
 between. The measurements in sections 2 to 8 were taken that way, except where they say otherwise.
 
-**What makes Rapid unlike a game:** we don't know what we're drawing until the APP pass has run. The
+**What makes Rapid unlike a game:** we don't know what we're drawing until the APP phase has run. The
 user can put the map anywhere in the world, at any zoom, with any layers on. A street grid in Seattle,
 a parking lot with 5,000 individually mapped stalls, a wetland traced with thousands of nodes, and an
 undersea cable crossing an ocean are all normal OpenStreetMap. So:
@@ -190,8 +268,8 @@ What that says:
   as in this profile. (Both fixed on Nov 19: section 8, "What the steps cost".) The rest is
   `renderPolygons()`, `renderVertices()` and `entitiesInBox()`. See
   "Renderer: classify a node only when it's dirty" in `backlog.md`.
-- **Moving the view makes Pixi rebuild everything it knows about the scene.** A pan frame's APP pass
-  costs about what a redraw's does, but its DRAW pass goes from under 1 ms to about 2 µs per visible
+- **Moving the view makes Pixi rebuild everything it knows about the scene.** A pan frame's APP phase
+  costs about what a redraw's does, but its DRAW phase goes from under 1 ms to about 2 µs per visible
   feature: 7 ms in Seattle, 23 at Staten Island, 28 at Golmud, 109 in Užice (where a pan frame takes
   a third of a second in all). A CPU profile in Seattle puts it in Pixi's `_updateRenderGroups()`:
   about 7 ms collecting every renderable into a new instruction list (`_buildInstructions()`), and
@@ -240,7 +318,7 @@ What that says:
 
 ## 3. Frame stats
 
-A `GraphicsSystem` that knows what each frame contained and what it cost. The two passes see different
+A `GraphicsSystem` that knows what each frame contained and what it cost. The two phases see different
 things, so stats come from both:
 
 - **During APP**, from Rapid: time spent in each layer's `render()` and `cull()`, and counts that only
@@ -252,7 +330,7 @@ things, so stats come from both:
 Since Rapid can't plan the frame ahead, the frame itself is the unit we gather stats on. A
 `RenderFrame` (`modules/pixi/RenderFrame.ts`) is passed from `_app()` through `PixiScene.render()`
 into every layer's `render()` and `cull()`: the frame number plus whatever the frame gathers as it's
-made, compared against the frame budget (`scheduler.targetFrameTime`, 16.7 ms by default). This is
+made, compared against the frame budget (`scheduler.targetTickTime`, 16.7 ms by default). This is
 the same idea as SGI Performer's `pfFrameStats`, which `backlog.md` already cites.
 
 What a frame holds now (the class has the details):
@@ -304,7 +382,7 @@ into as they go, and the scene moves it onto the frame after the layer's pass (`
 - **`GraphicsSystem` owns frame stats** (Bryan, Nov 18). It keeps the last N frames in a ring buffer.
   Code that wants them (a script, an info card) asks it; layers don't keep their own.
 - **The frame object is a `RenderFrame`** (Bryan, Nov 18). `SchedulerSystem` already exports a
-  `FrameMetrics` (its moving averages of frame time), and the object will carry more than stats.
+  `TickMetrics` (its moving averages of frame time), and the object will carry more than stats.
 - **Reading Pixi's internals happens in one place.** The instruction list (`renderGroup.instructionSet`)
   and the GPU contexts (`renderer.graphicsContext.getGpuContext()`) aren't public API and can change in
   any Pixi release, so one module reads them, with a test that fails when their shape changes.
@@ -389,9 +467,9 @@ round caps and joins, by screen size instead of world units (section 2).
   JavaScript ports). Even if we write our own, a library makes a good reference to test against.
 - Where it lives. It's plain geometry with no Pixi in it, so `modules/geo/` fits, next to the code
   conflation uses.
-- Building bands on a zoom change, for every visible area: whether it fits in the APP pass, or needs
+- Building bands on a zoom change, for every visible area: whether it fits in the APP phase, or needs
   caching per zoom level or a worker. Bryan expects it to fit: Pixi's line builder already does the same
-  kind of math in the APP pass for every partial fill, and the result stays in the `Graphics` or `Mesh`
+  kind of math in the APP phase for every partial fill, and the result stays in the `Graphics` or `Mesh`
   until the next zoom change. Frame stats will say.
 
 ## 5. Dashed lines
@@ -527,7 +605,7 @@ Each step is measured with frame stats on the same set of places.
 4. **A rendering info card. First version done (Nov 18).** `UiRenderingCard`
    (`modules/ui/cards/`) sits with the measurement and history cards and shows the frame stats live
    while panning. Turn it on with ⌘⇧F, or "Show Rendering Panel" in the Map Data pane. It has:
-   - a chart of the last 120 frames, the DRAW pass stacked on the APP pass, with a line at the frame
+   - a chart of the last 120 frames, the DRAW phase stacked on the APP phase, with a line at the frame
      budget and red for a pass that went over it;
    - the APP and DRAW times as bars against the budget, averaged over the frames drawn in the last
      second, and the GPU time when detailed stats are on (its button turns them on, and hiding the
@@ -536,15 +614,15 @@ Each step is measured with frame stats on the same set of places.
      stats), and the scheduler's queue, pressure and dropped frames.
 
    The first thing it showed: **panning costs more than the frames `bun run measure` measures.** In
-   Seattle, panning 6 px per animation frame from a script, a frame took 15 to 20 ms of APP and 7 to
+   Seattle, panning 6 px per tick from a script, a frame took 15 to 20 ms of APP and 7 to
    10 ms of DRAW, against 10 and 0.8 for a frame where nothing changed. The script measures pan
    frames now (section 2).
 
    It redraws at most four times a second. Ideas for later, from Performer's `pfFrameStats`: texture
    and atlas use, vertices per layer (after step 5), marking restyle frames in the chart, and a
    GPU line in the chart.
-5. **Pass a `RenderFrame` through `render()` and `cull()`. Done (Nov 19),** together with the CULL
-   pass for the OSM layer (section 8), which needs it. Every layer's `render()`, `cull()` and
+5. **Pass a `RenderFrame` through `render()` and `cull()`. Done (Nov 19),** together with the cull
+   box for the OSM layer (section 8), which needs it. Every layer's `render()`, `cull()` and
    `retainFeature()` take the frame. Layers report what they did to their features, the OSM layer
    also where its time went, and the DRAW stats say how many instruction lists Pixi rebuilt
    (section 3). `bun run measure` saves all of it with `--out`, and the rendering card shows which
@@ -558,15 +636,15 @@ Each step is measured with frame stats on the same set of places.
    today anyway.
 
 Done outside the numbered steps: the imagery filter fix (section 6), render groups with OSM
-polygons split by tile ([`scene.md`](scene.md) section 3), and the CULL pass for the OSM layer
+polygons split by tile ([`scene.md`](scene.md) section 3), and the cull box for the OSM layer
 (section 8, Nov 19).
 
-## 8. A CULL pass
+## 8. The cull box
 
 **Built for the OSM layer (Nov 19).** Bryan's point: a layer doesn't need to decide what's visible
 on every frame. SGI Performer had CULL as its own stage between APP and DRAW.
 
-Before, every APP pass did everything, for every layer: ask the spatial index what's in the exact
+Before, every APP phase did everything, for every layer: ask the spatial index what's in the exact
 view, visit each of those features (update it if it's dirty, mark it seen), then hide every feature
 that wasn't seen. On a pan nothing is dirty, but all of that still ran (about 3 µs per visible
 feature), and it changed some feature's `visible` on every frame, which made Pixi rebuild the
@@ -664,7 +742,7 @@ passes at 60 ms. Over a new area, more of the frames are passes, as OSM tiles ar
   Golmud's from 343 to 460. With 128 px of padding it was 119 and 417, and Staten Island's hardly
   differed (313 against 326): its big features reach into the padding either way.
 - **More is drawn outside the view:** 1,295 draw calls in Seattle where the view alone needed 782.
-  The DRAW pass went from 0.8 to 1.0 ms, and GPU time didn't change.
+  The DRAW phase went from 0.8 to 1.0 ms, and GPU time didn't change.
 
 ### Redraw requests, checked
 
@@ -716,7 +794,7 @@ entities in Staten Island's cull box, of which the layer draws about 3,500.
 **Compare builds in one session.** The same build measured hours apart differs by more than some
 of these changes: Seattle's redraw frame was 10.8 and 17.5 ms in two runs of one build, and Staten
 Island's cull frames 63 ms one night and 100 the next morning. Old build then new, back to back at
-Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull frame's from 100 to
+Staten Island: the redraw frame's APP phase went from 57.1 to 34.5 ms, a cull frame's from 100 to
 72, and a kept frame's didn't change (6.0 and 5.8).
 
 ### What's left
@@ -735,10 +813,10 @@ Staten Island: the redraw frame's APP pass went from 57.1 to 34.5 ms, a cull fra
 
 ## 9. Frame pacing
 
-Built Nov 19. Until then an APP pass waited 250 ms after the last DRAW, whatever it was for. The
+Built Nov 19. Until then an APP phase waited 250 ms after the last DRAW, whatever it was for. The
 number was a rough guess carried over from iD, and it did two jobs: it kept an expensive pass from
 running too often, and it left time for input and for background work (tiles, validation). Since
-the CULL pass, most frames of a pan are cheap, and the two jobs can be told apart.
+the cull box, most frames of a pan are cheap, and the two jobs can be told apart.
 
 Bryan's direction: let the frame rate float with what's going on, so that 60, 30 or 20 frames a
 second are reached when the work allows. Rapid isn't a game and needn't hold 60. At 10 it's usable
@@ -812,12 +890,12 @@ Staten Island (z16.5, 18,500 features shown), old build then new in one session 
 | View-only frames, APP + DRAW | 1.5 + 1.5 ms | 1.1 + 1.1 ms |
 | Pass frames when the view left the cull box | 3 at 42 + 8 ms | 4 at 38 + 8 ms |
 | Main thread time in ticks | 0.42 s (10%) | 0.79 s (17%) |
-| Animation frames longer than 25 ms / 50 ms | 4 / 3 | 6 / 1 |
+| Ticks longer than 25 ms / 50 ms | 4 / 3 | 6 / 1 |
 
-**A pan on every animation frame** (from a script, 5 px a frame): 237 frames in 4.1 s, 57 a
+**A pan on every tick** (from a script, 5 px a frame): 237 frames in 4.1 s, 57 a
 second, with 29% of the main thread's time in ticks. At 15 px a frame (900 px a second, into
 unloaded territory): 46 a second, with a pass frame every 280 ms or so at 45 + 14 ms, and 20 of 240
-animation frames longer than 25 ms.
+ticks longer than 25 ms.
 
 **Background work isn't held up.** Time until Staten Island had loaded and the scheduler's queues
 were empty, one run each:
@@ -825,7 +903,7 @@ were empty, one run each:
 | | Before | After |
 |---|---|---|
 | Map still | 31.9 s (7 frames) | 31.9 s (5 frames) |
-| Panning on every animation frame meanwhile | 37.9 s (133 frames, 8.8 s of main thread) | 37.4 s (2,163 frames, 13.2 s of main thread) |
+| Panning on every tick meanwhile | 37.9 s (133 frames, 8.8 s of main thread) | 37.4 s (2,163 frames, 13.2 s of main thread) |
 
 Of the 32 s, the main thread works for about 6 (5 on the scheduler's queues, 1 drawing). Sixteen
 times the frames made no difference to it, which is why the gap doesn't look at the scheduler's
@@ -838,17 +916,17 @@ over 25. What that work is wasn't traced; validation is the likely one.)
 
 **`bun run measure` (pan frames, ms), now that they come a tick apart:** Seattle's view-only frames
 1.2 APP + 1.3 DRAW and its pass frames 18 + 12; Staten Island 1.4 + 1.3 and 40 + 9; Užice 5.0 +
-4.6 and 182 + 54. The script also has a `glide` measurement now: the view moves on every animation
-frame along the pan path, and it reports the frames drawn a second, the animation frames longer
+4.6 and 182 + 54. The script also has a `glide` measurement now: the view moves on every tick
+along the pan path, and it reports the frames drawn a second, the ticks longer
 than 25 ms, and what a pass frame cost in the middle of it. Seattle: 58 a second, 2 long of 240,
 31 ms. Staten Island: 57, 4 and 67 ms.
 
 **Start-up in the e2e tests** (software rendering, five pages at once; medians of 40 runs): OSM
 data is on screen 8.2 s after the page opens where it was 8.7, and a Rapid dataset shows 0.2 s
-after it's turned on where it took 1.0. The first frame's DRAW pass used to block for 3.3 s there
+after it's turned on where it took 1.0. The first frame's DRAW phase used to block for 3.3 s there
 and now takes 3 ms; the cost shows up later, in the first frame with features (1.4 s where it was
 0.7). Why the first one blocked isn't traced. One side effect: the page answers the tests sooner,
-while it's still busy starting, so the welcome screen (which fades out over animation frames) took
+while it's still busy starting, so the welcome screen (which fades out over ticks) took
 longer to close after its Escape, and the tests' start-up helper waits longer for it now.
 
 **Checked by screenshot** at Staten Island: after 6 pans, and after an eased zoom in, pan, rotation
@@ -859,7 +937,7 @@ the old box covers.
 ### What it doesn't fix
 
 - **A pass frame is one block of work.** When the view leaves the cull box at Staten Island, that's
-  45 to 80 ms in two ticks, three to five animation frames missed (21 ms since section 12, where
+  45 to 80 ms in two ticks, three to five ticks missed (21 ms since section 12, where
   the OSM layer follows the box without a pass). The first pass after a load is
   790 ms. Pacing decides how often that happens, not how long it takes: a cheaper pass, or a pass
   spread over frames (section 8, "What's left"), does.
@@ -872,7 +950,7 @@ the old box covers.
   listeners, and most throttle themselves. Together they took 0.3 ms a frame at Staten Island (cards
   closed), 0.6 with the minimap shown. A new listener should throttle itself.
 - **The OSM layer asks for the view's tiles on every frame** (`context.loadTiles()`), which is part
-  of the 1 to 2 ms a view-only frame's APP pass takes.
+  of the 1 to 2 ms a view-only frame's APP phase takes.
 
 ## 10. A deadline on the frame
 
@@ -902,7 +980,7 @@ A feature's style doesn't depend on the zoom. The layer worked it out again beca
   for a class like hover or select.
 
 The OSM layer's loops check `needsStyle` before matching a style. That alone took a zoom's APP
-pass from 148 to 47 ms in Seattle and from 327 to 102 ms at Staten Island. The other layers still
+phase from 148 to 47 ms in Seattle and from 327 to 102 ms at Staten Island. The other layers still
 check `dirty`, which works as before.
 
 ### What can wait, and how
@@ -917,11 +995,11 @@ check `dirty`, which works as before.
 - **At least half of what recent frames cost anyway,** up to 50 ms. Where a frame is expensive
   whatever changed in it, small steps cost more than they save.
 
-The DRAW pass's share counts against the budget too. Drawing a feature takes little time in the
-APP pass, because Pixi builds the geometry when it renders. So each feature drawn adds what it's
+The DRAW phase's share counts against the budget too. Drawing a feature takes little time in the
+APP phase, because Pixi builds the geometry when it renders. So each feature drawn adds what it's
 expected to cost there (`frame.drawDebt`: 4 µs for one drawn again after a zoom, 10 µs for a new
 or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 new features in
-19 ms of APP pass and then spent 212 ms in DRAW.
+19 ms of APP phase and then spent 212 ms in DRAW.
 
 - **Making a feature.** After a load there are thousands to make, and making one (its Pixi
   objects, its style) costs about 35 µs. Where the OSM layer's loops find an entity with no
@@ -933,7 +1011,7 @@ or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 n
 
   The layer remembers the entities that waited. On later frames `continueWaiting()` runs them
   through the same `render…()` functions as a pass does, 64 at a time, the ones in view first.
-  At least one batch is made on each call.
+  At least one chunk is made on each call.
 - **Drawing a feature again.** A layer calls `this.updateFeature(feature, frame, viewport)` where
   it called `feature.update(viewport)`.
   - A dirty feature **in view** is drawn at once while the frame has time. After that it waits,
@@ -960,17 +1038,17 @@ or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 n
 ### What it does
 
 Old build (frame pacing) then new, Nov 19. A zoom in of one level, eased over 400 ms, and 60 steps
-of +0.02 on every animation frame, as a wheel does:
+of +0.02 on every tick, as a wheel does:
 
 | | Seattle, before | Seattle, after | Staten Island, before | Staten Island, after |
 |---|---|---|---|---|
 | Eased: frames at a new zoom | 2 at 147 + 30 ms | 5 at 17 + 10 ms | 2 at 334 + 47 ms | 3 at 64 + 18 ms |
-| Eased: longest animation frame | 133 ms | 66 ms | 333 ms | 83 ms |
+| Eased: longest tick | 133 ms | 66 ms | 333 ms | 83 ms |
 | 60 steps: time they took | 1.33 s | 1.01 s | 2.07 s | 1.22 s |
-| 60 steps: longest animation frame | 150 ms | 18 ms | 300 ms | 50 ms |
-| 60 steps: animation frames over 50 ms | 3 | 0 | 6 | 1 |
+| 60 steps: longest tick | 150 ms | 18 ms | 300 ms | 50 ms |
+| 60 steps: ticks over 50 ms | 3 | 0 | 6 | 1 |
 
-(One run each. The longest animation frame varies from run to run: 33 to 66 ms in Seattle's eased
+(One run each. The longest tick varies from run to run: 33 to 66 ms in Seattle's eased
 zoom.)
 
 `bun run measure`'s restyle (every feature marked as a zoom does): the first frame, then how many
@@ -1016,7 +1094,7 @@ of which shows at Seattle or Staten Island:
 1. **A pass every half second that made nothing.** Each icon is turned into a texture the first
    time a feature asks for it, and when it arrived `PixiTextures` asked for a redraw of
    everything: 267 times during that load. A pass in Užice walks 100,000 entities (190 ms) and,
-   in the middle of a load, makes its one batch of 64. Now a texture's arrival asks for a frame,
+   in the middle of a load, makes its one chunk of 64. Now a texture's arrival asks for a frame,
    not a pass: a feature drawn without its icon stays dirty, the layer remembers it, and
    `scene.texturesLoaded()` has those drawn again (`gfx.requestFrame()`).
 2. **The budget was 6 to 13 ms, never 24.** The bigger budget needed an idle scheduler. But the
@@ -1155,7 +1233,7 @@ refresh (a 24 ms budget plus 9 ms of DRAW is 33), and wait for the next. Not che
   14 DRAW at Staten Island): putting off the new features didn't change it. Most of it is vertices
   (section 8, `design/filter-system.md`).
 - **The first pass after a load pays two things once:** `FilterSystem` matching every entity for
-  the first time (87 of that pass's 141 ms at Staten Island), and the first DRAW pass that has
+  the first time (87 of that pass's 141 ms at Staten Island), and the first DRAW phase that has
   anything in it (76 to 128 ms, whatever it draws).
 - **No frame between passes during a zoom.** The CSS transform still carries a zoom between pass
   frames. Now that a feature can be shown at a zoom it wasn't drawn for, a held frame could be
@@ -1184,7 +1262,7 @@ tables below are the second measurement. Four editors, at three of the difficult
 `bun run compare` (`scripts/compare.ts`) measures from outside, because iD and the older Rapids
 have no frame stats. It opens the page in a new tab of the debug Chrome (the real GPU, an M4, a
 1593×1067 window at 2x), waits until the data has arrived and the map has stopped changing for 5
-seconds, then pans and zooms with real input events, and watches the page's animation frames:
+seconds, then pans and zooms with real input events, and watches the page's ticks:
 
 - **Pan:** 60 two-finger scroll events, 600 px in all, into an area that isn't loaded yet.
 - **Pinch:** 40 trackpad pinch events, 1.2 zoom levels in.
@@ -1212,10 +1290,10 @@ after the time they took when they were recorded.
 ### Results
 
 "Drawn after" is from opening the page until the map stopped changing. "Frames" are the page's
-animation frames while the gesture's events were sent, and "longest" the longest gap between two,
+ticks while the gesture's events were sent, and "longest" the longest gap between two,
 until 2.5 s after the gesture. "Redraws" is how often the map's content was drawn again, a
 second: between redraws, all four move the last picture with a CSS transform. (Rapid reports its
-redraws. For iD it's the animation frames in which the OSM layer's elements changed, which isn't
+redraws. For iD it's the ticks in which the OSM layer's elements changed, which isn't
 quite the same thing.)
 
 **Downtown Seattle** (z17.5, 6 map tiles)
@@ -1361,8 +1439,8 @@ Its `wheel` events were on too: a hit test for each wheel event of a pan, for an
 | Užice: 240 pointer moves across the map | Before | Without the pass | And `globalMove` off |
 |---|---|---|---|
 | Time they took (4 s if the page keeps up) | 36.9 s | 15.7 s | 5.3 s |
-| Between animation frames, median / 90th percentile | 65 / 242 ms | 62 / 73 ms | 17 / 32 ms |
-| Animation frames over 100 ms | 117 | 1 | 1 |
+| Between ticks, median / 90th percentile | 65 / 242 ms | 62 / 73 ms | 17 / 32 ms |
+| Ticks over 100 ms | 117 | 1 | 1 |
 | One pointer move: Pixi's hit test | 50 ms | 50 ms | 5 ms |
 | One hover: APP + DRAW | 175 + 9 ms | 3 + 9 ms | 3 + 9 ms |
 
@@ -1401,7 +1479,7 @@ everything, and so did entering and leaving the drag mode: 61 passes of about 20
 | Time they took (1 s if the page keeps up) | 14.1 s | 1.5 s |
 | Passes | 61 | 0 |
 | A frame of the drag, APP + DRAW | 198 + 7 ms | 2.5 + 7 ms |
-| Between animation frames, 90th percentile / longest | 214 / 679 ms | 26 / 57 ms |
+| Between ticks, 90th percentile / longest | 214 / 679 ms | 26 / 57 ms |
 
 Selecting and deselecting (64 changes of mode, features of every kind) takes 2.7 ms of APP at
 the median, where each was a pass.
@@ -1487,7 +1565,7 @@ being worth drawing, on every pass.
   and not hidden.
 - **Arrivals pass them by too.** Three quarters of a tile that arrives is shape vertices, and
   each was sorted and asked about. `_renderArrived()` skips a shape vertex that isn't related and
-  has no feature (`_isIdleVertex()`), looking at up to 8,000 for each batch of 1,000 it draws.
+  has no feature (`_isIdleVertex()`), looking at up to 8,000 for each chunk of 1,000 it draws.
 - **The zoom for vertices is the map's effective zoom**, which grows with the latitude, so a
   view that only moves north or south can cross it. That used to be noticed at the next pass, and
   a pan has no passes now. The layer notices it on a kept frame, and remembers the tagged and
@@ -1553,7 +1631,7 @@ feature was put in line to be drawn again and placed in its tile's container.
 | Užice, from the tape (two runs each) | Before | After |
 |---|---|---|
 | Jump of half a level: the zoom frame, APP + DRAW | 210 + 16, 227 + 21 | 56 to 65 + 9 to 21 |
-| ..longest animation frame | 200, 217 ms | 50 ms (one run: 483, a garbage collection) |
+| ..longest tick | 200, 217 ms | 50 ms (one run: 483, a garbage collection) |
 | ..until everything is drawn again | 1.3, 1.4 s | 1.5 s (one run: 1.9) |
 | Eased zoom of a whole level, in: the costliest zoom frame, APP + DRAW | 499 ms | 118, 142 ms |
 | ..out | 445 ms | 80, 82 ms |
@@ -1568,7 +1646,7 @@ between tiles are still done, in smaller pieces between and after the drawing.
 **What's still long during a zoom isn't the zoom.** Across sixteen zooms, the frames that cost
 more than 150 ms were not zoom frames. They were six frames of 250 to 710 ms, and a trace
 shows 230 to 650 ms of garbage collection on the main thread inside each (see "Seen on the
-way"). That's where the animation frames of 450 ms in some runs come from.
+way"). That's where the ticks of 450 ms in some runs come from.
 
 **A zoom gets a real frame every 110 to 250 ms**, and the CSS transform scales the last one in
 between. `FramePacer` waits twice what a zoom frame cost before the next, as for any frame
@@ -2641,7 +2719,7 @@ the layer's containers. How it's put together is in [`scene.md`](scene.md) secti
 | Through the index | 0.023 | 0.07 to 0.08 | 0.11 | 0.06 |
 | ..of which Pixi, over the other layers | 0.004 | 0.007 | 0.005 | 0.004 |
 
-**Lines in batches.** `LineBatch` (`modules/pixi/lib/LineBatch.ts`) is one `Mesh`, with a shader
+**Lines in batches.** `LineBatchMesh` (`modules/pixi/lib/LineBatchMesh.ts`) is one `Mesh`, with a shader
 of our own, for the casings and strokes of many lines. The OSM layer has one for each level,
 road class and map tile of zoom 14 (`_lineBatch()`), and gives each line feature its batch. A
 line feature in a batch has no `LineMesh`: its casing and its stroke are two runs of vertices in
@@ -2652,7 +2730,7 @@ the batch's buffers, copied from its stroke mesh.
   the distance along the line, and how the line is drawn: width in pixels, color, opacity,
   dashes.
 - **The shader does the sum that `LineMesh` does on the CPU** (`point + offset × half width`),
-  from four numbers the layer sets on every frame (`LineBatch.setView()`): what a pixel is in
+  from four numbers the layer sets on every frame (`LineBatchMesh.setView()`): what a pixel is in
   world units, how much narrower lines are at this zoom, whether casings are drawn, wireframe.
   So a zoom changes nothing in any batch, and every line gets its new width in the same frame.
   (Before, each line was drawn again over the frames after a zoom.)
@@ -2739,7 +2817,7 @@ build, labels on, alternating, two runs of each):
 **What was left of step 6** is the next part: lines without a place in the scene, and Bryan's
 answer about casings and strokes.
 
-**Tests:** `test/dom/pixi/LineBatch.test.js` (vertices, styles, order, hiding, a changed line in
+**Tests:** `test/dom/pixi/LineBatchMesh.test.js` (vertices, styles, order, hiding, a changed line in
 place and at the end, packing, growing), batches in `PixiFeatureLine.test.js` and
 `PixiLayerOsm.test.js`, the hit test in `helpers.test.js`, `PixiScene.test.js`,
 `PixiLayerOsm.test.js`, `AbstractPixiFeature.test.js` and `test/dom/behaviors/`, line labels in
@@ -2765,7 +2843,7 @@ test now checks that a hovered line is drawn in its container with the filter on
   mobile devices), and every reduction in draw calls makes Rapid perform better for them."
   Numbers from other devices are on the backlog, and don't block this.
 
-**Two batches for each level.** One `LineBatch` for every casing of the level, and one for
+**Two batches for each level.** One `LineBatchMesh` for every casing of the level, and one for
 every stroke, drawn in that order (`PixiLayerOsm._lineBatch()`). In each, the lines are in the
 order of their road class and then their way's ID, as the classes' containers were.
 
@@ -2777,7 +2855,7 @@ order of their road class and then their way's ID, as the classes' containers we
   to that place, which is where its first line was. When the view is so far from it that a
   float could be off by 1/32 of a pixel at the view's zoom (260,000 pixels at zoom 16, 4,000
   world units at zoom 22), the layer moves the place to the view's center, and the batch
-  shifts its vertices (`LineBatch.moveOrigin()`, `_moveBatchOrigins()`).
+  shifts its vertices (`LineBatchMesh.moveOrigin()`, `_moveBatchOrigins()`).
 - **The largest batch is all 18,882 lines of Užice's level 0.** Its index buffer is built again
   when a line joins or leaves it (not when one is hidden, shown or changed). Making all of
   Užice's 107,000 features again takes 5.1 to 5.4 s with batches and 5.2 to 5.6 with a mesh per
@@ -2808,7 +2886,7 @@ What that needed:
   came from the label of the line's parent container, and is the feature's `zIndex` now.
 
 **The pointer, again.** Bryan remembered a ticker in Pixi for hit testing. It's there
-(`EventsTicker`, on `Ticker.system`), it's called on every animation frame, and it does nothing
+(`EventsTicker`, on `Ticker.system`), it's called on every tick, and it does nothing
 for us: it sends a pointer move again for objects that move under a still pointer, which only
 `eventMode: 'dynamic'` asks for, and we have none. `Ticker.system` runs anyway, for Pixi's own
 scheduler. What Pixi still does for a pointer move is make its event and test the other
@@ -2857,7 +2935,7 @@ batches a level, in the same build, labels on, alternating, two runs of each):
 
 **Tests:** two batches, a glowing line, `drawsInContainer()`, `hitTest()` and where a line is
 drawn in `PixiFeatureLine.test.js`; the batches of a level, their order and their moving origin
-in `PixiLayerOsm.test.js`; `moveOrigin()` in `LineBatch.test.js`; `featureOrder()` in
+in `PixiLayerOsm.test.js`; `moveOrigin()` in `LineBatchMesh.test.js`; `featureOrder()` in
 `helpers.test.js`; line labels without a container in `PixiLayerLabels.test.js`. The e2e tests:
 a hovered line glows in its own container and goes back to its batches; the scene's hit test
 finds what asking every feature would, lines that aren't in the scene among them (Pixi can't
@@ -2900,14 +2978,14 @@ changed what's drawn, with the last pointer position.
 | Areas | 684: 627 fills, 639 outlines, 55 sprites | 36,133: 1,880 fills, 1,918 outlines, 12,097 sprites |
 | Points and vertices | 5,049, as 13,937 display objects | 49,259, as 120,949 |
 
-**Areas are in two batches:** every fill in a `FillBatch`, then every outline in a `LineBatch`,
+**Areas are in two batches:** every fill in a `FillBatchMesh`, then every outline in a `LineBatchMesh`,
 both in the order of the areas' size, the largest first (`PixiLayerOsm._polygonBatch()`).
 An area that its batches draw has nothing in its container and isn't in the scene, like a line.
 
-- **`FillBatch`** (`modules/pixi/lib/FillBatch.ts`) is to fills what `LineBatch` is to lines: a
+- **`FillBatchMesh`** (`modules/pixi/lib/FillBatchMesh.ts`) is to fills what `LineBatchMesh` is to lines: a
   vertex is a corner of a triangle (16 bytes: where it is, its color and opacity, its pattern).
   What the two have in common (the buffers, a thing that changes in place, hiding by opacity,
-  order, the origin that follows the view) is `VertexBatch`.
+  order, the origin that follows the view) is `BatchMesh`.
 - **A fill's triangles are worked out once** (`triangulate()` in `helpers.ts`, with the `earcut`
   that Pixi uses and exports), for any zoom. A `Graphics` fill was triangulated again at every
   zoom.
@@ -2956,7 +3034,7 @@ part, where only lines were in batches):
 | Every feature redrawn after a zoom | 134, 153 → 136, 134 ms | 183, 185 → 177, 157 ms | 732, 702 → 816, 685 ms |
 
 - **Draw calls are down by 41 to 68% from the build before,** and by 58 to 80% from a display
-  object for each feature. Pixi's DRAW pass is half of what it was or less on every kind of
+  object for each feature. Pixi's DRAW phase is half of what it was or less on every kind of
   frame: it has fewer render groups to walk and nothing to triangulate.
 - **GPU time is up 1.5 ms in Staten Island,** with 63% more triangles. Its small buildings were
   a sprite each, two triangles; drawn as they are, with a 2 pixel outline around five corners,
@@ -2986,7 +3064,7 @@ part, where only lines were in batches):
 
 **Not done in this part:** points (the next part of this step), and line markers (step 9).
 
-**Tests:** `FillBatch.test.js`; `triangulate()` and `ringsContain()` in `helpers.test.js`; an
+**Tests:** `FillBatchMesh.test.js`; `triangulate()` and `ringsContain()` in `helpers.test.js`; an
 area in batches in `PixiFeaturePolygon.test.js` (the fill and each ring, a small one, a zoom
 that changes nothing, a band, a pattern, the hit test, a glow); the layer's batches of areas in
 `PixiLayerOsm.test.js`; area labels without a container in `PixiLayerLabels.test.js`. The e2e
@@ -3007,11 +3085,11 @@ somehow, though he didn't love the old glow: "users might complain if we take it
 replacing the fill hover some other way." Dashes of more than one color (meta/Rapid#1291) are
 for another time.
 
-**Points are in one batch:** the points, the vertices and the pins of areas, a `PointBatch` in
+**Points are in one batch:** the points, the vertices and the pins of areas, a `PointBatchMesh` in
 the points' container (`PixiLayerOsm._pointBatch()`, `_placePoint()`). A point that the batch
 draws has no sprites, nothing in its container and no place in the scene, like a line and an area.
 
-- **`PointBatch`** (`modules/pixi/lib/PointBatch.ts`) is a `VertexBatch` of pictures. A point is
+- **`PointBatchMesh`** (`modules/pixi/lib/PointBatchMesh.ts`) is a `BatchMesh` of pictures. A point is
   up to a few: its viewfields, its marker, its icon, in that order. A picture is four vertices
   of 32 bytes: where the point is in the world (the same in all four), where the corner is in
   pixels from the point, where the corner is in the texture, the tint and opacity, and two
@@ -3028,7 +3106,7 @@ draws has no sprites, nothing in its container and no place in the scene, like a
   every point again, once, where it was. (Hiding is a byte.)
 - **One texture.** Every marker, icon and viewfield is in the symbol atlas of `PixiTextures`,
   which has only ever had one texture (8192 pixels across; 2048 without `highQuality`). The
-  batches draw from that one (`PointBatch.setTexture()`). An icon that hasn't loaded is left
+  batches draw from that one (`PointBatchMesh.setTexture()`). An icon that hasn't loaded is left
   out, and the point is written again when it arrives. A picture from any other texture makes
   its point draw itself with sprites; nothing does today.
 - **What a point is drawn with is worked out once,** for the batch and for sprites alike
@@ -3164,7 +3242,7 @@ fills' shader, not the lines'. *Decided (Bryan, Nov 23): the first. Built with s
 **Not done:** the other layers' points (Rapid's vertices, the photo layers' markers) are sprites
 as before; a layer has to give its points a batch.
 
-**Tests:** `PointBatch.test.js`; a point with sprites and a point in a batch in
+**Tests:** `PointBatchMesh.test.js`; a point with sprites and a point in a batch in
 `PixiFeaturePoint.test.js` (its pictures, the levels of detail, a zoom that writes nothing, a
 move, an icon that arrives, a glow, the hit test at four zooms and rotations, the label box, the
 halo); the layer's batch and the place of a point in `PixiLayerOsm.test.js`; point labels from
@@ -3197,7 +3275,7 @@ one every 35 or 30 pixels, all made again at every zoom, in the line's own conta
 kept the line in the scene. Now:
 
 - **A line's markers are a strip in the strokes' batch** of its level
-  (`LineBatch.addMarkers()`): a copy of the line's stroke mesh, without caps, as wide as the
+  (`LineBatchMesh.addMarkers()`): a copy of the line's stroke mesh, without caps, as wide as the
   markers need (7 pixels for arrows, 21 for sided markers, at every zoom), ordered after every
   stroke of the level. No draw call is added.
 - **The fragment shader draws the markers in the strip.** It has the distance along the line
@@ -3261,7 +3339,7 @@ without outlines; in brackets, the build before this step.)
   1 for the points, 1 for the labels. Staten Island is 13 of 279, Užice 22 of 672. No line,
   area or point of the OSM layer is in Pixi's scene unless it's hovered, highlighted, or a
   vertex of what's selected.
-- **Pixi's DRAW pass is 0.2 to 0.3 ms on a frame where nothing changed,** from 0.95 to 1.75
+- **Pixi's DRAW phase is 0.2 to 0.3 ms on a frame where nothing changed,** from 0.95 to 1.75
   with a display object for each feature. It has 36 to 40 render groups to walk where it had
   246 to 580.
 - **GPU time didn't move** on the M4, with the strips' triangles (38,000 in Užice) and their
@@ -3278,7 +3356,7 @@ without outlines; in brackets, the build before this step.)
 **Seen on the way:**
 
 - **A batch whose things come and go kept getting larger buffers.** When its buffers were
-  full, a `VertexBatch` packed itself in place only if what was in use fit in half of them,
+  full, a `BatchMesh` packed itself in place only if what was in use fit in half of them,
   and otherwise took buffers half as large again. With outlines that come and go at every zoom
   across 20 pixels, Užice's outlines batch had room for 861,000 vertices after two zooms in
   and out, with 285,000 in use (48 MB where 16 are needed), and was still growing. It packs in
@@ -3288,7 +3366,7 @@ without outlines; in brackets, the build before this step.)
   shader has a shape for and one that it hasn't: in the batch and as a sprite. Found by the
   pixel comparison's first run, which is why that's a test now.
 
-**Tests:** markers in `LineBatch.test.js` (the strip, the bytes, the sides, another line,
+**Tests:** markers in `LineBatchMesh.test.js` (the strip, the bytes, the sides, another line,
 hiding) and `PixiFeatureLine.test.js` (the strip over the strokes, its own mesh, a zoom that
 changes nothing, a restyle, a glow, an image with no shape, sprites without batches, a way
 that runs backward); `OsmWay.isOneWayBackward()`; a small area's fill alone, and a tinted
@@ -3320,7 +3398,7 @@ Until now a glow was a `GlowFilter` on a feature's container, so a hovered line 
 its batch and drew itself in the scene, with sprites for its arrows, and a hovered area drew
 its outlines there. A halo was a `LineMesh` for each ring, with a dash texture. Now:
 
-- **A line's glow is a strip along it** (`LineBatch.addGlow()`): the line's stroke mesh with
+- **A line's glow is a strip along it** (`LineBatchMesh.addGlow()`): the line's stroke mesh with
   round ends and corners, as wide as the line and 12 pixels more on each side. The fragment
   shader fades it from the line's edge outward, and draws nothing over the line itself. For
   that it needs the distance from the line at every pixel, so each vertex has where it is from
@@ -3334,7 +3412,7 @@ its outlines there. A halo was a `LineMesh` for each ring, with a dash texture. 
   symbol atlas), behind the middle of the marker, twice its size and at least 30 pixels. A
   point that draws itself (a vertex above everything, a midpoint, another layer's marker) has
   it as a sprite, and no filter either.
-- **Glows are in small batches of their own** (`LineBatch.glows`, `PointBatch.glows`): one
+- **Glows are in small batches of their own** (`LineBatchMesh.glows`, `PointBatchMesh.glows`): one
   after each level's strokes, one after the areas' outlines, one under the points. The first
   version put a glow in the batch of what it's around, and a hover in Užice took 11 ms of
   DRAW: a batch that gets or loses a thing builds its index buffer again, for a town's roads.
@@ -3349,20 +3427,20 @@ its outlines there. A halo was a `LineMesh` for each ring, with a dash texture. 
   in the batch. `GlowFilter` is left for the lines and areas of layers without batches.
 
 **The clock.** Two numbers move everything, and they're uniforms that every batch shares
-(`LineBatch.setTime()`, `PointBatch.setTime()`): how bright a glow is (it breathes: down to
+(`LineBatchMesh.setTime()`, `PointBatchMesh.setTime()`): how bright a glow is (it breathes: down to
 55% and back in 1.6 seconds) and how far the dashes have marched (20 pixels a second).
 `PixiScene.animate(now)` sets them before each frame is drawn, and the opacity of the sprites
 that pulse. Nothing in a batch is written, and no feature is drawn again. (The view's uniforms
 moved to the scene too, `setBatchViews()`: the halo batch isn't the OSM layer's.)
 
-**Animation frames.** Rapid has drawn a frame only when something changed. While something
+**Animation draws.** Rapid has drawn a frame only when something changed. While something
 is hovered, highlighted or selected (`PixiScene.animated`), `GraphicsSystem` now draws the
 scene again as it is, with the clock further on (`_drawAnimation()`): no APP, no frame in the
 stats, no `draw` event. `AnimationPacer` says when:
 
 - **20 a second** on a screen that shows 60: every third tick, and none while other frames
   are drawn that often (they move the clock too).
-- **A third of the ticks at most.** After an animation frame the next waits two and a half
+- **A third of the ticks at most.** After an animation draw the next waits two and a half
   times as long as the browser took to come back, up to half a second. Where the GPU needs
   longer than a tick for a frame, the animation slows down instead of taking all of its time.
 - **It rests** after 30 seconds in which nothing else was drawn, with one last frame that
@@ -3370,13 +3448,13 @@ stats, no `draw` event. `AnimationPacer` says when:
   left open with something selected doesn't keep the GPU busy.
 - **Not at all with `prefers-reduced-motion`:** the glow and the halo are there, and still.
 
-An animation frame costs what any DRAW costs, because Pixi draws the whole scene:
+An animation draw costs what any DRAW costs, because Pixi draws the whole scene:
 
 | | Seattle (z17.5) | Užice (z16) |
 |---|---|---|
 | DRAW, on the CPU | 0.2 ms | 0.2 ms |
 | on the GPU (timer query) | 5.3 ms | 13.6 ms |
-| animation frames a second | 20 | 20 |
+| animation draws a second | 20 | 20 |
 | `requestAnimationFrame` a second meanwhile | 60 | 60 |
 
 So in Užice a selection keeps this machine's GPU busy a quarter of the time. That's an M4;
@@ -3415,7 +3493,7 @@ see the open questions.
 **Open:**
 - **Weak hardware.** The pacer is the guard against an animation that the GPU can't keep up
   with, and it's untested on a machine where that happens. The lasting answer is to not draw
-  the scene again: draw what's still to a texture once, and an animation frame is that
+  the scene again: draw what's still to a texture once, and an animation draw is that
   texture and what moves over it. Then the rate could be 60.
 - **The animation runs while what's selected is off screen** (`animated` looks at classes).
   It rests after 30 seconds like any other.
@@ -3428,8 +3506,8 @@ see the open questions.
   the glow; the glow's yellow on a yellow road is still weak, and its shape is all it has.
 
 **Tests:** the glow, its distance vector, a line that marches and the clock in
-`LineBatch.test.js`; pictures that pulse and from where in `PointBatch.test.js`;
-`AnimationPacer.test.js`; the frame loop's animation frames in `GraphicsSystem.test.js`;
+`LineBatchMesh.test.js`; pictures that pulse and from where in `PointBatchMesh.test.js`;
+`AnimationPacer.test.js`; the frame loop's animation draws in `GraphicsSystem.test.js`;
 `animated`, `animate()`, `setBatchViews()` and the sprites that pulse in `PixiScene.test.js`;
 `drawHalo()`, `setGlowFilter()`, the halo of any feature in `helpers.test.js` and
 `AbstractPixiFeature.test.js`; the halo batch in `PixiLayerMapUI.test.js`; glows and halos of
@@ -3484,8 +3562,8 @@ and compared by screenshot with the build before it.
    making a feature now. Skipped; a profile of a load would have to ask for it.
 8. **Polygons and points in the static tier.** A point is two or three `Container`s today, and
    a `Container` is 0.7 KB before it draws anything (section 13).
-   **Done (Nov 23):** every fill in a `FillBatch` and every outline in a `LineBatch`, and
-   every point in a `PointBatch` (above). The other layers' features are as they were.
+   **Done (Nov 23):** every fill in a `FillBatchMesh` and every outline in a `LineBatchMesh`, and
+   every point in a `PointBatchMesh` (above). The other layers' features are as they were.
 9. **Line markers in the stroke shader** (Bryan, Nov 23: after step 8). Oneway arrows and sided
    markers are a sprite every 30 or 35 pixels along a line, built again at every zoom, and they
    keep one line in ten in the scene: 103 of Seattle's 160 draw calls. The stroke's shader has
@@ -3494,7 +3572,7 @@ and compared by screenshot with the build before it.
 10. **Hovers and selections in the shaders, animated** (Bryan, Nov 23). The glow of a hover
    was a filter on a container, which kept hovered features in the scene; a halo was a mesh
    with a dash texture.
-   **Done (Nov 23):** glows and halos in batches, a clock in the shaders, and animation frames
+   **Done (Nov 23):** glows and halos in batches, a clock in the shaders, and animation draws
    (above).
 
 Steps 2 to 5 are section 7's step 6, in more detail and in a different order: strokes before

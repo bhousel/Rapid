@@ -9,7 +9,7 @@ import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
-import type { LineBatchItem } from './lib/LineBatch.ts';
+import type { LineBatchMeshItem } from './lib/LineBatchMesh.ts';
 import type { MinimalStyleProps, StyleProps } from '../lib/Style.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
@@ -79,7 +79,7 @@ export class AbstractPixiFeature {
   public labelAvoid: boolean;
 
   /** The lines of the Feature's halo, in the map UI's batch (see `_drawHalo`) */
-  protected _haloItems: LineBatchItem[];
+  protected _haloItems: LineBatchMeshItem[];
   /** The cells of the scene's avoid grid that this Feature has marked, if any */
   protected _avoidCells: CellRect | null;
   /** The generation of the avoid grid that `_avoidCells` is for */
@@ -225,7 +225,7 @@ export class AbstractPixiFeature {
    * @return The batch's items
    * @readonly
    */
-  public get haloItems(): readonly LineBatchItem[] {
+  public get haloItems(): readonly LineBatchMeshItem[] {
     return this._haloItems;
   }
 

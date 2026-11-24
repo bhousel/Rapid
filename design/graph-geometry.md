@@ -63,7 +63,7 @@ per graph without losing that.
 
 They're also slow to hit: `transient()` builds an `${id}v${v}` key string on every call (100-430 ns).
 With the key already built, the same lookup takes about 15 ns, and a Map or WeakMap keyed by the
-entity takes 5-6 ns (V8). An APP pass at z17.5 in central Paris makes about 88k of these calls.
+entity takes 5-6 ns (V8). An APP phase at z17.5 in central Paris makes about 88k of these calls.
 
 ### Keeping a version costs O(L)
 
@@ -221,7 +221,7 @@ Each answer lives with what it depends on:
   is the only writer of those fields (at rebase and schema changes). A separate base map would add a
   second lookup by ID to every read; the draft's `base.geometries` measured 2-3× today's read.
 - **Memoized answers survive new graphs.** A derived graph shares its parent's records, so it
-  inherits every memoized answer in O(1), and a commit clears only its closure. In V8, an APP pass
+  inherits every memoized answer in O(1), and a commit clears only its closure. In V8, an APP phase
   takes 48 ms today, 34 ms with memos kept on the object, 54 ms with a memo table emptied for every
   graph, and 64 ms with no memos.
 - **Geometry is never changed after it's stored.** A recompute makes a new `Geometry`, so graphs can
@@ -429,7 +429,7 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
 | Drag a vertex of a 2,010-node multipolygon, L=10k | 10 ms | 3.3 ms (the multipolygon recompute itself) |
 | A discrete edit, L=10k | 36-41 ms (22-27 ms without the session summary) | 0.25 ms, or 13 ms while the summary is O(L) |
 | A validator's scratch graph, per way, L=10k / 50k | 78-86 / 266 ms | 0.05-0.07 ms |
-| An APP pass at z17.5, central Paris (V8) | 48 ms | about 35-38 ms (estimate) |
+| An APP phase at z17.5, central Paris (V8) | 48 ms | about 35-38 ms (estimate) |
 | A tile merge with a 300-edit history | 119-136 ms | about 32-36 ms (estimate, synthetic tile without relations) |
 | Heap after accepting 200 roads (one harness) | 861 MB | 41 MB, of which 31 MB is the entities themselves |
 
@@ -458,7 +458,7 @@ lookups. Big relations stay expensive: one recompute of the Louvre's multipolygo
 - **JOSM's model** (one mutable dataset plus a command history): Rapid reads several versions at once.
   It renders staging while validating stable, runs what-ifs inside actions, and uploads a fixed
   version. Each of those would need a snapshot, which is a version store again.
-- **No memo tables** (compute topology answers directly): about 2× an object memo in V8, so an APP pass
+- **No memo tables** (compute topology answers directly): about 2× an object memo in V8, so an APP phase
   of about 41-46 ms instead of about 35-38 (both estimates).
 
 ## Who reads geometry today
@@ -564,7 +564,7 @@ Each step ships on its own and leaves the app working, with tests that pin what 
      now. Readers move to them: validators and `ValidationSystem` first, then the index sync, actions,
      modes, rendering and UI. Rapid features (`PixiLayerRapid`, `SelectMode`,
      `UiSectionSelectionList`, `UiRapidInspector`, the dataset's index) use their dataset's graph.
-   - This fixes the memos that answer for the wrong graph, and should cut an APP pass by about a
+   - This fixes the memos that answer for the wrong graph, and should cut an APP phase by about a
      quarter (estimate).
    - **Done.** Measured in Bun: memo reads (point or vertex, `isEndpoint`, line or area) 3.4× faster
      (42k reads in 0.57 instead of 1.94 ms); a drag pointermove on a street in 70 bus routes from 4.03
@@ -746,7 +746,7 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
    - **Measured (November 2026), not built.** In Chrome, on 13,600 entities of Seattle:
      - After 150 edits spread over the view (1,150 IDs in the set), 5-7% of the reads that depend on
        a graph go unmemoized, in validation and in a redraw. Validation (470-490 ms) and a full APP
-       pass (113-119 ms) don't change measurably, even with every one of those reads unmemoized.
+       phase (113-119 ms) don't change measurably, even with every one of those reads unmemoized.
      - But a drag frame asks about 22,500 point-or-vertex answers, 9,500 `isEndpoint` and 8,500
        `isIntersection`: `PixiLayerOsm` classifies every visible node on every frame. Without these
        memos a drag frame goes from 5.7-6.1 to 9.4-10 ms, so they stay.
@@ -803,7 +803,7 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
        entity's box finds staging's version.
      - Merges take half the time: 10k entities over a 20k-entity history in 28-30 ms in V8 (53-58 ms
        before). The heap after 100k entities is 161 MB, not 255. A drag frame (6.8-7.0 ms), a full APP
-       pass and validation are unchanged in Chrome, and `intersects()` over 16k entities takes
+       phase and validation are unchanged in Chrome, and `intersects()` over 16k entities takes
        0.2-0.3 ms (0.1-0.2 before).
 10. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
     in place. Their layers then rebind by object, like `PixiLayerOsm`, and `touch()`, `v` and

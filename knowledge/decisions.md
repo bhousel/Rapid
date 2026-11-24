@@ -86,7 +86,7 @@ Rejected:
   casings any size. Each feature says how far it can be hit from its geometry (`hitReach`).
 
 ## The OSM layer's lines are drawn in batches, with a shader of our own (Nov 2026)
-Section 15 of `design/graphics-system.md`, step 6. A `LineBatch` is one `Mesh` whose shader places
+Section 15 of `design/graphics-system.md`, step 6. A `LineBatchMesh` is one `Mesh` whose shader places
 each vertex for the line's width in pixels at the current zoom. Choices someone might undo:
 - **Two batches for each level: every casing, then every stroke** (Bryan, Nov 23). Where roads
   meet, neither's casing crosses the other's stroke; he judged the few pixels of difference
@@ -206,7 +206,7 @@ on color alone, with frames at regular intervals). Choices someone might undo:
   what it's around, each hover had that batch's index buffer built again (11 ms in Užice).
 - **A halo is two lines,** a dark one under the yellow dashes, so that it shows on any
   background. Its dashes march; a glow breathes. Both are a uniform from the clock.
-- **20 animation frames a second, not 60,** because each one draws the whole scene. Enough for
+- **20 animation draws a second, not 60,** because each one draws the whole scene. Enough for
   dashes that move a pixel a frame.
 - **The animation gives way:** to a slow machine (it takes a third of the ticks at most, by
   how long the browser takes to come back), to idleness (it rests after 30 seconds without a
@@ -214,7 +214,7 @@ on color alone, with frames at regular intervals). Choices someone might undo:
   `AnimationPacer` and `PixiScene.animated`. Bryan didn't ask for them, and kept them when
   he saw the result (Nov 23: "wouldn't change anything about it"). The numbers are guesses.
 - **Rejected for now: drawing the still scene to a texture,** and animating over it. It would
-  make an animation frame nearly free and allow 60 a second. It's a change to how every frame
+  make an animation draw nearly free and allow 60 a second. It's a change to how every frame
   is drawn, and wants numbers from weak hardware first.
 - **`GlowFilter` stays for features that draw themselves** in layers without batches (Rapid's
   and custom data's lines and areas). Every layer's points have the new glow.
@@ -385,7 +385,7 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
   neither, and at least half of what recent frames cost** (up to 50 ms). Catching up fast matters
   more than 60 frames a second only when nothing else wants the time. And each frame pays a fixed
   cost, so where that's high, small steps take longer in all.
-- **What a feature will cost in the DRAW pass counts against the frame's budget** (fixed
+- **What a feature will cost in the DRAW phase counts against the frame's budget** (fixed
   estimates per feature, `RenderFrame.drawDebt`). Rejected: estimating it from recent frames.
   DRAW has a fixed part and a part per feature, one frame doesn't tell them apart, and a wrong
   estimate feeds back into the next frame's budget.

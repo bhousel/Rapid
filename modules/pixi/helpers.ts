@@ -4,14 +4,14 @@ import { GlowFilter } from 'pixi-filters';
 import { LineMesh } from './lib/LineMesh.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import type { LineBatch, LineBatchItem, LineBatchStyle } from './lib/LineBatch.ts';
+import type { LineBatchMesh, LineBatchMeshItem, LineBatchMeshStyle } from './lib/LineBatchMesh.ts';
 
 
 // The halo around what's selected: a yellow line 2 pixels wide, in dashes of 6 with gaps of 3
 // that march along it, over a darker line 4 pixels wide. (The dark line is there so that the
 // dashes show on any background, a yellow road as well as a black one.)
-const HALO_DASHES: LineBatchStyle = { width: 2, minWidth: 2, color: 0xffff00, alpha: 1, dash: [6, 3], marches: true };
-const HALO_UNDER: LineBatchStyle = { width: 4, minWidth: 4, color: 0x000000, alpha: 0.55, marches: true };
+const HALO_DASHES: LineBatchMeshStyle = { width: 2, minWidth: 2, color: 0xffff00, alpha: 1, dash: [6, 3], marches: true };
+const HALO_UNDER: LineBatchMeshStyle = { width: 4, minWidth: 4, color: 0x000000, alpha: 0.55, marches: true };
 
 /** The color of a hover: the glow around what the pointer is over, and the tint of an area's fill */
 export const HOVER_COLOR = 0xffff00;
@@ -175,7 +175,7 @@ export function drawRings(
 
 /**
  * Draws the halo of a selected feature: dashed yellow lines along the rings, in a batch of
- * lines whose dashes march (see `LineBatch`, and `PixiLayerMapUI.haloBatchAt`). Each ring is
+ * lines whose dashes march (see `LineBatchMesh`, and `PixiLayerMapUI.haloBatchAt`). Each ring is
  * two lines there, a dark one and the dashes over it. Call it again with the same list for
  * other rings (they're written where the old ones were if they have as many points), and with
  * no rings to take the halo away.
@@ -185,7 +185,7 @@ export function drawRings(
  * @param x - Where the rings' coordinates start, in the world
  * @param y - The same, for y
  */
-export function drawHalo(batch: LineBatch, items: LineBatchItem[], rings: ArrayLike<number>[], x: number, y: number): void {
+export function drawHalo(batch: LineBatchMesh, items: LineBatchMeshItem[], rings: ArrayLike<number>[], x: number, y: number): void {
   const dx = x - batch.position.x;
   const dy = y - batch.position.y;
 
@@ -275,7 +275,7 @@ export interface Triangles {
 
 
 /**
- * Works out the triangles that fill polygons, for a `FillBatch`. (With `earcut`, which Pixi
+ * Works out the triangles that fill polygons, for a `FillBatchMesh`. (With `earcut`, which Pixi
  * uses for its own fills and exports.) The corners are the polygons' own points, in order, so
  * the result has as many as the rings have points.
  * @param polygons - The polygons, each with its holes

@@ -2,8 +2,8 @@ import * as PIXI from 'pixi.js';
 import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
-import { PointBatch } from '../../../modules/pixi/lib/PointBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
+import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 
 
 // A point that draws itself has a marker sprite. Its icon sprite is made only when the style
@@ -49,7 +49,7 @@ describe('PixiFeaturePoint', () => {
       addPulsing: (sprite, alpha) => pulsing.set(sprite, alpha),
       removePulsing: sprite => pulsing.delete(sprite)
     };
-    haloBatch = new LineBatch();
+    haloBatch = new LineBatchMesh();
     haloBatch.position.set(8388000, 8388000);    // near the world's middle, where the point is
     scene.layers.set('map-ui', { haloBatchAt: () => haloBatch });
     const layer = new AbstractPixiLayer(scene);
@@ -537,13 +537,13 @@ describe('PixiFeaturePoint', () => {
     const STAGE = { x: 0, y: 0 };    // not looked at
 
     beforeEach(() => {
-      PointBatch.setTexture(source);
+      PointBatchMesh.setTexture(source);
       missing = new Set();
       feature.gfx.textureManager.getTexture = (atlasID, textureID) => missing.has(textureID) ? PIXI.Texture.EMPTY : (TEXTURES[textureID] ?? null);
       origin = { worldTransform: new PIXI.Matrix() };    // (Pixi works a container's out when it renders)
       feature.gfx.origin = origin;
 
-      batch = new PointBatch();
+      batch = new PointBatchMesh();
       batch.position.set(8388000, 8388000);    // near the world's middle, where the point is
       calls = [];
       ['add', 'set', 'remove', 'setOrder', 'setVisible'].forEach(method => {
@@ -557,7 +557,7 @@ describe('PixiFeaturePoint', () => {
     });
     afterEach(() => {
       if (!batch.destroyed) batch.destroy();
-      PointBatch.setTexture(null);
+      PointBatchMesh.setTexture(null);
     });
 
     it('draws its pictures there, and has no sprites and nothing in its container', () => {
@@ -849,7 +849,7 @@ describe('PixiFeaturePoint', () => {
     // points. A hover then adds nothing to the points' batch: the point's pictures are written
     // where they were, and no index buffer is built again for every point there is.
     it('has its glow in the batch that its batch has for glows, and stays as it is in its own', () => {
-      const glows = new PointBatch();
+      const glows = new PointBatchMesh();
       glows.position.set(30, -20);
       batch.glows = glows;
       const FLOATS = 6;
@@ -1136,7 +1136,7 @@ describe('PixiFeaturePoint', () => {
       drawAt(17);
       assert.strictEqual(batch.size, 1);
 
-      const other = new PointBatch();
+      const other = new PointBatchMesh();
       other.position.set(8388000, 8388000);
       feature.batch = other;
       assert.strictEqual(batch.users, 0);

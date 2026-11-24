@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
 
 
@@ -35,7 +35,7 @@ describe('PixiFeatureLine', () => {
     scene.layers.set('map-ui', {
       haloBatchAt: (x, y) => {
         if (!haloBatch) {
-          haloBatch = new LineBatch();
+          haloBatch = new LineBatchMesh();
           haloBatch.position.set(x, y);
         }
         return haloBatch;
@@ -212,7 +212,7 @@ describe('PixiFeatureLine', () => {
 
   // The line's first segment runs along x from its first point, and nothing else is near that point.
   // The casing is 5 pixels wide, and a hit is good 5 pixels around it: 7.5 pixels from the line.
-  // A layer that draws many lines gives each two `LineBatch`es, one for its casing and one for
+  // A layer that draws many lines gives each two `LineBatchMesh`es, one for its casing and one for
   // its stroke. Each is a run of vertices in its batch then, and a zoom changes nothing there.
   describe('in batches', () => {
     const style = { casing: { width: 5, color: 0x444444 }, stroke: { width: 3, color: 0xffffff } };
@@ -230,8 +230,8 @@ describe('PixiFeatureLine', () => {
     }
 
     beforeEach(() => {
-      batch = new LineBatch();
-      casingBatch = new LineBatch();
+      batch = new LineBatchMesh();
+      casingBatch = new LineBatchMesh();
       for (const each of [batch, casingBatch]) {
         each.position.set(8388608, 8388608);    // the world's middle, where the line is
       }
@@ -356,8 +356,8 @@ describe('PixiFeatureLine', () => {
 
     it('moves to other batches when the layer gives it others', () => {
       drawAt(17, style);
-      const other = new LineBatch();
-      const otherCasings = new LineBatch();
+      const other = new LineBatchMesh();
+      const otherCasings = new LineBatchMesh();
       feature.batch = other;
       feature.casingBatch = otherCasings;
       drawAt(17);
@@ -407,7 +407,7 @@ describe('PixiFeatureLine', () => {
       assert.strictEqual(casingBatch.users, 1);
       assert.strictEqual(batch.size, 0);
 
-      const other = new LineBatch();
+      const other = new LineBatchMesh();
       feature.batch = other;
       assert.strictEqual(batch.users, 0);
       assert.strictEqual(other.users, 1);
@@ -444,7 +444,7 @@ describe('PixiFeatureLine', () => {
       // A layer with many lines gives the strokes' batch a small batch for the glows: one that
       // comes or goes doesn't have the strokes' index buffer built again.
       it('has its glow in the batch that the strokes\' batch has for glows, and leaves the strokes\' batch as it is', () => {
-        const glows = new LineBatch();
+        const glows = new LineBatchMesh();
         batch.glows = glows;
         feature.container.zIndex = 4.25;
         drawAt(17, style);
@@ -666,8 +666,8 @@ describe('PixiFeatureLine', () => {
         drawAt(17, style);
         glow();
         const item = feature.glowItem;
-        const other = new LineBatch();
-        const otherCasings = new LineBatch();
+        const other = new LineBatchMesh();
+        const otherCasings = new LineBatchMesh();
         feature.batch = other;
         feature.casingBatch = otherCasings;
         drawAt(17);
@@ -907,8 +907,8 @@ describe('PixiFeatureLine', () => {
       it('go to the batch that the line was given since, though only the zoom changed', () => {
         drawAt(17, oneway);
         const item = feature.arrowItem;
-        const other = new LineBatch();
-        const otherCasings = new LineBatch();
+        const other = new LineBatchMesh();
+        const otherCasings = new LineBatchMesh();
         other.position.set(8388608, 8388608);
         otherCasings.position.set(8388608, 8388608);
 

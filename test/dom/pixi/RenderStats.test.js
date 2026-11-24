@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { findChangedRenderGroups, readInstructionStats } from '../../../modules/pixi/lib/RenderStats.ts';
 import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
 
@@ -18,7 +18,7 @@ describe('RenderStats', () => {
       const mesh = new PIXI.Mesh({
         geometry: new PIXI.MeshGeometry({ positions: new Float32Array(8), uvs: new Float32Array(8), indices: new Uint32Array(6) })
       });
-      const batch = new LineBatch();    // has room for more than it draws
+      const batch = new LineBatchMesh();    // has room for more than it draws
       batch.add(geomStrokeMesh([0, 0, 10, 0]), 0, 0, { width: 3, minWidth: 2, color: 0xffffff, alpha: 1 });
       batch.flush();
       const drawn = batch.geometry.indexCount;

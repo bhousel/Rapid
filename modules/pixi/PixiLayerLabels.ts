@@ -661,7 +661,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * Rasterize queued labels into the text atlas.
-   * Called from the scheduler's drain phase, NOT from render() — see `_scheduleRasterDrain`.
+   * Called when the scheduler drains its queues, NOT from render() — see `_scheduleRasterDrain`.
    */
   protected _drainPendingRasters(): void {
     this._rasterDrainScheduled = false;

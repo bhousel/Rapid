@@ -1,11 +1,11 @@
-import { LineBatch, LINE_GLOW, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh, LINE_GLOW, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
 
 
 // A batch draws many lines as one mesh. Each vertex is 12 floats (the point on the line, its
 // offset for a half width of 1, the distance along the line, the second place it can have, and
 // the line's width) and 8 bytes (color, opacity, dashes).
-describe('LineBatch', () => {
+describe('LineBatchMesh', () => {
   const FLOATS = 12;
   const BYTES = 8;
   const STYLE = { width: 5, minWidth: 2, color: 0x336699, alpha: 0.5 };
@@ -17,7 +17,7 @@ describe('LineBatch', () => {
 
   let batch;
   beforeEach(() => {
-    batch = new LineBatch();
+    batch = new LineBatchMesh();
   });
   afterEach(() => {
     if (!batch.destroyed) batch.destroy();
@@ -353,28 +353,28 @@ describe('LineBatch', () => {
   });
 
   it('says which dashes it can draw', () => {
-    assert.isTrue(LineBatch.canDraw(null));
-    assert.isTrue(LineBatch.canDraw(undefined));
-    assert.isTrue(LineBatch.canDraw([]));
-    assert.isTrue(LineBatch.canDraw([6, 3]));
-    assert.isTrue(LineBatch.canDraw([20, 5, 5, 5]));
-    assert.isFalse(LineBatch.canDraw([6]));
-    assert.isFalse(LineBatch.canDraw([6, 3, 2, 3, 2, 3]));
-    assert.isFalse(LineBatch.canDraw([6.5, 3]));
-    assert.isFalse(LineBatch.canDraw([300, 3]));
+    assert.isTrue(LineBatchMesh.canDraw(null));
+    assert.isTrue(LineBatchMesh.canDraw(undefined));
+    assert.isTrue(LineBatchMesh.canDraw([]));
+    assert.isTrue(LineBatchMesh.canDraw([6, 3]));
+    assert.isTrue(LineBatchMesh.canDraw([20, 5, 5, 5]));
+    assert.isFalse(LineBatchMesh.canDraw([6]));
+    assert.isFalse(LineBatchMesh.canDraw([6, 3, 2, 3, 2, 3]));
+    assert.isFalse(LineBatchMesh.canDraw([6.5, 3]));
+    assert.isFalse(LineBatchMesh.canDraw([300, 3]));
   });
 
   it('draws every batch with one shader, which gets the view\'s numbers', () => {
-    const other = new LineBatch();
+    const other = new LineBatchMesh();
     assert.strictEqual(other.shader, batch.shader);
     other.destroy();
 
-    LineBatch.setView({ pixel: 0.25, narrow: 2, wireframe: true, casing: false, markers: true });
+    LineBatchMesh.setView({ pixel: 0.25, narrow: 2, wireframe: true, casing: false, markers: true });
     const uniforms = batch.shader.resources.lineUniforms.uniforms;
     assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing, uniforms.uMarkers], [0.25, 2, 1, 0, 1]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: false });
+    LineBatchMesh.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: false });
     assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing, uniforms.uMarkers], [1, 0, 0, 1, 0]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+    LineBatchMesh.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
   });
 
   // The markers along a line (oneway arrows, the triangles of a line with sides) are a strip
@@ -513,7 +513,7 @@ describe('LineBatch', () => {
     });
 
     it('ignore the markers of another batch', () => {
-      const other = new LineBatch();
+      const other = new LineBatchMesh();
       const item = other.addMarkers(straight, 0, 0, ARROWS);
       batch.setMarkers(item, corner, 0, 0, ARROWS);
       batch.setMarkerStyle(item, { kind: 'sided', color: 0, alpha: 1 });
@@ -688,7 +688,7 @@ describe('LineBatch', () => {
     });
 
     it('ignores the glow of another batch', () => {
-      const other = new LineBatch();
+      const other = new LineBatchMesh();
       const item = other.addGlow(straight, 0, 0, GLOW);
       batch.setGlow(item, round, 0, 0, GLOW);
       batch.setGlowStyle(item, { ...GLOW, color: 0 });
@@ -730,26 +730,26 @@ describe('LineBatch', () => {
 
   it('tells every batch\'s shader what the clock says: how bright the glows are, how far the dashes have marched', () => {
     const uniforms = batch.shader.resources.lineUniforms.uniforms;
-    LineBatch.setTime({ pulse: 0.75, shift: 120.5 });
+    LineBatchMesh.setTime({ pulse: 0.75, shift: 120.5 });
     assert.deepEqual([uniforms.uGlow, uniforms.uShift], [0.75, 120.5]);
-    LineBatch.setView({ pixel: 0.5, narrow: 0, wireframe: false, casing: true, markers: true });
+    LineBatchMesh.setView({ pixel: 0.5, narrow: 0, wireframe: false, casing: true, markers: true });
     assert.deepEqual([uniforms.uGlow, uniforms.uShift, uniforms.uPixel], [0.75, 120.5, 0.5], 'the view\'s numbers are others');
-    LineBatch.setTime({ pulse: 1, shift: 0 });
+    LineBatchMesh.setTime({ pulse: 1, shift: 0 });
     assert.deepEqual([uniforms.uGlow, uniforms.uShift], [1, 0]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+    LineBatchMesh.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
   });
 
   it('has no batch for its lines\' glows until it\'s given one, and destroys the one it has with it', () => {
     assert.isNull(batch.glows);
-    const glows = new LineBatch();
+    const glows = new LineBatchMesh();
     batch.glows = glows;
     batch.destroy();
     assert.isTrue(glows.destroyed);
     assert.isNull(batch.glows);
 
     // ..unless that one is gone already, as when their container destroyed both
-    const other = new LineBatch();
-    other.glows = new LineBatch();
+    const other = new LineBatchMesh();
+    other.glows = new LineBatchMesh();
     other.glows.destroy();
     assert.doesNotThrow(() => other.destroy());
   });

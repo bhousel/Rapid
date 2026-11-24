@@ -1,13 +1,13 @@
 import * as PIXI from 'pixi.js';
-import { PointBatch } from '../../../modules/pixi/lib/PointBatch.ts';
+import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 
 
 // A batch draws many points as one mesh. A point is a few pictures (a marker, an icon,
 // viewfields), each four vertices: 6 floats (where the point is, where the corner is in pixels
 // from it, where the corner is in the texture) and 8 bytes (color, opacity, whether the
 // picture turns with the map, whether the point is shown). What a batch does with its
-// buffers is `VertexBatch`'s, which `LineBatch.test.js` covers.
-describe('PointBatch', () => {
+// buffers is `BatchMesh`'s, which `LineBatchMesh.test.js` covers.
+describe('PointBatchMesh', () => {
   const FLOATS = 6;
   const BYTES = 8;
 
@@ -23,12 +23,12 @@ describe('PointBatch', () => {
 
   let batch;
   beforeEach(() => {
-    PointBatch.setTexture(source);
-    batch = new PointBatch();
+    PointBatchMesh.setTexture(source);
+    batch = new PointBatchMesh();
   });
   afterEach(() => {
     if (!batch.destroyed) batch.destroy();
-    PointBatch.setTexture(null);
+    PointBatchMesh.setTexture(null);
   });
 
   // The corners of one of a point's pictures: [x, y] of each, in pixels from the point
@@ -54,14 +54,14 @@ describe('PointBatch', () => {
 
   it('draws only what\'s in the texture it was given', () => {
     const elsewhere = new PIXI.Texture({ source: new PIXI.TextureSource({ width: 8, height: 8 }) });
-    assert.isTrue(PointBatch.canDraw(pin));
-    assert.isTrue(PointBatch.canDraw(cafe));
-    assert.isFalse(PointBatch.canDraw(elsewhere));
-    assert.isFalse(PointBatch.canDraw(PIXI.Texture.EMPTY));
+    assert.isTrue(PointBatchMesh.canDraw(pin));
+    assert.isTrue(PointBatchMesh.canDraw(cafe));
+    assert.isFalse(PointBatchMesh.canDraw(elsewhere));
+    assert.isFalse(PointBatchMesh.canDraw(PIXI.Texture.EMPTY));
     assert.strictEqual(batch.shader.resources.uTexture, source);
 
-    PointBatch.setTexture(null);
-    assert.isFalse(PointBatch.canDraw(pin));
+    PointBatchMesh.setTexture(null);
+    assert.isFalse(PointBatchMesh.canDraw(pin));
   });
 
   it('writes four vertices for each picture, all at the point\'s place', () => {
@@ -155,28 +155,28 @@ describe('PointBatch', () => {
 
   it('has no batch for its points\' glows until it\'s given one, and destroys the one it has with it', () => {
     assert.isNull(batch.glows);
-    const glows = new PointBatch();
+    const glows = new PointBatchMesh();
     batch.glows = glows;
     batch.destroy();
     assert.isTrue(glows.destroyed);
     assert.isNull(batch.glows);
 
     // ..unless that one is gone already, as when their container destroyed both
-    const other = new PointBatch();
-    other.glows = new PointBatch();
+    const other = new PointBatchMesh();
+    other.glows = new PointBatchMesh();
     other.glows.destroy();
     assert.doesNotThrow(() => other.destroy());
   });
 
   it('tells every batch\'s shader how bright the pictures that pulse are now', () => {
-    const other = new PointBatch();
+    const other = new PointBatchMesh();
     assert.strictEqual(other.shader, batch.shader);
     other.destroy();
 
     const uniforms = batch.shader.resources.pointUniforms.uniforms;
-    PointBatch.setTime(0.6);
+    PointBatchMesh.setTime(0.6);
     assert.strictEqual(uniforms.uPulse, 0.6);
-    PointBatch.setTime(1);
+    PointBatchMesh.setTime(1);
     assert.strictEqual(uniforms.uPulse, 1);
   });
 
@@ -237,7 +237,7 @@ describe('PointBatch', () => {
   });
 
   it('ignores a point of another batch', () => {
-    const other = new PointBatch();
+    const other = new PointBatchMesh();
     const item = other.add([quad()], 1, 0, 0);
     batch.set(item, [quad(), quad()], 2, 0, 0);
     assert.strictEqual(item.count, 4);

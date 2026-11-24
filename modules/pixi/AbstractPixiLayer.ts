@@ -27,13 +27,13 @@ const MIN_WAITING_PER_FRAME = 32;
 const SORT_WAITING_MS = 100;
 
 /**
- * What drawing a feature costs later, in the frame's DRAW pass, in milliseconds. Pixi builds a
+ * What drawing a feature costs later, in the frame's DRAW phase, in milliseconds. Pixi builds a
  * shape's geometry when it first renders it, so a feature that's new or has changed costs more
  * there than one drawn again after a zoom. Measured Nov 2026 on an M4 at Staten Island: a
  * restyle of 18,500 features took 34 ms of DRAW (2 µs each), and new features 5 µs each when a
  * few hundred were made in a frame, but 30 µs each when 7,000 were (212 ms).
  * They don't need to be exact: they keep one frame from drawing thousands of features in a few
- * milliseconds of APP pass, and then spending a quarter of a second in DRAW.
+ * milliseconds of APP phase, and then spending a quarter of a second in DRAW.
  */
 const DRAW_MS_PER_REDRAW = 0.004;
 const DRAW_MS_PER_NEW = 0.01;
@@ -61,7 +61,7 @@ const DRAW_MS_PER_NEW = 0.01;
  * A layer's work for a frame is one "pass": `render()` gathers the data the frame needs, updates its
  * features and marks them seen (`retainFeature`), then `cull()` hides the features that weren't seen.
  * A layer whose `render()` calls `keepFeatures()` skips the pass on frames where only the view moved
- * (see "A CULL pass" in `design/graphics-system.md`).
+ * (see "The cull box" in `design/graphics-system.md`).
  */
 export class AbstractPixiLayer {
 
@@ -311,7 +311,7 @@ export class AbstractPixiLayer {
    * A layer that gathers its data by `frame.cullBox` calls this from `render()`, once it knows it has
    * something to draw and before it gathers anything, and returns if the answer is `true`. `cull()`
    * then leaves the features alone too. If the answer is `false`, the layer must do the whole pass.
-   * (See "A CULL pass" in `design/graphics-system.md`.)
+   * (See "The cull box" in `design/graphics-system.md`.)
    * @param frame - The frame being rendered
    * @return `true` to skip the pass, `false` to do it
    */
@@ -624,7 +624,7 @@ export class AbstractPixiLayer {
 
 
   /**
-   * Draws a dirty feature, and counts what that will cost in the frame's DRAW pass against the
+   * Draws a dirty feature, and counts what that will cost in the frame's DRAW phase against the
    * frame's time (see `RenderFrame.drawDebt`).
    * @param feature - The feature to draw
    * @param frame - The frame being rendered

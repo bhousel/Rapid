@@ -1,6 +1,6 @@
 
 /**
- * After a pass, the next one waits this many times what the pass cost (its APP and DRAW passes
+ * After a pass, the next one waits this many times what the pass cost (its APP and DRAW phases
  * together), so that passes take at most a third of the time. The rest is for input and for the
  * scheduler's background work.
  */
@@ -43,7 +43,7 @@ export const MAX_DEFERRED_GAP = 1000;
  * See "Frame pacing" in `design/graphics-system.md`.
  */
 export class FramePacer {
-  /** What the last pass cost, in milliseconds (its APP and DRAW passes together) */
+  /** What the last pass cost, in milliseconds (its APP and DRAW phases together) */
   protected _cost: number;
   /** When the last pass finished (`-Infinity` before the first) */
   protected _lastPass: number;
@@ -123,7 +123,7 @@ export class FramePacer {
   /**
    * Records that a pass finished, and works out the gap before the next one.
    * @param now - The current time (`performance.now()`)
-   * @param costMs - What the pass cost in milliseconds (its APP and DRAW passes together)
+   * @param costMs - What the pass cost in milliseconds (its APP and DRAW phases together)
    */
   public passed(now: number, costMs: number): void {
     this._cost = Math.max(0, costMs);

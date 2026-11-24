@@ -36,12 +36,21 @@ Still to do:
 are in [`design/graphics-system.md`](../design/graphics-system.md). What's left is under "Pixi rendering
 follow-ups" in `backlog.md`.
 
-**Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
-order of work, Bryan's decisions and the measurements). Done and committed: steps 1 to 6 and 8
-to 10; step 7 (a worker) was skipped as probably unnecessary (Bryan). **Bryan (Nov 23): this is
-where the branch stops; a PR is next.**
+**Active, on `graphics-vocabulary`: names and words for the renderer** (Bryan, Nov 24). The
+batch classes are `BatchMesh` (from `PIXI.Mesh`) and `LineBatchMesh`, `FillBatchMesh`,
+`PointBatchMesh`, so a subclass is named after its parent. The frame loop's words are settled
+and defined in "Words used here" in `design/graphics-system.md`: a **tick** is a
+`requestAnimationFrame` callback (`addTickCallback()`, `TickMetrics`), a **frame** is everything
+needed to draw the map once (one in flight, maybe over several ticks), **APP and DRAW are phases**,
+a **pass** is a layer's walk over its data, an **animation draw** is a DRAW with no frame
+(`gfx.animationDraws`), and a **chunk** is a few entities taken at a time (`MAKE_CHUNK`).
+"Batch" alone means ours; Pixi's is always "Pixi's batch".
+
+**Merged in PR #12 (Nov 24): a line builder of our own** (section 15 has the direction, the
+order of work, Bryan's decisions and the measurements): steps 1 to 6 and 8 to 10; step 7 (a
+worker) was skipped as probably unnecessary (Bryan).
 - The OSM layer's lines, areas and points are drawn in batches with shaders of our own
-  (`modules/pixi/lib/`: `LineBatch`, `FillBatch`, `PointBatch`), from stroke meshes and bands
+  (`modules/pixi/lib/`: `LineBatchMesh`, `FillBatchMesh`, `PointBatchMesh`), from stroke meshes and bands
   built once (`modules/geo/stroke.ts`, `band.ts`). A zoom changes nothing in a batch. The
   layer finds its features under the pointer through the spatial index. Seattle is 20 draw
   calls where it was 385.
@@ -59,7 +68,7 @@ where the branch stops; a PR is next.**
 
 Next: nothing of section 15's order of work is left. Candidates, for Bryan to pick: numbers
 from weaker hardware (the animation's pacing is untested where the GPU is slow), animation
-frames that don't draw the whole scene, the other layers' features in batches (`backlog.md`).
+draws that don't draw the whole scene, the other layers' features in batches (`backlog.md`).
 Bryan (Nov 23): fewer draw calls are a result in themselves, since the M4 we measure on hides
 their cost. `renderer=canvas` is blank since the lines became meshes, and stays that way
 (`quirks.md`).

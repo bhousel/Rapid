@@ -1,6 +1,6 @@
-import { FillBatch } from '../../../modules/pixi/lib/FillBatch.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
-import { PointBatch } from '../../../modules/pixi/lib/PointBatch.ts';
+import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
+import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 
 
 // Each batch has its shader twice: in GLSL for WebGL, and in WGSL for WebGPU. Nothing here
@@ -28,9 +28,9 @@ describe('the batches\' WGSL shaders', () => {
   }
 
   const shaders = {
-    LineBatch: () => new LineBatch(),
-    FillBatch: () => new FillBatch(),
-    PointBatch: () => new PointBatch()
+    LineBatchMesh: () => new LineBatchMesh(),
+    FillBatchMesh: () => new FillBatchMesh(),
+    PointBatchMesh: () => new PointBatchMesh()
   };
 
   for (const [name, make] of Object.entries(shaders)) {

@@ -34,26 +34,26 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `GeometryPart` is a different object then). Don't go back to `graphics.stroke()` for them:
   Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms in
   Užice allocated. See section 15 of `design/graphics-system.md`.
-  - **The OSM layer's lines are in batches** (`lib/LineBatch.ts`, a `Mesh` with our own shader):
+  - **The OSM layer's lines are in batches** (`lib/LineBatchMesh.ts`, a `Mesh` with our own shader):
     two for each level, one for every casing and one for every stroke, drawn in that order.
     The layer gives each line feature its two (`feature.casingBatch` and `feature.batch`, from
     `_lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
     its own. The shader works out widths, the narrowing below zoom 17, the casing's absence
     below 16, wireframe and dashes from five numbers the layer sets on every frame
-    (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
+    (`LineBatchMesh.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
     on the zoom out of the vertices. Don't split the batches (by road class, by tile) without
     counting the draw calls: fewer is the point, and the order of the classes is in the batch.
   - **The markers along a line are in the strokes' batch too** (`feature.arrowItem`,
     `feature.sidedItem`): oneway arrows, and the triangles on the right of a line with sides.
-    They're a strip along the line (`LineBatch.addMarkers()`), over every stroke of the level,
+    They're a strip along the line (`LineBatchMesh.addMarkers()`), over every stroke of the level,
     and the fragment shader draws the shapes in it from the distance along the line and to
-    its side. So the shapes are in the shaders (GLSL and WGSL, in `LineBatch.ts`), with their
+    its side. So the shapes are in the shaders (GLSL and WGSL, in `LineBatchMesh.ts`), with their
     spacing and the strip's width in `LINE_MARKERS`; the sprites that a line draws when it
     draws itself (`PixiTextures`' `oneway`, `twoway` and `sided`) have to look the same.
     A new kind of marker needs both. `test/e2e/rendering.test.js` compares the two by
     their pixels: run it after touching either.
-  - **The OSM layer's areas are in batches too:** every fill in a `FillBatch`
-    (`lib/FillBatch.ts`), then every outline in a `LineBatch`, in the order of their size
+  - **The OSM layer's areas are in batches too:** every fill in a `FillBatchMesh`
+    (`lib/FillBatchMesh.ts`), then every outline in a `LineBatchMesh`, in the order of their size
     (`feature.fillBatch` and `feature.strokeBatch`, from `_polygonBatch()`). A fill's triangles
     are worked out once (`triangulate()` in `helpers.ts`); a partial fill's band is triangles
     in the same batch, worked out again when the zoom changes its width. Patterns come from
@@ -63,7 +63,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     3 triangles a corner; `SMALL_SIZE`), except in wireframe mode, where the outline is all
     there is. Draw something imperfect before drawing nothing (Bryan): don't add a level of
     detail that leaves a mapped thing invisible.
-  - **The OSM layer's points are in one batch** (`lib/PointBatch.ts`): points, vertices and the
+  - **The OSM layer's points are in one batch** (`lib/PointBatchMesh.ts`): points, vertices and the
     pins of areas, from north to south, the ones with viewfields over the others. The layer
     gives each its batch and its place with `_placePoint()`. A point is a few pictures (its
     viewfields, its marker, its icon), each a rectangle of the symbol atlas, a number of pixels
@@ -77,7 +77,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
       for the batch and for sprites alike. A new picture, size or anchor goes there.
     - **Where a point is on screen is `feature.labelBox()`,** from arithmetic. Labels and the
       avoid grid use it.
-    - **A batch draws from one texture,** the symbol atlas's first (`PointBatch.setTexture()`,
+    - **A batch draws from one texture,** the symbol atlas's first (`PointBatchMesh.setTexture()`,
       from `PixiTextures.reset()`). A point with a picture from anywhere else draws itself with
       sprites, and finds that out as it's drawn: `PixiLayerOsm._drawFeature()` gives it its
       place in the scene then.
@@ -93,7 +93,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     texture, a vertex that's drawn above everything. A hover or a selection isn't a reason:
     their glow and halo are in batches too (below). Anything new that a feature draws in its
     own container has to be said there, or it's drawn nowhere.
-  - **A hover's glow is in a batch of glows** (`LineBatch.glows`, `PointBatch.glows`): a strip
+  - **A hover's glow is in a batch of glows** (`LineBatchMesh.glows`, `PointBatchMesh.glows`): a strip
     around a line or around each ring of an area (`feature.glowItem`, `glowItems`), and a
     picture behind a point (`glowItem`, or the `glow` sprite of a point that draws itself). An
     area's fill is tinted meanwhile. **A hover has to show:** if a change takes away what a
@@ -105,7 +105,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     each ring, a dark one and yellow dashes that march over it. There's no `feature.halo`
     container. A halo's rings are the outline of its feature at the distance a click reaches
     (`geomStrokeOutline()`), given in the feature's container's coordinates.
-  - **What the batches share is `VertexBatch`** (`lib/VertexBatch.ts`): the buffers, a thing
+  - **What the batches share is `BatchMesh`** (`lib/BatchMesh.ts`): the buffers, a thing
     that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
     for), the order, the origin that follows the view. A new kind of batch says what a vertex
     holds, and writes it.
@@ -120,8 +120,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   no `DashLine` anymore, and nothing of ours calls Pixi's `buildLine`. Don't use Pixi's
   `DashLineShader`: it needs `SmoothGraphics`, and a context with it is never batched.
 - **What moves by itself is moved by a shader, from the clock.** A glow breathes and a halo's
-  dashes march because of two uniforms that every batch shares (`LineBatch.setTime()`,
-  `PointBatch.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
+  dashes march because of two uniforms that every batch shares (`LineBatchMesh.setTime()`,
+  `PointBatchMesh.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
   - **Don't write to a batch, or draw a feature again, to animate something.** Give the
     shader what it needs in the vertices once, and a uniform for the moment.
   - **`PixiScene.animated` says whether frames should keep coming** (something has the
@@ -130,7 +130,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     not after 30 seconds without a change, never with `prefers-reduced-motion`. Something new
     that moves has to make `animated` true while it's shown, and has to look right standing
     still (reduced motion, the rest).
-  - **An animation frame is a whole DRAW** (13 ms of GPU in Užice on an M4), with no APP and
+  - **An animation draw is a whole DRAW** (13 ms of GPU in Užice on an M4), with no APP and
     no `draw` event. Don't raise the rate, or animate something that's always on screen,
     without measuring what that does where the GPU is weak.
   - **A sprite that should pulse with the glows** is registered with `scene.addPulsing()`,
@@ -260,9 +260,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 
 ## Frames, passes and redraw requests
 
-How a frame is made, the CULL pass, frame pacing and the frame's deadline are in
+How a frame is made, the cull box, frame pacing and the frame's deadline are in
 [`design/graphics-system.md`](../../design/graphics-system.md) (sections 1, 3, 8, 9 and 10). The
-rules that come out of it:
+words for all of it (tick, frame, APP and DRAW phase, pass, held frame, animation draw, batch,
+chunk, …) are defined in its "Words used here": use them that way. The rules that come out of it:
 
 - **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
   on to the layer's own `render…()` helpers.
@@ -328,7 +329,7 @@ rules that come out of it:
   expensive frames. With a layer's ID, only that layer is drawn at once (in a held frame, if a pass
   is waiting). For data that arrived, use `deferredRedraw()`.
 - **Don't change the frame loop's timing without measuring it.** `bun run measure` reports frames
-  a second and long animation frames while the view moves on every animation frame (`glide`), and
+  a second and long ticks while the view moves on every tick (`glide`), and
   section 9 has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
   tests; `test/e2e/rendering.test.js` checks it in a browser.
 

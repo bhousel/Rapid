@@ -19,9 +19,9 @@ import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
 import { AvoidGrid } from './lib/AvoidGrid.ts';
-import { FillBatch } from './lib/FillBatch.ts';
-import { LineBatch } from './lib/LineBatch.ts';
-import { PointBatch } from './lib/PointBatch.ts';
+import { FillBatchMesh } from './lib/FillBatchMesh.ts';
+import { LineBatchMesh } from './lib/LineBatchMesh.ts';
+import { PointBatchMesh } from './lib/PointBatchMesh.ts';
 import { featureOrder } from './helpers.ts';
 import { Extent, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
@@ -470,7 +470,7 @@ export class PixiScene extends EventEmitter {
    * should have features ready for. It is the view with `CULL_PADDING` pixels around it, and it's
    * kept (the same object) for as long as the view stays inside it at the same zoom. So while the
    * user pans around inside the padding, a layer that has made everything in the box has nothing to
-   * do (see `AbstractPixiLayer.keepFeatures` and "A CULL pass" in `design/graphics-system.md`).
+   * do (see `AbstractPixiLayer.keepFeatures` and "The cull box" in `design/graphics-system.md`).
    * `GraphicsSystem` calls this for each frame.
    * @param viewport - The map's viewport (not Pixi's, which lags behind a pan)
    * @return The cull box
@@ -779,14 +779,14 @@ export class PixiScene extends EventEmitter {
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
     const pixel = 2 ** (WORLD_ZOOM - viewZoom);
     const isWireframe = !!map?.wireframeMode;
-    LineBatch.setView({
+    LineBatchMesh.setView({
       pixel: pixel,
       narrow: (styleZoom < 16) ? 4 : (styleZoom < 17) ? 2 : 0,
       wireframe: isWireframe,
       casing: styleZoom >= 16,
       markers: styleZoom >= 16
     });
-    FillBatch.setView({ pixel: pixel, rotation: viewport.transform.rotation, wireframe: isWireframe });
+    FillBatchMesh.setView({ pixel: pixel, rotation: viewport.transform.rotation, wireframe: isWireframe });
   }
 
 
@@ -823,8 +823,8 @@ export class PixiScene extends EventEmitter {
     // A glow breathes: from its brightest down by `PULSE_DEPTH` and back, in `PULSE_SECONDS`.
     const breath = (isStill || isResting) ? 0 : (0.5 - 0.5 * Math.cos(2 * Math.PI * seconds / PULSE_SECONDS));
     const pulse = 1 - PULSE_DEPTH * breath;
-    LineBatch.setTime({ pulse: pulse, shift: (seconds * MARCH_SPEED) % MARCH_WRAP });
-    PointBatch.setTime(pulse);
+    LineBatchMesh.setTime({ pulse: pulse, shift: (seconds * MARCH_SPEED) % MARCH_WRAP });
+    PointBatchMesh.setTime(pulse);
     for (const [sprite, alpha] of this._pulsing) {
       sprite.alpha = alpha * pulse;
     }
@@ -957,7 +957,7 @@ export class PixiScene extends EventEmitter {
 
   /**
    * Mark the whole scene as `dirty`: anything about any feature may have changed (the styles, the
-   * language, how areas are filled). During the next "APP" pass, dirty features will be rebuilt.
+   * language, how areas are filled). During the next APP phase, dirty features will be rebuilt.
    * For a new zoom or rotation, use `dirtyTransform()`.
    */
   public dirtyScene(): void {
@@ -1138,7 +1138,7 @@ export class PixiScene extends EventEmitter {
 
   /**
    * Mark specific features features as `dirty`
-   * During the next "APP" pass, dirty features will be rebuilt.
+   * During the next APP phase, dirty features will be rebuilt.
    * @param featureIDs - featureIDs to flag as 'dirty'
    */
   public dirtyFeatures(featureIDs: OneOrMore<FeatureID>): void {
