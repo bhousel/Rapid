@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { findChangedRenderGroups, GLCallCounter, GLTimer, readInstructionStats } from '../pixi/lib/RenderStats.ts';
+import { AnimationPacer } from '../pixi/lib/AnimationPacer.ts';
 import { FramePacer } from '../pixi/lib/FramePacer.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
@@ -50,6 +51,9 @@ const STILL_AFTER_MS = 150;
 
 /** How many recent frames to keep stats for (see `renderFrames`) */
 const RENDER_FRAME_HISTORY = 120;
+
+/** How often Pixi's own scheduler gets a turn (ms). It looks every 30 s or so for GPU resources to free. */
+const PIXI_TICK_MS = 1000;
 
 /**
  * The layers the user turns on and off.  Which of these are shown is saved in settings (in this
@@ -175,6 +179,12 @@ export class GraphicsSystem extends AbstractSystem {
   protected _glCounter: GLCallCounter | null;
   /** Measures GPU time while detailed stats are on (WebGL 2 with the timer query extension) */
   protected _glTimer: GLTimer<RenderFrame> | null;
+  /** When Pixi's system ticker last got a turn (`performance.now()`) */
+  protected _pixiTickTime: number;
+  /** Decides when the scene is drawn again only because something in it moves by itself */
+  protected _animationPacer: AnimationPacer;
+  /** How many times the scene was drawn again only because something in it moves by itself (see `animationFrames`) */
+  protected _animationFrames: number;
 
 
   /**
@@ -238,6 +248,9 @@ export class GraphicsSystem extends AbstractSystem {
     this._appFrame = null;
     this._glCounter = null;
     this._glTimer = null;
+    this._pixiTickTime = 0;
+    this._animationPacer = new AnimationPacer();
+    this._animationFrames = 0;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -248,10 +261,15 @@ export class GraphicsSystem extends AbstractSystem {
     // Schedule an immediate redraw whenever this system is resumed.
     this.on('resumed', () => { this.immediateRedraw(); });
 
-    // Ensure Pixi's shared ticker doesn't run its own rAF loop.
+    // Ensure Pixi's tickers don't run rAF loops of their own.
     // (Rapid's `SchedulerSystem` owns the game loop instead.)
+    // The shared ticker is for things we don't use (animated sprites). The system ticker runs
+    // Pixi's own scheduler, which frees GPU resources that went unused: `_tick()` gives it a
+    // turn once a second. (It also ran Pixi's events ticker, see `_afterPixiInit()`.)
     PIXI.Ticker.shared.autoStart = false;
     PIXI.Ticker.shared.stop();
+    PIXI.Ticker.system.autoStart = false;
+    PIXI.Ticker.system.stop();
 
     Object.assign(PIXI.BitmapFontManager.defaultOptions, {
       chars: PIXI.BitmapFontManager.ASCII,
@@ -479,6 +497,17 @@ export class GraphicsSystem extends AbstractSystem {
 
     // console.log('FPS=' + (1000 / deltaMS).toFixed(1));
 
+    // Give Pixi's own scheduler its turn (see the constructor): it's what frees the GPU
+    // resources that nothing has drawn for a while, and it checks the clock itself.
+    const now = window.performance.now();
+    if (now - this._pixiTickTime >= PIXI_TICK_MS) {
+      this._pixiTickTime = now;
+      PIXI.Ticker.system.update(now);
+    }
+
+    // The tick after an animation frame says how the machine keeps up with them.
+    this._animationPacer.tick(deltaMS);
+
     // Collect any GPU times that have arrived for earlier frames.
     if (this._glTimer) {
       for (const { tag: frame, ms } of this._glTimer.poll()) {
@@ -531,6 +560,32 @@ export class GraphicsSystem extends AbstractSystem {
     if (follow) {
       this._followTransform();
     }
+
+    // Nothing to prepare and nothing to draw, but something that's shown moves by itself: draw
+    // the scene again as it is, now and then, with the clock further on. (Not while the view
+    // has moved on from what's drawn: the next frame is for that.)
+    if (!this._appPending && !this._isTempTransformed && this._animationPacer.isDue(tickStart) && this.scene?.animated) {
+      this._drawAnimation(tickStart);
+    }
+  }
+
+
+  /**
+   * Draws the scene again as the last frame left it, at a later moment: what moves by itself
+   * has moved (see `PixiScene.animate`). There's no APP pass, no frame for the stats and no
+   * `draw` event: nothing changed that anyone has to hear about. `AnimationPacer` says when:
+   * no more often than the machine keeps up with, and not for long after the last change (the
+   * last one before a rest draws what moves where it stays).
+   * @param now - The moment (`performance.now()`)
+   */
+  protected _drawAnimation(now: number): void {
+    if (!this.textureManager?.loaded || !this.pixi || !this.scene) return;
+
+    const pacer = this._animationPacer;
+    this.scene.animate(now, pacer.isResting(now));
+    this.pixi.render();
+    pacer.animated(now);
+    this._animationFrames++;
   }
 
 
@@ -575,6 +630,16 @@ export class GraphicsSystem extends AbstractSystem {
    */
   public get renderFrames(): RenderFrame[] {
     return this._renderFrames.slice();
+  }
+
+
+  /**
+   * How many times the scene was drawn again only because something in it moves by itself
+   * (the glow of a hover, the dashes around a selection). Those aren't in `renderFrames`.
+   * @return The count since the system started
+   */
+  public get animationFrames(): number {
+    return this._animationFrames;
   }
 
 
@@ -1087,6 +1152,8 @@ export class GraphicsSystem extends AbstractSystem {
     if (frame) glTimer?.begin(frame);
     const t0 = performance.now();
 
+    this.scene?.animate(t0);    // what moves by itself is where it is at this moment
+    this._animationPacer.changed(t0);
     this.pixi!.render();
 
     const drawMs = performance.now() - t0;
@@ -1226,6 +1293,8 @@ export class GraphicsSystem extends AbstractSystem {
 
     // For testing, allow user to override the renderer preference:
     // `renderer=val` should be one of: 'canvas', 'webgpu', 'webgl1', 'webgl2', 'webgl'
+    // (With 'canvas', nothing is drawn: lines and the outlines of areas are meshes (`LineMesh`),
+    // Pixi's canvas renderer has no mesh pipe, and it throws on the first frame that updates one.)
     const renderParam = urlhash?.initialHashParams.get('renderer') ?? '';
     let renderPreference: 'canvas' | 'webgl' | 'webgpu';
     let renderGLVersion: 1 | 2 = 2;
@@ -1337,6 +1406,12 @@ export class GraphicsSystem extends AbstractSystem {
     stage.addChild(origin);
     this.origin = origin;
 
+
+    // Pixi's events ticker sends a pointer move again, a few times a second, for objects that
+    // move under a pointer that's still. Only `eventMode: 'dynamic'` asks for that, and nothing
+    // of ours has it, so it was a call on every animation frame that did nothing.
+    // (Whatever is under the pointer is found on each pointer event: `PixiScene.hitTest()`.)
+    PIXI.EventsTicker.removeTickerListener();
 
     // The Pixi Application comes with its own ticker that just calls `render()`,
     // and we don't want to ever use it.  Disable it.

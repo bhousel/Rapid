@@ -22,6 +22,7 @@ export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Contain
   const graphicsContext = (renderer as PIXI.WebGLRenderer).graphicsContext;  // WebGL and WebGPU have one
   let renderGroups = 0;
   let rebuiltInstructions = 0;
+  let indices = 0;
 
   const groups: PIXI.RenderGroup[] = root.renderGroup ? [root.renderGroup] : [];
   while (groups.length) {
@@ -41,11 +42,18 @@ export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Contain
       if (pipeID === 'batch') {
         const textures = (instruction as PIXI.Batch).textures?.count ?? 0;
         batchTextures[textures] = (batchTextures[textures] ?? 0) + 1;
+        indices += (instruction as PIXI.Batch).size;
+
+      } else if (pipeID === 'mesh' && instruction instanceof PIXI.Mesh) {
+        // (What's drawn of the index buffer: a `LineBatch` has room in it for more.)
+        const geometry = instruction.geometry;
+        indices += geometry?.indexCount || (geometry?.indexBuffer?.data.length ?? 0);
 
       } else if (pipeID === 'graphics' && instruction instanceof PIXI.Graphics) {
         const context = instruction.context;
         const gpuContext = graphicsContext?.getGpuContext(context);
         const floats = gpuContext?.geometryData?.vertices?.length ?? 0;
+        indices += gpuContext?.geometryData?.indices?.length ?? 0;
         let reason: UnbatchedGraphic['reason'] = 'unknown';
         if (context.customShader) {
           reason = 'shader';
@@ -62,7 +70,8 @@ export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Contain
   }
 
   unbatched.sort((a, b) => b.floats - a.floats);
-  return { renderGroups, rebuiltGroups: rebuilt.size, rebuiltInstructions, instructions, batchTextures, unbatched };
+  const triangles = Math.round(indices / 3);
+  return { renderGroups, rebuiltGroups: rebuilt.size, rebuiltInstructions, instructions, batchTextures, triangles, unbatched };
 }
 
 

@@ -74,6 +74,11 @@ export interface DrawFrameStats {
   instructions: Record<string, number>;
   /** Drawables merged into `batch` instructions, by how many textures their batch used */
   batchTextures: Record<number, number>;
+  /**
+   * Triangles in Pixi's instruction lists: everything in a batch, and each `Graphics` and `Mesh`
+   * drawn on its own. (Also what's in a render group that's outside the view.)
+   */
+  triangles: number;
   /** The `Graphics` drawn on their own, biggest first */
   unbatched: UnbatchedGraphic[];
   /** WebGL calls made during `pixi.render()`, only while detailed stats are on */

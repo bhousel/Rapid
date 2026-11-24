@@ -169,6 +169,22 @@ export class AbstractBehavior extends EventEmitter {
 
     //console.log(`hit: ${e.target?.label}`);
 
+    // The scene has found the feature under the pointer already (`PixiEvents._observeFeature`).
+    // It may be one that Pixi's own hit test doesn't look at, so `e.target` is something else.
+    const hit: AbstractPixiFeature | null | undefined = e._feature;
+    if (hit) {
+      result.target = {
+        container: hit.container,
+        feature: hit,
+        featureID: hit.id,
+        layer: hit.layer,
+        layerID: hit.layer.id,
+        data: hit.data,
+        dataID: hit.data?.dataID ?? null
+      };
+      return result;
+    }
+
     if (!e.target) {   // `e.target` is the PIXI.Container that triggered this event.
       return result;
     }

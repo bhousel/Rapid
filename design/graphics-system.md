@@ -11,7 +11,19 @@ improve, and until now we've had no way to see it except spot checks in Spector.
 > fewer passes (section 12), less garbage (section 13) and label placement (section 14). Section 11
 > compares the branch with the `main` of the time, Rapid 2.5 and iD. Sections 4 and 5 (partial fills
 > without a mask, dashed lines) aren't built. What's left is in `knowledge/backlog.md`, "Pixi
-> rendering follow-ups". The plan is in section 7.
+> rendering follow-ups". The plan is in section 7. Section 15 is where the renderer could go from
+> here (two tiers, a line builder of our own) and the order of work. Its steps 1 to 5 are built on
+> `linebuilder_refactor`: lines, the outlines of areas, halos and the lasso are drawn from stroke
+> meshes (`modules/geo/stroke.ts`, `modules/pixi/lib/LineMesh.ts`), a line is hit by its distance
+> from the pointer, `lineToPoly()` and `DashLine` are gone, and a partial fill is a band of real
+> geometry with no stencil mask (`modules/geo/band.ts`, with Clipper2 for the offsetting). Of step
+> 6: the OSM layer finds its features under the pointer through the spatial index, and draws its
+> lines in two batches per level with a shader of our own (`modules/pixi/lib/LineBatch.ts`): every
+> casing, then every stroke. A line that its batches draw isn't in Pixi's scene. Of step 8: areas
+> are in two batches too (`FillBatch` for every fill, a `LineBatch` for every outline). Points are in
+> one (`PointBatch`), the markers along lines are drawn by the lines' shader (step 9), and a
+> hover's glow and a selection's halo are in batches whose shaders move them (step 10), with
+> frames drawn at intervals while they do.
 
 Related docs: [`scene.md`](scene.md) (the display tree, draw order, what the pointer can reach),
 [`scheduler-system.md`](scheduler-system.md) (the frame loop and its budget),
@@ -316,6 +328,9 @@ into as they go, and the scene moves it onto the frame after the layer's pass (`
 
 ## 4. Partial fills without a stencil mask
 
+*(Built Nov 23, as option B below with Clipper2: section 15, step 5. This section is the reasoning
+from before, and "the mask" is what there was.)*
+
 **Why it's a mask.** The code came from iD, which drew in SVG and cut the middle out of each area with
 a clip path. Pixi used to be unable to hit-test a line, so Rapid builds the inside band as a stroke,
 copies its triangles into a `Mesh` (`PIXI.buildContextBatches`), and uses that mesh both as the fill's
@@ -361,6 +376,7 @@ Seattle, but not in the next parking lot, so it can't settle the question. `line
 `modules/pixi/helpers.ts` is the naive version of this: it runs Pixi's `buildLine` and walks the
 triangles back into an outline, which breaks on round joins and depends on Pixi's internals. It's used
 for line hit areas, select halos, area outline hit areas, and the label layer's boxes along lines.
+(It was, until Nov 22: section 15, step 4.)
 
 One line builder of our own, producing offset outlines, would replace all of those, give us the
 partial-fill band, and later the precise buffers that conflation may want (`backlog.md`, "Conflation /
@@ -379,6 +395,9 @@ round caps and joins, by screen size instead of world units (section 2).
   until the next zoom change. Frame stats will say.
 
 ## 5. Dashed lines
+
+*(`DashLine` is gone since Nov 22: lines and outlines with section 15's step 3, halos and the
+lasso with step 4. This section is what it was.)*
 
 **Today.** `lib/DashLine.ts` has two modes. Every caller uses the default, `useTexture: true`: one
 small dash texture per pattern (cached in `PixiTextures`), repeated along each segment by a texture
@@ -533,7 +552,7 @@ Each step is measured with frame stats on the same set of places.
 6. **The line builder,** as plain geometry with unit tests (a band never leaves its area, never
    overlaps itself, holes, slivers, short segments). Then, one at a time and measured: partial-fill
    bands instead of masks; hit areas, halos and label boxes instead of `lineToPoly`; dashes as one
-   stroke per line.
+   stroke per line. Section 15 has this step in more detail, and suggests another order.
 7. **Casings and strokes in grouped batches** with Pixi's `RenderLayer` ([`scene.md`](scene.md) section 4,
    [`profiling.md`](profiling.md)), measured after the masks are gone, since the masks break batches
    today anyway.
@@ -2047,3 +2066,1499 @@ label) and against the table above, and can ship on its own.
   labels at Seattle too, where there's room for them: the number placed should not drop.
 - **Rules that apply:** `modules/pixi/AGENTS.md` (find features by `container.__feature__`,
   not by depth; destroy what's replaced; no object per feature in a loop over all of them).
+
+## 15. Where this could go
+
+Written Nov 22, after Bryan asked what we'd do differently if the renderer were started over.
+It's a direction and an order of work. **Every step of the order is built and measured**
+(the "What was built" parts below) but step 7, which was skipped. What the direction says
+beyond those steps isn't built, and none of that is measured except where another section is
+named.
+
+**The short answer: keep the frame, change the unit of work.** APP, CULL and DRAW, the scheduler,
+the deadline, and drawing only when something changed all hold up (Unreal's render thread and
+Bevy's extract step are the same stages on other threads). The part of Performer we haven't built
+is its load management: lowering the level of detail when a frame runs over. That's the filter in
+[`filter-system.md`](filter-system.md) section 6.
+
+What has dated is one JavaScript object and one Pixi object for every feature. Most of what's left
+in sections 12 and 13 is the price of those objects on the main thread: 1.7 GB alive, a collection
+of 340 to 400 ms every 15 s of zooming, Pixi's line builder making a quarter of a zoom's garbage,
+212 ms of DRAW to build 7,000 new features.
+
+### Words used here
+
+- **Builder:** plain code that turns a line's coordinates into typed arrays. No Pixi in it, so it
+  can run in a unit test or a worker.
+- **Stroke mesh:** the triangles that draw a line (a casing, a stroke, an area's outline).
+- **Outline:** the ring around a line at a distance from it, or inside an area at a distance from
+  its edge. The partial-fill band, a halo and a label's path inside an area are made from outlines.
+- **Static tier:** the features nobody is touching, which is nearly all of them.
+- **Editing tier:** the features that are selected, hovered, drawn or dragged. A handful.
+- **Range:** the part of a tile's buffers that holds one feature's vertices.
+
+### What the other map renderers do, checked (Nov 22)
+
+For years people have suggested moving iD, and then Rapid, onto Mapbox GL or MapLibre. The attempts
+failed on making geometry editable. Bryan's recollection of why was checked against the source of
+MapLibre GL JS 6.19, Mapbox GL JS 3.37, mapbox-gl-draw, Placemark, terra-draw and deck.gl's editable
+layers, and against what their authors wrote. Read, not run: every number below is quoted from an
+issue or a pull request.
+
+**How a GeoJSON source reaches the GPU** (both libraries):
+
+1. The data goes to a worker. Mapbox still sends it as a `JSON.stringify` of the whole source
+   (200 ms for 200 lines of 4,500 coordinates each, maplibre-gl-js#106). MapLibre stopped in 5.13
+   (Nov 2025) and walks and clones the objects instead, which is still in proportion to the data.
+2. The worker cuts it into tiles (geojson-vt), encodes each tile, and builds each tile's vertex
+   arrays: lines are tessellated and polygons triangulated there.
+3. The arrays are transferred back without a copy, and uploaded when the tile is next drawn.
+
+Vertices are 16-bit integers on a grid of 8,192 units that belongs to the tile. A line's width is
+applied in the vertex shader, so a zoom inside one zoom level needs no new vertices; crossing a
+whole level means new tiles from the worker. The only path that doesn't go through the worker is a
+custom layer, where the application brings its own buffers and shaders.
+
+**What a change costs:**
+
+| | The unit that's sent | What's built again |
+|---|---|---|
+| `setData()`, both libraries | The whole source | Every tile of the source in view |
+| MapLibre `updateData()` (3.0, 2022) | A whole feature | Until 5.11 every tile; until 5.20 the whole index |
+| ..since 5.20 (Mar 2026) | A whole feature | Every tile in view inside the feature's box, old and new |
+| Mapbox `updateData()` with `dynamic: true` (3.4) | Whole features | The tiles the features touch, from an index without simplification |
+| `setFeatureState()` | Nothing (main thread) | That feature's range of the paint arrays; the buffer is uploaded again |
+
+- **The smallest change is a whole feature.** Move one vertex of a forest or a river, and every tile
+  in view that its box covers is cut, encoded and tessellated again, in the worker, and shown a
+  frame or more later. That's as Bryan remembered it, for exactly the features OSM is full of.
+- **MapLibre has improved a lot for small features among many.** Moving one point among 100,000
+  took 500 to 700 ms on 5.17; on 5.20 a user reported it 20 times faster than 5.7 at zoom 10
+  (maplibre-gl-js#4364). No number is published for dragging a vertex of a large polygon; the
+  benchmarks are all points.
+- **Feature state can't change geometry,** nor dashes, patterns, caps or joins: only color, opacity,
+  width, gap width, offset and blur.
+
+**What the editors built on them do:**
+
+- **mapbox-gl-draw** keeps two sources: "hot" for the features that changed since the last frame,
+  "cold" for the rest. Each frame of a drag is a `setData()` on hot with the whole dragged feature
+  and a point for each of its vertices and midpoints. Cold is set again in full whenever a feature
+  moves between the two, which its maintainers named as the main cost (mapbox-gl-draw#329, #332).
+  Still open: under 10 frames a second while dragging on a 4K screen (#1132), and trouble with
+  lines of thousands of vertices (#1383).
+- **Placemark** does the same: the selected feature in an `ephemeral` source, its handles in
+  another, everything else in a third. deck.gl was only ever used for the vertex dots and the
+  lasso, and was removed in Aug 2026. Its `docs/performance.md` lists as the first bottleneck:
+  "Updating MapLibre GL JS with new data. Specifically: sending new values across the postMessage
+  boundary, and generating new tiles in geojson-vt." Tom MacWright also tried cutting tiles on the
+  main thread (`@placemarkio/fast-source`: "trades off smoothness for latency"; it needed a custom
+  build of the library). He didn't consider it solved: "Products end up either sacrificing some
+  data-scalability (like Placemark) or sacrificing some edibility"
+  ([2024](https://macwright.com/2024/01/09/scalable-editable-geo)).
+- **terra-draw** sets all the features of a geometry type again, once a frame.
+- **deck.gl's editable layers** build on the main thread, and a change of data builds every
+  feature's buffers again unless the application arranges otherwise.
+- **Felt** draws the base map with MapLibre and what the user edits in a layer of its own, in
+  Canvas 2D, drawn from scratch on every frame.
+
+**What that says:**
+
+- **Nobody who edits through a tiled source has made large features fast.** Everyone arrives at the
+  split between a few hot features and many cold ones. The split is right. What it's built on
+  isn't, for an editor.
+- **The GPU buffers and the worker aren't the problem.** Three things about how they're used are:
+  1. *Features are cut into tiles,* so a change has to find and redo each piece.
+  2. *The worker is the only way to the screen,* so even one small feature waits for a round trip.
+  3. *Moving a feature between cold and hot rebuilds cold,* since a source is the unit.
+- **Rapid's renderer doesn't have these three, and shouldn't acquire them.** A feature is drawn
+  whole, in one tile's container (or `large`), and what changed is drawn again in the same frame.
+  That's why editing works here. What Rapid lacks is the other half: cheap drawing for the features
+  nobody is touching.
+
+### The design this points to
+
+Two tiers and one builder. It's hot and cold with the three problems above left out.
+
+- **Features stay whole.** A tile is where a feature is kept and culled, not something it's cut
+  by. A river is one run of vertices in one tile's buffers, or in `large`.
+- **One builder, run in two places.** For the editing tier it runs on the main thread, in the frame
+  of the change, as drawing does today. For the static tier it runs where there's time: in the
+  scheduler's batches first, and in a worker if measurements ask for it. Typed arrays cross to and
+  from a worker without a copy. It's the same code, so the two tiers look the same.
+- **The static tier is a few meshes per tile,** not a display object per feature: the stroke meshes
+  of a tile's lines of one class in one pair of buffers, each feature with its range. Widths are in
+  screen pixels and applied in the vertex shader, so a zoom changes a number and builds nothing.
+  (Today a zoom draws every feature again, because widths are in world units.)
+- **The editing tier is what we have now:** a display object per feature, built again whenever it
+  changes. A drag changes the ways that share the dragged node, usually one to four.
+- **Moving a feature between tiers touches only its range.** To take it out of the static tier,
+  its range is hidden (its indices are zeroed, and that part of the buffer is uploaded). To put it
+  back, the range is written again in place if it has as many vertices as before, as after a move.
+  If it has more, it goes at the end of the tile's buffers, and the tile is packed again when
+  there's time. No tile is rebuilt because one feature was touched.
+- **Approximate while it moves, exact when it rests.** What's costly to build exactly (a partial
+  fill's band, a large area's triangles) can be drawn roughly during a drag and built properly
+  when it stops. The frame's deadline already works this way for features that are waiting.
+- **Hover and selection are drawn in the editing tier.** They're a handful of features, so they
+  don't need per-feature state in a shader.
+- **The pointer finds features through the spatial index** (`editor.waySegments()`, and the
+  distance from the pointer to a segment), since a static feature has no display object to hit.
+  That's in `backlog.md` already, and the static tier can't be built before it.
+- **Pixi stays** for what it's good at: the WebGL state, textures and the atlas, sprites, text,
+  the UI overlays, and the editing tier. A `Mesh` with our own shader is drawn on its own, which is
+  what we want for a tile's mesh: Užice's 61,000 features were 2,056 draw calls and 7 ms of GPU
+  (section 6), so draw calls aren't what to save.
+
+**Not part of it:** a rewrite in Rust (the garbage is the problem, not JavaScript's speed, and
+typed arrays fix it in either language; WebAssembly is for single hot routines such as offsetting,
+when a profile asks), WebGPU (the cost is building geometry, not drawing it), and MapLibre as the
+renderer (above).
+
+### The line builder
+
+It has two products, from one walk along the line:
+
+- **A stroke mesh that doesn't know its width.** Each vertex is a point on the centerline, a
+  direction to push it out along (longer at a miter), and its distance along the line. The
+  position on screen is `point + direction × half the width`. So one mesh serves every zoom and
+  every width. At first that sum is done on the CPU, into a `MeshGeometry` that Pixi batches: a
+  zoom rewrites the positions in place, with no new arrays. Later the same arrays go to a shader
+  that does the sum. The distance along the line is the texture coordinate for dashes
+  (section 5): one stroke per line, with joins, and patterns of four values.
+- **An outline at a distance,** as rings. A halo needs it for a selected feature, a label for its
+  path inside an area (`PixiLayerLabels`, 12 px in), and the partial-fill band for every area
+  (section 4, option B). The band is the hard one: where an area is narrow or its segments short,
+  the offset ring folds over itself and has to be cleaned up.
+
+A hit area needs neither: whether the pointer is within a distance of a line is a sum over its
+segments, with no polygon (`geomStrokeContains()`, step 4).
+
+It's plain geometry, so it goes in `modules/geo/`, with unit tests (two points, repeated points,
+a turn of 180°, a closed ring, a sliver, segments shorter than the width) and a run over seeded
+random lines, as `graph_model.test.js` does for `Graph`.
+
+### What was built (Nov 22: step 2, and step 1 outside the browser)
+
+`modules/geo/stroke.ts`, on the `linebuilder_refactor` branch. (Step 3, below, draws with it.)
+
+- **`geomStrokeMesh(coords, options)`** builds the mesh: butt, square and round caps; bevel, miter
+  and round joins; open lines and rings. It writes into scratch arrays and copies the result
+  out, so a line costs three typed arrays and nothing else. The mesh says how it was built
+  (`cap`, `join`, `closed`), so whoever holds one can tell whether it's still the one it needs.
+- **`geomStrokePositions(mesh, halfWidth, out)`** and **`geomStrokeUVs(mesh, halfWidth, perUnit,
+  out)`** work out where the vertices are, and their texture coordinates, for a width. Both write
+  into an array they're given.
+- **A vertex is 7 numbers:** its point on the line, its direction away from it, the distance along
+  the line and how much further along the vertex is (so a dash pattern runs straight along each
+  edge of a segment, and isn't sheared at a corner), and its side.
+- **A round join or cap is 10 slices for a half circle,** in proportion to the turn (`roundSlices`).
+- **A corner that turns less than about 16° is a miter on both sides,** whatever join was asked
+  for: 2 vertices that both segments share. The difference from a round join is under 1% of the
+  half width. Traced curves are mostly such corners.
+- **The inside of a sharper corner is the one thing that depends on the width.** While the line
+  is narrow enough, both segments end where their inside edges cross, and nothing is covered
+  twice. When that crossing would be past the end of the shorter segment (Pixi's rule too), each
+  segment keeps its square end and they overlap. The triangles are the same in both cases: three
+  vertices have a second place to be, and the half width from which to use it (`fallbacks`).
+  A shader can make the same choice with a `step()`.
+- **A miter is two vertices on each side** (added with step 3): the segments run on to the tip
+  outside and to the inside miter inside, as Pixi's do. Two and not one, because each segment
+  counts its own distance to get there, for dashes. One triangle fills what opens when the inside
+  vertices move back. It was six vertices at first, half again what Pixi makes for a building.
+
+**Tests** (`test/unit/geo/stroke.test.js`): the cases by hand, and three checks over seeded random
+lines, 200 by default (`STROKE_SEEDS=5000` passes too). They test against the definition, not
+against Pixi: a round stroke covers every point within half a width of the line, nothing further
+away, and on a line that doesn't come near itself, every point once. Ten deliberate mistakes in the
+builder were each caught.
+
+**Against Pixi's `buildLine`,** in Bun, on every way of the three tapes (lines, and the outlines
+of areas), each as one stroke 5 px wide. Median of 5 runs. This is the line builder alone, not
+the rest of what Pixi does to draw a `Graphics`.
+
+Round caps and joins (the style defaults):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Ways, and their nodes | 5,700, 35,844 | 20,491, 169,706 | 50,252, 415,059 |
+| Pixi at z14: vertices a node, ms | 45.9, 16 | 33.7, 50 | 37.2, 143 |
+| ..z16 | 25.8, 10 | 19.9, 33 | 21.7, 95 |
+| ..z18 | 15.7, 7 | 13.0, 25 | 14.0, 69 |
+| ..z20 | 10.7, 6 | 9.6, 18 | 10.1, 53 |
+| `geomStrokeMesh`, once for every zoom | 7.1, 4 | 6.2, 15 | 6.3, 35 |
+| ..positions for a new zoom, ms | 0.4 | 2 | 6 |
+| ..the meshes | 10 MB | 42 MB | 101 MB |
+
+- **Pixi makes 20 to 26 vertices for each node at z16, and 34 to 46 at z14,** and makes them again
+  at every zoom. The mesh has 6 or 7, once: a zoom in Užice is 6 ms of sums where it was 95 ms of
+  building, and no new arrays.
+- **It's the round joins and caps.** With butt caps and miter joins Pixi makes 2.9 to 4.2 vertices
+  a node at z16 and the mesh 2.8 to 3.0, in about the same time.
+- **Most inside corners overlap at z16 and below, at this width:** 46% in Seattle, 75% at Staten
+  Island, 67% in Užice (10%, 7% and 37% at z18). OSM's corners have short segments: a turn of 90° in
+  a line 5 px wide needs 2.5 world units of each, about 4 m. It only shows on a translucent line,
+  and Pixi's rule gives the same.
+- What Pixi built in the app (which features, at which widths, casings included) is counted
+  below, with step 3.
+
+### What was built (Nov 22: step 3, and the rest of step 1)
+
+A line's casing and stroke, and each ring of an area's outline, is a **`LineMesh`**
+(`modules/pixi/lib/LineMesh.ts`): a Pixi `Mesh` that draws a stroke mesh at a width.
+
+- **`setStroke(strokeMesh, halfWidth, dashTexture, dashLength)` does only what changed.** A new
+  stroke mesh gets a new array of positions. A new width (every zoom, in world units) is worked
+  out in the array the mesh has, and Pixi is told that the buffer changed. Nothing is built.
+- **A feature builds a stroke mesh when its line, cap or join changes,** and not for a zoom, a
+  hover or a restyle (`PixiFeatureLine._drawPart()`). It knows the line is the same by its
+  `GeometryPart`: data is immutable, so a line that changed is another part.
+- **A casing and its stroke share one stroke mesh** when they have the same cap and join (the
+  style defaults do): one set of triangles and indices, two arrays of positions.
+- **A line that ends where it starts is built as a ring.** It gets a join there, where it had two
+  caps on top of each other, and its dashes run on around.
+- **Always batched** (`batchMode = 'batch'`, set once). A `Graphics` is batched only under 200
+  vertices, so long lines were each a draw call with a shader switch.
+- **Dashes are a texture that repeats along the line** (`PixiTextures.getDashTexture()`): one
+  repeat of the pattern, 1 texel high, 4 texels to the pixel, white where the line is. The color
+  and opacity come from the mesh. `DashLine` drew each segment as a stroke of its own with a
+  texture matrix, so a dashed line had no joins; now it has the joins its style asks for.
+- **A line that isn't dashed has no texture coordinates of its own.** They'd all be zero (one
+  texel of `Texture.WHITE`), so such lines share one array of zeros.
+- **Frame stats count triangles** (`draw.triangles`, the `tris` column of `bun run measure`):
+  everything in Pixi's instruction lists, from the sizes of its batches.
+
+**What the lines of a view are made of** (casings and strokes of the OSM layer after a load;
+Pixi's count is read from what it built for each `Graphics`):
+
+| | Seattle z17.5 | Staten Island z16.5 | Užice z16 | Užice z18 |
+|---|---|---|---|---|
+| Lines shown, and their nodes | 2,020, 7,863 | 1,837, 23,210 | 21,370, 104,835 | 6,550, 34,022 |
+| Casing vertices, before and after | 171,656 → 58,727 | 325,438 → 106,571 | 1,711,664 → 481,759 | 375,400 → 147,892 |
+| Stroke vertices | 67,136 → 32,183 | 224,056 → 95,545 | 606,574 → 464,060 | 163,618 → 133,141 |
+| ..both, for each node | 30.4 → 11.6 | 23.7 → 8.7 | 22.1 → 9.0 | 15.8 → 8.3 |
+| Lines drawn outside a batch | 48 → 0 | 490 → 0 | 1,197 → 0 | 182 → 0 |
+| Outline vertices (areas drawn in full) | 19,974 → 28,289 | 84,706 → 102,850 | 261,574 → 285,094 | 168,854 → 189,541 |
+| Outlines drawn outside a batch | 1 → 0 | 94 → 0 | 371 → 0 | 142 → 0 |
+
+Casings are where Pixi's round joins cost most. Strokes fall less, because many are dashed, and a
+dashed stroke was already butt-ended segments. Outlines (butt caps, miter joins) have about a
+tenth more vertices than Pixi's: the mesh has two vertices on each side of a corner where Pixi
+has one, for the dashes.
+
+**Sixteen zooms in Užice** (the script of section 13; one run of each build):
+
+| | `Graphics` | Lines as meshes | ..and outlines |
+|---|---|---|---|
+| Allocated | 13.3 GB | 7.2 GB | 6.6 GB |
+| ..by Pixi building lines and polygons (`buildContextBatches`) | 5.3 GB | 1.1 GB | 0.6 GB |
+| Frames over 120 ms | 5, up to 442 ms | 7, up to 145 ms | 4, up to 130 ms |
+| Minor collections (in sixteen more, traced) | 483, 1.8 s | 237, 0.75 s | 204, 0.62 s |
+| Major collections (the same) | 3 | 3 | 6 |
+| Heap after a load, collected | 1,628 MB | 1,470 MB | 1,469 MB |
+| ..after sixteen zooms | 1,745 MB | 1,554 MB | 1,476 MB |
+| ..after sixteen more | 1,798 MB | 1,629 MB | 1,478 MB |
+
+- **A zoom allocates half of what it did,** and the heap no longer grows over zooms: nothing is
+  replaced, so there's nothing for Pixi to keep until its collector comes around.
+- **The stop condition wasn't met.** A `Mesh` and its geometry per line hold less than the
+  `Graphics` they replace: 159 MB less after a load in Užice. What Pixi built in DRAW for every
+  `Graphics` (its vertices as arrays of numbers, 8 bytes each) is gone, and the stroke meshes and
+  positions that replace it are typed arrays, half as many vertices.
+- **The long frames that are left are the frames of a zoom itself,** 125 to 130 ms each (65 of APP
+  and 60 of DRAW), as before. In the traced run of the old build, three of the six long frames
+  had 105 to 186 ms of the collector's work in them; the four of the last build had 2 to 4 ms.
+  That build had six major collections where the others had three, none of them in a long frame,
+  and I don't know why there were more. It's one run of each, and collections don't come on a
+  schedule: the amounts allocated are the numbers to trust.
+- **A `LineMesh` is 1.9 KB before it has a line** (the `Mesh`, its geometry and three buffers;
+  71 MB for 38,000 of them in Užice). That's the cost per object that step 6 removes.
+
+**`bun run measure`** on the three tapes (`--fresh`, 9 frames a mode, boundaries hidden):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Redraw: APP, DRAW (ms) | 11.9, 2.1 → 9.2, 1.6 | 32.4, 3.0 → 24.5, 0.9 | 141.8, 6.8 → 117.2, 1.8 |
+| ..draw calls | 1,687 → 1,619 | 1,434 → 684 | 3,437 → 1,197 |
+| ..shader switches | 64 → 2 | 652 → 56 | 2,086 → 132 |
+| ..triangles | 192,939 → 156,454 | 563,141 → 444,187 | 1,819,394 → 1,484,476 |
+| A pan's frame: DRAW | 2.1 → 1.9 | 4.3 → 1.2 | 7.2 → 1.9 |
+| After a zoom: the first frame's DRAW | 21.2 → 8.3 | 5.8 → 4.3 | 7.2 → 2.5 |
+| ..until every feature is drawn again | 217 → 151 ms | 259 → 184 ms | 1,304 → 720 ms |
+
+- **DRAW is a third of what it was in the dense places.** The masks are most of what's left to
+  draw one at a time (step 5): Seattle has 1,336 mask instructions, and 1,619 draw calls.
+- **GPU time didn't clearly change:** 22 ms in Užice with either build when it's measured alone.
+- **A pan's APP in Užice is the labels layer** (5 to 9 ms in the frames after the cull box moves,
+  in both builds). It read 1.1 ms in the run before and 6.1 after, because of where the run was
+  in its queue, not because of the lines.
+
+**The heap and zoom numbers above were taken with landuse hidden** (found with step 4, below:
+a filter left on in the debug Chrome). They compare like with like, but the whole scene is 4%
+more features: step 3's build allocates 7.4 GB over sixteen zooms there, and holds 1,517 MB.
+
+**Screenshots** of Seattle, Staten Island and Užice (z16 and z18), and of a tunnel and a closed
+line at z19.5: 0.15 to 1.1% of the pixels differ from the build before. Where I looked (the
+parts that differ most), it's the dashes: they start at another phase and their ends are sharper.
+Round joins at 10 slices, translucent strokes (tunnels are drawn at 0.5) and corners look the
+same. The renderers `webgl1` and `webgpu` draw them too (one view of each).
+
+**What changed that someone might notice:**
+
+- **With `renderer=canvas`, the map is blank.** Pixi's canvas renderer has no mesh pipe, and it
+  doesn't skip a mesh: the first frame that updates one throws (`validateRenderable` of
+  `undefined`), and so does every frame after it. I reported this as "lines and outlines aren't
+  drawn" at first, from a screenshot of the last frame that had worked; step 5 found the rest.
+  The option stays as it is (Bryan, Nov 22, on the first report): it was an experiment, nobody
+  relies on it, and meshes on canvas are Pixi's to add.
+- **Dashed lines have joins and caps now,** the ones their style asks for: round joins by
+  default, and butt caps in all but a few of the dashed styles. A cap is at the end of the line,
+  not of each dash.
+- **A frame can switch shaders zero times** (the e2e test of the WebGL counters expected at least one).
+
+**Tests:** `test/dom/pixi/LineMesh.test.js`, more in `PixiFeatureLine.test.js` and
+`PixiFeaturePolygon.test.js`, and an e2e test that zooms the real app and checks that every line
+and outline is batched, kept its stroke mesh and its array, and moved.
+
+### What was built (Nov 22: step 4)
+
+**A line is hit by its distance from the pointer.** `LineHitArea` (it was `BufferHitArea`) asks
+`geomStrokeContains()`: is the point within half the line's width and 5 pixels of the line? It's
+a sum over the line's segments, done only for a point inside the line's box. There's no polygon to
+build, and a zoom changes one number, so a feature keeps its hit area and calls `set()`.
+
+- **It's round** at a line's ends and corners, where the polygon was cut square and beveled. Of
+  4,800 points on a grid, the same feature is hit at all but 10 in Seattle and 38 in Užice: a line
+  that now reaches around its corner or past its end, over what was hit there before. (Loading
+  the same build twice differs at 1 point.)
+
+**The builder's second product, an outline at a distance:** `geomStrokeOutline(coords, distance,
+{ closed, cap, join })` in `modules/geo/stroke.ts`. One ring around an open line; one outside and
+one inside a closed one, told apart by the ring's area. Each side is walked corner by corner. The
+outside of a corner gets a miter, a bevel or an arc. The inside is one point, where the edges of
+the two segments cross.
+
+- **It has no cleanup, and that's the limit of it.** Where a segment is shorter than the crossing
+  needs, the outline doubles back and leaves a loop. Where a curve is tighter than the distance,
+  or an area narrower than twice the distance, it crosses itself. That's what the code before it
+  did too (Pixi's `buildLine`, walked back into a path by `lineToPoly()`), and it's step 5's
+  first job: a partial fill's band shows every fold, a dashed halo few of them.
+- **Three rules for the inside of a corner, measured on 3,000 random lines that bend gently**
+  (steps of 1 to 5, turns of up to 34°, distances of 0.5 to 8.5):
+
+  | Rule | Lines with a loop | Loop's length, in distances (median) | |
+  |---|---|---|---|
+  | Stop at half the shorter segment | 122 | 0.55 | A notch towards the line wherever it wiggles |
+  | Two corners that share a short segment meet where their bisectors cross | 39 | 0.46 | Notches too, fewer |
+  | Go to the crossing anyway (built) | 547 | 0.07 | No notches. 90% of the loops are under 0.23 |
+
+  The first two never fold along a segment, and look worse: a notch can be as deep as the
+  distance, and a loop of 0.07 distances is half a pixel in a halo. So the count of loops isn't the
+  measure; I drew them (the pictures are in the session's scratchpad, not in the repo). The built
+  rule has one limit: a sharp corner whose segments are too short goes no further than 2
+  distances from the corner.
+
+**Drawn from it:**
+
+- **Select halos** of lines, polygons and points, and **the lasso**: `drawHalo()` and
+  `drawRings()` in `modules/pixi/helpers.ts` draw each ring as a dashed `LineMesh`, in a container
+  that keeps its meshes from one call to the next. A halo's rings are its feature's outline at
+  the distance a click reaches, with round corners and ends, as the hit area has.
+- **The path of a label inside an area** (`PixiLayerLabels.labelPolygons()`): the inside ring,
+  12 pixels in.
+
+**Gone:** `lineToPoly()` and `lineToPolygon()` (250 lines), `lib/DashLine.ts` (549 lines) and its
+texture cache. Nothing of ours calls Pixi's `buildLine` anymore.
+
+**What changed that someone might notice:**
+
+- **A halo is rounder and a little brighter.** It follows corners in arcs, not bevels, and it's
+  as opaque as its style says (0.9): `DashLine`'s texture drew it at about 0.81. Around tight
+  curves it's tangled, as before, a little less.
+- **A selected polygon that's drawn as a sprite has a halo** (around its real shape). It had one
+  only if it had been drawn in full before, at the distance of that zoom.
+- **A click a few pixels past the end of a line hits it.** A vertex is usually there, and on top.
+
+**Measured** (one run of each, except where it says):
+
+| | Step 3 | Step 4 |
+|---|---|---|
+| A hit test in Seattle, mean of 4,800 points | 0.30 ms | 0.28 ms |
+| A hit test in Užice | 8.4 ms | 7.4 ms (two runs) |
+| Užice, sixteen zooms: allocated | 7.4 GB | 7.3 GB |
+| ..heap after a load | 1,517 MB | 1,519 MB |
+| ..heap after sixteen zooms, and sixteen more | 1,523, 1,525 MB | 1,524, 1,525 MB |
+| ..minor collections | 240 (728 ms) | 247 (717 ms) |
+| `bun run measure`, Užice: redraw APP, every feature redrawn after a zoom | 117 ms, 720 ms | 120 ms, 717 ms |
+
+- **Nothing moved but the code,** which is what was expected: section 13 had already made the hit
+  shapes lazy, and halos are a handful of features. `bun run measure` draws the same scene in
+  all three places (same triangles, draw calls and masks).
+- **A hit test in Užice is 8 ms, and it's Pixi's walk** over 107,000 features. In a profile
+  (of step 3's build), 60% of the time is `EventBoundary.hitTestRecursive` itself and 12% the
+  `visible`, `renderable` and `worldTransform` getters it reads; every `contains()` together is
+  under 1%, and the rest isn't JavaScript. That's what a pointer move costs before anything is
+  drawn, and it's what the spatial index is for (step 6).
+- **Step 3's heap and zoom numbers were taken with landuse hidden.** The debug Chrome had that
+  filter on, left from an earlier session, and I didn't see it: 102,510 features where the whole
+  scene has 106,801 (892 areas drawn in full, not 1,880). All three of step 3's runs had it, so
+  its comparison stands, but its numbers (6.6 GB, 1,469 MB) aren't the whole scene's. The table
+  above is the whole scene, with step 3's build measured again beside step 4's.
+  `bun run measure` sets its own filters, so its numbers weren't affected.
+
+**Tests:** unit tests of the outline and of the distance test in `test/unit/geo/stroke.test.js`,
+with seeded lines (5,000 with `STROKE_SEEDS`): a round outline has inside it what's within the
+distance of a gentle line and nothing else; an outline of any cap and join is closed, finite and
+within reach; the distance test agrees with a plain distance. DOM tests of `LineHitArea`, of
+`drawRings()` and `drawHalo()`, and of the halos and hit areas of lines, polygons and points, and
+of a polygon's label path. Two e2e tests: a click 5 pixels beside a road selects it and draws
+its halo that far out, and a shift-drag draws the lasso and selects what's inside. Twenty ways
+of breaking the new code were each caught by a test.
+
+### What was built (Nov 23: step 5)
+
+**The trial that was asked for first: Clipper2, or code of our own.** The data is every partial
+fill in the three views: 334 in Seattle (5,776 nodes), 124 in Staten Island (20,442) and 167 in
+Užice (30,484). Shrinking each by 32 pixels, the costly part, outside the browser (Bun, the best
+of five runs, with mitered corners):
+
+| Library | Seattle | Staten Island | Užice | Gzipped | |
+|---|---|---|---|---|---|
+| `clipper2-ts` 2.0.1-19 | 6.4 ms | 46 ms | 74 ms | 18 KB | A TypeScript port that follows Clipper2. **Chosen** |
+| `clipper2-wasm` 0.4.0 | 3.3 ms | 19 ms | 29 ms | 96 KB | Needs `'wasm-unsafe-eval'` in our CSP, and starts asynchronously |
+| `clipper-lib` 6.4.2 (Clipper 1) | 7.9 ms | 49 ms | 83 ms | 26 KB | Last released in 2019 |
+| `clipper2-js` 1.2.4 | 9.5 ms | 291 ms | 243 ms | 19 KB | Another answer than the others (8,700 points where they have 1,127) |
+
+- **It's right.** For each fill, 40 random points: in the band if and only if inside the area
+  and within 32 pixels of its edge, and in no two triangles. Of 25,000 points, 4 disagree, at
+  the tolerance of an arc.
+- **Code of our own isn't worth writing.** The cleanup is a sweep over all the edges, which is
+  what Clipper is, and 18 KB buys the years of corner cases behind it. What it costs in garbage
+  is 1 to 9 MB for all the fills of a view (a zoom allocates 400 MB there).
+- **Most partial fills have no middle.** 241 of Seattle's 334, 84 of Staten Island's 124 and 140
+  of Užice's 167 are narrower than 64 pixels everywhere: the band is the whole area. Each had a
+  stencil mask all the same. And most of Clipper's time went to finding that out (12 ms for a
+  relation of 2,375 nodes): the fills that do have a middle take 12, 16 and 18 ms in all, from
+  the rings to the triangles (in V8, mitered; round corners add a third).
+- **What masks cost now is draw calls, not time.** With every area filled whole, which is the
+  most that removing masks can save, DRAW is 0.1 to 0.4 ms less and the draw calls 45 to 77%
+  fewer. Step 3 had already taken the lines out of the frame's cost.
+
+**`geomAreaBand(rings, width)`** in `modules/geo/band.ts` is the band as polygons: the area
+without its middle, where the middle is the area shrunk by the width (`inflatePaths`, cleaned up
+by Clipper). It returns `null` when there's no middle.
+
+- **The area is the outer ring minus its holes,** whichever way the rings go around and wherever
+  the holes are. A forest in Užice has a "hole" as large as its outer ring and mostly outside it;
+  taken as given, the band was the whole view.
+- **Its inside edge is round** around a corner that points into the area: the band is everything
+  within the width. I tried miter and bevel: they're 30% cheaper, and they look blocky where a
+  wood's edge wiggles.
+- **A polygon's `inradius`** (`GeometryPart`: how far its pole of inaccessibility is from its
+  edge) says whether it has a middle without asking Clipper. `polylabel` finds the pole to within
+  1 unit, once per polygon; Clipper is asked when the band is narrower than that radius plus 1.
+
+**`PixiFeaturePolygon` draws the band with its fill:** the band's polygons, each with its holes
+cut out, in the `Graphics` that drew the whole polygon before. The mask, its `Mesh`, and the
+`Graphics` it was built from are gone, and so is our call to Pixi's `buildContextBatches`.
+
+- **The band is kept** while the polygon and the width are the same (a hover or a new style
+  draws again without either changing). A zoom works it out again.
+- **A click hits the band,** as it hit the mask: Pixi's `Graphics` knows its holes.
+- **One `cut()` for all of a polygon's holes.** A second `cut()` also cuts the fill before it
+  (Pixi looks back two instructions), which a band in several pieces has.
+
+**Measured** (`bun run measure` on the tapes, step 4 → step 5, and with every area filled whole
+for comparison):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 1,619 → 385 (376) | 684 → 279 (263) | 1,197 → 672 (663) |
+| Stencil mask instructions | 1,336 → 0 | 496 → 0 | 668 → 0 |
+| Triangles | 156,454 → 132,621 | 444,207 → 345,600 | 1,484,476 → 1,333,339 |
+| Graphics outside a batch | 1 → 6 | 28 → 36 | 66 → 71 |
+| DRAW | 1.4 → 1.3 ms | 0.9 → 0.7 ms | 2.0 → 1.8 ms |
+| GPU | 6.2 → 4.9 ms | 6.2 → 6.2 ms | 23.9 → 19.7 ms |
+| Every feature redrawn after a zoom | 150 → 149 ms | 182 → 167 ms | 717 → 683 ms |
+
+- **The offsetting doesn't show in a zoom.** It replaces Pixi's stroke for the mask, and it runs
+  for a sixth to a third of the fills.
+- **Sixteen zooms in Užice** (one run, the whole scene): 7.3 → 6.9 GB allocated, of which
+  `geomAreaBand()` is 217 MB (the masks' `buildLine` was 226 MB, and is gone). The heap after a
+  load is 1,519 → 1,511 MB, and 1,525 → 1,512 MB after thirty-two zooms. (The trace of
+  collections came back empty for this run, so there's no count of those.)
+- **A hit test costs what it did** (0.27 ms in Seattle, 7.4 in Užice). The feature that's hit
+  changed at 8 of 4,800 grid points in Seattle and 11 in Užice. The ones I looked at were hits
+  on a mask's stray triangles, 35 to 51 units inside an area whose band is 11 wide, and the
+  forest above, which is hit along its edge now.
+- **The bundle** is 68 KB larger minified (5.07 → 5.14 MB), 18 KB gzipped.
+- **Screenshots:** 0.1 to 0.7% of the pixels differ from step 4, at the inside edges of bands
+  (round now, without the spikes a beveled stroke left) and at that forest.
+
+**What changed that someone might notice:**
+
+- **A band's inside edge is smooth.**
+- **An area with rings that OSM got wrong** is filled as its outer ring minus its holes.
+- **Nothing else:** an area with no middle looks as it did under its mask.
+
+**Tests:** `test/unit/geo/band.test.js` (squares, holes near the edge and in the middle, a hole
+that sticks out, and seeded random areas checked point by point against the definition: 2,000
+with `BAND_SEEDS`), the `inradius` in `GeometryPart.test.js`, partial fills in
+`PixiFeaturePolygon.test.js`, and an e2e test that no area fill mode leaves a stencil mask, a
+band that fills its middle, or an area with a middle that's filled whole. The e2e test of
+pixijs#12437 moved from the mask to a `LineMesh` (it fails with `'auto'` batching, as it should).
+Sixteen ways of breaking the new code were each caught by a test.
+
+### What was built (Nov 23: step 6, the first two parts)
+
+Step 6 is the static tier for lines. Two of its parts are built: the pointer finds the OSM
+layer's features through the spatial index, and the lines are drawn in batches with a shader of
+our own. A line still has a feature with a container, which the last part is about ("What's
+left of step 6", below).
+
+**The pointer.** Pixi's hit test asks every interactive container in the scene, on every pointer
+event. Now the OSM layer finds its own features (`PixiLayerOsm.hitTest()`), and Pixi's walk skips
+the layer's containers. How it's put together is in [`scene.md`](scene.md) section 2.
+
+- **The spatial index says which features to ask.** `editor.entitiesInBox()` for a box around
+  the pointer, and then the features of those entities (`_dataHasFeature`): a few dozen, of
+  Užice's 107,000.
+- **Each feature answers as it did to Pixi** (`AbstractPixiFeature.hitTest()`): its hit area, or
+  what it draws, by Pixi's rules for one container (`containerHit()` in `helpers.ts`). The one
+  drawn on top wins (`drawOrder()`), also against what Pixi found in the other layers. So this
+  changes how the feature is found, not which one: the same feature as Pixi's hit test over the
+  whole scene at every one of 86,400 points (a grid of 4,800 in Seattle and in Užice, in nine
+  states each: two zooms in and out, rotated, wireframe, full fill, a way selected).
+- **The box is as large as the furthest any feature can be hit from its geometry.** Each feature
+  says how far that is when it draws (`hitReach`: a line 5 pixels beyond its casing, a pin to
+  the top of its marker), and the layer keeps the largest. A fixed 48 pixels found 1,672
+  entities for a pointer in Užice at zoom 16, three quarters of them vertices that aren't
+  drawn; 16 pixels find 222, and the features there need 14.
+
+| One pointer event (hit test, ms) | Seattle z17.5 | Užice z16 | Užice z17 | Užice z18 |
+|---|---|---|---|---|
+| Pixi over the whole scene | 0.28 to 0.30 | 8.0 to 8.7 | 5.9 | 2.7 |
+| Through the index | 0.023 | 0.07 to 0.08 | 0.11 | 0.06 |
+| ..of which Pixi, over the other layers | 0.004 | 0.007 | 0.005 | 0.004 |
+
+**Lines in batches.** `LineBatch` (`modules/pixi/lib/LineBatch.ts`) is one `Mesh`, with a shader
+of our own, for the casings and strokes of many lines. The OSM layer has one for each level,
+road class and map tile of zoom 14 (`_lineBatch()`), and gives each line feature its batch. A
+line feature in a batch has no `LineMesh`: its casing and its stroke are two runs of vertices in
+the batch's buffers, copied from its stroke mesh.
+
+- **A vertex is 56 bytes:** the point on the line, how far the vertex is from it for a half
+  width of 1 (and the second place it has at an inside corner, with the half width that's from),
+  the distance along the line, and how the line is drawn: width in pixels, color, opacity,
+  dashes.
+- **The shader does the sum that `LineMesh` does on the CPU** (`point + offset × half width`),
+  from four numbers the layer sets on every frame (`LineBatch.setView()`): what a pixel is in
+  world units, how much narrower lines are at this zoom, whether casings are drawn, wireframe.
+  So a zoom changes nothing in any batch, and every line gets its new width in the same frame.
+  (Before, each line was drawn again over the frames after a zoom.)
+- **Dashes are made in the fragment shader** from the distance along the line, so a batch needs
+  no texture and one draw call serves any mix of patterns. A vertex has room for two dashes and
+  two gaps of up to 255 whole pixels, which every pattern in Rapid's styles fits; a line with
+  another gets `LineMesh`es.
+- **The order is what it was:** a line's casing, then its stroke, then the next line's. Batches
+  are drawn just below their class's containers, which still hold what a line's feature draws
+  itself (oneway arrows).
+- **A line that changes is written where it was** if it has as many vertices as before, and that
+  part of the buffer is sent to the GPU. Otherwise it goes at the end, and the batch packs
+  itself when half of it is unused.
+- **A hidden line stays where it is, with an opacity of 0 in its vertices,** which the shader
+  draws nothing for. (First it was left out of the index buffer, which had to be built again
+  for every batch at the edge of the view whenever the cull box moved: 7 ms more DRAW on those
+  frames in Užice.)
+- **The shader is written twice,** in GLSL and in WGSL. WebGL 2, WebGL 1 and WebGPU all draw it
+  (looked at in Seattle).
+
+Užice at zoom 16 has 83 batches for 21,370 lines: 36,964 casings and strokes, 945,819 vertices
+(53 MB, in buffers with room for 64 MB).
+
+**Measured** (the three places from their tapes; lines as a mesh each → in batches, in the same
+build, labels on, alternating, two runs of each):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 385 → 296 | 279 → 242 | 672 → 495 |
+| DRAW, nothing changed | 1.3, 1.3 → 1.3, 1.4 ms | 0.8, 0.8 → 0.9, 0.8 ms | 1.9, 1.7 → 1.4, 1.4 ms |
+| DRAW, a pan frame | 1.9, 1.6 → 1.6, 1.7 ms | 1.1, 1.0 → 1.4, 1.2 ms | 2.0, 1.9 → 1.9, 1.8 ms |
+| A frame that moves the cull box, APP + DRAW | 21.0, 19.3 → 16.6, 18.7 ms | 18.1, 16.9 → 16.3, 16.1 ms | 24.8, 26.1 → 24.7, 22.8 ms |
+| GPU | 4.8, 4.9 → 3.9, 5.1 ms | 6.2, 6.5 → 6.4, 6.6 ms | 17.1, 19.7 → 20.4, 19.6 ms |
+| Every feature redrawn after a zoom | 148, 149 → 134, 147 ms | 195, 183 → 202, 185 ms | 696, 711 → 683, 667 ms |
+
+- **Fewer draw calls, and little else.** A quarter fewer in Seattle and Užice, and 0.4 ms less
+  DRAW on a frame in Užice. The rest is inside what two runs differ by. Step 3 had taken the
+  lines out of a zoom's cost already (a `LineMesh` moves the vertices it has), so what batches
+  could still save was objects, not time.
+- **The heap after a load in Užice is 1,442 MB** (1,511 with step 5's build), and 1,451 after
+  thirty-two zooms (1,512). That's the 37,000 `LineMesh`es and their geometry, less the batches'
+  buffers. Sixteen zooms allocate 6.8 GB (6.9), with one major collection in 34 s.
+
+- **A drag costs what it did.** Moving a middle vertex of the line with the most nodes on each
+  of 60 frames: 0.7 ms of APP and 1.2 of DRAW in Seattle (92 nodes; 0.8 and 1.6 with meshes),
+  2.5 and 1.8 in Užice (886 nodes; 2.4 and 2.1). So there's no editing tier yet: every line is
+  in a batch, also the one being dragged.
+- **A zoom allocates about what it did:** the lines stopped making garbage in step 3. New in
+  the profile: 80 MB in Pixi's `syncShader`, which sets every uniform again for each mesh with
+  a shader of its own (its `unsafe-eval` polyfill, which our CSP needs).
+- **Lines are 1.5% of a zoom's work now.** In a profile of eight zooms in Užice, `renderLines()`
+  and everything under it is 108 ms of the 7,000 that the frames took. What's left: Pixi
+  building its render groups again (1,800 ms; one in five of the containers it walks is a
+  line's, with nothing in it now), polygons (500 ms in `renderPolygons()` and 470 in their
+  `update()`), points and vertices (400 ms in `renderVertices()` and 375 in the points'
+  `update()`), moving features to the new zoom's tile containers (670 ms), and labels (1,100
+  ms, placing them and making their textures).
+
+**What changed that someone might notice:**
+
+- **Dashes have smooth ends.** A dash's end was a quarter of a pixel of a texture; now it's one
+  pixel of the shader's own antialiasing.
+- **Two lines of one road class that overlap** (a wall along a building's edge) are drawn in
+  the order of their batch's tile and then their way's ID, at every zoom. It used to follow the
+  tiles of the view's zoom, and could change from one zoom level to the next.
+- **Every line changes width at once** at zooms 16 and 17, not over a few frames.
+- Screenshots differ from the unbatched lines in 0.3 to 2% of the pixels: those, and line edges
+  that moved by a hundredth of a pixel.
+
+**Found on the way:**
+
+- **Street names were gone.** The labels layer asked each line's container for its bounds, and
+  skipped a line under 40 pixels. A line in a batch has an empty container. It works the size
+  out from the line's points and width now. An e2e test about hovering showed it (a pin's label
+  had moved into the room).
+- **A batch could be destroyed before the line it was made for was drawn.** A feature gets its
+  batch in the pass, and may be drawn some frames later; the pass ended by removing empty
+  batches. A batch counts the features it was given to (`users`).
+- **`bun run measure` didn't say that the two runs it compared had different layers on.** Step
+  5's numbers were taken with the labels layer off (the debug Chrome's stored layers), and the
+  first run of this step with it on. `--setup` runs a snippet in the page before each place, to
+  set what's shown and to compare two ways of drawing in one build.
+
+**What was left of step 6** is the next part: lines without a place in the scene, and Bryan's
+answer about casings and strokes.
+
+**Tests:** `test/dom/pixi/LineBatch.test.js` (vertices, styles, order, hiding, a changed line in
+place and at the end, packing, growing), batches in `PixiFeatureLine.test.js` and
+`PixiLayerOsm.test.js`, the hit test in `helpers.test.js`, `PixiScene.test.js`,
+`PixiLayerOsm.test.js`, `AbstractPixiFeature.test.js` and `test/dom/behaviors/`, line labels in
+`PixiLayerLabels.test.js`, and e2e tests that both ways of finding the feature under the pointer
+agree at 1,200 points, and that a zoom changes nothing in a batch. Seventy ways of breaking the new
+code were each caught by a test.
+
+### What was built (Nov 23: step 6, the rest)
+
+**A regression first: the first two parts took the glow off a hovered line.** A hover's glow is
+a filter on the feature's container, and a line in a batch had nothing in its container. It went
+out in the commit of the first two parts (`6860f8d1d`), where the e2e test for hovering looked
+at classes and vertices, and nothing looked at the picture. It's fixed here (below), and that
+test now checks that a hovered line is drawn in its container with the filter on.
+
+**Decided (Bryan, Nov 23):**
+
+- **Every casing of a level in one pass, then every stroke.** "At the junctions it will look
+  very slightly different, but it will be like a few pixels that nobody would notice, or might
+  actually look better than what we do currently, and often covered up by a vertex marker."
+- **Draw calls count, whatever this machine's timings say.** The measurements are from an M4,
+  which hides what a draw call costs. "Many of our users will be on worse hardware (maybe even
+  mobile devices), and every reduction in draw calls makes Rapid perform better for them."
+  Numbers from other devices are on the backlog, and don't block this.
+
+**Two batches for each level.** One `LineBatch` for every casing of the level, and one for
+every stroke, drawn in that order (`PixiLayerOsm._lineBatch()`). In each, the lines are in the
+order of their road class and then their way's ID, as the classes' containers were.
+
+- **Roads join without a casing between them:** neither's casing crosses the other's stroke.
+- **16 batches draw Seattle's 2,021 lines and Užice's 21,370** (8 levels each), where the first
+  two parts had 42 and 83, and a mesh for each casing and stroke before that. A batch has no
+  tile and no road class: how a line is drawn is in its vertices.
+- **A batch's place in the world follows the view.** Its vertices are 32-bit floats relative
+  to that place, which is where its first line was. When the view is so far from it that a
+  float could be off by 1/32 of a pixel at the view's zoom (260,000 pixels at zoom 16, 4,000
+  world units at zoom 22), the layer moves the place to the view's center, and the batch
+  shifts its vertices (`LineBatch.moveOrigin()`, `_moveBatchOrigins()`).
+- **The largest batch is all 18,882 lines of Užice's level 0.** Its index buffer is built again
+  when a line joins or leaves it (not when one is hidden, shown or changed). Making all of
+  Užice's 107,000 features again takes 5.1 to 5.4 s with batches and 5.2 to 5.6 with a mesh per
+  line, and building index buffers is 81 ms of it.
+
+**A line that its batches draw isn't in the scene.** Its feature still has a `Container`, for
+its position and its `zIndex`, but the container has no parent: Pixi doesn't collect it, give
+it a transform or move it to another tile's container after a zoom. The layer asks the feature
+before it draws (`drawsInContainer()`), and puts it in its road class's tile container only if
+it will draw something there:
+
+- **A hovered or highlighted line draws itself,** with meshes of its own under the glow's
+  filter, and hides in its batches meanwhile (a byte per vertex). This is section 15's editing
+  tier, for the one case that needs it.
+- **A line with oneway arrows or sided markers** has those sprites in its container: 296 of
+  Seattle's lines, 2,259 of Užice's.
+- **A line with dashes that a batch can't draw,** and any line of a layer that gives no batches.
+
+What that needed:
+
+- **A line's hit test has nothing of Pixi's in it** (`PixiFeatureLine.hitTest()`): the pointer's
+  place in the world, less the line's position, against its `LineHitArea`.
+- **Which feature is on top is asked of the feature** (`sceneContainer`, `sceneOrder`,
+  `featureOrder()` in `helpers.ts`): the place in the scene of what draws it, which for a line
+  is its strokes' batch, and its order in that. The pointer still gets what's drawn on top.
+- **A line's label is placed from the line's points and the world's place on screen,** not
+  through the line's container. The more important roads still get their labels first; that
+  came from the label of the line's parent container, and is the feature's `zIndex` now.
+
+**The pointer, again.** Bryan remembered a ticker in Pixi for hit testing. It's there
+(`EventsTicker`, on `Ticker.system`), it's called on every animation frame, and it does nothing
+for us: it sends a pointer move again for objects that move under a still pointer, which only
+`eventMode: 'dynamic'` asks for, and we have none. `Ticker.system` runs anyway, for Pixi's own
+scheduler. What Pixi still does for a pointer move is make its event and test the other
+layers' features: 0.01 ms of the 0.09 that a move costs in Užice, where our hit test is 0.07
+(a third of that is the points' own hit areas, still asked by Pixi's rules). Nothing there is
+worth turning off.
+
+**Measured** (the three places from their tapes; a mesh for each casing and stroke → two
+batches a level, in the same build, labels on, alternating, two runs of each):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 385 → 270 | 279 → 211 | 672 → 428 |
+| ..of them for the lines' casings and strokes | 16 | 7 | 16 |
+| Render groups | 412 → 287 | 246 → 179 | 580 → 347 |
+| DRAW, nothing changed | 1.4, 1.4 → 1.3, 1.0 ms | 0.8, 0.8 → 0.6, 0.7 ms | 1.7, 1.7 → 1.3, 1.3 ms |
+| DRAW, a pan frame | 1.5, 1.7 → 1.9, 1.5 ms | 1.3, 1.3 → 1.0, 1.0 ms | 2.3, 2.0 → 1.9, 1.6 ms |
+| A frame that moves the cull box, APP + DRAW | 18.9, 20.5 → 19.4, 18.0 ms | 17.3, 18.3 → 15.1, 16.1 ms | 28.6, 26.6 → 27.1, 25.6 ms |
+| GPU | 5.0, 4.9 → 4.9, 5.0 ms | 6.3, 6.3 → 6.7, 6.0 ms | 20.4, 19.8 → 19.1, 20.1 ms |
+| Every feature redrawn after a zoom | 145, 134 → 151, 134 ms | 183, 188 → 182, 184 ms | 765, 733 → 685, 667 ms |
+
+- **A quarter to a third fewer draw calls** than a mesh for each casing and stroke (which Pixi
+  batched where it could), and 0.2 to 0.4 ms less DRAW on a frame. The other differences are
+  inside what two runs differ by, on this machine.
+- **A drag:** moving a middle vertex of the line with the most nodes on each of 60 frames is
+  0.8 ms of APP and 1.1 of DRAW in Seattle (92 nodes; 0.8 and 1.5 with meshes), and 2.7 and 1.8
+  in Užice (886 nodes; 2.2 and 1.9): the line is written into two batches there, half a
+  millisecond more than moving the vertices of two meshes.
+- **The heap after a load in Užice is 1,447 MB** (1,511 with step 5's build), and 1,458 after
+  thirty-two zooms (1,512). Sixteen zooms allocate 6.3 GB (6.9), with three major collections
+  in 34 s (96 ms in all).
+
+**What changed that someone might notice:** the junctions, and the glow that's back.
+
+**What's left for lines:**
+
+- **Oneway arrows in the batch.** They're why one line in ten is still in the scene, and they're
+  built again at every zoom. An arrow is the same sprite every 35 pixels along a line, which
+  the stroke's shader could draw from the distance along the line.
+- **The `Container` itself** (0.7 KB a line, in the heap and nowhere else): a line needs a
+  position and an order, not a display object. `AbstractPixiFeature` assumes one.
+- **A line's `update()` still runs after a zoom,** to give its hit area the new width.
+  `renderLines()` and everything under it is 1% of a zoom's work in Užice (80 ms of the 6,850
+  that eight zooms' frames took; polygons, points, vertices, labels and Pixi's render groups
+  are the rest, as in the first part's profile).
+
+**Tests:** two batches, a glowing line, `drawsInContainer()`, `hitTest()` and where a line is
+drawn in `PixiFeatureLine.test.js`; the batches of a level, their order and their moving origin
+in `PixiLayerOsm.test.js`; `moveOrigin()` in `LineBatch.test.js`; `featureOrder()` in
+`helpers.test.js`; line labels without a container in `PixiLayerLabels.test.js`. The e2e tests:
+a hovered line glows in its own container and goes back to its batches; the scene's hit test
+finds what asking every feature would, lines that aren't in the scene among them (Pixi can't
+be asked about those anymore); casings are under strokes and lines in the order of their road
+class. Ninety-nine ways of breaking the new code were each caught by a test.
+
+### What was built (Nov 23: step 8, the first part: areas)
+
+**Decided (Bryan, Nov 23):** the casings under every stroke look better than before, and stay.
+Step 7 (a worker) is probably unnecessary. Line markers in the stroke shader are step 9, after
+this one. And Pixi's events ticker should go, small as it is, "if for no other reason than that
+it makes debugging and profiling easier if things like that don't even appear in the flame
+chart".
+
+**Pixi's tickers are off.** `GraphicsSystem` already stopped the shared ticker and the
+application's. The system ticker ran its own `requestAnimationFrame` loop for two things: Pixi's
+events ticker (which sends a pointer move again for objects that move under a still pointer: only
+`eventMode: 'dynamic'` asks for that, and nothing of ours has it), and Pixi's own scheduler, which
+looks every half minute for GPU resources to free. The events ticker's listener is removed, the
+system ticker is stopped, and `_tick()` gives it a turn once a second for the scheduler.
+
+**Where the hit test happens, since Bryan asked** (Performer did it in an ISECT pass). Ours isn't
+a pass of the frame: `PixiEvents` asks the scene for the feature under the pointer on each
+pointer event, before the behaviors hear of it (`scene.hitTest()`, 0.03 to 0.07 ms). Nothing is
+under the pointer when Pixi's own test finds only the stage, which covers the whole map and
+catches every event, and no layer's index finds a feature: that's the background, and a drag
+there moves the map. What we don't do is ask again when the scene changes under a pointer that's
+still (data arrives, a zoom ends): the hover is as of the last pointer event. That was the events
+ticker's job, for `dynamic` objects only. If it's wanted, the place is the end of a frame that
+changed what's drawn, with the last pointer position.
+
+**What polygons and points were made of** (a census, before this part):
+
+| | Seattle z17.5 | Užice z16 |
+|---|---|---|
+| Draw calls | 270 | 428 |
+| ..for areas | 112, in 102 render groups | 295, in 168 |
+| ..for lines | 119, of which 103 are oneway arrows | 72, of which 56 |
+| ..for points | 38 | 58 |
+| Areas | 684: 627 fills, 639 outlines, 55 sprites | 36,133: 1,880 fills, 1,918 outlines, 12,097 sprites |
+| Points and vertices | 5,049, as 13,937 display objects | 49,259, as 120,949 |
+
+**Areas are in two batches:** every fill in a `FillBatch`, then every outline in a `LineBatch`,
+both in the order of the areas' size, the largest first (`PixiLayerOsm._polygonBatch()`).
+An area that its batches draw has nothing in its container and isn't in the scene, like a line.
+
+- **`FillBatch`** (`modules/pixi/lib/FillBatch.ts`) is to fills what `LineBatch` is to lines: a
+  vertex is a corner of a triangle (16 bytes: where it is, its color and opacity, its pattern).
+  What the two have in common (the buffers, a thing that changes in place, hiding by opacity,
+  order, the origin that follows the view) is `VertexBatch`.
+- **A fill's triangles are worked out once** (`triangulate()` in `helpers.ts`, with the `earcut`
+  that Pixi uses and exports), for any zoom. A `Graphics` fill was triangulated again at every
+  zoom.
+- **A partial fill's band is triangles in the same batch.** Most areas have no middle and are
+  filled whole (step 5). One that has a middle gets its band, worked out again when the zoom
+  changes the band's width in world units. Nothing else in the batch is touched by a zoom.
+- **Patterns come from one texture.** A batch draws fills with any mix of patterns in one draw
+  call, so `PixiTextures` draws the 27 patterns into an atlas, each in a cell with a border of
+  the texels that wrap around to it, and the shader lays the tiles out: 32 pixels on screen at
+  every zoom, upright however the map is turned. (They're anchored to the batch now, not to
+  each area, so the patterns of neighboring areas line up.)
+- **There's no low-resolution sprite for a small area in a batch.** It was there to spare a
+  `Graphics` for an area under 20 pixels. A small area's own triangles cost a batch no more,
+  so it's drawn as it is, at any size. (Under 4 pixels it's still hidden.)
+- **Outlines are over every fill.** Before, an area's fill and outline were drawn together, the
+  largest area first, so a small area's fill covered the outline of the larger one it's in.
+  Now every outline is on top, as in iD. **This is a change in the look that Bryan hasn't
+  seen.**
+- **The order of areas is by size everywhere.** It used to be by size inside a tile's
+  container, and by tile between them; two small areas that overlapped across a tile's edge
+  could be in either order.
+- **A hovered or highlighted area draws its outlines itself,** under the glow's filter, and
+  hides them in the batch. Its fill stays in the batch, so hovering a park doesn't lift its
+  fill over what's in the park.
+- **An area's hit test has nothing of Pixi's in it** when batches draw it: within a few pixels
+  of a ring (`geomStrokeContains()`), or in its fill (`ringsContain()`, of the band's polygons
+  for a partial fill; nothing in wireframe). And its label is placed from its outer ring, not
+  its container's bounds.
+
+**Measured** (the three places from their tapes; display objects for each feature → batches,
+in the same build, labels on, alternating, two runs of each; in brackets, the build before this
+part, where only lines were in batches):
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 385 → 160 [270] | 279 → 82 [211] | 672 → 135 [428] |
+| ..of them for areas | 2 | 2 | 2 |
+| Render groups | 412 → 186 | 246 → 113 | 580 → 180 |
+| Graphics that Pixi draws outside a batch | 6 → 0 | 36 → 0 | 71 → 0 |
+| Triangles | 132,700 → 133,800 | 345,600 → 562,200 | 1,333,000 → 1,687,000 |
+| DRAW, nothing changed | 1.2, 1.7 → 0.8, 0.7 ms | 0.9, 1.0 → 0.4, 0.4 ms | 1.8, 1.7 → 0.7, 0.6 ms |
+| DRAW, a pan frame | 1.7, 2.3 → 1.1, 1.2 ms | 1.3, 1.0 → 0.7, 0.7 ms | 2.3, 2.1 → 0.8, 0.8 ms |
+| DRAW, a frame that moves the cull box | 10.1, 11.3 → 6.6, 4.8 ms | 9.5, 5.6 → 3.4, 3.1 ms | 13.9, 11.7 → 5.9, 7.8 ms |
+| DRAW, the first frame after a zoom | 7.7, 8.5 → 4.1, 4.0 ms | 4.7, 4.5 → 0.6, 0.7 ms | 1.6, 1.6 → 0.6, 0.5 ms |
+| GPU | 4.9, 4.9 → 4.9, 5.0 ms | 6.4, 6.1 → 8.0, 7.8 ms | 20.2, 19.8 → 18.4, 21.1 ms |
+| Every feature redrawn after a zoom | 134, 153 → 136, 134 ms | 183, 185 → 177, 157 ms | 732, 702 → 816, 685 ms |
+
+- **Draw calls are down by 41 to 68% from the build before,** and by 58 to 80% from a display
+  object for each feature. Pixi's DRAW pass is half of what it was or less on every kind of
+  frame: it has fewer render groups to walk and nothing to triangulate.
+- **GPU time is up 1.5 ms in Staten Island,** with 63% more triangles. Its small buildings were
+  a sprite each, two triangles; drawn as they are, with a 2 pixel outline around five corners,
+  each is about 17 (this said 45 at first: see "A lower level of detail for small areas" in the
+  next part). Užice has 26% more. On this machine that's the only cost; a weaker GPU may
+  feel triangles more, or draw calls more (Bryan expects the latter). If it's the triangles:
+  the outlines of areas under 20 pixels can be hidden, a byte per vertex, for the look of a
+  fill with no border.
+- **Sixteen zooms in Užice allocate 3.9 GB** (6.3 with the build before, 6.9 at step 5): Pixi
+  no longer triangulates every fill at every zoom. What's left of the areas there is
+  `geomAreaBand()`, 226 MB, for the ones that have a middle. The heap after a load is 1,393 MB
+  (1,447), and 1,456 after thirty-two zooms (1,458). (The trace of collections came back empty
+  for this run, so there's no count of those.)
+- **Eight zooms' frames in Užice take 6.0 to 6.4 s of work** in a profile (6.9 before), and
+  DRAW is 1.1 s of it (2.1). `renderPolygons()` is 440 ms, the vertices 410, labels 400,
+  moving features to the new zoom's tile containers 430, and the lines 1 to 4%.
+- **Making all of Užice's 107,000 features again** takes 5.5 s, as before (5.1 to 5.4).
+
+**What changed that someone might notice:**
+
+- **Outlines over fills** (above).
+- **Two ways on top of each other, both dashed** (the monorail's two tracks) show both sets of
+  dashes, out of step. That's from step 6: the upper way's casing used to hide the lower way's
+  stroke, and every casing is under every stroke now.
+- **Small areas are drawn as they are,** not as a square or a circle.
+- **Patterns line up between neighboring areas.**
+
+**Not done in this part:** points (the next part of this step), and line markers (step 9).
+
+**Tests:** `FillBatch.test.js`; `triangulate()` and `ringsContain()` in `helpers.test.js`; an
+area in batches in `PixiFeaturePolygon.test.js` (the fill and each ring, a small one, a zoom
+that changes nothing, a band, a pattern, the hit test, a glow); the layer's batches of areas in
+`PixiLayerOsm.test.js`; area labels without a container in `PixiLayerLabels.test.js`. The e2e
+tests: lines and areas are in batches that a zoom leaves alone except for bands, a partial fill
+is a band that a click in the middle misses, the index finds what asking every feature does,
+and none of Pixi's tickers runs. Fifty-nine ways of breaking the new code were each caught by a
+test.
+
+### What was built (Nov 23: step 8, the rest: points)
+
+**Decided (Bryan, Nov 23):** the changes in the look from the first part are fine ("ok (very
+minor) changes"): outlines over every fill, small areas as they are, patterns that line up, both
+sets of dashes of two ways on top of each other. A hit test when the scene changes under a
+pointer that's still isn't needed: "Our scene doesn't have animation or movement - aside from
+having new data pop in as tiles load - and I'm very ok with not hit testing against that newly
+arrived data (it might be surprising to the user anyway)." A hovered area's fill has to change
+somehow, though he didn't love the old glow: "users might complain if we take it out without
+replacing the fill hover some other way." Dashes of more than one color (meta/Rapid#1291) are
+for another time.
+
+**Points are in one batch:** the points, the vertices and the pins of areas, a `PointBatch` in
+the points' container (`PixiLayerOsm._pointBatch()`, `_placePoint()`). A point that the batch
+draws has no sprites, nothing in its container and no place in the scene, like a line and an area.
+
+- **`PointBatch`** (`modules/pixi/lib/PointBatch.ts`) is a `VertexBatch` of pictures. A point is
+  up to a few: its viewfields, its marker, its icon, in that order. A picture is four vertices
+  of 32 bytes: where the point is in the world (the same in all four), where the corner is in
+  pixels from the point, where the corner is in the texture, the tint and opacity, and two
+  flags.
+- **The shader does what a point's container did.** A container was scaled by the inverse of
+  the zoom and turned against the map's rotation, so that its sprites came out at their size
+  and upright; every point's container was set again at every zoom. The shader works out where
+  the point is on screen and adds the corner's pixels there, so a zoom or a rotation writes
+  nothing. A viewfield points somewhere on the ground: its corners are added along the map's
+  axes as they are on screen, which the shader reads from the same matrix. The batch needs no
+  numbers from the view at all.
+- **What a zoom does change is in the vertices:** below zoom 17 points are drawn at 0.8 of
+  their size, pins as circles, without viewfields, and below 16 not at all. Crossing 17 writes
+  every point again, once, where it was. (Hiding is a byte.)
+- **One texture.** Every marker, icon and viewfield is in the symbol atlas of `PixiTextures`,
+  which has only ever had one texture (8192 pixels across; 2048 without `highQuality`). The
+  batches draw from that one (`PointBatch.setTexture()`). An icon that hasn't loaded is left
+  out, and the point is written again when it arrives. A picture from any other texture makes
+  its point draw itself with sprites; nothing does today.
+- **What a point is drawn with is worked out once,** for the batch and for sprites alike
+  (`PixiFeaturePoint._layout()`): the pictures, as a sprite would be told, in a list that every
+  point uses in turn. `updateStyle()` used to set sprites as it went.
+- **North to south, everywhere.** A pin overlaps the pins above it on the map. In tiles'
+  containers that held within a tile and between rows of tiles, not between two tiles side by
+  side (1% of overlapping pairs in Užice). Points with viewfields are last, as before.
+- **A point's sprites are made when it first draws itself,** which most never do. That is: a
+  hovered or highlighted point (its glow is a filter on its container), and the vertices and
+  midpoints of what's hovered or selected, which are drawn above everything in the map UI's
+  container, where Pixi's hit test finds them first. Every point used to have a marker sprite
+  from the moment it was made.
+- **A point is hit without Pixi:** its hit area is a rectangle or a circle in pixels, and the
+  pointer's distance from the point in the world, through the world's matrix as it was last
+  drawn, is in pixels too.
+- **Labels and the avoid grid ask the point where it's drawn** (`labelBox()`), which it knows
+  from its pictures. They asked Pixi for the container's bounds.
+- **A hovered or highlighted area's fill is twice as opaque** while it is, in its batch (0.3
+  to 0.6). Its outlines glow as before.
+
+**Checked against the sprites,** in one build (`layer.useBatches`), Seattle at zoom 17.5:
+
+- **The same pixels,** with the labels off: at zoom 19, turned, 1,085 of 6.8 million pixels
+  differ, none by more than 2 levels of 255 (how a translucent viewfield's color is rounded).
+  At zoom 17.5, 1,399 differ by more than that: pins that overlap across what were tile edges,
+  which are in the other order now.
+- **The same points hit:** at each of 19,200 places on a grid, with the map turned 34°, the set
+  of points whose hit area the pointer is in is the same, for 6,011 points. Which one is on top
+  differs at 79 places, where the order of the pins does.
+- **The same boxes:** `labelBox()` and Pixi's bounds of the container agree to 1e-13 pixels for
+  all 6,011 points, turned viewfields included. (One difference, wanted: viewfields that
+  aren't drawn below zoom 17 counted in Pixi's bounds, and pushed labels away.)
+
+**Measured** (the three places from their tapes; points as sprites → points in the batch, in
+the same build, labels on, alternating, two runs of each. The sprites' side is what the build
+before drew: lines and areas in batches.)
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 160 → 123 | 82 → 52 | 135 → 78 |
+| ..of them for points | 38 → 1 | 31 → 1 | 58 → 1 |
+| Render groups | 187 → 149 | 114 → 83 | 181 → 123 |
+| DRAW, nothing changed | 0.8, 0.7 → 0.6, 0.6 ms | 0.3, 0.4 → 0.3, 0.4 ms | 0.6, 0.6 → 0.5, 0.4 ms |
+| DRAW, a pan frame | 0.9, 1.0 → 1.0, 0.9 ms | 0.7, 0.7 → 0.6, 0.7 ms | 0.9, 0.7 → 0.6, 0.7 ms |
+| DRAW, a frame that moves the cull box | 4.3, 4.9 → 1.8, 1.7 ms | 3.1, 2.8 → 1.4, 1.1 ms | 7.8, 5.2 → 1.4, 1.4 ms |
+| DRAW, the first frame after a zoom | 3.5, 3.4 → 3.9, 2.8 ms | 0.6, 0.6 → 0.6, 0.6 ms | 0.5, 0.5 → 0.4, 0.4 ms |
+| APP, the frames after a zoom | 8.3, 8.4 → 8.1, 7.1 ms | 4.5, 4.8 → 4.8, 4.9 ms | 7.1, 6.4 → 5.8, 5.5 ms |
+| GPU | 5.0, 4.0 → 4.0, 3.8 ms | 6.2, 5.8 → 5.9, 6.1 ms | 20.5, 20.1 → 18.4, 16.2 ms |
+| Every feature redrawn after a zoom | 133, 134 → 133, 116 ms | 158, 148 → 140, 167 ms | 705, 655 → 650, 650 ms |
+
+- **Draw calls are down by 23 to 42% again,** to a third, a fifth and an eighth of the 385,
+  279 and 672 that a display object for each feature made. What's left in Seattle: 103 for the oneway arrows
+  (step 9), 16 for the lines' batches, 2 for the areas', 1 for the points', 1 for the labels.
+- **The frame that moves the cull box is where DRAW fell,** to a third or less. That frame
+  shows and hides the features at the edge of what's drawn; shown or hidden sprites made Pixi
+  build their tile's instructions again, and a point in the batch is a byte in four vertices.
+- **GPU time can only be compared within a session.** The first part of this step read 7.8 and
+  8.0 ms in Staten Island with the areas in batches. All four runs here draw the same 562,000
+  triangles there and read 5.8 to 6.2 ms; an hour later the same drawing read 6.6 and 7.7. So
+  the points' batch costs the GPU nothing that shows, and what the small areas' triangles
+  cost is measured below, in one session.
+- **Sixteen zooms in Užice allocate 3.1 GB** (3.9 with the areas' part, 6.3 at step 6). A point
+  comes through `update()` after a zoom and finds nothing to do, where it used to set its
+  container's scale, its sprites and a new hit area. The heap after a load is 1,352 MB
+  (1,393), and 1,368 after thirty-two zooms (1,456): the marker sprite that every point had,
+  and what the zooms left behind. (The trace of collections came back empty again.)
+
+**Seen on the way:**
+
+- **Labels aren't placed the same on every load.** Two loads of the same build and place
+  differ in 9,000 of 6.8 million pixels in Seattle, all of it labels (which ones got room, and
+  on which side of their pin). Placement goes in the order features are drawn in, and that
+  depends on when the frames had time. It makes screenshot comparisons of labels noisy.
+- **With the labels layer off, a pan left Rapid drawing sixty frames a second for good.** The
+  layer counted what the scene noted for it (something drawn over a label, room made for one)
+  as placement that was waiting, and took none of it while it was off: 1,800 notes after one
+  pan, and another frame asked for after every frame. It's `quirks.md`'s "`gfx.pending` seemed
+  to stay true". Fixed: a layer that shows no labels forgets what it placed, once, and throws
+  the scene's notes away. (Nothing in the UI turns labels off; a script that waits for the map
+  to be idle did, and ran to its timeout.)
+- **A selected photo's marker didn't stay on top.** `PixiFeaturePoint` gave a marker with
+  viewfields a `zIndex` of 99000 when it had the `selectphoto` or `highlightphoto` class, but
+  only inside the loop that makes the viewfields' sprites, and the next redraw set it back. It's
+  set from the class now.
+
+**A lower level of detail for small areas** (Bryan, Nov 23: "Rapid is unusual, we do draw a
+_lot_ of buildings, and at low zooms it's exponential, so it is worth thinking about how to do it
+efficiently"; perhaps low-detail meshes, so that nothing changes from a mesh to a sprite, and
+the shaders stay as they are). Nothing is built; this is what was measured, with the batches
+changed from the console (`_drawBatched` patched in the page).
+
+What a small area costs now, in Staten Island at zoom 16.5 (the mall, with every parking space
+mapped): 14,095 of the 14,724 areas drawn are under 20 pixels, and 2,668 of those are
+buildings. They have 5.0 corners each. A fill is 3.0 triangles, and an outline 14.4: three for
+each corner (two for the segment, one for the join). **A small area is 17 triangles where its
+sprite was 2, and 14 of them are its outline.** (The first part of this step said "about 45":
+that was wrong.) Together they're 245,000 of the frame's 562,000 triangles.
+
+Four ways of drawing the areas under 20 pixels, two rounds in one session, alternating:
+
+| | Triangles, Staten Island | GPU: nothing changed, a pan, a zoom | Triangles, Užice | GPU, nothing changed |
+|---|---|---|---|---|
+| As they are (now) | 562,000 | 7.7, 6.6 / 7.2, 7.8 / 9.4, 9.2 ms | 1,687,000 | 23.2, 21.6 ms |
+| A: its surrounding rectangle, filled and outlined | 515,000 | 8.0, 7.7 / 6.8, 6.9 / 8.8, 8.6 ms | 1,479,000 | 21.6, 19.7 ms |
+| B: its own fill, no outline | 359,000 | 5.2, 6.3 / 6.0, 6.5 / 6.5, 6.5 ms | 1,394,000 | 19.8, 20.0 ms |
+| C: the rectangle's fill, no outline (the sprite's triangles) | 346,000 | 6.4, 6.5 / 6.4, 6.5 / 6.5, 6.5 ms | 1,333,000 | 18.6, 18.6 ms |
+
+- **A simpler shape saves almost nothing.** The small areas are rectangles already, so a
+  rectangle in their place (A) takes off 8% of the triangles and none of the time.
+- **The outlines are the cost:** without them (B) Staten Island has 36% fewer triangles, and
+  the GPU takes 1 to 3 ms less of 7 to 9 on the M4. That's the 1.5 ms the first part saw.
+- **The fill's own shape is nearly free** (B against C: 13,000 triangles).
+- **What B looks like:** a block of its fill's color, a third opaque, with no edge. A row of
+  parking spaces becomes one grey band; with outlines it's a grid.
+
+So the efficient small area keeps its own fill and gets its edge some cheaper way than a stroke
+mesh. Ways, cheapest first:
+
+1. **No edge under 20 pixels** (B). A few lines in `PixiFeaturePolygon`. The look changes.
+2. **The edge drawn by the fills' shader.** A fill's triangles know which of their sides are
+   the area's edge: with a flag for each side in the vertices (there are three unused bytes in
+   each, but the corners of a triangle can't be shared then), the fragment shader can draw the
+   two pixels inside those sides in the outline's color. A small area is then its fill's 3
+   triangles, edge included, and looks as it does now. It needs screen-space derivatives
+   (`fwidth`), which WebGL 1 has as an extension.
+3. **A thinner stroke mesh:** two triangles a segment and no joins, 10 for a rectangle where
+   there are 14. A notch of a pixel at each corner. Saves under a third of what the outlines cost.
+
+The second is the one that draws the same picture for the sprite's price, and it changes the
+fills' shader, not the lines'. *Decided (Bryan, Nov 23): the first. Built with step 9, below.*
+
+**Not done:** the other layers' points (Rapid's vertices, the photo layers' markers) are sprites
+as before; a layer has to give its points a batch.
+
+**Tests:** `PointBatch.test.js`; a point with sprites and a point in a batch in
+`PixiFeaturePoint.test.js` (its pictures, the levels of detail, a zoom that writes nothing, a
+move, an icon that arrives, a glow, the hit test at four zooms and rotations, the label box, the
+halo); the layer's batch and the place of a point in `PixiLayerOsm.test.js`; point labels from
+the point's own box, and no waiting while labels are off, in `PixiLayerLabels.test.js`; a
+hovered area's fill in `PixiFeaturePolygon.test.js`. The e2e tests:
+every point is in the batch, which a zoom leaves alone; the avoid grid has every point where the
+batch draws it; a hovered pin draws itself and goes back; the vertices of a hovered road draw
+themselves above everything; and the batch's points are hit where Pixi hits them drawn with
+sprites. A hundred and one ways of breaking the new code were each caught by a test.
+
+### What was built (Nov 23: step 9, line markers)
+
+**Decided (Bryan, Nov 23):**
+- **A hovered area's fill is tinted, for now.** "My biggest concern today is just that a user
+  won't see what they are hovering on." The old glow's yellow was jarring, "but it was at
+  least visible".
+- **A small area without its outline is fine:** "at least _something_ is drawn, and if a user
+  hovers over it, they will see the parking stuff. As a general rule, I'd prefer to draw
+  something imperfect than draw nothing that the user can see and risk them thinking there is
+  nothing mapped there."
+- **Where hovers and selections should go:** drawn and animated by shader code, which would
+  also stop them leaning on color alone (colorblind users), and would do better than the dashed
+  halos around lines. It means frames at regular intervals while something is hovered or
+  selected, not only when something changed, "but this should be ok, as our passes are a lot
+  faster now". Not built: `backlog.md`.
+
+**The markers along a line are drawn by the lines' shader.** Oneway arrows, arrows with two
+heads (a way that alternates) and the triangles on the right of a line with sides were sprites:
+one every 35 or 30 pixels, all made again at every zoom, in the line's own container, which
+kept the line in the scene. Now:
+
+- **A line's markers are a strip in the strokes' batch** of its level
+  (`LineBatch.addMarkers()`): a copy of the line's stroke mesh, without caps, as wide as the
+  markers need (7 pixels for arrows, 21 for sided markers, at every zoom), ordered after every
+  stroke of the level. No draw call is added.
+- **The fragment shader draws the markers in the strip.** It has the distance along the line
+  in pixels, as for dashes, and now the distance to the line's side (a vertex knows which
+  side of the line it's on: the stroke mesh always had that). The nearest marker's middle is
+  the nearest multiple of the spacing, and each shape is a few lines of arithmetic that say
+  how far inside it a pixel is: a shaft and a triangle for an arrow, a triangle 4.5 to 9.5
+  pixels to the right for a sided marker. Half a pixel either side of the edge is smoothed.
+- **No bytes were added to a vertex.** A strip says what it is with a least width of 0, and
+  its four dash bytes hold the kind, the spacing and the vertex's side.
+- **They're left out below zoom 16** by one more of the view's numbers (`uMarkers`).
+- **A line that glows draws its markers as sprites, with the rest of itself,** as before. So
+  do the lines of the layers that have no batches (Rapid's).
+- **A line whose style has a marker image that the shader has no shape for** draws its
+  markers as sprites, in the scene. None of Rapid's styles has one.
+
+**What looks different:**
+
+- **The arrows are sharper.** A sprite was a 10 by 5 texture, turned and smoothed.
+- **A marker follows its line around a corner,** where a sprite stuck straight out past it.
+- **A long segment has a marker every 35 pixels.** Sprites were limited to 100 a segment
+  (Rapid#544), spread out.
+- **Arrows point back along a way tagged `oneway=-1`** (or `conveying=backward`,
+  `flow_direction=backward`). They used to point the way the line was drawn whatever the tag,
+  which is the wrong way for those. `OsmWay.isOneWayBackward()` says so, the layers turn the
+  marker around in the style (`lineMarker.scale: [-1, 1]`), and both the shader and the
+  sprites follow it. **Bryan didn't ask for this one.**
+
+**With it, from Bryan's answers:**
+
+- **An area under 20 pixels is its fill alone** (way 1 of "A lower level of detail for small
+  areas", above): no outline in the batch, except in wireframe mode, where there's no fill.
+  Its outline comes with a zoom that makes it large enough, and with a hover.
+- **A hovered or highlighted area's fill is tinted halfway to the glow's color,** yellow or
+  blue, as well as twice as opaque.
+
+**Checked against the sprites,** in one build, with the labels off: in Seattle at zoom 17.5,
+the pixels that differ are the edges of the arrows (13,600 of 6.8 million by more than a tenth
+of full brightness, for 281 lines with arrows and 15 with sides), at zoom 19 turned 34° 7,000.
+In the test map, 91% of the pixels that the shader's arrows cover are covered by the sprites',
+and 99% the other way around.
+
+**Measured** (the three places from their tapes; markers as sprites → markers in the batch, in
+the same build, labels on, alternating, two runs of each. Both sides have the small areas
+without outlines; in brackets, the build before this step.)
+
+| | Seattle | Staten Island | Užice |
+|---|---|---|---|
+| Draw calls | 123 → 20 | 52 → 13 | 78 → 22 |
+| Render groups | 149 → 40 | 83 → 36 | 123 → 40 |
+| Triangles | 132,800 → 132,500 [133,800] | 359,100 → 362,700 [562,200] | 1,394,000 → 1,432,000 [1,687,000] |
+| DRAW, nothing changed | 0.7, 0.7 → 0.3, 0.3 ms | 0.3, 0.4 → 0.2, 0.2 ms | 0.5, 0.5 → 0.3, 0.2 ms |
+| DRAW, a pan frame | 1.1, 1.0 → 0.6, 0.6 ms | 0.7, 0.6 → 0.5, 0.5 ms | 0.7, 0.7 → 0.5, 0.6 ms |
+| DRAW, a frame that moves the cull box | 2.0, 1.9 → 0.9, 0.9 ms | 1.2, 1.4 → 0.8, 0.9 ms | 1.6, 1.3 → 0.8, 0.9 ms |
+| DRAW, the first frame after a zoom | 3.7, 3.6 → 3.0, 2.6 ms | 0.5, 0.6 → 0.5, 0.4 ms | 0.4, 0.4 → 0.3, 0.2 ms |
+| APP, the frames after a zoom | 8.4, 7.8 → 7.1, 7.3 ms | 4.7, 4.5 → 4.7, 4.6 ms | 5.9, 5.8 → 5.8, 6.0 ms |
+| GPU | 4.1, 5.1 → 4.2, 4.2 ms | 5.2, 6.2 → 6.4, 6.0 ms | 19.3, 19.9 → 19.1, 21.7 ms |
+
+- **Seattle is 20 draw calls, where it was 385** with a display object for each feature: 16
+  for the lines (a batch of casings and one of strokes for each of 8 levels), 2 for the areas,
+  1 for the points, 1 for the labels. Staten Island is 13 of 279, Užice 22 of 672. No line,
+  area or point of the OSM layer is in Pixi's scene unless it's hovered, highlighted, or a
+  vertex of what's selected.
+- **Pixi's DRAW pass is 0.2 to 0.3 ms on a frame where nothing changed,** from 0.95 to 1.75
+  with a display object for each feature. It has 36 to 40 render groups to walk where it had
+  246 to 580.
+- **GPU time didn't move** on the M4, with the strips' triangles (38,000 in Užice) and their
+  pixels that draw nothing.
+- **The small areas' outlines were 203,000 of Staten Island's 562,000 triangles,** and 293,000
+  of Užice's 1,687,000. ("A lower level of detail for small areas", above, measured what that
+  is in GPU time: 1 to 3 ms in Staten Island.)
+- **Sixteen zooms in Užice allocate 2.9 GB** (3.1 before this step, 13.7 at the start of this
+  section). The heap after a load is 1,371 MB (1,352), and 1,404 after thirty-two zooms
+  (1,368): the outlines' batch keeps the room that its busiest zoom needed, since outlines now
+  come and go with the zoom ("Seen on the way", below). The trace of collections came back
+  empty again.
+
+**Seen on the way:**
+
+- **A batch whose things come and go kept getting larger buffers.** When its buffers were
+  full, a `VertexBatch` packed itself in place only if what was in use fit in half of them,
+  and otherwise took buffers half as large again. With outlines that come and go at every zoom
+  across 20 pixels, Užice's outlines batch had room for 861,000 vertices after two zooms in
+  and out, with 285,000 in use (48 MB where 16 are needed), and was still growing. It packs in
+  place now up to three quarters full, and takes smaller buffers when less than a third is in
+  use: the same two zooms end with room for 575,000.
+- **A marker was drawn twice** in the first version here, when a line had one marker that the
+  shader has a shape for and one that it hasn't: in the batch and as a sprite. Found by the
+  pixel comparison's first run, which is why that's a test now.
+
+**Tests:** markers in `LineBatch.test.js` (the strip, the bytes, the sides, another line,
+hiding) and `PixiFeatureLine.test.js` (the strip over the strokes, its own mesh, a zoom that
+changes nothing, a restyle, a glow, an image with no shape, sprites without batches, a way
+that runs backward); `OsmWay.isOneWayBackward()`; a small area's fill alone, and a tinted
+hover, in `PixiFeaturePolygon.test.js`. The e2e tests: every oneway line's arrows are in its
+level's strokes' batch and no line is in the scene; an area has outlines only from 20 pixels;
+and the shader's arrows cover the pixels that sprites' do. Sixty-seven ways of breaking the new
+code were each caught by a test.
+
+### What was built (Nov 23: step 10, hovers and selections in the shaders)
+
+**Decided (Bryan, Nov 23):**
+- **The tinted hover fill stays:** "hover fill is looking really good now, I can easily tell
+  what's being hovered."
+- **A midpoint points the way its line is drawn,** whatever the tags say: with `oneway=-1`
+  "the triangular midpoints also switch direction - this feels wrong to me - these should
+  always point in the direction the line is drawn."
+- **What's below is as he wants it** (Nov 23, after seeing it): "wouldn't change anything
+  about it."
+
+**The midpoints first.** Nothing reverses the way, and it wasn't new: `_gatherMidpoints()` has
+swapped a segment's two nodes for `oneway=-1` since January 2022 (`5224863af`). That was a
+month after the whole line was drawn reversed for that tag, so that its arrows pointed the way
+of travel (`a3130ead2`). The arrows got their own reversal later (Oct 2022, and a marker style
+now), and the midpoints kept theirs. The swap is gone; `actionAddMidpoint` finds the edge either
+way around.
+
+**A hover's glow and a selection's halo are drawn by the batches' shaders, and they move.**
+Until now a glow was a `GlowFilter` on a feature's container, so a hovered line or point left
+its batch and drew itself in the scene, with sprites for its arrows, and a hovered area drew
+its outlines there. A halo was a `LineMesh` for each ring, with a dash texture. Now:
+
+- **A line's glow is a strip along it** (`LineBatch.addGlow()`): the line's stroke mesh with
+  round ends and corners, as wide as the line and 12 pixels more on each side. The fragment
+  shader fades it from the line's edge outward, and draws nothing over the line itself. For
+  that it needs the distance from the line at every pixel, so each vertex has where it is from
+  the nearest point of the line (`_writeAround()`): across a segment that runs from one
+  side's normal to the other's through 0, and the length of what's interpolated is the
+  distance. (It's in the two floats where a line has its distance along itself: a glow has no
+  dashes.)
+- **An area's glow is the same strip around each ring,** on both sides of its outline, and
+  its fill is tinted as before. A small area gets its outline while it's hovered.
+- **A point's glow is a picture:** a disc that fades out (`PixiTextures._cacheGlow()`, in the
+  symbol atlas), behind the middle of the marker, twice its size and at least 30 pixels. A
+  point that draws itself (a vertex above everything, a midpoint, another layer's marker) has
+  it as a sprite, and no filter either.
+- **Glows are in small batches of their own** (`LineBatch.glows`, `PointBatch.glows`): one
+  after each level's strokes, one after the areas' outlines, one under the points. The first
+  version put a glow in the batch of what it's around, and a hover in Užice took 11 ms of
+  DRAW: a batch that gets or loses a thing builds its index buffer again, for a town's roads.
+  In a batch of its own a glow costs what it weighs. An empty batch draws nothing.
+- **A halo is two lines along each ring, in one batch for all halos** in the map UI layer
+  (`haloBatchAt()`, `drawHalo()`): a dark line 4 pixels wide, and yellow dashes 2 pixels wide
+  over it, so the dashes show on a yellow road and on a pale background alike. They **march**
+  (a negative width says so): as wide as they say at every zoom and in wireframe, with
+  dashes that the shader moves along the line.
+- **So nothing of the OSM layer is in the scene for a hover or a selection,** apart from the
+  vertices and midpoints that are drawn above everything. A hovered oneway keeps its arrows
+  in the batch. `GlowFilter` is left for the lines and areas of layers without batches.
+
+**The clock.** Two numbers move everything, and they're uniforms that every batch shares
+(`LineBatch.setTime()`, `PointBatch.setTime()`): how bright a glow is (it breathes: down to
+55% and back in 1.6 seconds) and how far the dashes have marched (20 pixels a second).
+`PixiScene.animate(now)` sets them before each frame is drawn, and the opacity of the sprites
+that pulse. Nothing in a batch is written, and no feature is drawn again. (The view's uniforms
+moved to the scene too, `setBatchViews()`: the halo batch isn't the OSM layer's.)
+
+**Animation frames.** Rapid has drawn a frame only when something changed. While something
+is hovered, highlighted or selected (`PixiScene.animated`), `GraphicsSystem` now draws the
+scene again as it is, with the clock further on (`_drawAnimation()`): no APP, no frame in the
+stats, no `draw` event. `AnimationPacer` says when:
+
+- **20 a second** on a screen that shows 60: every third tick, and none while other frames
+  are drawn that often (they move the clock too).
+- **A third of the ticks at most.** After an animation frame the next waits two and a half
+  times as long as the browser took to come back, up to half a second. Where the GPU needs
+  longer than a tick for a frame, the animation slows down instead of taking all of its time.
+- **It rests** after 30 seconds in which nothing else was drawn, with one last frame that
+  leaves the glows at their brightest, and goes on when something is drawn again. An editor
+  left open with something selected doesn't keep the GPU busy.
+- **Not at all with `prefers-reduced-motion`:** the glow and the halo are there, and still.
+
+An animation frame costs what any DRAW costs, because Pixi draws the whole scene:
+
+| | Seattle (z17.5) | Užice (z16) |
+|---|---|---|
+| DRAW, on the CPU | 0.2 ms | 0.2 ms |
+| on the GPU (timer query) | 5.3 ms | 13.6 ms |
+| animation frames a second | 20 | 20 |
+| `requestAnimationFrame` a second meanwhile | 60 | 60 |
+
+So in Užice a selection keeps this machine's GPU busy a quarter of the time. That's an M4;
+see the open questions.
+
+**What a hover costs,** the frame after the class changes, medians of 12 features in Užice
+(APP + DRAW, ms):
+
+| | before | glows in their features' batches | glows in their own |
+|---|---|---|---|
+| a road | 2.2 + 2.2 | 2.2 + 11.4 | 1.3 + 0.8 |
+| an area | 3.8 + 1.7 | 1.9 + 7.2 | 1.8 + 2.7 |
+| a pin | (drew itself) | 1.2 + 9.1 | 1.3 + 0.7 |
+
+**What changed that someone might notice:**
+- **Glows are softer and they breathe;** halos have a dark line under their dashes, and the
+  dashes move.
+- **A line's glow is over everything of its level,** where the filter's was at the line's
+  own place among the others. A point's is under every point.
+- **An area's pin glows with it,** and so does any vertex or midpoint that's hovered.
+- **Other layers' points have the new glow** (they use `PixiFeaturePoint`); their lines and
+  areas have the filter still.
+
+**Two things found by looking, which no test had caught:**
+- **The first glow drew nothing.** Its strip said only whether a vertex was at the edge, and
+  both sides of a segment are: the distance was the same all the way across, and the shader
+  faded everything out. The feature had its glow item, visible, in the right batch. The e2e
+  tests now count the pixels that a glow changes (`glowPixels()` in `select.test.js`).
+- **The map was black with `renderer=webgpu`:** the WGSL named a variable `from`, which WGSL
+  reserves and GLSL doesn't. Nothing compiles the WGSL in a test, so `shaders.test.js` checks
+  the names each shader declares against WGSL's lists. Also under WebGPU, the atlas uploaded
+  its pictures without premultiplying them (the WebGL uploader does), which made the glow a
+  hard disc and every picture's faint edge too bright; `AtlasAllocator` passes
+  `premultipliedAlpha` now.
+
+**Open:**
+- **Weak hardware.** The pacer is the guard against an animation that the GPU can't keep up
+  with, and it's untested on a machine where that happens. The lasting answer is to not draw
+  the scene again: draw what's still to a texture once, and an animation frame is that
+  texture and what moves over it. Then the rate could be 60.
+- **The animation runs while what's selected is off screen** (`animated` looks at classes).
+  It rests after 30 seconds like any other.
+- **30 seconds, 20 frames a second, 1.6 seconds a breath, 12 pixels of glow** are first
+  guesses, each a constant.
+- **Where a line turns sharply between short segments, the glow is brighter inside the
+  corner,** and can reach over the line: the strip overlaps itself there, as a wide stroke
+  does (see "Translucent strokes" below).
+- **Color still does most of the work.** Movement helps a colorblind user find the halo and
+  the glow; the glow's yellow on a yellow road is still weak, and its shape is all it has.
+
+**Tests:** the glow, its distance vector, a line that marches and the clock in
+`LineBatch.test.js`; pictures that pulse and from where in `PointBatch.test.js`;
+`AnimationPacer.test.js`; the frame loop's animation frames in `GraphicsSystem.test.js`;
+`animated`, `animate()`, `setBatchViews()` and the sprites that pulse in `PixiScene.test.js`;
+`drawHalo()`, `setGlowFilter()`, the halo of any feature in `helpers.test.js` and
+`AbstractPixiFeature.test.js`; the halo batch in `PixiLayerMapUI.test.js`; glows and halos of
+lines, areas and points in their features' tests; the glow batches, and the midpoints, in
+`PixiLayerOsm.test.js`; the glow's picture in `PixiTextures.test.js`; WGSL names in
+`shaders.test.js`. The e2e tests: a hovered road, area and pin stay in their batches and
+their glow changes the pixels around them, on both sides, and none elsewhere; a halo is a
+click's reach from its road, marches, holds still for a user who asked for less motion, and
+keeps its width in wireframe; the animation stops when nothing is hovered or selected; and
+with less motion asked for, a glow is on the screen after the one frame that a hover makes, and
+off it after the next. Seventy-eight ways of breaking the new code were each caught by a test.
+
+### Order of work
+
+Each step is measured on the tapes of Seattle, Staten Island and Užice (`bun run measure --tape`),
+and compared by screenshot with the build before it.
+
+1. **Count what Pixi builds now.** Vertices per layer in frame stats (section 2 asked for it), and
+   for a zoom in each place: vertices, bytes allocated, and time in `buildLine`. This is what the
+   builder is judged against. **Done (Nov 22):** outside the browser and in the app (above).
+   Frame stats count triangles for everything; vertices per layer weren't worth a walk on every
+   frame.
+2. **The builder's stroke mesh. Done (Nov 22).** In `modules/geo/`, with its tests. Round joins and caps get a
+   fixed number of slices, not one that grows with the width in world units (section 2: a cap
+   gets 25 to 95 slices where a handful would look the same).
+3. **Casings and strokes drawn from it. Done (Nov 22),** and the outlines of areas (above). Each
+   is a `Mesh` with a fixed `batchMode` (pixijs#12437) and a dash texture of its own kind. A zoom
+   rewrites positions and builds nothing. (`lib/DashLine.ts` went with step 4.)
+   *Measured by:* bytes allocated over sixteen zooms in Užice (13.7 GB now; `buildContextBatches`
+   was 6 GB of it in section 13 and nothing has reduced it), how often a major collection comes,
+   the heap after a load, DRAW.
+   *Stop if:* a `Mesh` and its geometry per line hold more than the `Graphics` they replace. Then
+   keep `Graphics` for now, and bring step 6 forward.
+4. **Hit areas by distance, and the halo and label path from the outline. Done (Nov 22).**
+   `lineToPoly()` and its dependence on Pixi's `buildLine` are gone, and `DashLine` with them
+   (above). The outline has no cleanup yet: that's the next step's.
+5. **Partial-fill bands instead of stencil masks** (section 4). **Done (Nov 23),** with Clipper2
+   for the offsetting and its cleanup (above). The masks were most of the draw calls, and the
+   mask's `Mesh` was where pixijs#12437 and #12388 bit. Bands depend on the zoom, and are built
+   again over the frames after one, as the masks were.
+6. **The static tier, for lines first.** A mesh per tile and class with our own shader, ranges, and
+   the editing tier for what's touched. Needs hit-testing through the spatial index first. The
+   check against a pass (`osmSceneState()`) has to learn to read ranges.
+   *Measured by:* the heap (the OSM layer's features are about 520 MB of it), what a zoom
+   allocates, a pan's frames, and a drag of one vertex of the largest line and area in each place.
+   **Done (Nov 23):** the hit test, lines in two batches a level, and no place in the scene
+   for a line that its batches draw (above). The editing tier is a hovered line and nothing
+   else: a dragged line is written again in its batches, at the cost it had.
+7. **Building in a worker,** when the numbers say main-thread building is what's left: a tile that
+   arrives, and the first draw after a load. **Probably not needed** (Bryan, Nov 23: "sounds
+   like it may be unnecessary"): building a stroke mesh or a fill's triangles is a small part of
+   making a feature now. Skipped; a profile of a load would have to ask for it.
+8. **Polygons and points in the static tier.** A point is two or three `Container`s today, and
+   a `Container` is 0.7 KB before it draws anything (section 13).
+   **Done (Nov 23):** every fill in a `FillBatch` and every outline in a `LineBatch`, and
+   every point in a `PointBatch` (above). The other layers' features are as they were.
+9. **Line markers in the stroke shader** (Bryan, Nov 23: after step 8). Oneway arrows and sided
+   markers are a sprite every 30 or 35 pixels along a line, built again at every zoom, and they
+   keep one line in ten in the scene: 103 of Seattle's 160 draw calls. The stroke's shader has
+   the distance along the line, and can draw them from it.
+   **Done (Nov 23):** a strip in the strokes' batch for each line with markers (above).
+10. **Hovers and selections in the shaders, animated** (Bryan, Nov 23). The glow of a hover
+   was a filter on a container, which kept hovered features in the scene; a halo was a mesh
+   with a dash texture.
+   **Done (Nov 23):** glows and halos in batches, a clock in the shaders, and animation frames
+   (above).
+
+Steps 2 to 5 are section 7's step 6, in more detail and in a different order: strokes before
+bands, because the stroke mesh is the simpler product and the larger share of the garbage, and it
+settles how typed arrays reach Pixi before the hard geometry starts.
+
+### Decided (Bryan, Nov 22)
+
+- **Strokes first, then bands.** Strokes are simpler, and a band is a stroke with an offset.
+- **Try Clipper2 for the band's offsetting,** and measure its size and time before deciding
+  between it and code of our own. Conflation's buffers (`backlog.md`) want the same answer.
+  *The trial's outcome (Nov 23, step 5): `clipper2-ts`, 18 KB gzipped. Bryan agreed (Nov 23):
+  it works well on our data. `clipper2-wasm` is worth keeping in mind, but not at the cost of
+  relaxing the CSP now.*
+- **Round joins and caps start at 10 slices for a half circle,** more only if they look jagged.
+  The lines are thin, and a vertex marker often covers the join anyway.
+- **Every casing of a level before every stroke** (Nov 23, built in step 6), and **fewer draw
+  calls are a result in themselves** (Nov 23: the test machine is an M4, and many users have
+  less). Both are quoted in "What was built (Nov 23: step 6, the rest)".
+
+### Open questions
+
+- **The frame of a zoom is still 125 ms in Užice,** half of it DRAW. Not looked at yet: every
+  mesh's vertices are copied into Pixi's batch again (24 bytes a vertex), and the features move
+  to other tiles when a whole zoom level is crossed.
+- **Dashes without textures everywhere.** The OSM layer's lines and outlines get their dashes
+  from the batch's shader (steps 6 and 8), and halos too (step 10). The lasso and the other
+  layers' lines are `LineMesh`es with a texture per pattern, and Pixi's batch holds 16 textures.
+- **A halo that doesn't cross itself.** It's the outline as built (step 4), loops and all: fine
+  around most features, tangled around a tight curve or a staircase's arcs at z16, as it was
+  before. Clipper would clean it (step 5 has it now): under 0.1 ms for a way of a few dozen
+  nodes, 12 to 18 ms for a relation of 2,400, on every frame of a drag. If halos and the label
+  path both moved to it, `geomStrokeOutline()` would have no caller left.
+- **A band that doesn't depend on the zoom.** The band is worked out again at every zoom, because
+  its width is in pixels. Inside one face of an area's straight skeleton, the distance to the
+  edge is the distance to one line, which a triangle's corners interpolate exactly. So a mesh of
+  those faces with the distance at each vertex, built once, could be cut at any width by a
+  shader (or by clipping each face on the CPU). That's for the static tier, and it needs a
+  straight skeleton that survives OSM's polygons.
+- **The `inradius` is good to 1 unit,** which is 8 pixels at zoom 19. Clipper is asked in that
+  margin, so nothing is drawn wrong; a finer `polylabel` would ask it less often.
+- **Snapping by distance.** The pointer finds the OSM layer's features through the spatial index
+  (step 6), and each still answers with its drawn hit area, in drawing order. Choosing the
+  nearest line, or a vertex before a line, is a redesign of hover and snapping
+  ([`scene.md`](scene.md) section 4).
+- **The other layers' features are still found by Pixi's walk.** Rapid's datasets, custom data,
+  photos and QA items: few features next to OSM's, until a dataset of buildings is on.
+  A layer takes its own with `scene.setHitTester()` and a `hitTest()` like the OSM layer's.
+- **Translucent strokes.** A stroke mesh overlaps itself where a line is wider than a segment is
+  long: most corners at z16 (above). An opaque line doesn't show it. Tunnels are drawn at 0.5
+  (`StyleSystem`), and some other layers' lines at 0.7. Looked at with step 3: Seattle's tunnels
+  look the same as with Pixi's builder, which overlaps there too. Not looked at: the data layers.
+- **A smaller vertex.** 28 bytes in a stroke mesh (56 in a batch, 16 of them how the line is
+  drawn, and the casing and the stroke each have their own copy), and every vertex at a corner
+  repeats the corner's point and distance. An index into the line's own coordinates would take it to 16 to 20, for the CPU's
+  sums; a shader wants the point in each vertex. Step 3's heap numbers say it isn't urgent: the
+  heap fell 159 MB with the vertex as it is, and the objects cost more than the arrays.
+- **A casing and its stroke could share their vertices.** They're in two batches (step 6), each
+  with its own copy of the line's triangles, 56 bytes a vertex. One buffer of the triangles and
+  two of how they're drawn (16 bytes a vertex each) would be a third less memory. A line
+  without a casing would then cost the casings' batch its vertices for nothing: 27% of Užice's
+  lines.
+- **`syncShader` for each batch.** Pixi sets every uniform again for each mesh with a shader of
+  its own (its `unsafe-eval` polyfill makes garbage doing it: 80 MB over sixteen zooms in Užice
+  with 83 batches; there are 16 now).
+- **Where a worker gets coordinates from.** Packed by the main thread and transferred, or built
+  where the OSM data is parsed.

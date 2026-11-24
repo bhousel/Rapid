@@ -2,8 +2,8 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
-import { getDebugBBox, lineToPoly } from './helpers.ts';
-import { geomLineSegments } from '../geo/index.ts';
+import { getDebugBBox } from './helpers.ts';
+import { geomLineSegments, geomStrokeOutline } from '../geo/index.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { CellRect } from './lib/AvoidGrid.ts';
@@ -18,6 +18,7 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 const MINZOOM = 12;
+const POLYGON_LABEL_INSET = 12;   // how far inside a polygon's outer ring its label runs, in pixels
 
 // SpatialSystem cache identifiers for label placement boxes and debug boxes.
 const SPATIAL_LABELS = 'labels';
@@ -150,6 +151,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   protected _freed: LabelRoom[];
   /** Whether the last call to `placeTextLabel` or `placeRopeLabel` placed a label */
   protected _didPlace: boolean;
+  /** Scratch space for the box of the point that `placeTextLabel` is placing a label for */
+  protected _pointBox: [number, number, number, number];
+  /** Whether the last `render()` showed no labels: the layer is off, or the view is zoomed out too far */
+  protected _isOff: boolean;
   /** The red boxes that show what labels avoid, in the label debug view, by feature (see `renderDebugAvoids`) */
   protected _debugAvoids: Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>;
   /** Whether the last frame put off placing labels (so that another frame should follow it) */
@@ -216,6 +221,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._unplaced = new Map<FeatureID, LabelRoom>();
     this._freed = [];
     this._didPlace = false;
+    this._pointBox = [0, 0, 0, 0];
+    this._isOff = false;
     this._debugAvoids = new Map<FeatureID, { sprite: PIXI.Sprite, cells: CellRect }>();
 
     // For ASCII-only labels, we can use PIXI.BitmapText to avoid generating label textures
@@ -396,11 +403,22 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   public render(frame: RenderFrame, viewport: Viewport): void {
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || viewZoom < MINZOOM) {
+      // No label is shown, so none is in anything's way and none waits for room. Forget what
+      // was placed (it's all placed again when labels are back), and what the scene noted
+      // since: left there, it counts as placement that's waiting (`numWaiting`), and asks for
+      // another frame after every frame.
+      if (!this._isOff) {
+        this._isOff = true;
+        this.reset();
+      }
+      this.scene.takeAvoidHits();
+      this.scene.takeAvoidFrees();
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
       this._placementWaiting = false;
       return;
     }
+    this._isOff = false;
 
     // Reset stale labels, as needed
     const tPrev = this._tPrev;
@@ -757,22 +775,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @return `false` if it stopped before the end of the list
    */
   public labelLines(features: PixiFeatureLine[], stop?: () => boolean): boolean {
-    /**
-     * Priority sort the labels according to what level their feature has been rendered on.
-     * This is hacky, but we can sort the line labels by their parent container label (name).
-     * It might be a level container with a name like "1", "-1", or just a name like "lines"
-     * If `parseInt` fails, just sort the label above everything.
-     * @param feature
-     */
-    function level(feature: PixiFeatureLine): number {
-      const parentLabel = feature.container.parent?.label;
-      const lvl = parseInt(parentLabel || '999', 10);
-      return isNaN(lvl) ? 999 : lvl;
-    }
+    const origin = this.gfx.origin;
+    if (!origin) return true;
 
-    features.sort((a, b) => level(b) - level(a));
+    // The lines of the more important roads get their labels first: a line's `zIndex` is its
+    // road class, and a part of 1 that puts the lines of a class in order.
+    // (Not by anything about the line's container: a line that's drawn in a batch isn't in the scene.)
+    features.sort((a, b) => Math.floor(b.container.zIndex) - Math.floor(a.container.zIndex));
 
     const temp = new PIXI.Point();
+    const world = new PIXI.Point();
     const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
@@ -788,17 +800,32 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!localCoords || localCoords.length < 2) continue;   // no points
       if (!feature.container.visible || !feature.container.renderable) continue; // not visible
 
-      const fBounds = feature.container.getBounds().rectangle;
-      if (fBounds.width < 40 && fBounds.height < 40) continue;    // too small
-
       // Project line vertices from feature-local space to label space
       // (= global screen minus labelOffset).
       const labelCoords: Vec2[] = new Array(localCoords.length);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      // (The line's coordinates start at its container's position in the world, and `origin`
+      // puts the world on screen. The container itself may not be in the scene.)
+      const position = feature.container.position;
       for (let i = 0; i < localCoords.length; i++) {
         const p = localCoords[i];
-        feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
+        world.set(p[0] + position.x, p[1] + position.y);
+        origin.toGlobal(world, temp);
         labelCoords[i] = [temp.x - labelOffset.x, temp.y - labelOffset.y];
+        if (temp.x < minX) minX = temp.x;
+        if (temp.x > maxX) maxX = temp.x;
+        if (temp.y < minY) minY = temp.y;
+        if (temp.y > maxY) maxY = temp.y;
       }
+
+      // How much room the line takes on screen: its points, and its width around them.
+      // (Not the bounds of its container: a line that's drawn in a batch has nothing in it.
+      // A line is hit 5 pixels beyond its casing, see `PixiFeatureLine`.)
+      const lineWidth = Math.max(0, 2 * feature.hitReach - 10);
+      if ((maxX - minX + lineWidth) < 40 && (maxY - minY + lineWidth) < 40) continue;    // too small
 
       const measurement = this.measureLabel(feature.label, 'normal');
       this._didPlace = false;
@@ -817,7 +844,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @return `false` if it stopped before the end of the list
    */
   public labelPolygons(features: PixiFeaturePolygon[], stop?: () => boolean): boolean {
+    const origin = this.gfx.origin;
+    if (!origin) return true;
+
     const temp = new PIXI.Point();
+    const world = new PIXI.Point();
     const labelOffset = this.scene.labelOffset;
 
     for (const feature of features) {
@@ -833,35 +864,38 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!outer || outer.length < 3) continue;  // no outer ring
       if (!feature.container.visible || !feature.container.renderable) continue;  // not visible
 
-      const fBounds = feature.container.getBounds().rectangle;
-      if (fBounds.width < 600 && fBounds.height < 600) continue;  // too small
+      // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
+      // as a flat array, which is what `geomStrokeOutline` expects.
+      // (The polygon's coordinates start at its container's position in the world, and `origin`
+      // puts the world on screen. The container itself may not be in the scene: a polygon
+      // that's drawn in batches has nothing in it.)
+      const position = feature.container.position;
+      const flatOuter: number[] = new Array(outer.length * 2);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < outer.length; i++) {
+        const p = outer[i];
+        world.set(p[0] + position.x, p[1] + position.y);
+        origin.toGlobal(world, temp);
+        flatOuter[i * 2]     = temp.x - labelOffset.x;
+        flatOuter[i * 2 + 1] = temp.y - labelOffset.y;
+        if (temp.x < minX) minX = temp.x;
+        if (temp.x > maxX) maxX = temp.x;
+        if (temp.y < minY) minY = temp.y;
+        if (temp.y > maxY) maxY = temp.y;
+      }
+      if ((maxX - minX) < 600 && (maxY - minY) < 600) continue;  // too small
 
       const measurement = this.measureLabel(feature.label, 'italic');
 
-      // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
-      // as a flat array, which is what `lineToPoly` expects.
-      const flatOuter: number[] = new Array(outer.length * 2);
-      for (let i = 0; i < outer.length; i++) {
-        const p = outer[i];
-        feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
-        flatOuter[i * 2]     = temp.x - labelOffset.x;
-        flatOuter[i * 2 + 1] = temp.y - labelOffset.y;
-      }
-
-      // someday: precompute line buffer in geometry class maybe?
-      const hitStyle = {
-        alignment: 0.5,  // middle of line
-        color: 0x0,
-        width: 24,
-        alpha: 1.0,
-        join: 'bevel',
-        cap: 'butt'
-      };
-      const bufferdata = lineToPoly(flatOuter, hitStyle);
-      if (!bufferdata.inner) continue;
-      const coords: Vec2[] = new Array(bufferdata.inner.length / 2);  // un-flatten :(
-      for (let i = 0; i < bufferdata.inner.length / 2; ++i) {
-        coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
+      // The label runs along the inside of the ring, 12 pixels in.
+      const inner = geomStrokeOutline(flatOuter, POLYGON_LABEL_INSET, { closed: true, join: 'bevel' }).inner;
+      if (!inner) continue;
+      const coords: Vec2[] = new Array(inner.length / 2);  // un-flatten :(
+      for (let i = 0; i < inner.length / 2; ++i) {
+        coords[i] = [ inner[(i * 2)], inner[(i * 2) + 1] ];
       }
 
       this._didPlace = false;
@@ -987,7 +1021,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param  feature - The feature to place point labels on
    * @param  measurement - The label measurements (size + str/style)
    */
-  public placeTextLabel(feature: AbstractPixiFeature, measurement: LabelMeasurement): void {
+  public placeTextLabel(feature: PixiFeaturePoint, measurement: LabelMeasurement): void {
     if (!feature) return;
 
     const spatial = this.context.systems.spatial!;
@@ -997,24 +1031,21 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const container = feature.container;
     if (!container.visible || !container.renderable) return;
 
-    // `f` - feature, these bounds are in "global" coordinates
-    // The rectangle is in global/screen coordinates (where [0,0] is top left).
-    // To work in a coordinate system that is consistent, remove the label offset.
-    // If we didn't do this, as the user pans or rotates the map, the objects that leave
-    // and re-enter the scene would end up with different coordinates each time!
-    const fRect = container.getBounds().clone().pad(1, 0);
-    fRect.x -= this.scene.labelOffset.x;
-    fRect.y -= this.scene.labelOffset.y;
+    // `f` - feature, the box of what the point draws, in label space: the screen minus the
+    // label offset. (In screen coordinates, as the user pans or rotates the map, the objects
+    // that leave and re-enter the scene would end up with different coordinates each time!)
+    // The point says where it's drawn: it may be drawn by a batch, and not be in the scene.
+    const box = feature.labelBox(this._pointBox);
+    if (!box) return;
 
-    const fLeft = fRect.x;
-    const fTop = fRect.y;
-    const fWidth = fRect.width;
-    const fHeight = fRect.height;
-    const fRight = fRect.x + fWidth;
-    const fMidX = fRect.x + (fWidth * 0.5);
-    const fBottom = fRect.y + fHeight;
-    const fMidY = (feature.type === 'Point') ? (fRect.y + fHeight - 14)  // next to marker
-      : (fRect.y + (fHeight * 0.5));
+    const fLeft = box[0] - 1;   // (a pixel of room on either side)
+    const fTop = box[1];
+    const fWidth = box[2] - box[0] + 2;
+    const fHeight = box[3] - box[1];
+    const fRight = fLeft + fWidth;
+    const fMidX = fLeft + (fWidth * 0.5);
+    const fBottom = fTop + fHeight;
+    const fMidY = fBottom - 14;  // next to marker
 
     // `l` = label, these bounds are in "local" coordinates to the label,
     // 0,0 is the center of the label

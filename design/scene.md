@@ -2,7 +2,10 @@
 
 **Status:** In progress (Nov 2026). Sections 1 and 2 (containers per spatial ID, interactivity by
 mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines and points split by
-tile, Nov 19). Section 4 is ideas with nothing built.
+tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
+two batches a level, every casing and then every stroke, its areas in two, every fill and
+then every outline, and its points in one; a feature that its batches draw isn't in the scene
+(Nov 23). Section 4 is ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -13,6 +16,8 @@ tile, Nov 19). Section 4 is ideas with nothing built.
   over everything.
 - **Hit-testing.** Pixi tests the tree top-down and stops at the first container with
   `eventMode: 'static'`. A container with `eventMode: 'none'` is skipped along with its whole subtree.
+  (The OSM layer's features are found through the spatial index instead, with the same answer:
+  "Who finds the feature under the pointer", below.)
   Whatever draws on top takes the pointer, which is right for selecting and wrong for drawing: a muted
   "already mapped" Rapid line lies exactly on the OSM sidewalk it matched, so a line started on that
   sidewalk ended up as a loose node (pre.4 release check, Nov 2026). Photo markers and QA items over
@@ -31,20 +36,38 @@ origin
 ├ basemap
 │  ├ osm                 zIndex 0
 │  │  ├ polygons
+│  │  │  ├ fills         a `FillBatch`: every polygon's fill, the largest first
+│  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill (a polygon
+│  │  │  │               under 20 pixels has none)
+│  │  │  ├ glows         a `LineBatch`: the glow around the outlines of a hovered polygon
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
-│  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area)
+│  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area).
+│  │  │                  Only the polygons that draw something themselves are in these (none,
+│  │  │                  while the layer draws in batches): the rest aren't in the scene
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
+│  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
+│  │        ├ strokes              a `LineBatch`: every stroke, above every casing, and then the
+│  │        │                      markers along the lines (oneway arrows), above every stroke
+│  │        ├ glows                a `LineBatch`: the glow around a hovered line of the level
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
-│  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile
+│  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile.
+│  │                               Only the lines that draw themselves are in these (one with
+│  │                               dashes or markers that a batch can't draw): the rest aren't
+│  │                               in the scene
 │  ├ <spatialID>         one per Rapid dataset / custom data cache / GeoScribble, zIndex 1, 2, … in
 │  │  ├ polygons         the order they first draw (so external data is above OSM, and a dataset's
 │  │  └ lines            polygons are above OSM lines, as before)
 │  └ …
 ├ points
 │  ├ osm                 OSM points, interesting vertices and the virtual POI pins
-│  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude
-│  │  └ viewfields       points with viewfields, above the tiles
+│  │  ├ glows            a `PointBatch`: the glow behind a hovered point, under every point
+│  │  ├ points           a `PointBatch`: every one of them, from north to south, the ones with
+│  │  │                  viewfields last
+│  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude. Only the
+│  │  │                  points that draw themselves are in these (one with a picture from
+│  │  │                  another texture): the rest aren't in the scene
+│  │  └ viewfields       the same, for points with viewfields, above the tiles
 │  └ <spatialID>         other layers' points, straight in the container
 ├ debug-over
 ├ streetview
@@ -55,8 +78,10 @@ origin
 ├ labels                 screen-space, not interactive
 ├ blocks                 edit blocks, straight in the group: always interactive (they catch the pointer
 │                        on purpose, and show `not-allowed`)
-└ ui                     PixiLayerMapUI: lasso, geolocation, and `selected` (the vertices and midpoints
-                         of the selected/hovered ways, so the user can grab them above everything)
+└ ui                     PixiLayerMapUI: lasso, geolocation, `halo` (one `LineBatch` for the halos of
+                         everything that's selected, in any layer), and `selected` (the vertices and
+                         midpoints of the selected/hovered ways, so the user can grab them above
+                         everything)
 ```
 
 The rule: **a layer never adds a feature straight into a group.** It asks the scene for the container
@@ -110,6 +135,44 @@ halo on a Rapid line while drawing, and a cheaper hit test in those modes.
 
 Not changed: the `'drawing'` class still turns off the drawing way's own hit area (Rapid#648), and
 `DragBehavior` still turns off the dragged node's.
+
+### Who finds the feature under the pointer (Nov 23)
+
+Pixi's hit test asks every interactive container in the scene, on every pointer event: 8 ms among
+Užice's 107,000 features, whatever is under the pointer. A layer that keeps its data in a spatial
+index can ask the few features near the pointer instead, so a layer can take its spatial ID's hit
+testing from Pixi:
+
+- **The layer says so:** `scene.setHitTester('osm', layer)`. The scene then gives that spatial
+  ID's containers `eventMode: 'none'` whatever the mode, and Pixi's walk skips them.
+- **`PixiEvents` asks the scene for the feature on every pointer event** (`scene.hitTest()`), and
+  puts it on the event (`_feature`). `AbstractBehavior._getEventData()` reads it from there; the
+  behaviors and modes are unchanged.
+- **The scene takes whichever is drawn on top:** the feature that Pixi's own target belongs to, or
+  the one a layer found (`drawOrder()` in `helpers.ts` compares their places in the tree). A layer
+  whose spatial ID the mode keeps from the pointer isn't asked.
+- **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
+  within reach of the pointer (the furthest any feature drawn so far can be hit from its
+  geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
+  point answers by its hit area, a shape in pixels around where the point is on screen. A line
+  answers by its distance from the pointer in world coordinates, and an area by that distance
+  from its rings or by being in its fill. None of that is Pixi's: a feature that its batches
+  draw isn't in the scene. (One that draws itself, like a vertex of what's selected, answers by
+  the rules Pixi has for one container: `containerHit()`.)
+- **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
+  what draws each (`sceneContainer`: a feature's own container, a line's strokes' batch, an
+  area's fills' batch, the points' batch), and in one batch by the feature's order there.
+- **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
+  spatial container: Pixi still finds those.
+
+Checked on a grid of 4,800 points, in Seattle and Užice, in nine states each (two zooms in and
+out, rotated, wireframe, full fill, a way selected), while every line was still in the scene:
+the same feature as Pixi's hit test over the whole scene at all 86,400 points. Since the lines
+and the areas left the scene, Pixi can't be asked about them: `test/e2e/select.test.js` checks
+the index against asking every feature of the layer. The points left it too (step 8): the test
+draws them with sprites once more, and checks that the batch's points are hit where Pixi hits
+those.
+The numbers are in `design/graphics-system.md` section 15 (step 6).
 
 ## 3. Render groups
 
@@ -234,6 +297,9 @@ changed. A frame of Užice replays about 3,400 draw calls in 6 ms.
   features were made.
 
 **Points** (`_pointTileContainer()`): a container per tile, for points, vertices and the POI pins.
+*(Since Nov 23 the layer's batch draws them, in one draw call, from north to south everywhere:
+see `graphics-system.md` section 15, step 8. The tiles hold the few points that draw themselves,
+and what follows is how those are ordered.)*
 - Points are drawn from north to south, so that a pin overlaps the pins above it on the map. The
   tiles' containers are ordered by row, and points within a tile as before.
 - **Not kept: two tiles side by side.** Where points overlap across the edge between them, the
@@ -296,7 +362,8 @@ What it changed (dev build, from tapes; DRAW in ms):
   moves the view, at Seattle as much as in Užice. A class of lines with a handful of members doesn't need a container per tile:
   splitting only the classes that are big would get most of that back. Not tried.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
-  touches a big group.
+  touches a big group. *(Done, Nov 23: halos are one batch in the `ui` group, and a hover's glow is
+  in a small batch beside what it's around. See section 15 of `graphics-system.md`, step 10.)*
 
 ## 4. Later
 
@@ -305,11 +372,9 @@ What it changed (dev build, from tapes; DRAW in ms):
   default: with the datasets non-interactive, the OSM line under a muted already-mapped line is
   reachable anyway, and that muted line staying visible is the point of the setting. Reordering is a
   visual preference, which is where a layer-order UI would belong.
-- **Batching casings and strokes.** Each `PixiFeatureLine` renders its casing then its stroke, so a
-  dense view draws casing, stroke, casing, stroke, one pair per line. Pixi's `RenderLayer` (8.6+) can
-  render all casings of a level then all strokes while they stay children of the feature container
-  (hit-testing unchanged). See `design/profiling.md`.
-- **Hit-testing by geometry** (the spatial index instead of Pixi) would make snapping independent of
-  stroke width and z-order altogether, and would make "don't snap to the segment next to the active
-  node" (commented out in `HoverBehavior`/`DrawBehavior`) easy. A redesign of hover and snapping;
-  noted as the direction, not planned.
+- **Snapping by geometry.** The OSM layer's features are found through the spatial index now
+  (section 2), but each still answers with its drawn hit area, so the answer is what Pixi gave.
+  Choosing by distance instead (the nearest line, a vertex before a line) would make snapping
+  independent of stroke width and z-order, and would make "don't snap to the segment next to the
+  active node" (commented out in `HoverBehavior`/`DrawBehavior`) easy. A redesign of hover and
+  snapping; noted as the direction, not planned.

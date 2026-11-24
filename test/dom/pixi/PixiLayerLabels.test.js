@@ -9,13 +9,21 @@ import { PixiLayerLabels } from '../../../modules/pixi/PixiLayerLabels.ts';
 describe('PixiLayerLabels', () => {
   let layer, spatial, grid, hits, frees, changed;
 
-  // A stand-in for a point feature drawn 10 px wide at [x, y] of label space
+  // A stand-in for a point feature drawn 10 px wide at [x, y] of label space.
+  // (It says where it's drawn itself: a point that a batch draws has nothing in its container.)
   function pointAt(id, x, y, avoided = true) {
     const cells = avoided ? grid.cellsOf(x, y, x + 10, y + 10) : null;
     if (cells) grid.mark('avoid', cells);
     return {
       id: id, type: 'Point', style: {}, avoidCells: cells,
-      container: { visible: true, renderable: true, getBounds: () => new PIXI.Bounds(x, y, x + 10, y + 10) }
+      container: { visible: true, renderable: true },
+      labelBox: out => {
+        out[0] = x;
+        out[1] = y;
+        out[2] = x + 10;
+        out[3] = y + 10;
+        return out;
+      }
     };
   }
 
@@ -84,6 +92,13 @@ describe('PixiLayerLabels', () => {
       grid.mark('avoid', grid.cellsOf(0, 112, 300, 300));
       grid.mark('avoid', grid.cellsOf(0, 0, 98, 300));
       grid.mark('avoid', grid.cellsOf(112, 0, 300, 300));
+      layer.placeTextLabel(point, MEASURE);
+      assert.lengthOf(labelBoxes(), 0);
+    });
+
+    it('places no label for a point that draws nothing', () => {
+      const point = pointAt('osm-n1', 100, 100, false);
+      point.labelBox = () => null;
       layer.placeTextLabel(point, MEASURE);
       assert.lengthOf(labelBoxes(), 0);
     });
@@ -165,6 +180,57 @@ describe('PixiLayerLabels', () => {
     });
   });
 
+  // With the layer off, or the view zoomed out too far, no label is placed. What the scene
+  // notes about labels meanwhile must not count as placement that's waiting: the layer would
+  // ask for a frame after every frame, forever (a pan with labels off did that).
+  describe('while no labels are shown', () => {
+    const FRAME = { time: 0 };
+    let resets;
+
+    beforeEach(() => {
+      resets = 0;
+      layer.reset = () => {
+        resets++;
+        layer._unplaced.clear();
+      };
+      layer.labelContainer = { visible: true };
+      layer.debugContainer = { visible: true };
+      layer._enabled = false;
+    });
+
+    it('forgets what was placed, once, and hides the labels', () => {
+      layer._unplaced.set('osm-w1', [100, 100, 300, 120]);
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      assert.strictEqual(resets, 1);
+      assert.isFalse(layer.labelContainer.visible);
+      assert.strictEqual(layer._unplaced.size, 0);
+    });
+
+    it('waits for nothing, whatever is drawn over a label or makes room for one meanwhile', () => {
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      layer._unplaced.set('osm-w1', [100, 100, 300, 120]);       // (if anything were still remembered)
+      frees.push(grid.cellsOf(200, 104, 210, 114));
+      hits.push(grid.cellsOf(200, 104, 210, 114));
+      layer.scene.numAvoidHits = 1;
+      assert.strictEqual(layer.numWaiting, 1);
+
+      layer.scene.numAvoidHits = 0;      // (the stand-in scene's count doesn't follow its list)
+      layer.render(FRAME, { transform: { zoom: 17 } });
+      assert.lengthOf(frees, 0);
+      assert.lengthOf(hits, 0);
+      assert.strictEqual(layer.numWaiting, 0);
+    });
+
+    it('does the same when the view is zoomed out too far for labels', () => {
+      layer._enabled = true;
+      frees.push(grid.cellsOf(200, 104, 210, 114));
+      layer.render(FRAME, { transform: { zoom: 11 } });
+      assert.strictEqual(resets, 1);
+      assert.lengthOf(frees, 0);
+    });
+  });
+
   describe('labelPoints', () => {
     it('remembers a point that got no room for its label', () => {
       layer.measureLabel = () => MEASURE;
@@ -178,6 +244,119 @@ describe('PixiLayerLabels', () => {
       layer.labelPoints([point]);
       assert.lengthOf(labelBoxes(), 0);
       assert.isTrue(layer._unplaced.has('osm-n1'));
+    });
+  });
+
+  // A line's label runs along it, if the line takes enough room on screen. That's worked out
+  // from the line's points and width, and from where `origin` puts the world on screen: a line
+  // that's drawn in a batch has nothing in its container, and the container isn't in the scene.
+  describe('labelLines', () => {
+    // A stand-in for a line feature along x, `length` world units long, starting at [1100, 2100]
+    // in the world, hit `hitReach` pixels from its geometry, of the given road class
+    function lineOf(id, length, hitReach, roadClass = 0) {
+      const container = new PIXI.Container();    // nothing in it, and it has no parent
+      container.position.set(1000, 2000);
+      container.zIndex = roadClass + 0.5;
+      return {
+        id: id, type: 'LineString', label: 'Main Street', hitReach: hitReach,
+        geometry: { local: { coords: [[100, 100], [100 + length, 100]] } },
+        container: container
+      };
+    }
+
+    let placed, coords;
+    beforeEach(() => {
+      placed = [];
+      coords = new Map();
+      layer.gfx.origin = new PIXI.Container();    // world units are pixels
+      layer.measureLabel = () => MEASURE;
+      layer.placeRopeLabel = (feature, measurement, labelCoords) => {
+        placed.push(feature.id);
+        coords.set(feature.id, labelCoords);
+      };
+    });
+
+    it('puts the label along where the line is on screen, wherever its container is', () => {
+      layer.gfx.origin.position.set(-1000, -2000);
+      layer.gfx.origin.scale.set(2);
+      layer.labelLines([lineOf('line', 50, 0)]);
+      assert.deepEqual(coords.get('line'), [[1200, 2200], [1300, 2200]]);    // (world - 500, -1000) × 2
+    });
+
+    it('labels the lines of the more important roads first', () => {
+      layer.labelLines([lineOf('footway', 50, 0, -20), lineOf('motorway', 50, 0, 0), lineOf('residential', 50, 0, -9)]);
+      assert.deepEqual(placed, ['motorway', 'residential', 'footway']);
+    });
+
+    it('labels a line that\'s 40 pixels long or more, and not a shorter one', () => {
+      layer.labelLines([lineOf('long', 40, 0), lineOf('short', 39, 0)]);
+      assert.deepEqual(placed, ['long']);
+    });
+
+    it('counts the line\'s width: a line is hit 5 pixels beyond its casing', () => {
+      layer.labelLines([lineOf('wide', 34, 8), lineOf('narrow', 34, 6)]);    // casings of 6 and 2 pixels
+      assert.deepEqual(placed, ['wide']);
+    });
+
+    it('doesn\'t label a hidden line, or one without a label', () => {
+      const hidden = lineOf('hidden', 100, 0);
+      hidden.container.visible = false;
+      const unnamed = lineOf('unnamed', 100, 0);
+      unnamed.label = null;
+      layer.labelLines([hidden, unnamed]);
+      assert.deepEqual(placed, []);
+    });
+  });
+
+
+  describe('labelPolygons', () => {
+    // A stand-in for a polygon feature: a rectangle `width` by `height`, with its corner at
+    // [100, 100] of the world, which is also where it is in label space here. Its container
+    // has nothing in it and isn't in the scene, as when batches draw the polygon.
+    function polygonOf(id, width, height) {
+      const container = new PIXI.Container();
+      container.position.set(100, 100);
+      return {
+        id: id, type: 'Polygon', label: 'Park', style: {},
+        geometry: { local: { outer: [[0, 0], [width, 0], [width, height], [0, height], [0, 0]] } },
+        container: container
+      };
+    }
+
+    let paths;
+    beforeEach(() => {
+      paths = [];
+      layer.gfx.origin = new PIXI.Container();    // world units are pixels
+      layer.measureLabel = () => MEASURE;
+      layer.placeRopeLabel = (feature, measurement, coords) => { paths.push(coords); layer._didPlace = true; };
+    });
+
+    it('runs a large polygon\'s label along the inside of its outer ring, 12 pixels in', () => {
+      layer.labelPolygons([polygonOf('osm-w1', 800, 700)]);
+      assert.lengthOf(paths, 1);
+      const path = paths[0];
+      const xs = path.map(coord => coord[0]);
+      const ys = path.map(coord => coord[1]);
+      assert.closeTo(Math.min(...xs), 112, 1e-6);
+      assert.closeTo(Math.max(...xs), 888, 1e-6);
+      assert.closeTo(Math.min(...ys), 112, 1e-6);
+      assert.closeTo(Math.max(...ys), 788, 1e-6);
+      assert.deepEqual(path.at(-1), path[0]);    // it's a ring
+      assert.lengthOf(path, 5);
+    });
+
+    it('does the same whichever way the ring goes around', () => {
+      const polygon = polygonOf('osm-w1', 800, 700);
+      polygon.geometry.local.outer.reverse();
+      layer.labelPolygons([polygon]);
+      const xs = paths[0].map(coord => coord[0]);
+      assert.closeTo(Math.min(...xs), 112, 1e-6);
+      assert.closeTo(Math.max(...xs), 888, 1e-6);
+    });
+
+    it('gives no label to a polygon under 600 pixels both ways', () => {
+      layer.labelPolygons([polygonOf('osm-w1', 500, 400)]);
+      assert.lengthOf(paths, 0);
     });
   });
 

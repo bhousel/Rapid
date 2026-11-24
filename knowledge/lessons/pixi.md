@@ -3,10 +3,9 @@
 How Pixi behaves, and what that means for Rapid.
 
 - **Mark features dirty when styles change** — `immediateRedraw()` alone doesn't work. Call `gfx.scene.dirtyScene()` before redraw so features re-fetch their style.
-- **Pixi v8 `textureSpace: 'local'` stretches the texture to fit each stroked shape's bounding box** — read `node_modules/pixi.js/lib/scene/graphics/shared/utils/generateTextureFillMatrix.mjs` for the exact math. In the `'local'` branch, Pixi computes `bounds = shape.getBounds()` of the current stroke instruction and maps UV so (0,0) = top-left of bounds, (1,1) = bottom-right. The user-supplied `style.matrix` is then composed on top. For DashLine, each `stroke()` call covers one segment, so `'local'` makes one full dash cycle stretch across each segment — longer segments = bigger dashes. Use `textureSpace: 'global'` for tiled patterns where the cycle length must be independent of segment length. (`'global'` is misnamed: it does NOT use worldTransform; it just normalizes UV by `texture.source.width/height` per pixel.)
-- **Rapid supports the WebGL1 renderer path** — e.g. `?renderer=webgl1` in the URL. WebGL1 only supports REPEAT wrap on power-of-two textures, so pattern textures (like DashLine's dash texture) must keep `nextPow2` padding. Compensate for the padding in the user-supplied `style.matrix` rather than dropping the padding. Specifically, scale the matrix by `(dashSize / texW, width / texH)` so one full texture cycle (texW × texH pixels) maps to exactly `dashSize × width` local units — then multiplied by `userScale` for the caller's coordinate system.
-- **DashLine matrix composition: scale BEFORE rotate** — with uniform scale, scale-then-rotate and rotate-then-scale produce the same matrix. With non-uniform scale (which we need to compensate for different x/y pow2 padding), the order matters. In Pixi's pre-multiply convention (`scale()`, `rotate()`, `translate()` all pre-multiply), do `m.identity(); m.scale(sx, sy); m.rotate(angle); m.translate(tx, ty)` — result is `M = T * R * S`, so a vector is first scaled (in texture-axis frame), then rotated to line direction, then translated to line origin. Reverse order tilts the texture axes off the line direction.
-- **DashLine `scale` vs container scale are independent axes** — DashLine's `scale` option converts drawing-coord units to screen pixels (multiplies `width` and `dash[i]`). Container scale controls the Pixi transform hierarchy. For Line/Polygon features (`container.scale = 1`, drawing in world units), use `scale: localScale` (`2^(WORLD_ZOOM-zoom)`). For Point features (`container.scale = 1/worldScale`, drawing in CSS pixels), use `scale: 1` (default). Don't conflate the two.
+- **Pixi v8 `textureSpace: 'local'` stretches the texture to fit each stroked shape's bounding box** — read `node_modules/pixi.js/lib/scene/graphics/shared/utils/generateTextureFillMatrix.mjs` for the exact math. In the `'local'` branch, Pixi computes `bounds = shape.getBounds()` of the current stroke instruction and maps UV so (0,0) = top-left of bounds, (1,1) = bottom-right. The user-supplied `style.matrix` is then composed on top. A dash texture stroked one segment at a time (as `DashLine` did, before it was replaced by `LineMesh`) stretches one full cycle across each segment with `'local'` — longer segments = bigger dashes. Use `textureSpace: 'global'` for tiled patterns where the cycle length must be independent of segment length. (`'global'` is misnamed: it does NOT use worldTransform; it just normalizes UV by `texture.source.width/height` per pixel.)
+- **Rapid supports the WebGL1 renderer path** — e.g. `?renderer=webgl1` in the URL. WebGL1 only supports REPEAT wrap on power-of-two textures, so a texture that repeats (a dash pattern from `PixiTextures.getDashTexture()`) is a power of 2 wide, with the pattern stretched over all of it: its texture coordinates count in repeats of the pattern, not in texels, so the width doesn't show.
+- **Pre-multiplied matrices: scale BEFORE rotate** — with uniform scale, scale-then-rotate and rotate-then-scale produce the same matrix. With non-uniform scale the order matters. In Pixi's pre-multiply convention (`scale()`, `rotate()`, `translate()` all pre-multiply), do `m.identity(); m.scale(sx, sy); m.rotate(angle); m.translate(tx, ty)` — result is `M = T * R * S`, so a vector is first scaled (in the texture's own axes), then rotated, then translated. Reverse order tilts the texture's axes.
 - **`viewZoom` vs `styleZoom`: always use the right zoom for each purpose** — `viewZoom = viewport.transform.zoom` is the true Mercator zoom; use it for scale chain math (`worldScale = 2^(viewZoom - WORLD_ZOOM)`). `styleZoom = map?.effectiveZoom() ?? viewZoom` is latitude-adjusted; use it only for LOD thresholds and visual style decisions (e.g. `styleZoom < 16`). Mixing them causes features to scale incorrectly at high latitudes. Name them explicitly in functions that need both.
 - **Don't accept "works for one caller" as a fix for a shared utility** — If a `useTexture: true`/`false` toggle changes visible output for the same input, that's a bug in the utility, not a configuration choice for callers. Look at the math before reaching for a workaround.
 - **Pixi v8 renderer is NOT re-entrant** — never call `renderer.render()` or `renderer.generateTexture()` inside a layer's render path. The renderer shares batcher / renderPipes / renderTarget state across the whole frame; a nested render corrupts whichever slots are in flight. Symptom: intermittent visual glitches (garbled textures, smeared/wrong-UV meshes) on the FIRST frame an object enters the scene, which self-heal on the next clean render. Label texture creation is now deferred through `SchedulerSystem.schedule()` so it runs after frame callbacks. Remaining known risk: `PixiFeaturePolygon` still uses `PIXI.GpuGraphicsContext` + `buildContextBatches` to extract geometry; replace that with direct tessellation.
@@ -36,4 +35,98 @@ How Pixi behaves, and what that means for Rapid.
   frame that moved the tile without a rebuild. It reproduced in a few lines by doing those steps
   with a render after each (headless Chromium, `node_modules/pixi.js/dist/pixi.min.js`). In Rapid it
   also needed a mask that Pixi had never batched: one batched once keeps a stale place in an old
-  batch and is written there instead of throwing (the e2e test calls `mask.unload()` first).
+  batch and is written there instead of throwing (the e2e test, which is about a `LineMesh` now
+  that the masks are gone, calls `mesh.unload()` first).
+- **A container's bounds are what its children draw.** When a feature stops drawing in its own
+  container, everything that asked the container for its size gets nothing. The OSM layer's lines
+  moved into batches (`LineBatch`, Nov 2026), and `PixiLayerLabels` skipped every line as "too
+  small": it read `feature.container.getBounds()`. No test looked for street names. It showed as
+  a label that turned up in the freed room in a test about hovering, and as names missing from
+  one of two screenshots. Before moving drawing out of a container, grep for `getBounds`.
+- **Something handed out before it's used can be cleaned up as unused.** A line feature gets its
+  batch in the layer's pass and may be drawn some frames later (the frame's deadline). The pass
+  ended by destroying batches with no lines in them, which that one still was. Count who holds a
+  thing (`LineBatch.users`), not only what's in it.
+- **Pixi's events mixin isn't on `Container` until a renderer is made.** In a DOM test,
+  `interactiveChildren` is `undefined` and nothing below a container is "interactive", so code
+  that follows Pixi's hit-test rules behaves differently than in the app. `import 'pixi.js/events'`
+  in the test.
+- **A `Mesh` with a shader of its own: bring its buffers up to date in `onRender`.** Pixi calls
+  it once before each render. `buffer.update(size, offset)` remembers one range, the last one
+  given, so collect what changed and call it once there. And `geometry.indexCount = 0` means "the
+  whole index buffer": a mesh with nothing to draw has to be `renderable = false`.
+- **A filter on a container shows what's drawn in that container, and nothing else.** A hovered
+  line's glow is a `GlowFilter` on its feature's container. When the lines moved into batches
+  the container was empty, the glow was gone, and it was committed that way: every test passed,
+  because the tests for hovering looked at classes and vertices. After moving what a feature
+  draws, look at it hovered, selected and dragged in a screenshot, and give the test something
+  about the picture to check (here: the line has meshes in its container while it glows).
+- **Fewer, larger batches were cheaper than they looked.** One batch for all the lines of a
+  level (18,882 in Užice) sounded like a lot to rebuild when a line joins: building its index
+  buffer again is a loop over typed arrays, 81 ms in all while 107,000 features were made.
+  What does cost is whatever makes it rebuild often: hiding a line used to, on every frame the
+  cull box moved (7 ms of DRAW), until hiding became a byte per vertex.
+- **Pixi has three tickers, and stopping the application's leaves two.** `Ticker.shared` (animated
+  sprites) and `Ticker.system`, which ran its own `requestAnimationFrame` loop for Pixi's events
+  ticker (pointer moves sent again for `eventMode: 'dynamic'` objects) and Pixi's scheduler (which
+  frees unused GPU resources). Neither showed in our frame stats; both showed in every flame
+  chart. To see what runs: `PIXI.Ticker.system.started`, and walk `_head.next` for its listeners.
+  `GraphicsSystem` stops both and gives the system ticker a turn once a second.
+- **A batch draws what a level-of-detail sprite was there to avoid.** The `lowRes` sprite for a
+  small area existed because a `Graphics` per building was too much. In a `FillBatch` a small
+  area's own triangles cost no object and no draw call, so the special case went away. When
+  moving something into a batch, ask what its workarounds were for.
+  *(Later the same day: the fill is nearly free, but the outline isn't. A small rectangle's
+  outline is 14 triangles to its fill's 3, and Staten Island's 14,000 parking spaces made them
+  a third of the frame's triangles, 1 to 3 ms of GPU. A workaround can be there for more than
+  one reason: count what each part of the replacement costs.)*
+- **A shader can do what a counter-scaled container did.** Every point had a container scaled by
+  the inverse of the zoom and turned against the map's rotation, so its sprites came out at
+  their size and upright, and every one was set again at every zoom. In a mesh's vertex shader,
+  `uWorldTransformMatrix * uTransformMatrix` takes a position to pixels on screen: add the
+  offset in pixels after that, and nothing in the vertices depends on the zoom or the rotation.
+  The map's own axes on screen are that matrix's first two columns, normalized (for what turns
+  with the map), so no uniform about the view is needed.
+- **A container's `worldTransform` is what the last render made it.** It isn't worked out when
+  you read it: in a DOM test, with no render, it's the identity whatever the container's scale.
+  Give code that reads it a matrix in tests (`{ worldTransform: new PIXI.Matrix().scale(…) }`),
+  and remember that in the app it's the view as last drawn, which is what a hit test wants.
+- **When two paths draw the same thing, work out what's drawn in one place.** Points can be
+  drawn by a batch or by sprites. Both take the same list of pictures (`_layout()`), so the two
+  can be compared pixel for pixel in one build, and a new marker or anchor can't be added to
+  one and forgotten in the other.
+- **What a fragment shader draws can only be tested by its pixels.** The lines' shader draws
+  oneway arrows from a few lines of arithmetic. Every buffer was right while the sided markers
+  were on the wrong side of their lines, and while a marker was drawn twice (by the batch and
+  by a sprite). An e2e test that renders the map with and without them, and compares the
+  pixels they change with the sprites', caught both kinds: `gfx.pixi.renderer.render()`, then
+  `drawImage()` of the canvas into a 2D one in the same task, and `getImageData()`.
+- **"Left" depends on which way y goes.** The stroke mesh calls a vertex's side 1 "left of the
+  direction of travel", by `(-dy, dx)`. On screen, where y is down, that's the right. Check a
+  side against a picture, not against the word.
+- **A growth rule can be bounded and still wasteful.** A batch that got larger buffers whenever
+  it was more than half full of live vertices stops growing at twice its peak, in theory. With
+  things that come and go at every zoom it was at three times what it used and climbing. Count
+  the room against the use after the churn a real session makes, not after a load.
+- **A thing that comes and goes belongs in a small batch of its own.** A batch that gets or
+  loses a thing builds its whole index buffer again (in the order of every thing's `order`).
+  A hover's glow in the batch of a town's roads made every hover 11 ms of DRAW in Užice, where
+  hiding a line there had been a byte per vertex. In a batch that holds only glows it's 0.8.
+  A thing that changes *in place* (same vertex count) is cheap anywhere: only what was written
+  is sent to the GPU.
+- **A number that's the same at both edges of a strip says nothing in between.** The first
+  glow gave each vertex "1 at the strip's edge, 0 on the line", and a segment's two sides are
+  both edges: the fragment shader got 1 everywhere, and faded the glow to nothing. For a
+  distance across a strip, interpolate something signed (or a vector, and take its length):
+  one side's normal to the other's goes through 0 on the line.
+- **WGSL reserves names that GLSL allows:** `from`, `filter`, `target`, `type`, `mod`, `self`,
+  `set`, and about 140 more. A variable called `from` in the WGSL made the map black with
+  `renderer=webgpu`, with a warning in the console and every test passing (they draw with
+  WebGL). `test/dom/pixi/shaders.test.js` checks the names; it doesn't compile anything.
+- **An upload of our own has to premultiply as Pixi's does.** `AtlasAllocator`'s WebGPU
+  uploader left `premultipliedAlpha` off, and the WebGL one sets `UNPACK_PREMULTIPLY_ALPHA`.
+  Icons hid it (their faint edges are a pixel wide); a picture that fades over 16 pixels was
+  a hard disc.
+- **An animation frame is a whole DRAW.** Pixi renders the scene or nothing, so moving one
+  halo's dashes draws every batch: 0.2 ms on the CPU, and 5 to 14 ms of GPU on an M4. That's
+  why what moves is paced (`AnimationPacer`), and rests.

@@ -1,296 +1,214 @@
 import * as PIXI from 'pixi.js';
-import { vecEqual, vecLength, type Vec2 } from '@rapid-sdk/math';
+import { geomStrokeMesh } from '../geo/index.ts';
+import { GlowFilter } from 'pixi-filters';
+import { LineMesh } from './lib/LineMesh.ts';
+
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { LineBatch, LineBatchItem, LineBatchStyle } from './lib/LineBatch.ts';
 
 
-/** Line style options for lineToPoly */
-export interface LineStyle {
-  alignment?: number;
-  width?: number;
-  native?: boolean;
-  [key: string]: any;
-}
+// The halo around what's selected: a yellow line 2 pixels wide, in dashes of 6 with gaps of 3
+// that march along it, over a darker line 4 pixels wide. (The dark line is there so that the
+// dashes show on any background, a yellow road as well as a black one.)
+const HALO_DASHES: LineBatchStyle = { width: 2, minWidth: 2, color: 0xffff00, alpha: 1, dash: [6, 3], marches: true };
+const HALO_UNDER: LineBatchStyle = { width: 4, minWidth: 4, color: 0x000000, alpha: 0.55, marches: true };
 
-/** Result from lineToPoly containing paths for hit areas */
-export interface LineToPolyResult {
-  /** Flattened [x,y,x,y,...] coordinates for perimeter */
-  perimeter: number[];
-  /** Flattened outer path (for closed lines only) */
-  outer?: number[];
-  /** Flattened inner path (for closed lines only) */
-  inner?: number[];
+/** The color of a hover: the glow around what the pointer is over, and the tint of an area's fill */
+export const HOVER_COLOR = 0xffff00;
+
+/** The color of a highlight: the same, for what something in the sidebar points at */
+export const HIGHLIGHT_COLOR = 0x7092ff;
+
+/** Where a point is in a container's own coordinates, while `containerHit()` works */
+const _local = new PIXI.Point();
+
+
+/**
+ * Whether a point is over a container, by the rules Pixi's own hit test has for one subtree
+ * (`EventBoundary.hitTestRecursive`): a `hitArea` decides where it has one, otherwise the
+ * children do, and then what the container draws (`containsPoint`). Nothing with
+ * `eventMode: 'none'` or hidden is hit.
+ *
+ * Pixi's hit test starts at the stage and asks every interactive container in the scene. This
+ * asks one, for a caller that already knows which few could be under the pointer (see
+ * `PixiScene.hitTest`). The container's ancestors aren't looked at.
+ * @param container - The container to test
+ * @param point - The point, in the stage's coordinates (a pointer event's `global`)
+ * @param interactive - Whether an ancestor made everything below it interactive (leave it out)
+ * @return `true` if the pointer would hit the container or something in it
+ */
+export function containerHit(container: PIXI.Container, point: PIXI.PointData, interactive: boolean = false): boolean {
+  const eventMode = container.eventMode;
+  if (!container.visible || !container.renderable || !container.measurable || eventMode === 'none') return false;
+  if (eventMode === 'passive' && !container.interactiveChildren) return false;
+
+  const hitArea = container.hitArea;
+  if (hitArea) {
+    container.worldTransform.applyInverse(point, _local);
+    if (!hitArea.contains(_local.x, _local.y)) return false;
+  }
+
+  const isInteractive = interactive || eventMode === 'static' || eventMode === 'dynamic';
+  if (container.interactiveChildren) {
+    const children = container.children;
+    for (let i = children.length - 1; i >= 0; i--) {
+      if (containerHit(children[i], point, isInteractive)) return true;
+    }
+  }
+
+  if (!isInteractive) return false;
+  if (hitArea) return true;
+
+  if (container instanceof PIXI.ViewContainer) {   // something that draws: a sprite, a graphics, a mesh
+    container.worldTransform.applyInverse(point, _local);
+    return container.containsPoint(_local);
+  }
+  return false;
 }
 
 
 /**
- * Generates a polygon from a line. Intended for use to create custom hit areas for our ways.
- * @see https://jsfiddle.net/bigtimebuddy/xspmq8au/
- * @param   width  - Width of the polygon in pixels (deviation from either side of the line)
- * @param   points - Flat array of [x,y,x,y,...] coordinates that make up the line.
- * @return  The polygon encasing the line with specified width.
+ * Says which of two containers in the same scene is drawn later, and so is on top where they
+ * overlap. It's the order of a walk through the tree: a container's children are kept in the
+ * order they're drawn in (Pixi sorts them by `zIndex` when it renders).
+ * @param a - A container
+ * @param b - Another
+ * @return A positive number if `a` is drawn after `b`, a negative one if before, and 0 if they're
+ *   the same container or aren't in the same tree
  */
-export function lineToPolygon(width: number, points: number[]): PIXI.Polygon {
-  const numPoints = points.length / 2;
-  const output = new Array(points.length * 2);
-  for (let i = 0; i < numPoints; i++) {
-    const j = i * 2;
+export function drawOrder(a: PIXI.Container, b: PIXI.Container): number {
+  if (a === b) return 0;
 
-    // Position of current point
-    const x = points[j];
-    const y = points[j + 1];
+  let depthA = 0;
+  let depthB = 0;
+  for (let c = a.parent; c; c = c.parent) depthA++;
+  for (let c = b.parent; c; c = c.parent) depthB++;
 
-    // Start
-    const x0 = points[j - 2] !== undefined ? points[j - 2] : x;
-    const y0 = points[j - 1] !== undefined ? points[j - 1] : y;
+  // Bring the deeper one up to the other's depth. If that arrives at the other, one is inside
+  // the other: a container is drawn before what's in it.
+  let ca: PIXI.Container = a;
+  let cb: PIXI.Container = b;
+  for (; depthA > depthB; depthA--) ca = ca.parent!;
+  for (; depthB > depthA; depthB--) cb = cb.parent!;
+  if (ca === cb) return (ca === a) ? -1 : 1;
 
-    // End
-    const x1 = points[j + 2] !== undefined ? points[j + 2] : x;
-    const y1 = points[j + 3] !== undefined ? points[j + 3] : y;
-
-    // Get the angle of the line
-    const a = Math.atan2(-x1 + x0, y1 - y0);
-    const deltaX = width * Math.cos(a);
-    const deltaY = width * Math.sin(a);
-
-    // Add the x, y at the beginning
-    output[j] = x + deltaX;
-    output[j + 1] = y + deltaY;
-
-    // Add the reflected x, y at the end
-    output[(output.length - 1) - j - 1] = x - deltaX;
-    output[(output.length - 1) - j] = y - deltaY;
+  // Then up together, to the two children of the same parent.
+  while (ca.parent !== cb.parent) {
+    if (!ca.parent || !cb.parent) return 0;
+    ca = ca.parent;
+    cb = cb.parent;
   }
-
-  // close the shape
-  output.push(output[0], output[1]);
-  return new PIXI.Polygon(output);
+  const parent = ca.parent;
+  if (!parent) return 0;
+  return parent.children.indexOf(ca) - parent.children.indexOf(cb);
 }
 
 
 /**
- * Use Pixi's built-in line builder to convert a line with some width into a polygon.
- * @see https://github.com/pixijs/pixijs/blob/dev/packages/graphics/src/utils/buildLine.ts
- * @param  flatPoints - Flat array of [x,y,x,y,...] points that make up the line
- * @param  lineStyle  - Object suitable to use as a lineStyle (important options are alignment and width)
- * @return Result containing perimeter and optionally outer/inner paths
+ * The color that a feature glows in: a hover's, a highlight's, or none.
+ * @param classes - The feature's classes
+ * @return The color as 0xRRGGBB, or `null` if the feature doesn't glow
  */
-export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): LineToPolyResult {
-  const EPSILON = 1e-4;
-  const first: Vec2 = [flatPoints[0], flatPoints[1]];
-  const last: Vec2 = [flatPoints[flatPoints.length - 2], flatPoints[flatPoints.length - 1]];
-  const isClosed = vecEqual(first, last, EPSILON);
-
-  lineStyle.native = false;  // we want the non-native line builder
-
-  // Make some fake graphicsData and graphicsGeometry.
-  // (I'm avoiding using a real PIXI.Graphic because I dont want to affect the batch system)
-//  const graphicsData = { shape: sourceShape, lineStyle: lineStyle };
-  const graphicsGeometry = { closePointEps: EPSILON, indices: [], verts: [], uvs: [] };
-
-  // Pixi will do the work for us.
-// v7
-//  PIXI.buildLine(graphicsData, graphicsGeometry);
-// v8
-  PIXI.buildLine(
-    flatPoints,
-    lineStyle,
-    false,  // flipAlignment
-    isClosed,
-    graphicsGeometry.verts,
-    graphicsGeometry.indices
-  );
+export function glowColor(classes: ReadonlySet<ClassID>): number | null {
+  return classes.has('hover') ? HOVER_COLOR : classes.has('highlight') ? HIGHLIGHT_COLOR : null;
+}
 
 
-  // The `graphicsGeometry` now contains the points as they would be drawn (as a strip of triangles).
-  // What we really want is a polygon representing the outer shape.
-  //
-  // Some findings about the `buildLine` triangulation code:
-  //  - PIXI doesn't actually use GL_TRIANGLE_STRIP here, they are just normal GL_TRIANGLES.
-  //  - They are a mix of ccw/cw winding (they don't follow the "ccw = frontface" convention)
-  //  - Rounded caps/joins can add a lot of triangles, the code below can't handle them
-  //  - Triangles with small area may be skipped (they appear in verts but not in indices)
-  //
-  // (it looks something like this)
-  //
-  //                        7 +…_
-  //                         / \ "-…_
-  //  L  0        2       4 / F \ G  + 8
-  //     +-------_+-------_+…_   \  /
-  //     | A _…-" | C _…-" |  "-…_\/
-  //     |_-"   B |_-"   D | E _…-+
-  //     +--------+--------+-""    6
-  //  R  1        3        5
-  //
-  //  triangle:  A ccw  B cw   C ccw  D cw   E ccw  F ccw  G cw
-  //   indices:  0 1 2  1 2 3  2 3 4  3 4 5  4 5 6  4 6 7  6 7 8  …
-  //      side:  L R L  R L R  L R L  R L R  L R R  L R L  R L R  …
-
-  const verts = graphicsGeometry.verts;
-  const indices = graphicsGeometry.indices;
-
-  const sides = new Map<number, boolean>();  // Map(index -> what side it's on) (`true` if left, `false` if right)
-  const pathL: Vec2[] = [];
-  const pathR: Vec2[] = [];
-  let lastL: Vec2 | undefined;
-  let lastR: Vec2 | undefined;
-  let lenL = 0;
-  let lenR = 0;
-
-  // Sometimes `buildLine` skips triangles if they are too small, so keep track
-  // of the previous triangle's verts and indices in case we need them.
-  let vp0: Vec2 | undefined;
-  let vp1: Vec2 | undefined;
-  let vp2: Vec2 | undefined;
-  let ip0: number | undefined;
-  let ip1: number | undefined;
-  let ip2: number | undefined;
-
-  // Inspect each triangle in the strip.
-  for (let j = 0; j < indices.length; j += 3) {
-    const i0 = indices[j];
-    const i1 = indices[j + 1];
-    const i2 = indices[j + 2];
-    const v0: Vec2 = [ verts[(i0 * 2)], verts[(i0 * 2) + 1] ];
-    const v1: Vec2 = [ verts[(i1 * 2)], verts[(i1 * 2) + 1] ];
-    const v2: Vec2 = [ verts[(i2 * 2)], verts[(i2 * 2) + 1] ];
-
-    // First triangle
-    // Pick index 0 as the "left side" and index 1 as the "right side"
-    if (j === 0) {
-      sides.set(i0, true);   // left
-      sides.set(i1, false);  // right
-      sides.set(i2, true);   // left
-      pathL.push(v0);
-      pathR.push(v1);
-      pathL.push(v2);
-      lastR = v1;
-      lastL = v2;
-      lenL = vecLength(v0, v2);
-
-    // Subsequent triangles
-    // Each subsequent triangle in the strip should have:
-    // - two "seen" vertices where we know their sides, and
-    // - one "new" vertex where we need to figure out what side of the line it's on.
-    } else {
-      let s0 = sides.get(i0);
-      let s1 = sides.get(i1);
-      let s2 = sides.get(i2);
-
-      // Sometimes `buildLine` skips triangles - (their verts appear in the vertex array but not the index array)
-      // So first - check if any of the "new" verts in this triangle happen to match the previous triangle's verts
-      if (s0 === undefined && vecEqual(v0, vp0!, EPSILON)) {  // v0 and vp0 are the same point
-        s0 = sides.get(ip0!);
-        sides.set(i0, s0!);
-      }
-      if (s1 === undefined && vecEqual(v1, vp1!, EPSILON)) {  // v1 and vp1 are the same point
-        s1 = sides.get(ip1!);
-        sides.set(i1, s1!);
-      }
-      if (s2 === undefined && vecEqual(v2, vp2!, EPSILON)) {  // v2 and vp2 are the same point
-        s2 = sides.get(ip2!);
-        sides.set(i2, s2!);
-      }
-
-      // Given 2 "seen" vertex sides, what side would the third vertex be on?
-      // `buildLine` puts the new side on the opposite of the "previous" vertex side.
-      // There is no requirement to build the lines this way, it's just how `buildLine` works.
-      // (round caps and joins aren't always this way, so this code doesn't support them!)
-
-      // One of these should be the "new" vertex..
-      let inew: number | undefined;
-      let vnew: Vec2 | undefined;
-      let snew: boolean | undefined;
-      if (s0 === undefined) {
-        inew = i0;
-        vnew = v0;
-        snew = !s2;
-      }
-      if (s1 === undefined) {
-        inew = i1;
-        vnew = v1;
-        snew = !s0;
-      }
-      if (s2 === undefined) {
-        inew = i2;
-        vnew = v2;
-        snew = !s1;
-      }
-
-      // Append the new vertex to either the left or right side path
-      if (inew !== undefined && vnew !== undefined && snew !== undefined) {
-        sides.set(inew, snew);  // snew = `true` if left, `false` if right
-        if (snew === true) {
-          pathL.push(vnew);
-          if (lastL) lenL += vecLength(lastL, vnew);
-          lastL = vnew;
-        } else {
-          pathR.push(vnew);
-          if (lastR) lenR += vecLength(lastR, vnew);
-          lastR = vnew;
-        }
-      }  // else we've seen all these vertices before - shouldnt happen?
+/**
+ * Gives a container the glow of a hover or a highlight, or takes it away. This is for a
+ * feature that draws itself, with display objects in its container: the glow is a filter on
+ * the container. (A feature that batches draw has its glow drawn there, by their shaders.)
+ * @param container - The feature's container
+ * @param color - The glow's color, or `null` for no glow
+ */
+export function setGlowFilter(container: PIXI.Container, color: number | null): void {
+  if (color === null) {
+    if (container.filters) {
+      container.filters = null!;
     }
+  } else if (!container.filters) {
+    const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: color });
+    glow.resolution = 2;
+    container.filters = [glow];
+  } else {
+    const glow = (container.filters as PIXI.Filter[])[0];
+    if (glow instanceof GlowFilter && new PIXI.Color(glow.color).toNumber() !== color) {    // a hover over a highlight
+      glow.color = color;
+    }
+  }
+}
 
-    // Remember current verts and indices for next loop iteration
-    vp0 = v0; vp1 = v1; vp2 = v2;
-    ip0 = i0; ip1 = i1; ip2 = i2;
+
+/**
+ * Draws rings as lines, each a `LineMesh` child of a container. The children are made as rings
+ * come and destroyed as they go, so call it again with the container it drew into before.
+ * The container's `tint` and `alpha` color them.
+ * @param parent - The container to draw into. Nothing else should be in it.
+ * @param rings - The rings, each as `[x, y, x, y, …]` in the container's coordinates (its last point may repeat its first)
+ * @param width - The lines' width, in those coordinates
+ * @param dashTexture - The dash pattern, for dashed lines (`PixiTextures.getDashTexture()`)
+ * @param dashLength - The length of one repeat of that pattern, in those coordinates
+ */
+export function drawRings(
+  parent: PIXI.Container, rings: ArrayLike<number>[], width: number,
+  dashTexture: PIXI.Texture | null = null, dashLength: number = 0
+): void {
+  while (parent.children.length > rings.length) {   // a ring fewer than before
+    parent.children[parent.children.length - 1].destroy();
   }
 
-
-  const result: LineToPolyResult = {
-    perimeter: []
-  };
-
-  // This path can be used as an array of points for the hitArea.
-  // Go out on one side and back on the other, then close it off.
-  const len = pathL.length + pathR.length + 1;
-  const perimeter: number[] = new Array(len * 2);
-  let i = 0;
-  for (let j = 0; j < pathL.length; ++i, ++j) {   // flatten coords
-    perimeter[i * 2] = pathL[j][0];
-    perimeter[i * 2 + 1] = pathL[j][1];
-  }
-
-  pathR.reverse();
-  for (let j = 0; j < pathR.length; ++i, ++j) {   // flatten coords
-    perimeter[i * 2] = pathR[j][0];
-    perimeter[i * 2 + 1] = pathR[j][1];
-  }
-  // close the shape
-  perimeter[perimeter.length - 2] = perimeter[0];
-  perimeter[perimeter.length - 1] = perimeter[1];
-
-  result.perimeter = perimeter;
-
-  // If the line was closed, determine which path is longer (outer) and shorter (inner)
-  if (isClosed) {
-    const pointsL: number[] = new Array((pathL.length + 1) * 2);
-    for (let j = 0; j < pathL.length; ++j) {   // flatten coords
-      pointsL[j * 2] = pathL[j][0];
-      pointsL[j * 2 + 1] = pathL[j][1];
+  for (let i = 0; i < rings.length; i++) {
+    let mesh = parent.children[i] as LineMesh | undefined;
+    if (!mesh) {
+      mesh = new LineMesh();
+      mesh.label = `ring${i}`;
+      mesh.eventMode = 'none';
+      mesh.sortableChildren = false;
+      parent.addChild(mesh);
     }
-    // close the shape
-    pointsL[pointsL.length - 2] = pathL[0][0];
-    pointsL[pointsL.length - 1] = pathL[0][1];
+    // (a miter longer than the line is wide becomes a bevel: an outline can turn sharply)
+    const strokeMesh = geomStrokeMesh(rings[i], { closed: true, cap: 'butt', join: 'miter', miterLimit: 2 });
+    mesh.setStroke(strokeMesh, width / 2, dashTexture, dashLength);
+  }
+}
 
-    const pointsR: number[] = new Array((pathR.length + 1) * 2);
-    for (let j = 0; j < pathR.length; ++j) {   // flatten coords
-      pointsR[j * 2] = pathR[j][0];
-      pointsR[j * 2 + 1] = pathR[j][1];
-    }
-    // close the shape
-    pointsR[pointsR.length - 2] = pathR[0][0];
-    pointsR[pointsR.length - 1] = pathR[0][1];
 
-    if (lenL > lenR) {
-      result.outer = pointsL;
-      result.inner = pointsR;
-    } else {
-      result.outer = pointsR;
-      result.inner = pointsL;
+/**
+ * Draws the halo of a selected feature: dashed yellow lines along the rings, in a batch of
+ * lines whose dashes march (see `LineBatch`, and `PixiLayerMapUI.haloBatchAt`). Each ring is
+ * two lines there, a dark one and the dashes over it. Call it again with the same list for
+ * other rings (they're written where the old ones were if they have as many points), and with
+ * no rings to take the halo away.
+ * @param batch - The batch to draw in
+ * @param items - The feature's halo in the batch so far. It's brought up to date: two items for each ring.
+ * @param rings - The rings to draw, each as `[x, y, x, y, …]` in world units from the place given
+ * @param x - Where the rings' coordinates start, in the world
+ * @param y - The same, for y
+ */
+export function drawHalo(batch: LineBatch, items: LineBatchItem[], rings: ArrayLike<number>[], x: number, y: number): void {
+  const dx = x - batch.position.x;
+  const dy = y - batch.position.y;
+
+  for (let i = 0; i < rings.length; i++) {
+    // (a miter longer than the line is wide becomes a bevel: an outline can turn sharply)
+    const strokeMesh = geomStrokeMesh(rings[i], { closed: true, cap: 'butt', join: 'miter', miterLimit: 2 });
+    for (let k = 0; k < 2; k++) {
+      const style = k ? HALO_DASHES : HALO_UNDER;
+      const item = items[i * 2 + k];
+      if (item?.batch === batch) {
+        batch.setStroke(item, strokeMesh, dx, dy);
+        batch.setStyle(item, style);
+      } else {
+        item?.batch?.remove(item);
+        items[i * 2 + k] = batch.add(strokeMesh, dx, dy, style, k);
+      }
     }
   }
 
-  return result;
+  while (items.length > rings.length * 2) {   // a ring fewer than before
+    const item = items.pop()!;
+    item.batch?.remove(item);
+  }
 }
 
 
@@ -325,3 +243,104 @@ export function getDebugBBox(
   if (label) sprite.label = label;
   return sprite;
 }
+
+
+/**
+ * Says which of two features is drawn later, and so is on top where they overlap: by where
+ * each is drawn in the scene (`sceneContainer`, see `drawOrder`), and for two that the same
+ * mesh draws (lines in one batch), by their order in it.
+ * @param a - A feature
+ * @param b - Another
+ * @return A positive number if `a` is drawn after `b`, a negative one if before, and 0 if it can't be said
+ */
+export function featureOrder(a: AbstractPixiFeature, b: AbstractPixiFeature): number {
+  const containerA = a.sceneContainer;
+  const containerB = b.sceneContainer;
+  if (containerA !== containerB) return drawOrder(containerA, containerB);
+  return a.sceneOrder - b.sceneOrder;
+}
+
+
+/** A polygon to triangulate: an outer ring and the holes in it, each as `[x, y, x, y, …]` */
+export interface RingPolygon {
+  outer: ArrayLike<number>;
+  holes: ArrayLike<number>[];
+}
+
+/** The triangles that fill some polygons: their corners, and three indices of corners for each */
+export interface Triangles {
+  positions: Float32Array;
+  indices: Uint16Array | Uint32Array;
+}
+
+
+/**
+ * Works out the triangles that fill polygons, for a `FillBatch`. (With `earcut`, which Pixi
+ * uses for its own fills and exports.) The corners are the polygons' own points, in order, so
+ * the result has as many as the rings have points.
+ * @param polygons - The polygons, each with its holes
+ * @return The triangles of all of them
+ */
+export function triangulate(polygons: RingPolygon[]): Triangles {
+  let numFloats = 0;
+  for (const polygon of polygons) {
+    numFloats += polygon.outer.length;
+    for (const hole of polygon.holes) {
+      numFloats += hole.length;
+    }
+  }
+
+  const positions = new Float32Array(numFloats);
+  const all: number[] = [];
+  let first = 0;    // the first corner of the polygon that's being worked on
+
+  for (const polygon of polygons) {
+    const coords: number[] = [];
+    const holeStarts: number[] = [];
+    const addRing = (ring: ArrayLike<number>): void => {
+      const start = coords.length;
+      for (let i = 0; i < ring.length; i++) {
+        coords[start + i] = ring[i];
+      }
+    };
+    addRing(polygon.outer);
+    for (const hole of polygon.holes) {
+      holeStarts.push(coords.length / 2);
+      addRing(hole);
+    }
+
+    positions.set(coords, first * 2);
+    for (const index of PIXI.earcut(coords, holeStarts, 2)) {
+      all.push(index + first);
+    }
+    first += coords.length / 2;
+  }
+
+  const indices = (first < 65536) ? new Uint16Array(all) : new Uint32Array(all);
+  return { positions: positions, indices: indices };
+}
+
+
+/**
+ * Whether a point is inside rings, by the even-odd rule: inside an outer ring and not in a hole
+ * of it, whichever way the rings go around.
+ * @param rings - The rings, each as `[x, y, x, y, …]`
+ * @param x - The point
+ * @param y - The point
+ * @return `true` if it's inside
+ */
+export function ringsContain(rings: ArrayLike<number>[], x: number, y: number): boolean {
+  let inside = false;
+  for (const ring of rings) {
+    const n = ring.length;
+    for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
+      const yi = ring[i + 1];
+      const yj = ring[j + 1];
+      if ((yi > y) !== (yj > y) && x < (ring[j] - ring[i]) * (y - yi) / (yj - yi) + ring[i]) {
+        inside = !inside;
+      }
+    }
+  }
+  return inside;
+}
+

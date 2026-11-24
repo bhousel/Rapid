@@ -338,6 +338,38 @@ describe('GeometryPart', () => {
       assert.strictEqual(part.world.surround, part.world.surround);
     });
 
+    it('computes the inradius of a polygon: how far its pole of inaccessability is from its edge', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'Polygon', coordinates: [[[0, 0], [0.004, 0], [0.004, 0.002], [0, 0.002], [0, 0]]] });
+
+      // The rectangle is twice as wide as it's high: the widest circle in it is half its height across.
+      const [width, height] = part.local.extent.dimensions();
+      assert.closeTo(width, 2 * height, 0.01);
+      assert.isAtMost(part.local.inradius, height / 2);
+      assert.isAbove(part.local.inradius, height / 2 - 1);   // (the pole is found to within 1 unit)
+    });
+
+    it('counts a hole\'s edge too', () => {
+      // A square of 0.004°, with two slits from near its top to near its bottom. The widest circle
+      // fits between the slits, 0.0023° apart: it touches both, and nothing of the outer ring.
+      const outer = [[0, 0], [0.004, 0], [0.004, 0.004], [0, 0.004], [0, 0]];
+      const slit = x => [[x, 0.0002], [x + 0.0001, 0.0002], [x + 0.0001, 0.0038], [x, 0.0038], [x, 0.0002]];
+      const whole = new Rapid.GeometryPart(context);
+      whole.setData({ type: 'Polygon', coordinates: [outer] });
+      const slitted = new Rapid.GeometryPart(context);
+      slitted.setData({ type: 'Polygon', coordinates: [outer, slit(0.00075), slit(0.00315)] });
+
+      const side = whole.local.extent.dimensions()[0];
+      assert.closeTo(whole.local.inradius, side / 2, 1);
+      assert.closeTo(slitted.local.inradius, side * (0.0023 / 0.004) / 2, 1);
+    });
+
+    it('gives a line no inradius', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0.001], [0.002, 0]] });
+      assert.strictEqual(part.local.inradius, 0);
+    });
+
     it('LineString poi falls back to the centroid', () => {
       const part = new Rapid.GeometryPart(context);
       part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0.001], [0.002, 0]] });

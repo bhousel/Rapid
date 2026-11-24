@@ -3,6 +3,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecRotate } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -27,6 +28,16 @@ export interface CoordData {
   map: Vec2;
   /** World coordinate where [0,0] is world origin */
   world: Vec2;
+}
+
+/**
+ * A Pixi pointer event, with the feature that the scene found under the pointer
+ * (`PixiScene.hitTest`). Pixi's own `target` doesn't know about the features of a layer that
+ * finds its own, such as the OSM layer's.
+ */
+export interface ScenePointerEvent extends PIXI.FederatedPointerEvent {
+  /** The feature under the pointer, `null` if there's none */
+  _feature?: AbstractPixiFeature | null;
 }
 
 /** Extended WheelEvent with normalized delta values */
@@ -331,6 +342,16 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
+   * Finds the feature under the pointer, and puts it on the event for the listeners.
+   * (Pixi reuses its event objects, so this is done for every event that's passed on.)
+   * @param e - A Pixi FederatedPointerEvent
+   */
+  protected _observeFeature(e: ScenePointerEvent): void {
+    e._feature = this.gfx.scene?.hitTest(e.global, e.target as PIXI.Container | null) ?? null;
+  }
+
+
+  /**
    * On Mac, consider a control-left-click as a right-click - Rapid#920
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
@@ -399,6 +420,7 @@ export class PixiEvents extends EventEmitter {
   protected _pointerdown(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
+    this._observeFeature(e);
     this._checkButtons(e);
     this.emit('pointerdown', e);
   }
@@ -410,6 +432,7 @@ export class PixiEvents extends EventEmitter {
   protected _pointermove(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
+    this._observeFeature(e);
     this._checkButtons(e);
     this.emit('pointermove', e);
   }
@@ -421,6 +444,7 @@ export class PixiEvents extends EventEmitter {
   protected _pointerup(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
+    this._observeFeature(e);
     this._checkButtons(e);
     this.emit('pointerup', e);
   }
@@ -430,6 +454,7 @@ export class PixiEvents extends EventEmitter {
    * @param e - A Pixi FederatedPointerEvent
    */
   protected _pointercancel(e: PIXI.FederatedPointerEvent): void {
+    this._observeFeature(e);
     this.emit('pointercancel', e);
   }
 
@@ -439,6 +464,7 @@ export class PixiEvents extends EventEmitter {
    */
   protected _click(e: PIXI.FederatedPointerEvent): void {
     // no need to _observeModifierKeys here, 'click' fires immediately after 'pointerup'
+    this._observeFeature(e);
     this._checkButtons(e);
     this.emit('click', e);
   }

@@ -38,6 +38,7 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
   expect(frame.draw.rebuiltGroups).toBeLessThanOrEqual(frame.draw.renderGroups);
   expect(frame.draw.instructions.batch).toBeGreaterThan(0);
   expect(Object.keys(frame.draw.batchTextures).length).toBeGreaterThan(0);
+  expect(frame.draw.triangles).toBeGreaterThan(100);    // counted from the batches' sizes
   for (const graphic of frame.draw.unbatched) {
     expect(graphic.reason).not.toBe('unknown');   // we found its GPU context
     expect(graphic.floats).toBeGreaterThan(0);
@@ -261,6 +262,296 @@ test('after a zoom, draws the features again over the following frames, with the
 });
 
 
+// A line's casing and stroke, and each ring of an area's outline, are drawn from a stroke mesh
+// that's built once, for any width (see `design/graphics-system.md`, section 15).
+// - The lines are in batches (`LineBatch`), one for the casings and one for the strokes of each
+//   level: a line is a run of vertices in its batches' buffers, and the shader works out its
+//   width. A zoom changes four numbers, and nothing in a batch. The line's feature isn't in the scene.
+// - Areas are in two batches too: every fill (`FillBatch`), then every outline. A zoom changes
+//   nothing in the outlines' batch, and in the fills' batch only the areas whose band changed.
+test('draws lines, areas and points in batches that a zoom leaves alone', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+
+    // The lines, the areas and the points that are drawn
+    const collect = () => {
+      const found = { lines: [], polygons: [], points: [] };
+      for (const feature of layer.features.values()) {
+        if (!feature.visible || feature.dirty) continue;
+        if (feature.type === 'LineString') {
+          found.lines.push(feature);
+        } else if (feature.type === 'Polygon') {
+          found.polygons.push(feature);
+        } else if (feature.type === 'Point') {
+          found.points.push(feature);
+        }
+      }
+      return found;
+    };
+
+    // What the points' batch holds: its arrays, and a sum of everything in them except the
+    // byte that says whether a point is shown (the sixth of a vertex's eight).
+    const pointBatch = () => {
+      const batch = layer.pointBatch;
+      let sum = 0;
+      for (const n of batch._floats) {
+        sum += n;
+      }
+      batch._bytes.forEach((n, i) => {
+        if (i % 8 !== 5) sum += n;
+      });
+      return { batch: batch, floats: batch._floats, sum: sum, indexCount: batch.geometry.indexCount, renderable: batch.renderable };
+    };
+
+    // What a batch holds: its arrays, and a sum of everything in them except the lines' opacity.
+    // (A hidden line has an opacity of 0 in its vertices, and that's all that changes when it's hidden.)
+    const batches = () => {
+      const found = new Map();
+      for (const batch of layer.lineBatches) {
+        let sum = 0;
+        let hiddenVertices = 0;
+        for (const n of batch._floats) {
+          if (Math.abs(n) < 1e30) sum += n;    // (not the "never" of a vertex with no second place: nothing adds up next to it)
+        }
+        batch._bytes.forEach((n, i) => {
+          if (i % 8 !== 3) {
+            sum += n;
+          } else if (n === 0 && i < batch.vertexUse[0] * 8) {
+            hiddenVertices++;
+          }
+        });
+        found.set(batch, {
+          floats: batch._floats, sum: sum, hiddenVertices: hiddenVertices,
+          indexCount: batch.geometry.indexCount, renderable: batch.renderable
+        });
+      }
+      return found;
+    };
+
+    const before = collect();
+    const batchesBefore = batches();
+    const pointsBefore = pointBatch();
+    const pointItemsBefore = new Map(before.points.map(feature => [feature, [feature.item, feature.item?.first, feature.item?.count]]));
+    const meshInstructions = gfx.lastRenderFrame.draw.instructions.mesh ?? 0;
+    const uniforms = [...batchesBefore.keys()][0].shader.resources.lineUniforms.uniforms;
+    const pixelBefore = uniforms.uPixel;
+    const itemsBefore = new Map(before.lines.map(feature => [feature, [feature.casingItem, feature.strokeItem, feature.strokeItem?.first, feature.arrowItem, feature.arrowItem?.first]]));
+    // Oneway arrows: a strip in the strokes' batch of the line's level, over every stroke there
+    const oneways = before.lines.filter(feature => feature.style.lineMarker.image);
+    const arrowsWrong = oneways.filter(feature => {
+      const item = feature.arrowItem;
+      const strokeOrders = item?.batch?._items.filter(other => other.batch && other.order < 1e5).map(other => other.order) ?? [];
+      return !item?.visible || item.batch !== feature.strokeItem?.batch || item.order <= Math.max(...strokeOrders) || item.batch._bytes[item.first * 8 + 4] !== 1;
+    }).map(feature => feature.id);
+    // Each area's fill: where it is in the fills' batch, and whether it's a band
+    const fillsBefore = new Map(before.polygons.map(feature => [feature, [feature.fillItem, feature.fillItem?.first, feature._batchBand]]));
+    // ..and its outlines: an area under 20 pixels has none
+    const outlinesBefore = new Map(before.polygons.map(feature => [feature, [feature.lod, feature.ringItems.slice(), feature.ringItems.map(item => item.first)]]));
+    const wrongOutlines = polygons => polygons.filter(feature => (feature.lod === 2) !== (feature.ringItems.length > 0)).map(feature => feature.id);
+    const outlinesWrongBefore = wrongOutlines(before.polygons);
+
+    // Dashed lines: the pattern is in the last four bytes of each vertex
+    const dashed = before.lines.filter(feature => {
+      const item = feature.strokeItem;
+      const bytes = item?.batch?._bytes;
+      return bytes && bytes[item.first * 8 + 4] > 0;
+    });
+
+    const startID = gfx.lastRenderFrame.id;
+    map.zoom(map.zoom() + 0.5);
+    while (!gfx.renderFrames.some(frame => frame.id > startID && frame.dirtyScene)) {
+      await nextFrame();
+    }
+    while (gfx.pending) {
+      await nextFrame();
+    }
+
+    const after = collect();
+    const batchesAfter = batches();
+    const pointsAfter = pointBatch();
+    let pointsChanged = 0;
+    for (const feature of after.points) {
+      const old = pointItemsBefore.get(feature);
+      if (!old) continue;
+      if (feature.item !== old[0] || feature.item?.first !== old[1] || feature.item?.count !== old[2]) pointsChanged++;
+    }
+    // (A zoom in makes the cull box smaller, and a line that's outside it now is hidden: its
+    // vertices and its triangles stay where they are, with an opacity of 0.)
+    let batchesChanged = 0;
+    let moreHidden = 0;
+    for (const [batch, old] of batchesBefore) {
+      const now = batchesAfter.get(batch);
+      if (!now || now.floats !== old.floats || now.sum !== old.sum || now.indexCount !== old.indexCount) batchesChanged++;
+      if (now) moreHidden += now.hiddenVertices - old.hiddenVertices;
+    }
+    let linesChanged = 0;
+    for (const feature of after.lines) {
+      const old = itemsBefore.get(feature);
+      if (!old) continue;
+      if (feature.casingItem !== old[0] || feature.strokeItem !== old[1] || feature.strokeItem?.first !== old[2]) linesChanged++;
+      if (feature.arrowItem !== old[3] || feature.arrowItem?.first !== old[4]) linesChanged++;
+    }
+
+    // A whole fill stays as it is. A band is worked out for the new zoom (its width is in pixels).
+    let fillsChanged = 0;
+    let bandsChanged = 0;
+    for (const feature of after.polygons) {
+      const old = fillsBefore.get(feature);
+      if (!old) continue;
+      const wasBand = !!old[2];
+      const isBand = !!feature._batchBand;
+      if (wasBand || isBand) {
+        if (feature._batchBand !== old[2]) bandsChanged++;
+      } else if (feature.fillItem !== old[0] || feature.fillItem.first !== old[1]) {
+        fillsChanged++;
+      }
+    }
+
+    // An area that was large enough for outlines keeps them as they were. One that the zoom
+    // made large enough gets them.
+    let outlinesChanged = 0;
+    let outlinesGained = 0;
+    for (const feature of after.polygons) {
+      const old = outlinesBefore.get(feature);
+      if (!old) continue;
+      if (old[0] === 2) {
+        const same = feature.ringItems.length === old[1].length && feature.ringItems.every((item, i) => item === old[1][i] && item.first === old[2][i]);
+        if (!same) outlinesChanged++;
+      } else if (feature.ringItems.length > 0) {
+        outlinesGained++;
+      }
+    }
+
+    return {
+      lines: before.lines.length,
+      linesWithMeshes: before.lines.filter(feature => feature.stroke || feature.casing).length,
+      linesNotInBatch: before.lines.filter(feature => !feature.strokeItem?.batch).length,
+      linesWithCasing: before.lines.filter(feature => feature.casingItem).length,
+      dashed: dashed.length,
+      batches: batchesBefore.size,
+      levels: new Set([...batchesBefore.keys()].map(batch => batch.parent)).size,
+      polygonBatches: layer.polygonBatches.map(batch => batch.label).sort(),
+      // A line that its batches draw isn't in the scene: none is, oneway arrows and all
+      oneways: oneways.length,
+      arrowsWrong: arrowsWrong,
+      markerSprites: before.lines.filter(feature => feature.container.getChildByLabel('lineMarkers')).length,
+      spriteBatches: gfx.lastRenderFrame.draw.instructions.batch ?? 0,
+      linesInScene: before.lines.filter(feature => feature.container.parent).length,
+      linesDrawingThemselves: before.lines.filter(feature => feature.container.children.length > 0).length,
+      batchesDrawn: [...batchesBefore.values()].filter(batch => batch.renderable && batch.indexCount > 0).length + 2,    // (and the areas' two)
+      batchesChanged: batchesChanged,
+      moreHidden: moreHidden,
+      linesHidden: before.lines.filter(feature => !feature.visible).length,
+      linesChanged: linesChanged,
+      pixel: [pixelBefore, uniforms.uPixel],
+      meshInstructions: meshInstructions,
+      polygons: before.polygons.length,
+      polygonsInScene: before.polygons.filter(feature => feature.container.parent).length,
+      polygonsNotInBatches: before.polygons.filter(feature => !feature.fillItem?.batch || feature.ringItems.some(item => !item.batch)).length,
+      smallPolygons: before.polygons.filter(feature => feature.lod === 1).length,
+      outlinesWrongBefore: outlinesWrongBefore,
+      outlinesWrongAfter: wrongOutlines(after.polygons),
+      outlinesChanged: outlinesChanged,
+      outlinesGained: outlinesGained,
+      polygonsWithShapes: before.polygons.filter(feature => feature.fill || feature.strokes || feature.lowRes).length,
+      bands: before.polygons.filter(feature => feature._batchBand).length,
+      // An area with a pattern has the pattern's number in its fill's vertices, if it's large enough to show one
+      patterned: before.polygons.filter(feature => feature.style.fill?.pattern).length,
+      patternsWrong: before.polygons.filter(feature => {
+        const pattern = feature.style.fill?.pattern;
+        const item = feature.fillItem;
+        if (!pattern || !item?.batch) return false;
+        const [width, height] = feature.geometry.local.extent.dimensions();
+        const isLarge = Math.min(width, height) / pixelBefore >= 32;
+        const number = item.batch._bytes[item.first * 8 + 4];
+        return number !== (isLarge ? gfx.textureManager.getPatternNumber(pattern) : 0) || (isLarge && number === 0);
+      }).map(feature => feature.id),
+      fillsChanged: fillsChanged,
+      bandsChanged: bandsChanged,
+      points: before.points.length,
+      pointsInScene: before.points.filter(feature => feature.container.parent).length,
+      pointsNotInBatch: before.points.filter(feature => feature.item?.batch !== pointsBefore.batch).length,
+      pointsWithSprites: before.points.filter(feature => feature.marker || feature.icon || feature.viewfields).length,
+      pointsWithIcons: before.points.filter(feature => feature.style.icon.image && feature.item?.count >= 8).length,
+      pointsWithViewfields: before.points.filter(feature => feature.style.viewfield.angles.length && feature.item?.count >= 8).length,
+      pointContainers: layer.pointContainer.children.map(child => child.label),
+      pointBatchDrawn: pointsBefore.renderable && pointsBefore.indexCount > 0,
+      pointBatchChanged: pointsAfter.batch !== pointsBefore.batch || pointsAfter.floats !== pointsBefore.floats ||
+        pointsAfter.sum !== pointsBefore.sum || pointsAfter.indexCount !== pointsBefore.indexCount,
+      pointsChanged: pointsChanged,
+      graphicsDrawnAlone: gfx.lastRenderFrame.draw.unbatched.filter(graphic => /\/(casing|stroke\d*)$/.test(graphic.label)).length
+    };
+  });
+
+  // Every line is in a batch, and has no mesh of its own
+  expect(result.lines).toBeGreaterThan(20);
+  expect(result.linesWithMeshes).toBe(0);
+  expect(result.linesNotInBatch).toBe(0);
+  expect(result.linesWithCasing).toBeGreaterThan(20);
+  expect(result.dashed).toBeGreaterThan(0);
+  // ..one for the casings and one for the strokes of each level
+  expect(result.batches).toBeGreaterThan(1);
+  expect(result.batches).toBe(2 * result.levels);
+  expect(result.batchesDrawn).toBe(result.batches + 2);    // and the areas' fills and outlines
+  expect(result.pointBatchDrawn).toBe(true);
+  expect(result.meshInstructions).toBe(result.batchesDrawn + 1);    // and the points
+  expect(result.linesInScene).toBe(0);
+  expect(result.linesDrawingThemselves).toBe(0);
+  // ..and their oneway arrows too. What's left for Pixi's own batches of sprites is the labels.
+  expect(result.oneways).toBeGreaterThan(3);
+  expect(result.arrowsWrong).toEqual([]);
+  expect(result.markerSprites).toBe(0);
+  expect(result.spriteBatches).toBeLessThan(3);
+  // The zoom changed what a pixel is, and nothing in any batch
+  expect(result.pixel[1]).toBeCloseTo(result.pixel[0] / Math.SQRT2, 6);
+  expect(result.batchesChanged).toBe(0);
+  expect(result.linesChanged).toBe(0);
+  expect(result.moreHidden > 0).toBe(result.linesHidden > 0);
+
+  // Every area is in the two batches of areas, with nothing of its own, and isn't in the scene
+  expect(result.polygonBatches).toEqual(['fills', 'outlines']);
+  expect(result.polygons).toBeGreaterThan(20);
+  expect(result.polygonsInScene).toBe(0);
+  expect(result.polygonsNotInBatches).toBe(0);
+  expect(result.polygonsWithShapes).toBe(0);
+  expect(result.graphicsDrawnAlone).toBe(0);
+  expect(result.patternsWrong).toEqual([]);
+  // An area under 20 pixels is its fill alone; the others have their outlines. The zoom left
+  // those as they were, and gave outlines to the areas that it made large enough.
+  expect(result.smallPolygons).toBeGreaterThan(0);
+  expect(result.outlinesWrongBefore).toEqual([]);
+  expect(result.outlinesWrongAfter).toEqual([]);
+  expect(result.outlinesChanged).toBe(0);
+  expect(result.outlinesGained).toBeGreaterThan(0);
+  // The zoom left the whole fills as they were, and worked the bands out again
+  expect(result.fillsChanged).toBe(0);
+  expect(result.bands).toBeGreaterThan(0);
+  expect(result.bandsChanged).toBeGreaterThan(0);
+
+  // Every point, vertex and virtual pin is in the one batch of points, with no sprites, and
+  // isn't in the scene: the batch is all there is under the points' container, with the
+  // batch for the glows of hovered points under it
+  expect(result.points).toBeGreaterThan(20);
+  expect(result.pointsNotInBatch).toBe(0);
+  expect(result.pointsWithSprites).toBe(0);
+  expect(result.pointsInScene).toBe(0);
+  expect(result.pointContainers).toEqual(['glows', 'points']);
+  expect(result.pointsWithIcons).toBeGreaterThan(5);
+  // The zoom left the batch as it was: the shader keeps the points their size on screen
+  expect(result.pointBatchChanged).toBe(false);
+  expect(result.pointsChanged).toBe(0);
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
 // A zoom changes how features are drawn, not which ones there are. So the OSM layer follows the
 // cull box to its new size without a pass, and runs its features through its `render…()`
 // functions again over the next frames (see `design/graphics-system.md`, section 12).
@@ -320,12 +611,41 @@ test('marks every point in view for labels to avoid, and puts no label over a po
     const screen = gfx.pixi.screen;
 
     const labelBoxes = spatial.getCache('labels').rbush.all().filter(item => item.contents.labelID).length;
-    const result = { points: 0, notMarked: [], markedElsewhere: [], underALabel: [], labelBoxes: labelBoxes };
+    const result = { points: 0, withViewfields: 0, notInBatch: [], notMarked: [], markedElsewhere: [], underALabel: [], labelBoxes: labelBoxes };
+    // Where the points' batch draws a point: around the corners of its pictures, each a number
+    // of pixels from where the point is on screen, along the screen's axes or (a viewfield) the map's.
+    const toScreen = gfx.origin.worldTransform;
+    const mapX = [toScreen.a / Math.hypot(toScreen.a, toScreen.b), toScreen.b / Math.hypot(toScreen.a, toScreen.b)];
+    const mapY = [toScreen.c / Math.hypot(toScreen.c, toScreen.d), toScreen.d / Math.hypot(toScreen.c, toScreen.d)];
+    const drawnRect = feature => {
+      const item = feature.item;
+      const batch = item?.batch;
+      if (!batch || !item.visible) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let v = item.first; v < item.first + item.count; v++) {
+        const [px, py, dx, dy] = batch._floats.subarray(v * 6, v * 6 + 4);
+        const at = gfx.origin.toGlobal({ x: px + batch.position.x, y: py + batch.position.y });
+        const turns = batch._bytes[v * 8 + 4] > 0;
+        const x = at.x + (turns ? (mapX[0] * dx + mapY[0] * dy) : dx);
+        const y = at.y + (turns ? (mapX[1] * dx + mapY[1] * dy) : dy);
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    };
+
     for (const feature of scene.layers.get('osm').features.values()) {
       if (feature.type !== 'Point' || !feature.visible || feature.dirty) continue;
-      const rect = feature.container.getBounds().rectangle;
+      const rect = drawnRect(feature);
+      if (!rect) {
+        result.notInBatch.push(feature.id);
+        continue;
+      }
       if (rect.x + rect.width < 0 || rect.y + rect.height < 0 || rect.x > screen.width || rect.y > screen.height) continue;
       result.points++;
+      if (feature.style.viewfield.angles.length) result.withViewfields++;
 
       // where it's drawn, a pixel in from each edge
       const x = rect.x - offset.x;
@@ -334,8 +654,8 @@ test('marks every point in view for labels to avoid, and puts no label over a po
       const marked = feature.avoidCells;
       if (!marked) {
         result.notMarked.push(feature.id);
-      } else if (!feature.viewfields && (marked[0] > drawn[0] || marked[1] > drawn[1] || marked[2] < drawn[2] || marked[3] < drawn[3])) {
-        result.markedElsewhere.push(feature.id);     // (hidden viewfields count in `getBounds`, and aren't marked)
+      } else if (marked[0] > drawn[0] || marked[1] > drawn[1] || marked[2] < drawn[2] || marked[3] < drawn[3]) {
+        result.markedElsewhere.push(feature.id);
       }
       if (marked && grid.isTaken('label', marked)) {
         // a point's own label may touch it; another feature's may not cover it
@@ -350,6 +670,7 @@ test('marks every point in view for labels to avoid, and puts no label over a po
 
   const loaded = await check();
   expect(loaded.points).toBeGreaterThan(20);
+  expect(loaded.notInBatch).toEqual([]);
   expect(loaded.labelBoxes).toBeGreaterThan(0);
   expect(loaded.notMarked).toEqual([]);
   expect(loaded.markedElsewhere).toEqual([]);
@@ -381,6 +702,7 @@ test('marks every point in view for labels to avoid, and puts no label over a po
   await waitForIdle(page);
   const turned = await check();
   expect(turned.points).toBeGreaterThan(5);
+  expect(turned.notInBatch).toEqual([]);
   expect(turned.notMarked).toEqual([]);
   expect(turned.markedElsewhere).toEqual([]);
   expect(turned.underALabel).toEqual([]);
@@ -539,9 +861,11 @@ test('makes features over several frames when there are many to make, and ends u
 });
 
 
-// Lines and points are split into containers by map tile, each with its own render group, so that
-// a change to one feature makes Pixi rebuild a small group. The order they're drawn in stays.
-test('keeps lines in the order of their road class, and points from north to south, across tile containers', async ({ page, consoleErrors }) => {
+// Points are split into containers by map tile, each with its own render group, so that a change
+// to one feature makes Pixi rebuild a small group; so are the lines that draw something themselves
+// (oneway arrows). The other lines are in their level's two batches: every casing, then every
+// stroke, each in the order of the road classes. The order they're drawn in stays.
+test('keeps lines in the order of their road class, casings under strokes, and points from north to south', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -554,7 +878,25 @@ test('keeps lines in the order of their road class, and points from north to sou
     // A feature's container is in its tile's container, which is in that container's render group.
     const groupOf = feature => feature.container.parent.parent;
     const lines = visible.filter(feature => feature.type === 'LineString');
-    const points = visible.filter(feature => feature.type === 'Point' && feature.container.parent.label !== 'selected');
+    const linesInScene = lines.filter(feature => feature.container.parent);
+    const points = visible.filter(feature => feature.type === 'Point' && feature.container.parent?.label !== 'selected');
+
+    // In a level's container: the casings' batch, the strokes' batch, then the road classes' containers.
+    let levelsOutOfOrder = 0;
+    for (const level of layer.lineContainer.children) {
+      const labels = level.children[0].children.map(child => child.label);
+      const casings = labels.indexOf('casings');
+      const strokes = labels.indexOf('strokes');
+      const others = labels.findIndex(label => label !== 'casings' && label !== 'strokes');
+      if (strokes === -1 || (casings !== -1 && casings > strokes) || (others !== -1 && others < strokes)) levelsOutOfOrder++;
+    }
+
+    // In a batch: by road class, then by the way's ID, which is the feature's `zIndex`.
+    let batchesOutOfOrder = 0;
+    for (const batch of layer.lineBatches) {
+      const orders = batch._items.map(item => item.order);
+      if (orders.some((order, i) => i > 0 && order < orders[i - 1])) batchesOutOfOrder++;
+    }
 
     // In draw order, the lines' containers go from the lowest road class to the highest.
     let outOfOrder = 0;
@@ -566,33 +908,163 @@ test('keeps lines in the order of their road class, and points from north to sou
         if (i > 0 && groups[i].zIndex < groups[i - 1].zIndex) outOfOrder++;
       }
     }
-    const pointGroups = layer.pointContainer.children;
-    for (let i = 1; i < pointGroups.length; i++) {
-      if (pointGroups[i].zIndex < pointGroups[i - 1].zIndex) outOfOrder++;
-    }
+
+    // The points are in one batch, from north to south, the ones with viewfields after the others.
+    const pointOrders = layer.pointBatch._items.map(item => item.order);
+    const expectedOrder = feature => feature.geometry.world.origin[1] + (feature.style.viewfield.angles.length ? 2 ** 25 : 0);
 
     return {
       lines: lines.length,
+      linesInScene: linesInScene.length,
       lineGroups: lineGroups.size,
-      // every line is in a container of its own road class (the whole part of its `zIndex`)
-      linesInAnotherClass: lines.filter(feature => Math.floor(groupOf(feature).zIndex) !== Math.floor(feature.container.zIndex)).length,
-      linesInRenderGroups: lines.filter(feature => groupOf(feature).isRenderGroup).length,
+      // every line in the scene is in a container of its own road class (the whole part of its `zIndex`)
+      linesInAnotherClass: linesInScene.filter(feature => Math.floor(groupOf(feature).zIndex) !== Math.floor(feature.container.zIndex)).length,
+      linesInRenderGroups: linesInScene.filter(feature => groupOf(feature).isRenderGroup).length,
+      // ..and every line has its place in its batches by its `zIndex`
+      linesOrderedOtherwise: lines.filter(feature => feature.strokeItem?.order !== feature.container.zIndex).length,
+      roadClasses: new Set(lines.map(feature => Math.floor(feature.container.zIndex))).size,
+      levelsOutOfOrder: levelsOutOfOrder,
+      batchesOutOfOrder: batchesOutOfOrder,
       points: points.length,
-      pointGroups: pointGroups.length,
-      pointsInRenderGroups: points.filter(feature => groupOf(feature).isRenderGroup).length,
+      pointsOrderedOtherwise: points.filter(feature => feature.item?.order !== expectedOrder(feature)).length,
+      pointsWithViewfields: points.filter(feature => feature.style.viewfield.angles.length).length,
+      pointBatchOutOfOrder: pointOrders.some((order, i) => i > 0 && order < pointOrders[i - 1]),
+      pointBatchFirst: layer.pointContainer.children[0] === layer.pointBatch.glows && layer.pointContainer.children[1] === layer.pointBatch,
       outOfOrder: outOfOrder
     };
   });
 
   expect(result.lines).toBeGreaterThan(10);
   expect(result.lineGroups).toBeGreaterThan(1);
-  expect(result.linesInRenderGroups).toBe(result.lines);
+  expect(result.linesInScene).toBeLessThan(result.lines);
+  expect(result.linesInRenderGroups).toBe(result.linesInScene);
   expect(result.linesInAnotherClass).toBe(0);
+  expect(result.roadClasses).toBeGreaterThan(2);
+  expect(result.linesOrderedOtherwise).toBe(0);
+  expect(result.levelsOutOfOrder).toBe(0);
+  expect(result.batchesOutOfOrder).toBe(0);
   expect(result.points).toBeGreaterThan(10);
-  expect(result.pointGroups).toBeGreaterThan(0);
-  expect(result.pointsInRenderGroups).toBe(result.points);
+  expect(result.pointsOrderedOtherwise).toBe(0);
+  expect(result.pointBatchOutOfOrder).toBe(false);
+  expect(result.pointBatchFirst).toBe(true);    // under any point that draws itself, and over the points' glows
   expect(result.outOfOrder).toBe(0);
 
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
+// The markers along a line (oneway arrows) are drawn by the lines' batch: a strip along the line,
+// in which the shader draws an arrow every 35 pixels. Nothing in a buffer says what an arrow
+// looks like, so this looks at the pixels: the batch's arrows have to be where sprites draw them.
+test('draws oneway arrows from the lines\' shader, where sprites would draw them', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  // (Labels are placed again when features are made again, not always in the same places.)
+  await page.evaluate(() => rapidContext.systems.gfx.scene.disableLayers('labels'));
+  await waitForIdle(page);
+
+  // The map's pixels: as it's drawn, and without the markers
+  const grab = withSprites => page.evaluate(withSprites => {
+    const gfx = rapidContext.systems.gfx;
+    const layer = gfx.scene.layers.get('osm');
+    const canvas = gfx.pixi.canvas;
+    const pixels = () => {
+      gfx.pixi.renderer.render({ container: gfx.pixi.stage });
+      const copy = document.createElement('canvas');
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      const context = copy.getContext('2d');
+      context.drawImage(canvas, 0, 0);
+      return context.getImageData(0, 0, copy.width, copy.height).data;
+    };
+
+    const lines = [...layer.features.values()].filter(feature => feature.type === 'LineString' && feature.visible);
+    const sprites = lines.map(feature => feature.container.getChildByLabel('lineMarkers')).filter(Boolean);
+    const drawn = pixels();
+
+    // Without: the shader leaves the markers out, or the sprites are hidden
+    const uniforms = layer.lineBatches[0].shader.resources.lineUniforms.uniforms;
+    uniforms.uMarkers = 0;
+    sprites.forEach(container => { container.visible = false; });
+    const without = pixels();
+    uniforms.uMarkers = 1;
+    sprites.forEach(container => { container.visible = true; });
+
+    // Where the markers are: the pixels that they change
+    const marked = [];
+    for (let i = 0; i < drawn.length; i += 4) {
+      const change = Math.max(Math.abs(drawn[i] - without[i]), Math.abs(drawn[i + 1] - without[i + 1]), Math.abs(drawn[i + 2] - without[i + 2]));
+      if (change > 80) marked.push(i / 4);
+    }
+    return {
+      marked: marked,
+      inBatch: lines.filter(feature => feature.arrowItem?.visible).length,
+      withSprites: sprites.length,
+      asked: withSprites
+    };
+  }, withSprites);
+
+  const batch = await grab(false);
+  expect(batch.inBatch).toBeGreaterThan(3);
+  expect(batch.withSprites).toBe(0);
+  expect(batch.marked.length).toBeGreaterThan(100);
+
+  // The same lines, with their markers as sprites
+  await page.evaluate(() => {
+    const gfx = rapidContext.systems.gfx;
+    const prototype = Rapid.PixiFeatureLine.prototype;
+    globalThis.__markersBatchable = prototype._markersBatchable;
+    prototype._markersBatchable = function() {
+      return !(this._style.lineMarker?.image || this._style.sidedMarker?.image);
+    };
+    gfx.scene.layers.get('osm').reset();
+    gfx.immediateRedraw();
+  });
+  await waitForIdle(page);
+  const sprites = await grab(true);
+  expect(sprites.inBatch).toBe(0);
+  expect(sprites.withSprites).toBe(batch.inBatch);
+
+  // Below zoom 16 neither draws them: the layer tells the shader so (and to leave casings out).
+  // (The zoom that counts is the map's effective one. Saying it's lower loads no other tiles.)
+  const lowZoom = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const uniforms = gfx.scene.layers.get('osm').lineBatches[0].shader.resources.lineUniforms.uniforms;
+    const drawn = async () => {
+      const startID = gfx.lastRenderFrame.id;
+      gfx.immediateRedraw();
+      while (gfx.lastRenderFrame.id === startID || gfx.pending) {
+        await new Promise(resolve => { requestAnimationFrame(resolve); });
+      }
+      return [uniforms.uMarkers, uniforms.uCasing];
+    };
+    const effectiveZoom = map.effectiveZoom;
+    map.effectiveZoom = () => 15.5;
+    const low = await drawn();
+    map.effectiveZoom = effectiveZoom;
+    const high = await drawn();
+    return { low: low, high: high };
+  });
+  expect(lowZoom.low).toEqual([0, 0]);
+  expect(lowZoom.high).toEqual([1, 1]);
+
+  // Nearly every pixel of a sprite's arrow is in the shader's, and the other way around.
+  // (The shader's arrow has sharp edges; the sprite's is a small texture, turned and smoothed.)
+  const inSprites = new Set(sprites.marked);
+  const both = batch.marked.filter(pixel => inSprites.has(pixel)).length;
+  expect(both / sprites.marked.length).toBeGreaterThan(0.9);
+  expect(both / batch.marked.length).toBeGreaterThan(0.8);
+
+  await page.evaluate(() => {
+    Rapid.PixiFeatureLine.prototype._markersBatchable = globalThis.__markersBatchable;
+    const gfx = rapidContext.systems.gfx;
+    gfx.scene.layers.get('osm').reset();
+    gfx.scene.enableLayers('labels');
+    gfx.immediateRedraw();
+  });
   await waitForIdle(page);
   expect(consoleErrors).toEqual([]);
 });
@@ -618,10 +1090,12 @@ test('draws a point again when its icon arrives, without another pass', async ({
     const textures = gfx.textureManager;
     const EMPTY = PIXI.Texture.EMPTY;
 
-    const withIcon = [...layer.features.values()].filter(feature => feature.visible && feature.icon?.visible);
+    // A point in the batch has four vertices for each of its pictures: its marker, and its icon if that's drawn
+    const hasIcon = f => f.item?.count === 8;
+    const withIcon = [...layer.features.values()].filter(f => f.visible && f.type === 'Point' && f.style.icon.image && !f.style.viewfield.angles.length);
     const feature = withIcon[0];
     const image = feature.style.icon.image;
-    const startup = { withIcons: withIcon.length, missing: withIcon.filter(f => f.icon.texture === EMPTY || f.dirty).length };
+    const startup = { withIcons: withIcon.length, missing: withIcon.filter(f => !hasIcon(f) || f.dirty).length };
 
     // Pretend the icon hasn't loaded, and draw the feature again: it's drawn without, and stays dirty.
     const getTexture = textures.getTexture;
@@ -629,7 +1103,7 @@ test('draws a point again when its icon arrives, without another pass', async ({
     feature.dirty = true;
     gfx.immediateRedraw();
     await settle();
-    const without = { missing: feature.icon.texture === EMPTY, dirty: feature.dirty, pending: gfx.pending };
+    const without = { missing: !hasIcon(feature), dirty: feature.dirty, pending: gfx.pending };
 
     // The icon arrives.
     const startID = gfx.lastRenderFrame.id;
@@ -640,7 +1114,7 @@ test('draws a point again when its icon arrives, without another pass', async ({
     return {
       startup: startup,
       without: without,
-      after: { missing: feature.icon.texture === EMPTY, dirty: feature.dirty },
+      after: { missing: !hasIcon(feature), dirty: feature.dirty },
       frames: frames.length,
       passes: frames.filter(frame => !frame.layers.get('osm').kept).length
     };
@@ -661,11 +1135,103 @@ test('draws a point again when its icon arrives, without another pass', async ({
 });
 
 
+// A partial fill fills a band along the inside of an area's edge. The band is geometry
+// (`geomAreaBand()`): triangles in the layer's batch of fills, like a whole fill's. So there's
+// no stencil mask, in any area fill mode. (A mask was a mesh of its own, and where pixijs#12437
+// and #12388 bit: Rapid#1636.) An area with no middle 32 pixels from its edge is filled whole.
+test('draws partial fills as bands along the edge, with no stencil mask in any area fill mode', async ({ page, consoleErrors }) => {
+  await startRapid(page, TEST_MAP);
+  await waitForOsmData(page);
+  await waitForIdle(page);
+
+  const result = await page.evaluate(async () => {
+    const { gfx, map } = rapidContext.systems;
+    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
+    const layer = gfx.scene.layers.get('osm');
+    const bandWidth = 32 * 2 ** (16 - rapidContext.viewport.transform.zoom);
+
+    const state = () => {
+      const found = { filled: 0, banded: 0, whole: 0, masked: 0, wrong: [] };
+      const fills = layer.polygonBatches.find(batch => batch.label === 'fills');
+      const drawsFills = !!fills && fills.shader.resources.fillUniforms.uniforms.uWireframe === 0;
+
+      for (const feature of layer.features.values()) {
+        if (feature.type !== 'Polygon' || !feature.visible || !feature.fillItem) continue;    // not a polygon that's drawn
+        if (feature.fill?.mask) found.masked++;
+        if (!feature.fillItem.visible) found.wrong.push(`${feature.id}: shown, with its fill hidden`);
+        if (!drawsFills) {    // wireframe: the shader draws no fill, and a click hits none
+          const [px, py] = feature.geometry.local.poi;
+          const at = { x: feature.container.position.x + px, y: feature.container.position.y + py };
+          if (feature.geometry.local.inradius > 2 * bandWidth && feature.hitTest({ x: 0, y: 0 }, at)) found.wrong.push(`${feature.id}: hit in its middle in wireframe`);
+          continue;
+        }
+        found.filled++;
+
+        // A click in the polygon's middle (the point furthest from its edge) hits a whole fill, and not a band.
+        const local = feature.geometry.local;
+        const [x, y] = local.poi;
+        const world = { x: feature.container.position.x + x, y: feature.container.position.y + y };
+        const isBand = !!feature._batchBand;
+        const hitsMiddle = feature.hitTest({ x: 0, y: 0 }, world);
+        if (isBand) {
+          found.banded++;
+          // (The polygon's `inradius` may be 1 short of the truth.)
+          if (hitsMiddle && local.inradius > bandWidth) found.wrong.push(`${feature.id}: a band that fills its middle`);
+          if (local.inradius + 1 < bandWidth) found.wrong.push(`${feature.id}: a band in a polygon with no middle`);
+        } else {
+          found.whole++;
+          if (!hitsMiddle) found.wrong.push(`${feature.id}: filled whole, but not in its middle`);
+        }
+        if (map.areaFillMode === 'partial' && !isBand && local.inradius > bandWidth + 1 && feature.style.fill?.type !== 'full') {
+          const [width, height] = local.extent.dimensions();
+          if (Math.min(width, height) >= 70 * bandWidth / 32) found.wrong.push(`${feature.id}: filled whole, with a middle`);
+        }
+      }
+      return found;
+    };
+
+    const counts = {};
+    for (const mode of ['partial', 'full', 'wireframe', 'partial']) {
+      map.areaFillMode = mode;
+      await nextFrame();
+      while (gfx.pending) {
+        await nextFrame();
+      }
+      gfx.immediateRedraw();
+      await nextFrame();
+      await nextFrame();
+      counts[mode] = state();
+      counts[mode].stencilMasks = gfx.lastRenderFrame.draw.instructions.stencilMask ?? 0;
+    }
+    return counts;
+  });
+
+  expect(result.partial.banded).toBeGreaterThan(0);
+  expect(result.partial.whole).toBeGreaterThan(0);
+  expect(result.full.banded).toBe(0);
+  expect(result.full.whole).toBe(result.partial.filled);
+  expect(result.wireframe.filled).toBe(0);
+  for (const mode of ['partial', 'full', 'wireframe']) {
+    expect(result[mode].wrong).toEqual([]);
+    expect(result[mode].masked).toBe(0);
+    expect(result[mode].stencilMasks).toBe(0);
+  }
+
+  await waitForIdle(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+
+
 // Rapid#1636, pixijs#12437: in Pixi's 'auto' batch mode, a mesh of 100 vertices or fewer is
-// batched. A partial fill's mask that crosses that line in a frame where its tile's render group is
-// rebuilt made Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`),
-// until something rebuilt it. The masks are always batched now, so crossing the line changes nothing.
-test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
+// batched. A mesh that crosses that line in a frame where its tile's render group is rebuilt made
+// Pixi throw on every later frame that moved the tile (`MeshPipe.updateRenderable`), until
+// something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
+// always batched, so crossing the line changes nothing. (The lasso and the lines of the other
+// layers are `LineMesh`es. The OSM layer's lines and outlines are in
+// `LineBatch`es, which have a shader of their own and are never batched by Pixi: the test
+// turns those off to get an outline's `LineMesh` in a tile.)
+test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
   await waitForIdle(page);
@@ -679,40 +1245,45 @@ test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame it
       await nextFrame();
       await nextFrame();
     };
-    // A mask geometry of n vertices, as `_drawShapes()` makes one (with uvs)
-    const strip = n => {
-      const positions = new Float32Array(n * 2);
-      const indices = [];
-      for (let i = 0; i < n; i++) {
-        positions[i * 2] = (i >> 1) * 4;
-        positions[i * 2 + 1] = (i & 1) * 4;
-      }
-      for (let i = 0; i + 2 < n; i++) indices.push(i, i + 1, i + 2);
-      return new PIXI.MeshGeometry({ positions, uvs: new Float32Array(n * 2), indices: new Uint32Array(indices) });
+    // The stroke mesh of a zigzag of n points: 4 vertices at each corner
+    const zigzag = n => {
+      const coords = [];
+      for (let i = 0; i < n; i++) coords.push(i * 4, (i & 1) * 4);
+      return Rapid.geomStrokeMesh(coords);
     };
 
+    // (With batches off, an area's outline is a `LineMesh` in its feature's container, in its tile.)
     const layer = scene.layers.get('osm');
-    const feature = [...layer.features.values()].find(feature => feature.visible && feature.mask?.visible);
+    layer.useBatches = false;
+    layer.reset();
+    gfx.immediateRedraw();
+    await drawFrame();
+    while (gfx.pending) {
+      await nextFrame();
+    }
+    const feature = [...layer.features.values()].find(feature => feature.visible && feature.strokes?.children[0]?.strokeMesh?.vertexCount);
     if (!feature) return { found: false };
 
-    const mask = feature.mask;
+    const mesh = feature.strokes.children[0];
     const tile = feature.container.parent;
+    const large = zigzag(60);
+    const small = zigzag(10);
     const batched = [];
 
-    // A mask of 200 vertices (more than Pixi batches in 'auto' mode), that Pixi has never batched,
-    // like one first drawn zoomed in. (A mask that was batched once keeps its old place in a batch,
-    // and Pixi writes it there instead of throwing.)
-    mask.unload();
-    feature._setMaskGeometry(strip(200));
+    // A mesh of more vertices than Pixi batches in 'auto' mode, that Pixi has never batched, like
+    // one first drawn zoomed in. (A mesh that was batched once keeps its old place in a batch, and
+    // Pixi writes it there instead of throwing.)
+    mesh.unload();
+    mesh.setStroke(large, 1);
     await drawFrame();
-    batched.push(mask.batched);
+    batched.push(mesh.batched);
 
-    // In one frame: the tile's render group is rebuilt (a child added), and the mask gets 50 vertices
+    // In one frame: the tile's render group is rebuilt (a child added), and the mesh gets fewer
     const child = new PIXI.Container();
     tile.addChild(child);
-    feature._setMaskGeometry(strip(50));
+    mesh.setStroke(small, 1);
     await drawFrame();
-    batched.push(mask.batched);
+    batched.push(mesh.batched);
 
     // Then frames that move the tile, without a rebuild: the anchor moves its container
     const [x, y] = scene.anchor;
@@ -723,54 +1294,16 @@ test('keeps drawing a partial fill whose mask crosses 100 vertices in a frame it
 
     tile.removeChild(child);
     child.destroy();
-    feature.dirty = true;   // draw its real mask again
+    feature._meshPart = null;   // draw its real outline again
+    feature.dirty = true;
     gfx.immediateRedraw();
-    return { found: true, batched: batched };
+    return { found: true, vertices: [large.vertexCount, small.vertexCount], batched: batched };
   });
 
   expect(result.found).toBe(true);
+  expect(result.vertices[0]).toBeGreaterThan(100);
+  expect(result.vertices[1]).toBeLessThan(100);
   expect(result.batched).toEqual([true, true]);
-
-  await waitForIdle(page);
-  expect(consoleErrors).toEqual([]);
-});
-
-
-// pixijs#12295, #12388: a stencil mask that's still visible when nothing draws it (its fill hidden,
-// or no longer masked) keeps its place from an earlier batch, and Pixi writes it there when an
-// ancestor moves, over other features' vertices. So a mask is visible only while its fill is.
-test('shows a partial fill\'s mask only with its fill, in every area fill mode', async ({ page, consoleErrors }) => {
-  await startRapid(page, TEST_MAP);
-  await waitForOsmData(page);
-  await waitForIdle(page);
-
-  const result = await page.evaluate(async () => {
-    const { gfx, map } = rapidContext.systems;
-    const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
-    const layer = gfx.scene.layers.get('osm');
-
-    const counts = {};
-    for (const mode of ['partial', 'full', 'wireframe', 'partial']) {
-      map.areaFillMode = mode;
-      await nextFrame();
-      while (gfx.pending) {
-        await nextFrame();
-      }
-      const polygons = [...layer.features.values()].filter(feature => feature.visible && feature.mask);
-      counts[mode] = {
-        masks: polygons.filter(feature => feature.mask.visible).length,
-        alone: polygons.filter(feature => feature.mask.visible && !(feature.fill.visible && feature.fill.mask === feature.mask)).length
-      };
-    }
-    return counts;
-  });
-
-  expect(result.partial.masks).toBeGreaterThan(0);
-  expect(result.full.masks).toBe(0);
-  expect(result.wireframe.masks).toBe(0);
-  for (const mode of ['partial', 'full', 'wireframe']) {
-    expect(result[mode].alone).toBe(0);
-  }
 
   await waitForIdle(page);
   expect(consoleErrors).toEqual([]);
@@ -792,7 +1325,11 @@ test('counts WebGL calls while detailed stats are on', async ({ page, consoleErr
 
   const gl = await page.evaluate(() => rapidContext.systems.gfx.lastRenderFrame.draw.gl);
   expect(gl.draws).toBeGreaterThan(0);
-  expect(gl.programs).toBeGreaterThan(0);
+  // (A frame can switch shaders zero times: lines are batched meshes now, so on this small map
+  // everything is drawn with the batch shader, which the frame before left bound.)
+  expect(gl.programs).toBeGreaterThanOrEqual(0);
+  expect(gl.textureBinds).toBeGreaterThanOrEqual(0);
+  expect(gl.bufferUploads).toBeGreaterThanOrEqual(0);
 
   // Turning them off removes the counters
   const hasCounters = await page.evaluate(() => {

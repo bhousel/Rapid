@@ -7,6 +7,7 @@ How to measure frames, memory and garbage without fooling yourself. See also `de
 - **Time the parts before designing around the whole** — a zoom's restyle took 139 ms in Seattle, and the plan was to spread it over frames. Timing its parts first showed 85 ms of it was `styles.styleMatch()` and the `style` setter, for styles that don't depend on the zoom: the layer's loops said `if (feature.dirty)`, and a zoom makes everything dirty. Not doing that work (`feature.needsStyle`) cut the restyle to a third before any of it was spread out. Wrap the suspects with timers in the page (`bun run cdp eval`) before building machinery.
 - **Say what "loaded" means before explaining why it takes long** — `bun run measure`'s load time at Staten Island was 32 s, and I wrote that loading waits on the network. Watching the requests showed the 20 tiles had arrived after 2.6 s and everything was drawn after 8: the other 24 s were the script waiting for the scheduler's queues to empty. One request log would have shown it.
 - **Feature filters don't mean the same across versions** — with `disable_features=landuse`, Rapid 2.5 and iD hide most areas (their landuse rule is "an area that isn't a building, water, …"), and Rapid 3 hides only what its `filter_landuse` ruleset names. Staten Island showed 6,500 features in Rapid 2.5 and 16,000 in Rapid 3 for the same view. To compare editors, hide only boundaries.
+- **Check what the debug Chrome hides before comparing two runs** — its feature filters, area fill and layers are stored in the profile, and every script that doesn't set its own gets them. One day's heap and zoom numbers for Užice were taken with landuse hidden (a filter left on earlier), and the next day's without: 102,510 features against 106,801, which read as the new build allocating 10% more. A script that measures should say what it loaded (features made, features visible) beside its numbers, and two builds should be measured in one sitting. `bun run measure` sets its filters itself and prints them.
 - **Measuring can use up the OSM API's patience: record the place** — about forty reloads of dense places in a day, and later five loads of Užice in an hour and a half, and the API answered 429 to every map request. Use a tape (`--tape`, `scripts/tape.ts`): one download, then every run is answered from the file. It's also the only fair comparison: two live runs of the same build gave Užice's first pan as 14 and 16 frames a second, and from the tape it was 18 both times, the same as the build it had seemed slower than.
 - **Check that the plan's grouping matches the data before building it** — points were going to be split by rows of tiles, which keeps their north-to-south order exactly. A count in the loaded scene showed 12,870 of Užice's 49,259 points in one row, and that a pan sideways touches every row. Ten minutes with `layer.features` settled it.
 - **Before comparing two builds' screenshots, compare two loads of one build** — the split's screenshots differed from the old build's in up to 39,000 pixels. So did two loads of the same build: tile containers and equal lines were drawn in the order they were made, which depends on timing since features are made over frames. Ordering them by tile and ID made the picture repeatable (4 to 660 pixels), and then a diff means something.
@@ -27,3 +28,30 @@ How to measure frames, memory and garbage without fooling yourself. See also `de
   affected: noise (0.3 to 0.7 ms of DRAW). Two rounds of A B C A B C with `--runs 15` showed only
   Seattle moving (261 of 300 masks affected), by about 1 ms, every time. Count what the change
   touches at each place (a snippet over the scene) before reading a difference.
+- **Two runs of `bun run measure` may not have had the same layers on.** The debug Chrome keeps
+  what was last set (layers, filters, area fill), and the script measures with that. Step 5's
+  table was taken with the labels layer off, and the next step's first run with it on: 20 more
+  draw calls and a few ms of APP that had nothing to do with the change. The first lines of the
+  output say which layers and filters were on: read them before comparing. Better, compare in
+  one build, alternating: `--setup snippet.js` runs in the page before each place, to switch
+  what's compared (`layer.useBatches = false; layer.reset();`) and to set what's shown.
+- **A checksum of a typed array has to leave out its huge values.** A sum over a batch's floats
+  included a "never" of 3e38 in most vertices, and nothing else that changed could move it: the
+  test passed whatever happened to the array.
+- **A wait that hits its timeout has found something.** A script waited for `gfx.pending` to be
+  false and ran to its 90 s timeout in some states. That was noted as a quirk of the script
+  and worked around for a day. It was Rapid drawing sixty frames a second for good after a pan
+  with the labels layer off. When "idle" never comes, ask the app who's waiting (each layer's
+  `numWaiting`) before lengthening the timeout.
+- **Label placement isn't the same on every load.** Two loads of one build and place differed
+  in 9,000 pixels in Seattle, all labels: placement follows the order features are drawn in,
+  which follows the frames' timing. Compare screenshots with the labels off, or compare two
+  ways of drawing in one load.
+- **GPU time from two sessions can't be compared.** Staten Island's frame read 7.8 and 8.0 ms
+  one hour, 5.8 to 6.2 the next (four runs), and 6.6 and 7.7 after that, drawing the same
+  562,000 triangles. Within a session, alternating, the readings held: four ways of drawing
+  small areas kept their order in both rounds. A difference between this turn's table and the
+  last one's is not a result; measure both sides again, in one run of the script.
+- **Check an estimate against a count before it's written down.** "A small building is about 45
+  triangles" came from dividing a difference by a guess at how many there were. A snippet that
+  walked the batch said 17, and that most were parking spaces, not buildings.

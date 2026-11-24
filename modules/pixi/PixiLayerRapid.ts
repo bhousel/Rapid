@@ -542,6 +542,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
               style.lineMarker ??= {};
               const isAlternating = (tags.oneway === 'alternating' || tags.oneway === 'reversible');
               style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
+              // (An arrow shows the way of travel: back along a way tagged `oneway=-1`.)
+              if (!isAlternating && way.isOneWayBackward()) {
+                style.lineMarker.scale = [-1, 1];
+              }
             } else {
               delete style.lineMarker;
             }

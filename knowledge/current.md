@@ -7,16 +7,12 @@ Follow-ups from the release check are in `backlog.md`.
 
 ## Active: dependency upgrades (from the Nov 18 and Nov 20 checkups)
 Landed (see `completed.md`): the first batch, CDN pins from `package.json`, maplibre-gl 6, the e2e tests,
-pixi.js 8.23, and Bryan's own packages (country-coder 6, location-conflation 4, osm-community-index 7,
-node-diff3 4, osm-auth 4). Careful with `cloc`: its real versions end in `-cloc`, so `bun update`
+pixi.js 8.23, Bryan's own packages (country-coder 6, location-conflation 4, osm-community-index 7,
+node-diff3 4, osm-auth 4), and id-tagging-schema 7.3 with name-suggestion-index 9 (Bryan, Nov 22;
+pinhead stays at 15). Careful with `cloc`: its real versions end in `-cloc`, so `bun update`
 "upgrades" `2.12.0-cloc` to a 2022 `2.11.0`.
 
 Still to do:
-- **id-tagging-schema 7.3 + name-suggestion-index 8, together** (NSI 8 needs schema 7; we already call
-  `buildIDPresets()`). NSI 9 (ESM-only, its own `Preset` types) is in NSI's changelog but not on npm yet.
-  **Not with pinhead 16:** schema 7.3 uses 4 icons pinhead 16 renamed (`bagel_seeded`,
-  `person_running_after_person`, `person_squatting_and_person_reaching_up`,
-  `person_wearing_martial_arts_belt_front_kicking`), and `build_data.ts` drops missing icons silently.
 - **`bunfig.toml`'s `minimumReleaseAgeExcludes`**: country-coder and location-conflation are past the
   3-day window now and can come off the list.
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
@@ -38,8 +34,37 @@ Still to do:
 ## Rendering: what's next
 `pixi-8.23` (PR #10) and `label-avoids` (PR #11) are merged (`completed.md`); the plans and measurements
 are in [`design/graphics-system.md`](../design/graphics-system.md). What's left is under "Pixi rendering
-follow-ups" in `backlog.md`. Waiting on Pixi: pixijs#12437 (our partial-fill masks are always batched
-until it's fixed; `PixiFeaturePolygon._setMaskGeometry()`).
+follow-ups" in `backlog.md`.
+
+**Active, on `linebuilder_refactor`: a line builder of our own** (section 15 has the direction, the
+order of work, Bryan's decisions and the measurements). Done and committed: steps 1 to 6 and 8
+to 10; step 7 (a worker) was skipped as probably unnecessary (Bryan). **Bryan (Nov 23): this is
+where the branch stops; a PR is next.**
+- The OSM layer's lines, areas and points are drawn in batches with shaders of our own
+  (`modules/pixi/lib/`: `LineBatch`, `FillBatch`, `PointBatch`), from stroke meshes and bands
+  built once (`modules/geo/stroke.ts`, `band.ts`). A zoom changes nothing in a batch. The
+  layer finds its features under the pointer through the spatial index. Seattle is 20 draw
+  calls where it was 385.
+- **Step 10 (Nov 23): hovers and selections in the shaders, animated.**
+  - A hover's glow is a strip (lines, areas) or a picture (points) in a small batch of glows;
+    a selection's halo is two marching lines for each ring in the map UI layer's batch. No
+    OSM feature is in Pixi's scene for a hover or a selection, and none has a filter.
+  - While something is hovered or selected the scene is drawn again 20 times a second
+    (`AnimationPacer`): less on a machine that doesn't keep up, not after 30 seconds without
+    a change, never with `prefers-reduced-motion`. Bryan has seen it and wouldn't change
+    anything (Nov 23); the numbers are still first guesses.
+  - A midpoint points the way its line is drawn, whatever `oneway=-1` says (Bryan asked).
+  - The map was black under `renderer=webgpu` on the way (a WGSL reserved word); fixed, and
+    WebGPU's atlas uploads are premultiplied now.
+
+Next: nothing of section 15's order of work is left. Candidates, for Bryan to pick: numbers
+from weaker hardware (the animation's pacing is untested where the GPU is slow), animation
+frames that don't draw the whole scene, the other layers' features in batches (`backlog.md`).
+Bryan (Nov 23): fewer draw calls are a result in themselves, since the M4 we measure on hides
+their cost. `renderer=canvas` is blank since the lines became meshes, and stays that way
+(`quirks.md`).
+
+Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first

@@ -41,14 +41,183 @@ The structure and the reasoning are in `design/scene.md`; these are the choices 
 - **No reordering while drawing.** With the datasets non-interactive the OSM line is reachable anyway;
   lifting OSM visually is a preference for a layer-order UI later (`zIndex` per container makes it cheap).
 
-## Partial fill masks are always batched (Nov 2026)
-Pixi's `'auto'` batch mode batches a `Mesh` up to 100 vertices, and a mask that crossed that line in a
+## Meshes that change get a fixed batch mode (Nov 2026)
+Pixi's `'auto'` batch mode batches a `Mesh` up to 100 vertices, and one that crossed that line in a
 frame where its tile was rebuilt crashed Pixi (pixijs#12437, Rapid#1636). Chosen: `batchMode = 'batch'`
-on every mask geometry (`PixiFeaturePolygon._setMaskGeometry()`), which measured the same as `'auto'`.
+on the geometry of every mesh whose geometry we replace (found with the masks that partial fills had,
+which are gone; every `LineMesh` now), which measured the same as `'auto'`.
 Rejected: `'no-batch'` (about 1 ms more DRAW a frame in Seattle, where 261 of 300 masks were batched),
-and replacing the mask when `mask.batched` would change (the old #1636 workaround; more code, and only
-keeps `'auto'`'s batching). Revisit when Pixi fixes #12437, or when partial fills stop using a mask
-(`design/graphics-system.md` section 4).
+and replacing the mesh when `batched` would change (the old #1636 workaround; more code, and only
+keeps `'auto'`'s batching). Revisit when Pixi fixes #12437.
+
+## Partial fills are bands of real geometry, offset by Clipper2 (Nov 2026)
+A partial fill fills the part of an area within 32 pixels of its edge. That was a full fill under a
+stencil mask (a stroke along the inside of the edge); it's now the band itself, as polygons
+(`geomAreaBand()`): the area minus the area shrunk by 32 pixels. Chosen for the shrinking and its
+cleanup: `clipper2-ts`, a TypeScript port of Clipper2 (18 KB gzipped, BSL-1.0, pinned to an exact
+version: its versions look like prereleases). Measured on every partial fill of three dense views
+(`design/graphics-system.md` section 15, step 5).
+Rejected: `clipper2-wasm` (twice as fast, but 96 KB, an asynchronous start, and it needs
+`'wasm-unsafe-eval'` in our CSP), `clipper-lib` (Clipper 1, unmaintained since 2019), `clipper2-js`
+(wrong answers on our data), and writing the cleanup ourselves (it's a sweep-line clipper: what
+Clipper is). An inside stroke without cleanup (option A in section 4) pokes out of narrow areas and
+covers pixels twice.
+Most partial fills have no middle at that width and are filled whole, which a polygon's `inradius`
+says before Clipper is asked. Bryan asked for the trial, and agreed to `clipper2-ts` (Nov 23). Keep
+`clipper2-wasm` in mind for later; he doesn't want to relax the CSP for it now.
+
+## The OSM layer finds its own features under the pointer (Nov 2026)
+Pixi's hit test asks every interactive container in the scene on every pointer event: 8 ms in
+Užice. Chosen: the layer asks the editor's spatial index which entities are near the pointer, then
+each of their features whether it's hit, by Pixi's own rules for one container (`containerHit()`),
+and takes the one drawn on top (`drawOrder()`). The scene compares that with Pixi's answer for
+everything else (`PixiScene.hitTest()`), and `PixiEvents` puts the feature on the event. So the
+feature that's found is the one Pixi found (checked at 86,400 points), in 0.07 ms. (Lines answer
+by their distance from the pointer since they left the scene; the rest as before.)
+Rejected:
+- **A hit test with rules of its own** (the nearest line, vertices before lines): it changes what
+  a click selects and what a drawn line snaps to. That's the redesign of hover and snapping in
+  `design/scene.md` section 4, not a performance change.
+- **A hit area on each tile container,** so Pixi's walk skips the tiles away from the pointer:
+  a few lines, but a feature without display objects (the static tier) has nothing for Pixi to walk.
+- **Remembering the answer per event on the scene:** Pixi reuses its event objects, so the event
+  isn't a key. `PixiEvents` asks once and puts the answer on the event it passes on.
+- **A fixed reach around the pointer** (a pin is 28 pixels tall): styles can make markers and
+  casings any size. Each feature says how far it can be hit from its geometry (`hitReach`).
+
+## The OSM layer's lines are drawn in batches, with a shader of our own (Nov 2026)
+Section 15 of `design/graphics-system.md`, step 6. A `LineBatch` is one `Mesh` whose shader places
+each vertex for the line's width in pixels at the current zoom. Choices someone might undo:
+- **Two batches for each level: every casing, then every stroke** (Bryan, Nov 23). Where roads
+  meet, neither's casing crosses the other's stroke; he judged the few pixels of difference
+  unnoticeable or better. In a batch the order is road class, then way ID.
+- **No tiles and no road classes among the batches.** The first cut had a batch per level, class
+  and zoom 14 tile (83 in Užice); it's 16 now. Bryan: draw calls count whatever the M4's
+  timings say, since many users have weaker hardware. The price is a large index buffer built
+  again when a line joins or leaves (81 ms of the 5 s that making all of Užice takes), and a
+  batch whose place in the world has to follow the view (`moveOrigin()`), since nothing else
+  keeps its 32-bit floats small.
+- **How a line is drawn is in each of its vertices** (width, least width, color, opacity, dashes:
+  16 of a vertex's 56 bytes), so one draw call serves any mix of styles and dashes need no
+  texture. A style table in a texture would make vertices smaller; not measured.
+- **A line that its batches draw isn't in the scene,** though its feature keeps a `Container`
+  (position, `zIndex`, visibility). Taking the container out of `AbstractPixiFeature` is a
+  larger change, and being out of the scene is what Pixi's cost came from.
+- **The editing tier is a hovered or highlighted line only:** its glow is a filter on its
+  container, so it draws itself there meanwhile. A dragged or selected line stays in its
+  batches: a drag measured the same either way.
+- **Dashes the vertex can't hold** (more than four numbers, fractions, over 255 pixels) fall back
+  to `LineMesh`es with a dash texture. None of Rapid's styles has one.
+
+## Areas are drawn in two batches: fills, then outlines (Nov 2026)
+Step 8 of section 15, the first part. Choices someone might undo:
+- **Every outline is over every fill** (as iD draws areas). Before, a small area's fill covered
+  the outline of the larger one it's in. Not shown to Bryan yet when it was built (Nov 23).
+- **Triangles from Pixi's `earcut`** (`PIXI.earcut`, which Pixi exports), not a dependency of our
+  own. It keeps `triangulate()` in `modules/pixi/`; if fills are ever built in a worker or
+  tested without Pixi, `earcut` becomes a direct dependency (it's in the bundle already).
+- **Patterns in one atlas texture, tiled by the shader,** so one draw call draws fills with any
+  mix of patterns. A texture array would need WebGL 2; a batch per pattern would lose the
+  order between areas. Each cell has a border of the texels that wrap around, for smoothing.
+- **No low-resolution sprite for a small area.** A batch draws its real shape at no extra cost
+  per object; Užice at zoom 16 has 26% more triangles for it, in 2 draw calls where there were 295.
+- **A hovered area draws only its outlines itself,** for the glow. Drawing its fill there too
+  would lift it over everything inside the area.
+- **Pixi's tickers are off** (Bryan, Nov 23: he wants such things gone from flame charts). The
+  events ticker's listener is removed; the system ticker is stopped and gets a turn once a
+  second from `GraphicsSystem._tick()`, for Pixi's own scheduler (which frees unused GPU
+  resources). If something of ours ever needs `eventMode: 'dynamic'`, the events ticker is what
+  made that work.
+
+## Points are drawn in one batch (Nov 2026)
+Step 8 of section 15, the rest. Choices someone might undo:
+- **One batch for points, vertices and the pins of areas,** from north to south everywhere, the
+  ones with viewfields last. The tiles' containers ordered them by row and then by tile, so
+  pins that overlapped across a tile's edge could be in either order.
+- **The shader sizes the pictures in pixels and keeps them upright,** so a zoom or a rotation
+  writes nothing. Below zoom 17 points are smaller and pins are circles: that's in the
+  vertices, and crossing 17 writes every point once.
+- **A batch draws from one texture: the symbol atlas's first.** It has always been the only one
+  (8192 pixels across, or 2048 without `highQuality`). A point with a picture from anywhere
+  else draws itself with sprites; several textures in the shader would be the fix if a second
+  one ever filled up.
+- **What's drawn above everything draws itself:** the vertices and midpoints of what's hovered
+  or selected, in the map UI's container, where Pixi's hit test finds them before anything of
+  the OSM layer's. A second batch there was the alternative (no sprites made on a hover); the
+  sprites are a few dozen for a typical way.
+- **A hovered or highlighted point draws itself too,** under its glow, like a line. *(Until
+  step 10: its glow is a picture in a batch now.)*
+- **A point's sprites are made when it first draws itself,** so `feature.marker` is `null`
+  until then. The midpoints used to turn `feature.marker`: they set `markerRotation` now.
+- **Labels and the avoid grid ask the point where it's drawn** (`labelBox()`, arithmetic), not
+  Pixi (`container.getBounds()`). The two agree to 1e-13 pixels for points drawn with sprites;
+  the one difference is that viewfields hidden below zoom 17 no longer count.
+- **A photo marker with viewfields that's selected or highlighted is always drawn over the
+  others** (`zIndex` 99000). Before, it was only if the class was there when the viewfields'
+  sprites were made, and the next redraw undid it.
+- **A hovered area's fill changes while it's hovered,** in its batch (`LIT_FILL_OPACITY`, and
+  since step 9 `LIT_FILL_TINT`). Bryan (Nov 23): the fill has to change somehow on a hover, or
+  users will miss it; he didn't love the old glow over the whole area. The outlines still glow.
+- **No hit test when the scene changes under a still pointer** (Bryan, Nov 23: not needed; our
+  scene doesn't move, and hovering data that just arrived might surprise the user anyway).
+
+## Line markers are drawn by the lines' shader (Nov 2026)
+Step 9 of section 15. Choices someone might undo:
+- **A strip in the strokes' batch, not a batch of its own and not the stroke's own pixels.**
+  The markers of a line are a second copy of its stroke mesh, 7 pixels wide for arrows and 21
+  for sided markers, in the batch that draws the level's strokes, ordered after every stroke.
+  That's no draw call more. Drawing them in the stroke's own fragments would need no vertices
+  at all, but an arrow is 5 pixels across and a stream's stroke is 3, and a sided marker is
+  beside the line.
+- **The shapes are formulas in the fragment shader,** in pixels, the same as the textures that
+  sprites use (`PixiTextures`). They can't be read off a buffer, so an e2e test compares the
+  pixels with the sprites'.
+- **No new bytes in a vertex.** A strip's vertices say what they are with a least width of 0,
+  and use the four dash bytes for the kind, the spacing, and the side of the line.
+- **A marker follows the line around a corner,** where a sprite stuck straight out past it.
+  And there's no limit of 100 markers on a segment anymore (it was there for the sprites).
+- **Arrows point back along a way tagged `oneway=-1`** (`OsmWay.isOneWayBackward()`,
+  `lineMarker.scale: [-1, 1]`). They pointed along the way it was drawn, whatever the tag:
+  wrong for those ways. (The midpoints turned around for them too, which was wrong the other
+  way: see the next entry.)
+- **An area under 20 pixels has no outline in the batch** (Bryan, Nov 23: "at least
+  _something_ is drawn, and if a user hovers over it, they will see"; "I'd prefer to draw
+  something imperfect than draw nothing that the user can see and risk them thinking there is
+  nothing mapped there"). Not in wireframe mode, where the outline is all there is.
+- **A hovered area's fill is tinted halfway to the hover's color** (yellow; blue for a
+  highlight) and twice as opaque (Bryan, Nov 23: tinted "for now"; what matters today is that
+  a user sees what they're hovering). He's seen it since: "looking really good now, I can
+  easily tell what's being hovered."
+
+## Hovers and selections are drawn by the shaders, and they move (Nov 2026)
+Step 10 of section 15 (Bryan's idea, Nov 23: animated by shader code, so that they don't lean
+on color alone, with frames at regular intervals). Choices someone might undo:
+- **A midpoint points the way its line is drawn** (Bryan, Nov 23), not the way of travel. The
+  arrows show travel. `_gatherMidpoints()` had swapped the nodes for `oneway=-1` since 2022,
+  from when the whole line was drawn reversed.
+- **A glow is geometry with a distance in it, not a filter.** A strip around the line, faded
+  by the fragment shader from the line's edge out, hollow over the line. No blur, no extra
+  render target, and the feature stays in its batches.
+- **A glow is over everything of its level** (a line's), over every outline (an area's) and
+  under every point (a point's). The filter's was at the feature's own place among the
+  others. One place for all of them is what a batch of glows gives, and "light on top" reads
+  the same everywhere.
+- **Glows are in batches of their own,** though that's three more meshes. In the batch of
+  what it's around, each hover had that batch's index buffer built again (11 ms in Užice).
+- **A halo is two lines,** a dark one under the yellow dashes, so that it shows on any
+  background. Its dashes march; a glow breathes. Both are a uniform from the clock.
+- **20 animation frames a second, not 60,** because each one draws the whole scene. Enough for
+  dashes that move a pixel a frame.
+- **The animation gives way:** to a slow machine (it takes a third of the ticks at most, by
+  how long the browser takes to come back), to idleness (it rests after 30 seconds without a
+  change), and to `prefers-reduced-motion` (it never starts). All three are in
+  `AnimationPacer` and `PixiScene.animated`. Bryan didn't ask for them, and kept them when
+  he saw the result (Nov 23: "wouldn't change anything about it"). The numbers are guesses.
+- **Rejected for now: drawing the still scene to a texture,** and animating over it. It would
+  make an animation frame nearly free and allow 60 a second. It's a change to how every frame
+  is drawn, and wants numbers from weak hardware first.
+- **`GlowFilter` stays for features that draw themselves** in layers without batches (Rapid's
+  and custom data's lines and areas). Every layer's points have the new glow.
 
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
@@ -179,8 +348,8 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 - **Container position = `world.origin` (extent center)** — Each feature's `container.position` is set to the extent center of its geometry in z16 world coordinates. All vertex drawing is then origin-relative. This keeps vertex magnitudes small (~thousands not ~8 million), making float32 drawing safe and d3-polygon numerics stable.
 - **Points: counter-scale + counter-rotate** — `origin` scales geometry up with zoom. Point sprites are fixed-size in screen pixels. Fix: set `container.scale = baseScale / worldScale` and `container.rotation = -bearing`. This keeps child sprites screen-sized regardless of zoom/bearing. Halos and hit areas live in the counter-scaled local space, so they work unchanged.
 - **Lines + polygons: world-local stroke widths** — Instead of counter-scaling (which would shrink geometry), express stroke widths in world-local units: `localWidth = pixelWidth * 2^(WORLD_ZOOM - zoom)`. At render time `origin`'s scale inverts this back to screen pixels. Dash patterns and buffer widths use the same conversion.
-- **Hit areas are in container-local space** — `container.hitArea = new PIXI.Polygon(...)` coordinates must be in the container's local frame. For world-path features the local frame is world-local (origin-relative). `lineToPoly()` is called with world-local points and a world-local buffer width. Pixi composes the container transform when doing hit testing, so no extra projection is needed.
-- **DashLine halos: `scale` only, no per-caller workaround** — lines and polygons pass `scale: localScale`, points `1` (their container is counter-scaled). DashLine uses `textureSpace: 'global'` and keeps pow2 padding for WebGL1, compensated in its matrix. The details are in `lessons/pixi.md`.
+- **Hit areas are in container-local space** — a `container.hitArea`'s coordinates must be in the container's local frame. For world-path features the local frame is world-local (origin-relative): a `LineHitArea` gets the feature's world-local points and a world-local distance. Pixi composes the container transform when doing hit testing, so no extra projection is needed.
+- **Halos: `scale` only, no per-caller workaround** — `drawHalo()` takes how many of the container's units a pixel is: lines and polygons pass `localScale`, points `1` (their container is counter-scaled). The halo's width and its dashes are in pixels.
 - **`viewZoom` vs `styleZoom` naming convention** — named at the top of each method that needs both: `viewZoom` for scale math, `styleZoom` (latitude-adjusted) only for level-of-detail thresholds and styling (`lessons/pixi.md`).
 
 ## Frame pacing (Nov 2026)

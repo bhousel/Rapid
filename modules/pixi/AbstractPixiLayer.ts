@@ -102,6 +102,8 @@ export class AbstractPixiLayer {
   protected _sortedTime: number;
   /** How many of the layer's features are visible (kept by `AbstractPixiFeature`, see `numVisible`) */
   protected _numVisible: number;
+  /** The furthest that any feature drawn since the last reset can be hit from its geometry's box, in pixels (`AbstractPixiFeature.hitReach`) */
+  protected _hitReach: number;
   /**
    * Whether the layer is making features after its pass has ended (in a later frame, or after
    * `cull()`), for data that the pass put off. `retainFeature()` then counts them as seen by that pass.
@@ -146,6 +148,7 @@ export class AbstractPixiLayer {
     this._sortedBox = null;
     this._sortedTime = -Infinity;
     this._numVisible = 0;
+    this._hitReach = 0;
     this._catchingUp = false;
 
     // Feature <-> Data
@@ -248,6 +251,7 @@ export class AbstractPixiLayer {
     this._waitingForTexture.clear();
     this._sortedBox = null;
     this._numVisible = 0;
+    this._hitReach = 0;
     this._currentBox = null;
 
     for (const spatialID of this._spatialIDs) {
@@ -480,6 +484,19 @@ export class AbstractPixiLayer {
 
 
   /**
+   * Finds the layer's feature under the pointer, the one drawn on top if there are several.
+   * The scene asks this of a layer that said it finds its own (`PixiScene.setHitTester`), in
+   * place of Pixi's hit test. Override it in such a layer; this one finds nothing.
+   * @param _point - The pointer's place in the stage's coordinates (a pointer event's `global`)
+   * @param _world - The same place in world coordinates
+   * @return The feature, or `null` if the pointer is over none of the layer's
+   */
+  public hitTest(_point: PIXI.PointData, _world: PIXI.PointData): AbstractPixiFeature | null {
+    return null;
+  }
+
+
+  /**
    * Counts a feature of this layer being shown or hidden. `AbstractPixiFeature` calls this when
    * its `visible` changes, so the layer knows how many are visible without walking them all.
    * @param _feature - The feature
@@ -617,6 +634,9 @@ export class AbstractPixiLayer {
     const drawMs = feature.onlyTransformDirty ? DRAW_MS_PER_REDRAW : DRAW_MS_PER_NEW;
     feature.update(viewport);
     frame.drawDebt += drawMs;
+    if (feature.hitReach > this._hitReach) {
+      this._hitReach = feature.hitReach;
+    }
 
     // Still dirty? Then it's drawn without a texture that hasn't loaded yet (an icon, see
     // `PixiFeaturePoint.updateStyle`). `texturesLoaded()` draws it again when one arrives.

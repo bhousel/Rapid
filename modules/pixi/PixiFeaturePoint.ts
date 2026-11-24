@@ -1,21 +1,88 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { DashLine } from './lib/DashLine.ts';
-import { GlowFilter } from 'pixi-filters';
+import { PointBatch } from './lib/PointBatch.ts';
+import { glowColor } from './helpers.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
-import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
+import type { PointBatchItem, PointBatchQuad } from './lib/PointBatch.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
-/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
-type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
+// How many points make the circle of a halo
+const HALO_CIRCLE_POINTS = 20;
+
+// The markers that are pins: anchored at their tip, with the icon up in their head
+const PINS = ['pin', 'boldPin', 'osmose'];
+
+// Where a pin's icon goes, in pixels above its tip. (The middle of a pin is 15 above it; this looks nicer.)
+const PIN_ICON_Y = -14;
+
+// A point can be hit at least this close to it, in pixels across, and this much beyond its marker
+const HIT_MINSIZE = 20;
+const HIT_PAD = 4;
+
+// In a batch, a point with viewfields is drawn over every point without (see `sceneOrder`).
+// (Points are ordered by their place in the world, which is under 2^24.)
+const VIEWFIELDS_ABOVE = 2 ** 25;
 
 
 /** Scratch space for `PixiFeaturePoint.updateAvoid` */
 const TEMP: Vec2 = [0, 0];
+const TEMP_BOX: [number, number, number, number] = [0, 0, 0, 0];
+
+// The glow behind a hovered or highlighted point: a disc of the glow's color, twice as wide as
+// the marker (and at least `GLOW_MIN_SIZE` pixels), that's solid out to half its radius and
+// fades from there. It breathes (see `PixiScene.animate`).
+const GLOW_SCALE = 2;
+const GLOW_MIN_SIZE = 30;
+const GLOW_ALPHA = 0.9;
+
+// What `_layout()` worked out, for the feature that's being drawn: its pictures, the lowest
+// first (the glow, then the viewfields, then the marker, then the icon), and which of them is
+// which. The objects are used again for every feature, so that drawing one makes none.
+const QUADS: PointBatchQuad[] = [];
+let _glowQuad = -1;
+let _firstViewfield = 0;
+let _numViewfields = 0;
+let _markerQuad = -1;
+let _iconQuad = -1;
+
+/**
+ * Returns one of the scratch pictures, to be filled in.
+ * @param index - Which one
+ * @return The picture
+ */
+function quadAt(index: number): PointBatchQuad {
+  let quad = QUADS[index];
+  if (!quad) {
+    quad = { texture: PIXI.Texture.EMPTY, x: 0, y: 0, width: 0, height: 0, anchorX: 0.5, anchorY: 0.5, rotation: 0, color: 0xffffff, alpha: 1, turns: false, pulses: false };
+    QUADS[index] = quad;
+  }
+  return quad;
+}
+
+/**
+ * Works out how big a picture is drawn, from what a style says about it.
+ * @param quad - The picture. Its `width` and `height` are set.
+ * @param size - The style's `size`: the picture is that many pixels across, if it's a number
+ * @param scale - The style's `scale`: one number, or one for each direction
+ * @param fallback - The size to use if the style has none, or `null` for the texture's own
+ */
+function setSize(quad: PointBatchQuad, size: number | undefined, scale: number | number[] | undefined, fallback: number | null): void {
+  let [scaleX, scaleY] = Array.isArray(scale) ? scale : [scale];
+  if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
+  if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
+
+  const across = Number.isFinite(size) ? size! : fallback;
+  if (across !== null) {
+    quad.width = across * scaleX!;
+    quad.height = across * scaleY!;
+  } else {
+    quad.width = quad.texture.orig.width * scaleX!;
+    quad.height = quad.texture.orig.height * scaleY!;
+  }
+}
 
 
 /** Additional properties for a point */
@@ -28,31 +95,65 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
 
 
 /**
- * This class renders a Point feature.
+ * This class renders a Point feature: a marker, perhaps with an icon over it and viewfields
+ * under it. They're drawn at a size on screen, whatever the zoom, and the marker and icon stay
+ * upright however the map is turned.
+ *
+ * A layer that draws many points gives the feature a `PointBatch`. Its pictures are then a
+ * few rectangles in the batch's buffers, drawn with the other points there, and the feature
+ * has no sprites and nothing in its container: it needn't be in the scene at all
+ * (`drawsInContainer()`). A zoom or a rotation changes nothing in a batch.
+ *
+ * Without a batch, the pictures are sprites in the feature's container, which is scaled and
+ * turned to undo the map's zoom and rotation. A hovered or highlighted point has one picture
+ * more, either way: a glow behind the others.
+ * (See `design/graphics-system.md` section 15.)
  *
  * Properties available:
- * - `marker`      - `PIXI.Sprite` for the marker
- * - `icon`        - `PIXI.Sprite` for the icon (or `null` if the style has none)
+ * - `batch`       - `PointBatch` that draws the point, if the layer gave it one
+ * - `marker`      - `PIXI.Sprite` for the marker (or `null` while a batch draws the point)
+ * - `icon`        - `PIXI.Sprite` for the icon (or `null` if there's none to draw)
  * - `viewfields`  - `PIXI.Container` containing the viewfields (or `null` if none)
+ * - `glow`        - `PIXI.Sprite` for the glow of a hover or a highlight (or `null` if there's none to draw)
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePoint extends AbstractPixiFeature {
 
-  /** PIXI.Sprite for the marker */
+  /** PIXI.Sprite for the marker (or null until the point is drawn, and while a batch draws it) */
   public marker: PIXI.Sprite | null;
   /** PIXI.Sprite for the icon (or null while the style has no icon: most vertices) */
   public icon: PIXI.Sprite | null;
   /** PIXI.Container containing the viewfields (or null if none) */
   public viewfields: PIXI.Container | null;
+  /** PIXI.Sprite for the glow of a hover or a highlight (or null while there's none, or a batch draws it) */
+  public glow: PIXI.Sprite | null;
+  /** How the marker is turned on screen, in radians (a midpoint points along its way). Set it before `update()`. */
+  public markerRotation: number;
   /** Narrows the inherited `PixiFeatureProps` props to `PixiFeaturePointProps` */
   public declare props: PixiFeaturePointProps;
 
+  /** The batch that the layer gave this feature to draw in (see `batch`) */
+  protected _batch: PointBatch | null;
+  /** The point in a batch, if a batch draws it */
+  protected _item: PointBatchItem | null;
+  /** The point's glow in the batch that its batch has for glows, while it's hovered or highlighted there */
+  protected _glowItem: PointBatchItem | null;
+  /** Whether the point was last drawn with sprites of its own, in its container */
+  protected _ownDraw: boolean;
+  /** Whether the point's batch couldn't draw it the last time it was drawn (see `drawsInContainer`) */
+  protected _unbatchable: boolean;
+  /** Whether the point was last drawn with pictures that turn with the map (viewfields) */
+  protected _turns: boolean;
   /** Count of viewfield sprites (to detect changes) */
   protected _viewfieldCount: number;
   /** Name of viewfield texture (to detect changes) */
   protected _viewfieldName: string | null;
-  /** How big the point is drawn on screen, compared with its textures (see `updateStyle`) */
+  /** How big the point is drawn on screen, compared with what its style says (see `updateStyle`) */
   protected _screenScale: number;
+  /** The marker's box, in pixels from the point at the style's own size: `[minX, minY, maxX, maxY]` */
+  protected _markerBox: [number, number, number, number];
+  /** The box of everything the point draws, in pixels from the point on screen: `[minX, minY, maxX, maxY]` (`maxX < minX` if it draws nothing) */
+  protected _box: [number, number, number, number];
 
 
   /**
@@ -65,19 +166,22 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this._viewfieldCount = 0;         // to watch for change in # of viewfield sprites
     this._viewfieldName = null;       // to watch for change in viewfield texture
     this._screenScale = 1;
+    this._markerBox = [0, 0, 0, 0];
+    this._box = [0, 0, -1, -1];
+    this._batch = null;
+    this._item = null;
+    this._glowItem = null;
+    this._ownDraw = false;
+    this._unbatchable = false;
+    this._turns = false;
     this.props.isCircular = false;    // set true to use a circular halo and hit area
+    this.markerRotation = 0;
 
-    const marker = new PIXI.Sprite();
-    marker.label = 'marker';
-    marker.eventMode = 'none';
-    marker.sortableChildren = false;
-    marker.visible = true;
-    this.marker = marker;
-
-    this.icon = null;         // add later only if needed (see `updateStyle`)
-    this.viewfields = null;   // add later only if needed
-
-    this.container.addChild(marker);
+    // The sprites are made in `update()`, if no batch draws the point
+    this.marker = null;
+    this.icon = null;
+    this.viewfields = null;
+    this.glow = null;
   }
 
 
@@ -86,6 +190,175 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * Do not use the Feature after calling `destroy()`.
    */
   public destroy(): void {
+    this._dropSprites();
+    this._dropItem();
+    this.batch = null;
+
+    super.destroy();
+  }
+
+
+  /**
+   * The batch to draw the point in, with the other points of the layer, or `null` to draw it
+   * with sprites of its own. The layer sets it before `update()`, and positions the batch near
+   * the point. The feature may be drawn some frames later, so the batch counts the features it
+   * was given to (`VertexBatch.users`).
+   * @return The batch, or `null`
+   */
+  public get batch(): PointBatch | null {
+    return this._batch;
+  }
+  /**
+   * @param val - The batch to draw the point in from the next `update()`, or `null` for none.
+   *   A point that gets another is drawn again.
+   */
+  public set batch(val: PointBatch | null) {
+    if (val === this._batch) return;
+    if (this._batch) this._batch.users--;
+    if (val) val.users++;
+    this._batch = val;
+    this._styleDirty = true;
+    this._transformOnly = false;
+  }
+
+
+  /**
+   * The point in the batch, if a batch draws it
+   * @return The batch's item, or `null`
+   * @readonly
+   */
+  public get item(): PointBatchItem | null {
+    return this._item;
+  }
+
+
+  /**
+   * The point's glow in a batch of its own, while the point is hovered or highlighted and its
+   * batch has one for glows (see `PointBatch.glows`)
+   * @return The glows' batch's item, or `null`
+   * @readonly
+   */
+  public get glowItem(): PointBatchItem | null {
+    return this._glowItem;
+  }
+
+
+  /**
+   * Whether this point draws something in its own container, and so has to be in the scene (the
+   * layer asks before `update()`, to know whether to give it a place there).
+   * A point that a batch draws has nothing in its container, unless the batch couldn't draw
+   * it the last time: one of its pictures isn't in the texture that batches draw from
+   * (`PointBatch.canDraw`). That's only known once it's drawn, so a layer asks again after
+   * `update()`.
+   * @return `true` if its container has to be in the scene
+   */
+  public drawsInContainer(): boolean {
+    const batch = this._batch;
+    if (!batch || batch.destroyed) return true;
+    return this._unbatchable;
+  }
+
+
+  /**
+   * Whether the pointer is over this point: in its hit area, which is around where the point
+   * is on screen. This needs nothing of Pixi's, so it's the same whether a batch draws the
+   * point (its container isn't in the scene then) or the point draws itself.
+   * @param _point - The pointer's place in the stage's coordinates
+   * @param world - The same place in world coordinates
+   * @return `true` if the pointer hits it
+   */
+  public override hitTest(_point: PIXI.PointData, world: PIXI.PointData): boolean {
+    const origin = this.gfx.origin;
+    const hitArea = this.container.hitArea;
+    if (!origin || !hitArea || !this.visible || !this._allowInteraction) return false;
+
+    // From the point to the pointer: in the world, then on screen as the world was last drawn,
+    // then in the hit area's own pixels (the marker's, before it's made smaller at low zooms).
+    const position = this.container.position;
+    const m = origin.worldTransform;
+    const dx = world.x - position.x;
+    const dy = world.y - position.y;
+    const scale = this._screenScale;
+    return hitArea.contains((m.a * dx + m.c * dy) / scale, (m.b * dx + m.d * dy) / scale);
+  }
+
+
+  /**
+   * The batch that draws this point, if one does: where the point is drawn among the others is
+   * where that batch is, and the point's `sceneOrder` in it.
+   * @return The batch, or this feature's own container
+   */
+  public override get sceneContainer(): PIXI.Container {
+    const item = this._item;
+    return (item?.batch && item.visible) ? item.batch : this.container;
+  }
+
+
+  /**
+   * Where this point is drawn among the others that its batch draws.
+   * @return Its order in the batch (0 if no batch draws it)
+   */
+  public override get sceneOrder(): number {
+    const item = this._item;
+    return (item?.batch && item.visible) ? item.order : 0;
+  }
+
+
+  /**
+   * Whether the Feature is currently visible
+   * @return `true` if the feature is currently visible
+   */
+  public override get visible(): boolean {
+    return super.visible;
+  }
+  /**
+   * A point that a batch draws is shown and hidden there too. (Not shown there while the point
+   * draws itself: see `drawsInContainer`.)
+   * @param val - `true` to show the feature, `false` to hide it
+   */
+  public override set visible(val: boolean) {
+    super.visible = val;
+    const item = this._item;
+    const glowItem = this._glowItem;
+    const inBatch = val && !this._ownDraw;
+    if (item && item.visible !== inBatch) {
+      item.batch?.setVisible(item, inBatch);
+    }
+    if (glowItem && glowItem.visible !== inBatch) {
+      glowItem.batch?.setVisible(glowItem, inBatch);
+    }
+  }
+
+
+  /**
+   * The box of everything this point draws, in label space (see `PixiScene.updateLabelSpace`),
+   * as the point was last drawn. Labels are placed around it, and keep clear of it.
+   * @param out - Where to put the result
+   * @return `out`, as `[minX, minY, maxX, maxY]`, or `null` if the point draws nothing
+   */
+  public labelBox(out: [number, number, number, number]): [number, number, number, number] | null {
+    const box = this._box;
+    const origin = this._geom?.world?.origin;
+    if (!origin || box[2] < box[0]) return null;
+
+    const [x, y] = this.scene.worldToLabel(origin[0], origin[1], TEMP);
+    out[0] = x + box[0];
+    out[1] = y + box[1];
+    out[2] = x + box[2];
+    out[3] = y + box[3];
+    return out;
+  }
+
+
+  /**
+   * Destroys the sprites, if this feature has them.
+   */
+  protected _dropSprites(): void {
+    if (this.glow) {
+      this.scene.removePulsing(this.glow);
+      this.glow.destroy();
+      this.glow = null;
+    }
     if (this.marker) {
       this.marker.destroy();
       this.marker = null;
@@ -98,8 +371,29 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       this.viewfields.destroy({ children: true });
       this.viewfields = null;
     }
+    this._viewfieldCount = 0;
+    this._viewfieldName = null;
+  }
 
-    super.destroy();
+
+  /**
+   * Takes the point out of the batch that draws it, if one does.
+   */
+  protected _dropItem(): void {
+    const item = this._item;
+    if (item) item.batch?.remove(item);
+    this._item = null;
+    this._dropGlowItem();
+  }
+
+
+  /**
+   * Takes the point's glow out of the batch that draws it, if one does.
+   */
+  protected _dropGlowItem(): void {
+    const item = this._glowItem;
+    if (item) item.batch?.remove(item);
+    this._glowItem = null;
   }
 
 
@@ -110,6 +404,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
     this.layer.work.updated++;
+
+    // (A point that moved is drawn again, wherever it's drawn.)
+    if (this._geomDirty) this._styleDirty = true;
 
     this.updateGeometry();
     this.updateStyle(viewport);
@@ -123,40 +420,23 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   /**
    * Marks where this point is drawn, for labels to keep clear of (see `AbstractPixiFeature.updateAvoid`).
    *
-   * A point is drawn at a size on screen, upright, whatever the zoom and rotation: so its box
-   * is its marker's size around its place in label space, from arithmetic. A point with
-   * viewfields is different: they keep their direction on the ground, so what they cover
-   * changes as the map turns. Few points have them, and for those Pixi is asked what's drawn.
+   * A point is drawn at a size on screen, upright, whatever the zoom and rotation: so what it
+   * covers is the box of its pictures around its place in label space, from arithmetic.
+   * (Viewfields keep their direction on the ground, so their part of the box is for the
+   * rotation the point was last drawn at.)
    */
   public override updateAvoid(): void {
     const scene = this.scene;
-    const marker = this.marker;
-    const origin = this._geom?.world?.origin;
-    if (!this.labelAvoid || !this.container?.visible || !marker || !origin || !scene?.avoidGrid) {
+    if (!this.labelAvoid || !this.container?.visible || !scene?.avoidGrid) {
       this._setAvoid(null);
       return;
     }
-
-    const hasViewfields = !!this.viewfields && this.viewfields.renderable;
-    if (hasViewfields || !marker.visible || marker.rotation !== 0) {
-      const rect = this.container.getBounds().rectangle;
-      const offset = scene.labelOffset;
-      this._setAvoid([rect.x - offset.x, rect.y - offset.y, rect.x + rect.width - offset.x, rect.y + rect.height - offset.y]);
-      return;
-    }
-
-    const [x, y] = scene.worldToLabel(origin[0], origin[1], TEMP);
-    const w = marker.texture.orig.width * Math.abs(marker.scale.x) * this._screenScale;
-    const h = marker.texture.orig.height * Math.abs(marker.scale.y) * this._screenScale;
-    const minX = x - (marker.anchor.x * w);
-    const minY = y - (marker.anchor.y * h);
-    this._setAvoid([minX, minY, minX + w, minY + h]);
+    this._setAvoid(this.labelBox(TEMP_BOX));
   }
 
 
   /**
-   * Updates the container position and z-ordering from the point geometry.
-   * @param viewport - Pixi viewport to use for rendering
+   * Updates the container position from the point geometry.
    */
   public updateGeometry(): void {
     if (!this._geomDirty) return;
@@ -175,17 +455,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     const [x, y] = origin;
     this.container.position.set(x, y);
-
-    // sort markers by latitude ascending
-    // sort markers with viewfields above markers without viewfields
-    const z = y;  // use y coord as the z-index
-    this.container.zIndex = (this._viewfieldCount > 0) ? (z + 1000) : z;
     this._geomDirty = false;
   }
 
 
   /**
-   * Updates the marker, icon, and viewfield display sprites from the current style.
+   * Draws the marker, icon, and viewfields from the current style: in the layer's batch if it
+   * gave one that can draw them, otherwise as sprites of this feature's own.
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateStyle(viewport: Viewport): void {
@@ -195,67 +471,439 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const map = context.systems.map;
     const viewZoom = viewport.transform.zoom;
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
-    const wireframeMode = map?.wireframeMode;
-    const textureManager = this.gfx.textureManager!;
-    const style = this._style;
-    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.image ?? '');
-
+    const isWireframe = !!map?.wireframeMode;
     const container = this.container;
-    const marker = this.marker!;
+    const style = this._style;
 
-    // Use y-coordinate as the z-index.
-    const z = container.position.y;
-
-    // If we are in a rotated frame, apply counter-rotation to keep the icons and markers facing up.
-    // (However viewfields container _should_ include the bearing, and will below)
-    const bearing = viewport.transform.rotation;
-    container.rotation = -bearing;
-
-    // If we are rendering world coordinates, apply counter-scale to get children back to screen coords.
-    // Scale down even more at lower zooms.
-    const baseScale = (styleZoom < 17 || wireframeMode) ? 0.8 : 1.0;
-    this._screenScale = baseScale;
-    if (this._geom) {   // GeometryPart path
-      const worldScale = 2 ** (viewZoom - WORLD_ZOOM) || 1;
-      container.scale.set(baseScale / worldScale, baseScale / worldScale);
-    } else {
-      container.scale.set(baseScale, baseScale);
+    // Not a Point, or no GeometryPart data? (`updateGeometry` hid it.)
+    if (this._geom?.type !== 'Point' || !this._geom.world?.origin) {
+      this._styleDirty = false;
+      return;
     }
 
-    // Show marker, if any..
-    if (style.marker.image) {
-      // anchor, default to middle,middle
-      let [anchorX, anchorY] = style.marker.anchor || [];
-      if (!Number.isFinite(anchorX)) anchorX = 0.5;
-      if (!Number.isFinite(anchorY)) anchorY = 0.5;
-      marker.anchor.set(anchorX, anchorY);
+    // Below zoom 16 points aren't drawn. Up to 17, and in wireframe mode, they're drawn
+    // smaller, pins as circles, without viewfields.
+    const lod = (styleZoom < 16) ? 0 : (styleZoom < 17 || isWireframe) ? 1 : 2;
+    const screenScale = (lod === 2) ? 1.0 : 0.8;
+    const hasViewfields = (style.viewfield?.angles?.length ?? 0) > 0;
+    const batch = (this._batch && !this._batch.destroyed) ? this._batch : null;
+    const item = this._item;
 
-      // size, if unset, size will be determined by the texture
-      const markerSize = style.marker.size;
-      const markerScale = style.marker.scale || [];
-      let [scaleX, scaleY] = Array.isArray(markerScale) ? markerScale : [markerScale];
-      if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
-      if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
-      if (Number.isFinite(markerSize)) {
-        marker.width = markerSize! * scaleX!;
-        marker.height = markerSize! * scaleY!;
+    const bearing = viewport.transform.rotation;
+
+    // Only the zoom or the rotation changed, and the batch has the point as it's drawn now:
+    // nothing to do. (This runs for every point after a zoom, so it makes no objects.)
+    if (this.onlyTransformDirty && lod === this.lod && (
+      lod === 0 || (item && item.batch === batch && !this._ownDraw && !this._turns)
+    )) {
+      // (A selected point's halo is drawn around its container's place, at its scale.)
+      if (this._classes.has('select')) this._setTransform(viewZoom, bearing, screenScale);
+      this.visible = (lod > 0);
+      this._styleDirty = false;
+      return;
+    }
+
+    this.lod = lod;
+    this._screenScale = screenScale;
+    this._setTransform(viewZoom, bearing, screenScale);
+
+    // Sort markers by latitude ascending, and markers with viewfields above markers without.
+    // Make the active photo image pop out at the user.
+    const z = container.position.y;
+    const isActivePhoto = this._classes.has('selectphoto') || this._classes.has('highlightphoto');
+    container.zIndex = !hasViewfields ? z : isActivePhoto ? 99000 : (z + 1000);
+
+    if (lod === 0) {   // Hide container and everything under it
+      this.visible = false;
+      this._styleDirty = false;
+      return;
+    }
+
+    const missing = this._layout(lod, bearing);
+    const count = _firstViewfield + _numViewfields + (_markerQuad >= 0 ? 1 : 0) + (_iconQuad >= 0 ? 1 : 0);
+
+    // A batch draws the point if every picture is in the batch's texture.
+    let inBatch = !!batch;
+    for (let i = 0; inBatch && i < count; i++) {
+      inBatch = PointBatch.canDraw(QUADS[i].texture);
+    }
+
+    this._ownDraw = !inBatch;
+    this._unbatchable = (!!batch && !inBatch);
+    this._turns = (_numViewfields > 0);
+    this.visible = true;
+
+    if (inBatch) {
+      this._dropSprites();
+      this._drawBatched(batch!, count, hasViewfields);
+
+    } else {
+      // Sprites of this feature's own, in its container.
+      this._dropItem();
+      this._drawSprites(bearing);
+    }
+
+    // If we are waiting on a texure to load, stay dirty.
+    this._styleDirty = missing;
+  }
+
+
+  /**
+   * Scales and turns the container so that what's in it is in pixels on screen, and upright:
+   * the container is in world coordinates, under a parent that zooms and turns with the map.
+   * (For sprites, and for the halo, which copies the container's transform. A batch's shader
+   * does the same for what's in it.)
+   * @param viewZoom - The view's zoom
+   * @param bearing - The map's rotation, in radians
+   * @param screenScale - How big the point is drawn, compared with what its style says
+   */
+  protected _setTransform(viewZoom: number, bearing: number, screenScale: number): void {
+    const container = this.container;
+    const worldScale = 2 ** (viewZoom - WORLD_ZOOM) || 1;
+    container.rotation = -bearing;
+    container.scale.set(screenScale / worldScale, screenScale / worldScale);
+  }
+
+
+  /**
+   * Works out what the point is drawn with at a level of detail: its pictures, in the scratch
+   * list (`QUADS`), in pixels at the style's own size. Also what follows from them: whether
+   * the marker is round (`props.isCircular`), the marker's box and the box of everything.
+   * @param lod - The level of detail: 1 (smaller, pins as circles, no viewfields) or 2 (full)
+   * @param bearing - The map's rotation, in radians
+   * @return `true` if a picture is left out because its texture hasn't loaded yet
+   */
+  protected _layout(lod: number, bearing: number): boolean {
+    const textureManager = this.gfx.textureManager!;
+    const style = this._style;
+    const vfAngles = style.viewfield?.angles || [];
+    const isPin = PINS.includes(style.marker.image ?? '');
+    let count = 0;
+    let missing = false;
+
+    // The glow of a hover or a highlight, under everything: its place is kept, and it's
+    // filled in once the marker is known.
+    const color = glowColor(this._classes);
+    const glowTexture = (color !== null) ? textureManager.getTexture('symbol', 'glow') : null;
+    _glowQuad = (glowTexture && glowTexture !== PIXI.Texture.EMPTY) ? count++ : -1;
+    _firstViewfield = count;
+
+    // Pinlike markers are circles at lower zoom, and where viewfields are present.
+    const markerID = (isPin && (lod === 1 || vfAngles.length > 0)) ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
+    const isCircular = /(circle|midpoint)$/i.test(markerID);
+    const isPinned = (isPin && !isCircular);   // drawn as a pin: its tip is at the point
+    this.props.isCircular = isCircular;
+
+    // Viewfields, if any, under everything. They turn with the map.
+    _numViewfields = 0;
+    if (lod === 2 && vfAngles.length > 0) {
+      const texture = textureManager.getTexture('symbol', style.viewfield.image || '') || PIXI.Texture.WHITE;
+      if (texture === PIXI.Texture.EMPTY) {
+        missing = true;
       } else {
-        marker.scale.set(scaleX, scaleY);
+        // anchor, default to middle,middle
+        let [anchorX, anchorY] = style.viewfield.anchor || [];
+        if (!Number.isFinite(anchorX)) anchorX = 0.5;
+        if (!Number.isFinite(anchorY)) anchorY = 0.5;
+
+        for (const angle of vfAngles) {
+          const quad = quadAt(count++);
+          quad.texture = texture;
+          quad.x = 0;
+          quad.y = 0;
+          quad.anchorX = anchorX!;
+          quad.anchorY = anchorY!;
+          setSize(quad, style.viewfield.size, style.viewfield.scale, null);   // no default (size will be determined by the texture)
+          quad.rotation = angle * Math.PI / 180;
+          quad.color = style.viewfield.color ?? 0x333333;
+          quad.alpha = style.viewfield.opacity ?? 1;
+          quad.turns = true;
+          quad.pulses = false;
+        }
+        _numViewfields = count - _firstViewfield;
+      }
+    }
+
+    // The marker, if any
+    const markerBox = this._markerBox;
+    markerBox[0] = markerBox[1] = markerBox[2] = markerBox[3] = 0;
+    _markerQuad = -1;
+    if (style.marker.image) {
+      const texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
+      if (texture === PIXI.Texture.EMPTY) {
+        missing = true;
+      } else {
+        const quad = quadAt(count);
+        quad.texture = texture;
+        quad.x = 0;
+        quad.y = 0;
+        quad.anchorX = 0.5;                  // middle,
+        quad.anchorY = isPinned ? 1 : 0.5;   // bottom (a pin) or middle
+        setSize(quad, style.marker.size, style.marker.scale, null);   // if unset, size will be determined by the texture
+        quad.rotation = this.markerRotation;
+        quad.color = style.marker.color ?? 0xffffff;
+        quad.alpha = style.marker.opacity ?? 1;
+        quad.turns = false;
+        quad.pulses = false;
+        _markerQuad = count++;
+
+        const w = Math.abs(quad.width);
+        const h = Math.abs(quad.height);
+        markerBox[0] = -quad.anchorX * w;
+        markerBox[1] = -quad.anchorY * h;
+        markerBox[2] = markerBox[0] + w;
+        markerBox[3] = markerBox[1] + h;
+      }
+    }
+
+    // The icon, if any, over the marker
+    _iconQuad = -1;
+    if (style.icon.image) {
+      const texture = textureManager.getTexture('symbol', style.icon.image) || PIXI.Texture.EMPTY;
+      if (texture === PIXI.Texture.EMPTY) {
+        missing = true;
+      } else {
+        // anchor, default to middle,middle
+        let [anchorX, anchorY] = style.icon.anchor || [];
+        if (!Number.isFinite(anchorX)) anchorX = 0.5;
+        if (!Number.isFinite(anchorY)) anchorY = 0.5;
+
+        const quad = quadAt(count);
+        quad.texture = texture;
+        quad.x = 0;
+        quad.y = isPinned ? PIN_ICON_Y : 0;   // in the pin's head, or in the middle
+        quad.anchorX = anchorX!;
+        quad.anchorY = anchorY!;
+        setSize(quad, style.icon.size || 11, style.icon.scale, 11);   // default to 11px to fit within the marker
+        quad.rotation = 0;
+        quad.color = style.icon.color ?? 0x111111;
+        quad.alpha = style.icon.opacity ?? 1;
+        quad.turns = false;
+        quad.pulses = false;
+        _iconQuad = count++;
+      }
+    }
+
+    // The glow: a disc behind the marker's middle, twice as wide as the marker.
+    if (_glowQuad >= 0) {
+      const quad = quadAt(_glowQuad);
+      const size = Math.max(GLOW_MIN_SIZE, GLOW_SCALE * Math.max(markerBox[2] - markerBox[0], markerBox[3] - markerBox[1]));
+      quad.texture = glowTexture!;
+      quad.x = (markerBox[0] + markerBox[2]) / 2;
+      quad.y = (markerBox[1] + markerBox[3]) / 2;
+      quad.width = size;
+      quad.height = size;
+      quad.anchorX = 0.5;
+      quad.anchorY = 0.5;
+      quad.rotation = 0;
+      quad.color = color!;
+      quad.alpha = GLOW_ALPHA;
+      quad.turns = false;
+      quad.pulses = true;
+    }
+
+    this._layoutBox(count, bearing);
+    return missing;
+  }
+
+
+  /**
+   * Works out the box of everything the point draws, on screen: around the corners of each
+   * picture that `_layout()` worked out, as it's turned.
+   * (Not the glow: a hover must leave every label where it is.)
+   * @param count - How many pictures there are
+   * @param bearing - The map's rotation, in radians
+   */
+  protected _layoutBox(count: number, bearing: number): void {
+    const scale = this._screenScale;
+    const box = this._box;
+    box[0] = box[1] = Infinity;
+    box[2] = box[3] = -Infinity;
+    for (let i = _firstViewfield; i < count; i++) {
+      const quad = QUADS[i];
+      const turn = quad.rotation + (quad.turns ? bearing : 0);
+      const cos = Math.cos(turn);
+      const sin = Math.sin(turn);
+      const left = -quad.anchorX * quad.width;
+      const top = -quad.anchorY * quad.height;
+      for (let corner = 0; corner < 4; corner++) {
+        const cx = (corner === 0 || corner === 3) ? left : (left + quad.width);
+        const cy = (corner < 2) ? top : (top + quad.height);
+        let x = cx * cos - cy * sin;
+        let y = cx * sin + cy * cos;
+        if (!quad.turns) {   // (one that turns has its place turned too; they're all at the point)
+          x += quad.x;
+          y += quad.y;
+        }
+        x *= scale;
+        y *= scale;
+        if (x < box[0]) box[0] = x;
+        if (y < box[1]) box[1] = y;
+        if (x > box[2]) box[2] = x;
+        if (y > box[3]) box[3] = y;
+      }
+    }
+    if (count === _firstViewfield) {
+      box[0] = box[1] = 0;
+      box[2] = box[3] = -1;
+    }
+  }
+
+
+  /**
+   * Draws the point in its batch: the pictures that `_layout()` worked out, as rectangles there.
+   * They're written when the point, its style or its level of detail changes. The batch's
+   * shader keeps them the same size on screen, and upright, so a zoom or a rotation alone
+   * changes nothing here.
+   * @param batch - The batch
+   * @param count - How many pictures the point has
+   * @param hasViewfields - Whether the point's style has viewfields
+   */
+  protected _drawBatched(batch: PointBatch, count: number, hasViewfields: boolean): void {
+    const position = this.container.position;    // the point's place in the world
+    const x = position.x - batch.position.x;
+    const y = position.y - batch.position.y;
+    const scale = this._screenScale;
+
+    // From north to south, so that each pin overlaps the ones above it on the map, and the
+    // ones with viewfields over the ones without.
+    const order = position.y + (hasViewfields ? VIEWFIELDS_ABOVE : 0);
+
+    let item = this._item;
+    if (item && item.batch !== batch) {
+      item.batch?.remove(item);
+      item = this._item = null;
+    }
+
+    // The glow, if there's one, is the first of the pictures. Where the batch has a batch for
+    // glows it goes there, and the point's own pictures stay as many as they were: a hover
+    // then writes them where they are, and nothing else in the batch changes.
+    const glows = (_glowQuad >= 0) ? batch.glows : null;
+    const start = glows ? 1 : 0;
+    const own = count - start;
+
+    if (own <= 0) {
+      this._dropItem();
+      return;
+    } else if (item) {
+      batch.set(item, QUADS, own, x, y, scale, start);
+      batch.setOrder(item, order);
+      batch.setVisible(item, true);
+    } else {
+      this._item = batch.add(QUADS, own, x, y, scale, order, start);
+    }
+
+    let glowItem = this._glowItem;
+    if (glowItem && glowItem.batch !== glows) {
+      this._dropGlowItem();
+      glowItem = null;
+    }
+    if (glows) {
+      const gx = position.x - glows.position.x;
+      const gy = position.y - glows.position.y;
+      if (glowItem) {
+        glows.set(glowItem, QUADS, 1, gx, gy, scale);
+        glows.setOrder(glowItem, order);
+        glows.setVisible(glowItem, true);
+      } else {
+        this._glowItem = glows.add(QUADS, 1, gx, gy, scale, order);
+      }
+    }
+  }
+
+
+  /**
+   * Draws the point with sprites of this feature's own, in its container: one for each of the
+   * pictures that `_layout()` worked out. They're made and destroyed as the style needs.
+   * @param bearing - The map's rotation, in radians
+   */
+  protected _drawSprites(bearing: number): void {
+    const container = this.container;
+
+    // The glow of a hover or a highlight, under everything. Its opacity follows the scene's
+    // clock, as a glow in a batch does.
+    let glow = this.glow;
+    if (_glowQuad >= 0) {
+      if (!glow) {
+        glow = new PIXI.Sprite();
+        glow.label = 'glow';
+        glow.eventMode = 'none';
+        glow.sortableChildren = false;
+        this.glow = glow;
+        container.addChildAt(glow, 0);
+      }
+      const quad = QUADS[_glowQuad];
+      this._drawSprite(glow, quad);
+      this.scene.addPulsing(glow, quad.alpha);
+    } else if (glow) {
+      this.scene.removePulsing(glow);
+      glow.destroy();
+      this.glow = null;
+    }
+
+    // The viewfields, in a container below the marker that turns back with the map
+    // (the feature's container is turned to keep the marker and the icon upright).
+    let viewfields = this.viewfields;
+    if (_numViewfields > 0) {
+      if (!viewfields) {
+        viewfields = new PIXI.Container();
+        viewfields.label = 'viewfields';
+        viewfields.eventMode = 'none';
+        viewfields.sortableChildren = false;
+        viewfields.visible = true;
+        this.viewfields = viewfields;
+        container.addChildAt(viewfields, this.glow ? 1 : 0);   // above the glow
       }
 
-      // note - marker.texture gets set below in the effective zoom block
-      marker.alpha = style.marker.opacity ?? 1;
-      marker.tint = style.marker.color ?? 0xffffff;
+      // if # of viewfields has changed, or if the texture name has changed, recreate them
+      const vfImage = this._style.viewfield.image ?? null;
+      if (this._viewfieldCount !== _numViewfields || this._viewfieldName !== vfImage) {
+        for (const sprite of viewfields.removeChildren()) {
+          sprite.destroy();
+        }
+        for (let i = 0; i < _numViewfields; i++) {
+          const vfSprite = new PIXI.Sprite(QUADS[_firstViewfield + i].texture);
+          vfSprite.eventMode = 'none';
+          viewfields.addChild(vfSprite);
+        }
+        this._viewfieldCount = _numViewfields;
+        this._viewfieldName = vfImage;
+      }
+
+      viewfields.rotation = bearing;
+      for (let i = 0; i < _numViewfields; i++) {
+        this._drawSprite(viewfields.getChildAt(i) as PIXI.Sprite, QUADS[_firstViewfield + i]);
+      }
+
+    } else if (viewfields) {  // Had viewfields before and now should not
+      viewfields.destroy({ children: true });
+      this.viewfields = null;
+      this._viewfieldCount = 0;
+      this._viewfieldName = null;
+    }
+
+    // The marker. (It stays, hidden, while the style has none, or its texture hasn't loaded.)
+    let marker = this.marker;
+    if (!marker) {
+      marker = new PIXI.Sprite();
+      marker.label = 'marker';
+      marker.eventMode = 'none';
+      marker.sortableChildren = false;
+      this.marker = marker;
+      container.addChildAt(marker, (this.glow ? 1 : 0) + (this.viewfields ? 1 : 0));   // above the glow and the viewfields
+    }
+    if (_markerQuad >= 0) {
+      this._drawSprite(marker, QUADS[_markerQuad]);
       marker.visible = true;
-    } else {  // No marker
+    } else {
       marker.visible = false;
     }
 
-    // Show icon, if any..
+    // The icon
     // (The sprite is made for a point that has one. Of the points and vertices around a view
     // of Užice, two in three have none.)
     let icon = this.icon;
-    if (style.icon.image) {
+    if (_iconQuad >= 0) {
       if (!icon) {
         icon = new PIXI.Sprite();
         icon.label = 'icon';
@@ -264,274 +912,105 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         this.icon = icon;
         container.addChildAt(icon, container.getChildIndex(marker) + 1);   // above the marker
       }
-
-      // anchor, default to middle,middle
-      let [anchorX, anchorY] = style.icon.anchor || [];
-      if (!Number.isFinite(anchorX)) anchorX = 0.5;
-      if (!Number.isFinite(anchorY)) anchorY = 0.5;
-      icon.anchor.set(anchorX, anchorY);
-
-      // size, default to 11px to fit within the marker
-      const iconSize = style.icon.size || 11;
-      const iconScale = style.icon.scale || [];
-      let [scaleX, scaleY] = Array.isArray(iconScale) ? iconScale : [iconScale];
-      if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
-      if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
-      icon.width = iconSize * scaleX!;
-      icon.height = iconSize * scaleY!;
-
-      icon.texture = textureManager.getTexture('symbol', style.icon.image) || PIXI.Texture.EMPTY;
-      icon.alpha = style.icon.opacity ?? 1;
-      icon.tint = style.icon.color ?? 0x111111;
+      this._drawSprite(icon, QUADS[_iconQuad]);
       icon.visible = true;
     } else if (icon) {  // Had an icon before and now should not
       icon.destroy();
-      icon = null;
       this.icon = null;
-    }
-
-    // Update viewfields, if any..
-    const vfAngles = style.viewfield?.angles || [];
-    let vfTexture = PIXI.Texture.EMPTY;
-    if (vfAngles.length > 0) {  // Should have viewfields
-      vfTexture = textureManager.getTexture('symbol', style.viewfield.image || '') || PIXI.Texture.WHITE;
-
-      // Sort markers with viewfields above markers without viewfields
-      container.zIndex = z + 1000;
-
-      // Ensure viewfield container exists
-      if (!this.viewfields) {
-        this.viewfields = new PIXI.Container();
-        this.viewfields.label = 'viewfields';
-        this.viewfields.eventMode = 'none';
-        this.viewfields.sortableChildren = false;
-        this.viewfields.visible = true;
-        container.addChildAt(this.viewfields, 0);
-      }
-
-      // if # of viewfields has changed, or if the texture name has changed, recreate them
-      const vfImage = style.viewfield.image;
-      if (this._viewfieldCount !== vfAngles.length || this._viewfieldName !== vfImage) {
-        for (const sprite of this.viewfields.removeChildren()) {
-          sprite.destroy();
-        }
-
-        for (const _a of vfAngles) {
-          const vfSprite = new PIXI.Sprite(vfTexture);
-          vfSprite.eventMode = 'none';
-
-          // Make the active photo image pop out at the user
-          if (this._classes.has('selectphoto') || this._classes.has('highlightphoto')) {
-            container.zIndex = 99000;
-          }
-
-          this.viewfields.addChild(vfSprite);
-        }
-        this._viewfieldCount = vfAngles.length;
-        this._viewfieldName = vfImage ?? null;
-      }
-
-      // Apply bearing correction to the viewfield container
-      this.viewfields.rotation = bearing;
-
-      // anchor, default to middle,middle
-      let [anchorX, anchorY] = style.viewfield.anchor || [];
-      if (!Number.isFinite(anchorX)) anchorX = 0.5;
-      if (!Number.isFinite(anchorY)) anchorY = 0.5;
-
-      // size, no default (size will be determined by the texture)
-      const viewfieldSize = style.viewfield.size;
-      const viewfieldScale = style.viewfield.scale || [];
-      let [scaleX, scaleY] = Array.isArray(viewfieldScale) ? viewfieldScale : [viewfieldScale];
-      if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
-      if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
-
-      // Update viewfield angles and style
-      for (let i = 0; i < vfAngles.length; i++) {
-        const vfSprite = this.viewfields.getChildAt(i) as PIXI.Sprite;
-        vfSprite.anchor.set(anchorX, anchorY);
-        vfSprite.alpha = style.viewfield.opacity ?? 1;
-        vfSprite.tint = style.viewfield.color ?? 0x333333;
-        vfSprite.angle = vfAngles[i];
-        if (Number.isFinite(viewfieldSize)) {
-          vfSprite.setSize(viewfieldSize! * scaleX!, viewfieldSize! * scaleY!);
-        } else {
-          vfSprite.scale.set(scaleX, scaleY);
-        }
-      }
-
-    } else if (this.viewfields) {  // Had viewfields before and now should not
-      this.viewfields.destroy({ children: true });
-      this.viewfields = null;
-      this._viewfieldCount = 0;
-      container.zIndex = z;   // restore default marker sorting
-    }
-
-
-    //
-    // Apply effectiveZoom style adjustments
-    // This is where we adjust the actual texture and anchor properties
-    //
-    if (styleZoom < 16) {  // Hide container and everything under it
-      this.lod = 0;   // off
-      this.visible = false;
-
-    } else if (styleZoom < 17 || wireframeMode) {  // Markers drawn but smaller
-      this.lod = 1;  // simplified
-      this.visible = true;
-      if (this.viewfields) {
-        this.viewfields.renderable = false;
-      }
-
-      // Replace pinlike markers with circles at lower zoom
-      const markerID = isPin ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
-      this.props.isCircular = /(circle|midpoint)$/i.test(markerID);
-      marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
-      marker.anchor.set(0.5, 0.5);  // middle, middle
-      icon?.position.set(0, 0);     // middle, middle
-
-    } else {  // z >= 17 - Show the requested marker (circles OR pins)
-      this.lod = 2;  // full
-      this.visible = true;
-      if (this.viewfields) {
-        this.viewfields.renderable = true;
-      }
-
-      // Replace pinlike markers with circles if viewfields are present
-      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
-      this.props.isCircular = /(circle|midpoint)$/i.test(markerID);
-      marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
-      if (isPin && !this.props.isCircular) {
-        marker.anchor.set(0.5, 1);    // middle, bottom
-        icon?.position.set(0, -14);   // mathematically 0,-15 is center of pin, but looks nicer moved down slightly
-      } else {
-        marker.anchor.set(0.5, 0.5);  // middle, middle
-        icon?.position.set(0, 0);     // middle, middle
-      }
-    }
-
-    // If we are waiting on a texure to load, stay dirty.
-    const missingMarker = marker.visible && marker.texture === PIXI.Texture.EMPTY;
-    const missingIcon = !!icon && icon.texture === PIXI.Texture.EMPTY;
-    const missingViewfields = this.viewfields && vfTexture === PIXI.Texture.EMPTY;
-    this._styleDirty = !!(missingMarker || missingIcon || missingViewfields);
-  }
-
-
-// experiment
-  /** Recalculates the interactive hit area for this point feature based on its current bounds. */
-  public updateHitArea(): void {
-    if (!this.visible) return;
-
-    if (this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
-      this.container.hitArea = null;
-      return;
-    }
-
-    // In v8, getLocalBounds now returns a Bounds, not a Rectangle.
-    // The Rectangle is wrapped within the bounds object.
-    const rect = this.marker!.getLocalBounds().rectangle.clone();
-
-    // getLocalBounds apparently doesn't take scale into account?
-    // This only seems to matter when we adjust the marker size manually
-    // (The Mapillary Signs layer does this)
-    const scale = this.marker!.scale;
-    if (scale.x !== 1) {
-      rect.width *= scale.x;
-      rect.x *= scale.x;
-    }
-    if (scale.y !== 1) {
-      rect.height *= scale.y;
-      rect.y *= scale.y;
-    }
-
-    // Make sure the rectangle is at least as big as MINSIZE x MINSIZE
-    const MINSIZE = 20;
-    rect.enlarge(new PIXI.Rectangle(-MINSIZE / 2, -MINSIZE / 2, MINSIZE, MINSIZE));
-    rect.pad(4); // then pad a bit more
-
-    if (this.props.isCircular) {
-      this.container.hitArea = new PIXI.Circle(0, 0, rect.width / 2);
-    } else {
-      this.container.hitArea = rect;
     }
   }
 
 
   /**
-   * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
+   * Makes a sprite draw one of the pictures that `_layout()` worked out.
+   * @param sprite - The sprite
+   * @param quad - The picture
+   */
+  protected _drawSprite(sprite: PIXI.Sprite, quad: PointBatchQuad): void {
+    const texture = quad.texture;
+    sprite.texture = texture;
+    sprite.anchor.set(quad.anchorX, quad.anchorY);
+    sprite.position.set(quad.x, quad.y);
+    sprite.scale.set(quad.width / texture.orig.width, quad.height / texture.orig.height);
+    sprite.rotation = quad.rotation;
+    sprite.tint = quad.color;
+    sprite.alpha = quad.alpha;
+  }
+
+
+  /**
+   * Works out where the point can be hit: around its marker, in the container's own pixels
+   * (the style's size, before the point is made smaller at low zooms).
+   */
+  public updateHitArea(): void {
+    if (!this.visible) return;
+
+    const container = this.container;
+    if (this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
+      container.hitArea = null;
+      return;
+    }
+
+    // The marker's box, at least as big as MINSIZE x MINSIZE around the point, then padded a bit more.
+    const box = this._markerBox;
+    const half = HIT_MINSIZE / 2;
+    const minX = Math.min(box[0], -half) - HIT_PAD;
+    const minY = Math.min(box[1], -half) - HIT_PAD;
+    const maxX = Math.max(box[2], half) + HIT_PAD;
+    const maxY = Math.max(box[3], half) + HIT_PAD;
+
+    // (The shape that's there is used again: every point comes through here after a zoom.)
+    const hitArea = container.hitArea;
+    if (this.props.isCircular) {
+      const radius = (maxX - minX) / 2;
+      if (hitArea instanceof PIXI.Circle) {
+        hitArea.x = 0;
+        hitArea.y = 0;
+        hitArea.radius = radius;
+      } else {
+        container.hitArea = new PIXI.Circle(0, 0, radius);
+      }
+      this.hitReach = radius * this._screenScale;
+    } else {
+      if (hitArea instanceof PIXI.Rectangle) {
+        hitArea.x = minX;
+        hitArea.y = minY;
+        hitArea.width = maxX - minX;
+        hitArea.height = maxY - minY;
+      } else {
+        container.hitArea = new PIXI.Rectangle(minX, minY, maxX - minX, maxY - minY);
+      }
+      // (To the far corner: the marker stays upright when the map is turned.)
+      const reachX = Math.max(-minX, maxX);
+      const reachY = Math.max(-minY, maxY);
+      this.hitReach = Math.hypot(reachX, reachY) * this._screenScale;
+    }
+  }
+
+
+  /**
+   * Shows or hides the halo of a selected point: the edge of its hit area (so `updateHitArea`
+   * comes first). The glow of a hover or a highlight is one of the point's pictures (see `_layout`).
    */
   public updateHalo(): void {
-    const showHover = (this.visible && this._classes.has('hover'));
-    const showSelect = (this.visible && this._classes.has('select') && !this.props.isVirtual);
-    const showHighlight = (this.visible && this._classes.has('highlight'));
-
-    // Hover
-    if (showHover) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else if (showHighlight) {
-      if (!this.container.filters) {
-        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0x7092ff });
-        glow.resolution = 2;
-        this.container.filters = [glow];
-      }
-    } else {
-      if (this.container.filters) {
-        this.container.filters = null!;
-      }
+    const shape = this.container.hitArea;
+    if (!this.visible || !this._classes.has('select') || this.props.isVirtual || !shape) {
+      this._drawHalo(null);
+      return;
     }
 
-    // Select
-    if (showSelect) {
-      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
-      const haloParent = mapui.halo;
-      if (!haloParent) return;
-
-      if (!this.halo) {
-        this.halo = new PIXI.Graphics();
-        this.halo.label = `${this.id}-halo`;
-        this.halo.eventMode = 'none';
-        haloParent.addChild(this.halo);
-      } else if (this.halo.parent !== haloParent) {
-        this.halo.parent?.removeChild(this.halo);
-        haloParent.addChild(this.halo);
+    const rings: number[][] = [];
+    if (shape instanceof PIXI.Circle) {
+      const ring: number[] = [];
+      for (let i = 0; i < HALO_CIRCLE_POINTS; i++) {
+        const angle = 2 * Math.PI * i / HALO_CIRCLE_POINTS;
+        ring.push(shape.x + shape.radius * Math.cos(angle), shape.y + shape.radius * Math.sin(angle));
       }
-
-      // Make the halo transform mimic the container transform.
-      // The container is scaled so that children are drawn in _screen_ coordinates.
-      // This means that the halo is drawn in _screen_ coordinates.
-      this.halo.position = this.container.position;
-      this.halo.rotation = this.container.rotation;
-      this.halo.scale = this.container.scale;
-
-      const HALO_STYLE: StrokeStyleWithDash = {
-        alpha: 0.9,
-        dash: [6, 3],
-        width: 2,
-        color: 0xffff00
-      };
-
-      (this.halo as PIXI.Graphics).clear();
-
-      const shape = this.container.hitArea;
-      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-
-      if (shape instanceof PIXI.Circle) {
-        dl.circle(shape.x, shape.y, shape.radius, 20);
-      } else if (shape instanceof PIXI.Rectangle) {
-        dl.rect(shape.x, shape.y, shape.width, shape.height);
-      }
-
-    } else {
-      if (this.halo) {
-        this.halo.destroy();
-        this.halo = null;
-      }
+      rings.push(ring);
+    } else if (shape instanceof PIXI.Rectangle) {
+      rings.push([shape.left, shape.top, shape.right, shape.top, shape.right, shape.bottom, shape.left, shape.bottom]);
     }
+    this._drawHalo(rings);
   }
 
 }

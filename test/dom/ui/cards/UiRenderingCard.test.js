@@ -21,7 +21,7 @@ describe('UiRenderingCard', () => {
     frame.layers.set('labels', { enabled: true, kept: false, renderMs: 0.2, cullMs: 0, features: 10, visible: 10 });
     frame.draw = {
       ms: drawMs, renderGroups: 98, rebuiltGroups: osmKept ? 0 : 3, rebuiltInstructions: 0,
-      instructions: { batch: 12, stencilMask: 40 }, batchTextures: { 1: 12 }, unbatched: []
+      instructions: { batch: 12, stencilMask: 40 }, batchTextures: { 1: 12 }, triangles: 3400, unbatched: []
     };
     if (gpuMs !== undefined) {
       frame.draw.gpuMs = gpuMs;

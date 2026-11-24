@@ -1,5 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
+import { FillBatch } from './lib/FillBatch.ts';
+import { PointBatch } from './lib/PointBatch.ts';
 
 import type { AtlasOptions } from './lib/AtlasAllocator.ts';
 import type { Context } from '../Context.ts';
@@ -21,8 +23,22 @@ interface TextureData {
   refcount: number;
 }
 
-/** DashLine texture cache */
-type DashTextureCache = Record<string, PIXI.Texture>;
+// How many texels a dash texture has for each pixel of its pattern.
+const DASH_TEXELS = 4;
+
+// The patterns that areas can be filled with (`img/pattern/<name>.png`, each a tile of 32 pixels).
+// A pattern's number in the pattern atlas is its place in this list, from 1 (see `getPatternNumber`).
+const PATTERNS = [
+  'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
+  'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',
+  'forest_needleleaved', 'grass', 'landfill', 'lines', 'orchard', 'pond', 'quarry', 'vineyard',
+  'waves', 'wetland', 'wetland_bog', 'wetland_marsh', 'wetland_reedbed', 'wetland_swamp'
+];
+const PATTERN_TILE = 32;       // the size of a pattern's tile, in texels (and in pixels on screen)
+const PATTERN_COLUMNS = 8;     // how many patterns a row of the atlas has
+
+// The size of the `glow` texture, in texels (see `_cacheGlow`)
+const GLOW_SIZE = 64;
 
 
 /**
@@ -49,8 +65,10 @@ export class PixiTextures {
   protected _textureData: Map<TextureKey, TextureData>;
   /** SVG symbol elements (or null if failed) keyed by icon name (e.g. 'temaki-school') */
   protected _svgIcons: Map<TextureID, SVGSymbolElement | null>;
-  /** Cached textures used by the DashLine plugin, keyed by dash pattern string */
-  protected _dashTextureCache: DashTextureCache;
+  /** Every fill pattern in one texture (see `_buildPatternAtlas`) */
+  protected _patternAtlas: PIXI.Texture | null;
+  /** The dash patterns of `getDashTexture()`, keyed by dash pattern string */
+  protected _dashTextures: Map<string, PIXI.Texture>;
 
 
   /**
@@ -76,19 +94,13 @@ export class PixiTextures {
     // Because SVGs take some time to texturize, store the svg data and texturize only if needed
     this._svgIcons = new Map<TextureID, SVGSymbolElement | null>();  // (e.g. 'temaki-school')
 
-    // DashLine plugin needs its own cache - we could eventually put these in an atlas.
-    this._dashTextureCache = {};
+    this._dashTextures = new Map<string, PIXI.Texture>();
+    this._patternAtlas = null;
 
     // Prepare a "bundle" to load the pattern textures
     const assets = this.context.systems.assets!;
-    const filenames = [
-      'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
-      'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',
-      'forest_needleleaved', 'grass', 'landfill', 'lines', 'orchard', 'pond', 'quarry', 'vineyard',
-      'waves', 'wetland', 'wetland_bog', 'wetland_marsh', 'wetland_reedbed', 'wetland_swamp'
-    ];
     const bundle: Record<string, string> = {};
-    for (const k of filenames) {
+    for (const k of PATTERNS) {
       bundle[k] = assets.getFileURL(`img/pattern/${k}.png`);
     }
 
@@ -143,9 +155,14 @@ export class PixiTextures {
 
     this._textureData.clear();
     this._svgIcons.clear();
-    this._dashTextureCache = {};
+    this._dashTextures.clear();
 
     this._cacheGraphics();
+    this._cacheGlow();
+
+    // Point batches draw from the symbol atlas: its first texture, which has the markers now,
+    // and gets the icons as they load. (What a second one would hold, points draw with sprites.)
+    PointBatch.setTexture(this._atlas.symbol.slabs[0] ?? null);
 
     // Replace or load patterns
     Promise.resolve()
@@ -171,9 +188,126 @@ export class PixiTextures {
 //          this.allocate('symbol', textureID, w, h, source);
 //        }
 
+        this._buildPatternAtlas();
         this.loaded = true;
       })
       .catch(e => console.error(e));  // eslint-disable-line no-console
+  }
+
+
+  /**
+   * Draws every pattern into one texture, for `FillBatch`: a batch draws fills with any mix of
+   * patterns in one draw call, so they have to come from one texture. Each pattern has a cell
+   * of the grid: its tile, and around it a border of one texel that repeats the tile's other
+   * side, so that smoothing at the tile's edge takes the texels a repeating texture would.
+   */
+  protected _buildPatternAtlas(): void {
+    const cell = PATTERN_TILE + 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = PATTERN_COLUMNS * cell;
+    canvas.height = Math.ceil(PATTERNS.length / PATTERN_COLUMNS) * cell;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    PATTERNS.forEach((name, i) => {
+      const image = this.getPatternTexture(name)?.source.resource as CanvasImageSource | undefined;
+      if (!image) return;
+
+      const x = (i % PATTERN_COLUMNS) * cell;
+      const y = Math.floor(i / PATTERN_COLUMNS) * cell;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, cell, cell);
+      ctx.clip();
+      for (let row = -1; row <= 1; row++) {
+        for (let column = -1; column <= 1; column++) {
+          ctx.drawImage(image, x + 1 + column * PATTERN_TILE, y + 1 + row * PATTERN_TILE, PATTERN_TILE, PATTERN_TILE);
+        }
+      }
+      ctx.restore();
+    });
+
+    this._patternAtlas?.destroy(true);
+    const source = new PIXI.CanvasSource({ resource: canvas, resolution: 1, addressMode: 'clamp-to-edge', scaleMode: 'linear' });
+    this._patternAtlas = new PIXI.Texture({ source: source, label: 'pattern-atlas' });
+    FillBatch.setPatterns({ texture: this._patternAtlas, columns: PATTERN_COLUMNS, cell: cell, tile: PATTERN_TILE });
+  }
+
+
+  /**
+   * Makes the `glow` texture of the symbol atlas: a white disc that's solid out to half its
+   * radius and fades to nothing at its edge. A hovered or highlighted point has it behind its
+   * marker, tinted (`PixiFeaturePoint`). It's drawn on a canvas: a gradient is no `Graphics`.
+   */
+  protected _cacheGlow(): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = GLOW_SIZE;
+    canvas.height = GLOW_SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const half = GLOW_SIZE / 2;
+    const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+    for (let i = 0; i <= 8; i++) {      // from half the radius out, the square of what's left
+      const left = 1 - i / 8;
+      gradient.addColorStop(0.5 + 0.5 * i / 8, `rgba(255, 255, 255, ${left * left})`);
+    }
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
+    this.allocate('symbol', 'glow', GLOW_SIZE, GLOW_SIZE, canvas);
+  }
+
+
+  /**
+   * Returns a pattern's number in the pattern atlas, which is what a `FillBatch` wants to know
+   * to fill an area with it.
+   * @param textureID - The pattern's name, e.g. 'forest'
+   * @return Its number, from 1, or 0 if there's no such pattern
+   */
+  public getPatternNumber(textureID: Nullable<TextureID>): number {
+    return textureID ? PATTERNS.indexOf(textureID) + 1 : 0;
+  }
+
+
+  /**
+   * Returns the texture of a dash pattern, for a `LineMesh`: one repeat of the pattern, white where
+   * the line is drawn and clear in the gaps. It repeats along `u`, and it's the same all the way
+   * across `v`, so one texture draws the pattern at any width, color and opacity.
+   * @param dash - The pattern, as alternating lengths of dash and gap in pixels, e.g. `[10, 5]`
+   * @return The texture, or `null` if the pattern has no length or there's no canvas to draw it on
+   */
+  public getDashTexture(dash: number[]): PIXI.Texture | null {
+    const key = dash.toString();
+    const cached = this._dashTextures.get(key);
+    if (cached) return cached;
+
+    let length = 0;
+    for (const part of dash) {
+      length += part;
+    }
+    if (!(length > 0)) return null;
+
+    // The width is a power of 2, as WebGL 1 needs for a texture that repeats, with the pattern
+    // stretched over all of it.
+    const canvas = document.createElement('canvas');
+    canvas.width = PIXI.nextPow2(Math.ceil(length * DASH_TEXELS));
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const scale = canvas.width / length;
+    ctx.fillStyle = 'white';
+    let x = 0;
+    for (let i = 0; i < dash.length; i += 2) {
+      ctx.fillRect(x * scale, 0, dash[i] * scale, 1);
+      x += dash[i] + (dash[i + 1] ?? 0);
+    }
+
+    const source = new PIXI.CanvasSource({ resource: canvas, addressMode: 'repeat', scaleMode: 'linear' });
+    const texture = new PIXI.Texture({ source: source, label: `dash-${key}` });
+    this._dashTextures.set(key, texture);
+    return texture;
   }
 
 

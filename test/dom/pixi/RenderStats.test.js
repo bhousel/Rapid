@@ -1,11 +1,38 @@
 import * as PIXI from 'pixi.js';
-import { findChangedRenderGroups } from '../../../modules/pixi/lib/RenderStats.ts';
+import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { findChangedRenderGroups, readInstructionStats } from '../../../modules/pixi/lib/RenderStats.ts';
+import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
 
 
 describe('RenderStats', () => {
 
   // Pixi rebuilds a render group's instruction list when something in it was added, removed, shown
   // or hidden. Without a renderer nothing clears the flags, so the test clears them as a render would.
+  describe('readInstructionStats', () => {
+    // A render group as Pixi built it, with these instructions
+    const rootWith = instructions => ({
+      renderGroup: { renderGroupChildren: [], instructionSet: { instructionSize: instructions.length, instructions: instructions } }
+    });
+
+    it('counts the triangles that a mesh draws: all of its index buffer, or the part it says', () => {
+      const mesh = new PIXI.Mesh({
+        geometry: new PIXI.MeshGeometry({ positions: new Float32Array(8), uvs: new Float32Array(8), indices: new Uint32Array(6) })
+      });
+      const batch = new LineBatch();    // has room for more than it draws
+      batch.add(geomStrokeMesh([0, 0, 10, 0]), 0, 0, { width: 3, minWidth: 2, color: 0xffffff, alpha: 1 });
+      batch.flush();
+      const drawn = batch.geometry.indexCount;
+      assert.isAbove(drawn, 0);
+      assert.isAbove(batch.geometry.indexBuffer.data.length, drawn);
+
+      const stats = readInstructionStats({}, rootWith([mesh, batch]), new Set());
+      assert.strictEqual(stats.instructions.mesh, 2);
+      assert.strictEqual(stats.triangles, 2 + drawn / 3);
+      batch.destroy();
+    });
+  });
+
+
   describe('findChangedRenderGroups', () => {
     let stage, lines, polygons;
 

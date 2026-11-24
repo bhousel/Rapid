@@ -1,12 +1,18 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { DashLine } from './lib/DashLine.ts';
+import { drawRings } from './helpers.ts';
+import { LineBatch } from './lib/LineBatch.ts';
 import { geoMetersToLon, projWgs84ToWorld, vecSubtract, WORLD_ZOOM } from '@rapid-sdk/math';
 
-import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
+
+
+const LASSO_DASH = [6, 3];
+
+// How fine the halos' coordinates stay, in pixels (see `render`)
+const HALO_PRECISION = 1 / 32;
 
 
 /**
@@ -30,8 +36,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   protected _lassoData: Vec2[] | null;
   /** Whether the lasso shape needs to be redrawn */
   protected _lassoDirty: boolean;
-  /** Graphics object for the lasso outline stroke */
-  protected _lassoLine: PIXI.Graphics | null;
+  /** Container for the lasso's outline: a dashed `LineMesh` (see `drawRings`) */
+  protected _lassoLine: PIXI.Container | null;
   /** Graphics object for the lasso translucent fill */
   protected _lassoFill: PIXI.Graphics | null;
 
@@ -41,8 +47,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   public tileDebug: PIXI.Container | null;
   /** Container that holds selection ring/vertex graphics for selected features */
   public selected: PIXI.Container | null;
-  /** Container that holds the hover/select halo graphics */
+  /** Container that holds the halos of what's selected: one batch of lines (see `haloBatchAt`) */
   public halo: PIXI.Container | null;
+  /** The batch that draws the halos of what's selected, in the `halo` container */
+  protected _haloBatch: LineBatch | null;
   /** Container that holds the lasso selection polygon graphics */
   public lasso: PIXI.Container | null;
 
@@ -68,7 +76,40 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
     this.tileDebug = null;
     this.selected = null;
     this.halo = null;
+    this._haloBatch = null;
     this.lasso = null;
+  }
+
+
+  /**
+   * Returns the batch that draws the halos of selected features, making it if there's none:
+   * dashed lines that march, above everything on the map (see `drawHalo()` in `helpers.ts`).
+   * Any layer's features draw their halos in it.
+   * @param x - Where in the world the halo is that the batch is wanted for (a new batch's coordinates start there)
+   * @param y - The same, for y
+   * @return The batch, or `null` before the layer has its containers
+   */
+  public haloBatchAt(x: number, y: number): LineBatch | null {
+    const existing = this._haloBatch;
+    if (existing && !existing.destroyed) return existing;
+    if (!this.halo) return null;
+
+    const batch = new LineBatch();
+    batch.label = 'halos';
+    batch.position.set(x, y);
+    this.halo.addChild(batch);
+    this._haloBatch = batch;
+    return batch;
+  }
+
+
+  /**
+   * The batch that draws the halos of selected features, if there is one (see `haloBatchAt`)
+   * @return The batch, or `null`
+   * @readonly
+   */
+  public get haloBatch(): LineBatch | null {
+    return this._haloBatch;
   }
 
 
@@ -79,6 +120,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
     super.reset();
 
     this._oldz = 0;
+    this._haloBatch = null;    // (it goes with the `halo` container, below)
 
     const groupContainer = this.scene.groups.get('ui')!;
 
@@ -123,10 +165,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
     this.halo = halo;
 
     // LASSO
-    if (this._lassoLine)  this._lassoLine.destroy();
+    if (this._lassoLine)  this._lassoLine.destroy({ children: true });
     if (this._lassoFill)  this._lassoFill.destroy();
 
-    this._lassoLine = new PIXI.Graphics();
+    this._lassoLine = new PIXI.Container();
     this._lassoFill = new PIXI.Graphics();
     this._lassoData = null;
 
@@ -213,7 +255,27 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       this.renderLasso(frame, viewport);
     }
 
+    this._moveHaloOrigin(viewport);
   }
+
+
+  /**
+   * Keeps the halos' coordinates fine enough for the view's zoom: they're 32-bit floats from
+   * the batch's place in the world, which moves to the view when the view has gone far from
+   * it (as `PixiLayerOsm._moveBatchOrigins` does for its batches).
+   * @param viewport - The viewport that's being drawn
+   */
+  protected _moveHaloOrigin(viewport: Viewport): void {
+    const haloBatch = this._haloBatch;
+    if (!haloBatch || haloBatch.destroyed) return;
+
+    const reach = HALO_PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
+    const [x, y] = viewport.screenToWorld(viewport.center());
+    if (Math.abs(haloBatch.position.x - x) > reach || Math.abs(haloBatch.position.y - y) > reach) {
+      haloBatch.moveOrigin(Math.round(x), Math.round(y));
+    }
+  }
+
 
   /**
    * Render the lasso polygon
@@ -254,16 +316,11 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       // Convert screen pixel values to world units
       const scale = 2 ** (WORLD_ZOOM - viewport.transform.z);
 
-      // line
-      const lineStyle: DashLineOptions = {
-        alpha: 0.7,
-        dash: [6, 3],
-        width: 1,
-        scale: scale,
-        color: 0xffffff
-      };
-      line.clear();
-      new DashLine(this.gfx, line, lineStyle).poly(flatCoords);
+      // line: white, 1 pixel wide, in dashes of 6 with gaps of 3
+      const dashTexture = this.gfx.textureManager!.getDashTexture(LASSO_DASH);
+      line.tint = 0xffffff;
+      line.alpha = 0.7;
+      drawRings(line, [flatCoords], 1 * scale, dashTexture, (LASSO_DASH[0] + LASSO_DASH[1]) * scale);
 
       // fill
       const fillStyle: PIXI.FillStyle = {

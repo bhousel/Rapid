@@ -19,11 +19,15 @@ import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
 import { AvoidGrid } from './lib/AvoidGrid.ts';
+import { FillBatch } from './lib/FillBatch.ts';
+import { LineBatch } from './lib/LineBatch.ts';
+import { PointBatch } from './lib/PointBatch.ts';
+import { featureOrder } from './helpers.ts';
 import { Extent, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractMode } from '../modes/AbstractMode.ts';
-import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { AbstractPixiFeature, FeatureContainer } from './AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
@@ -51,6 +55,19 @@ const CULL_PADDING = 256;
  * grid is four times the blocks and the marking four times the writes.
  */
 const AVOID_CELL_PX = 2;
+
+
+// The classes whose features are drawn with something that moves (see `PixiScene.animated`)
+const ANIMATED_CLASSES: ClassID[] = ['hover', 'highlight', 'select'];
+
+// A glow breathes once in this many seconds, down to this much less than its brightest
+const PULSE_SECONDS = 1.6;
+const PULSE_DEPTH = 0.45;
+
+// The dashes around a selection march this many pixels a second. (The distance starts again
+// after `MARCH_WRAP` pixels: a multiple of the halo's dash pattern, so nothing jumps then.)
+const MARCH_SPEED = 20;
+const MARCH_WRAP = 9 * 4096;
 
 
 /**
@@ -120,6 +137,14 @@ export class PixiScene extends EventEmitter {
   protected _cullZoom: number;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
   protected _interactiveSpatialIDs: ReadonlySet<SpatialID> | null;
+  /** The layers that find their own features under the pointer, by spatial ID (see `setHitTester`) */
+  protected _hitTesters: Map<SpatialID, AbstractPixiLayer>;
+  /** The pointer's place in world coordinates, while `hitTest()` works */
+  protected _hitWorld: PIXI.Point;
+  /** The sprites whose opacity follows the clock, with their opacity at its brightest (see `addPulsing`) */
+  protected _pulsing: Map<PIXI.Sprite, number>;
+  /** Asks whether the user wants less motion on screen (`null` where that can't be asked) */
+  protected _reducedMotion: MediaQueryList | null;
 
 
   /**
@@ -143,6 +168,10 @@ export class PixiScene extends EventEmitter {
 
     this._spatialContainers = new Map<SpatialID, Set<PIXI.Container>>();
     this._interactiveSpatialIDs = null;
+    this._hitTesters = new Map<SpatialID, AbstractPixiLayer>();
+    this._hitWorld = new PIXI.Point();
+    this._pulsing = new Map<PIXI.Sprite, number>();
+    this._reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
     this._anchor = [0, 0];
     this._worldContainers = new Set<PIXI.Container>();
     this._cullBox = null;
@@ -274,7 +303,7 @@ export class PixiScene extends EventEmitter {
     const siblings = group.children.filter(child => child.label !== 'osm').length;
     const zIndex = (spatialID === 'osm') ? 0 : siblings + 1;
     const container = this.worldContainer(group, spatialID, zIndex);
-    container.eventMode = this._isInteractive(spatialID) ? 'passive' : 'none';
+    container.eventMode = this._eventMode(spatialID);
 
     let containers = this._spatialContainers.get(spatialID);
     if (!containers) {
@@ -474,6 +503,79 @@ export class PixiScene extends EventEmitter {
 
 
   /**
+   * What Pixi's own hit test does with the containers of a spatial ID: it looks in them
+   * (`'passive'`) or skips them and everything in them (`'none'`). It skips data that the mode
+   * keeps from the pointer, and data whose layer finds its own features (`setHitTester`).
+   * @param spatialID - The spatial ID, e.g. 'osm' or 'fbRoads'
+   * @return The `eventMode` for that spatial ID's containers
+   */
+  protected _eventMode(spatialID: SpatialID): PIXI.EventMode {
+    return (this._isInteractive(spatialID) && !this._hitTesters.has(spatialID)) ? 'passive' : 'none';
+  }
+
+
+  /**
+   * Says that a layer finds the features of a spatial ID under the pointer by itself
+   * (`AbstractPixiLayer.hitTest`), so Pixi's hit test leaves that spatial ID's containers out.
+   * Pixi's asks every interactive container in the scene, on every pointer event; a layer that
+   * keeps its data in a spatial index can ask the few near the pointer (see `hitTest`).
+   * @param spatialID - The spatial ID, e.g. 'osm'
+   * @param layer - The layer that draws its data, or `null` to give it back to Pixi
+   */
+  public setHitTester(spatialID: SpatialID, layer: AbstractPixiLayer | null): void {
+    if (layer) {
+      this._hitTesters.set(spatialID, layer);
+    } else {
+      this._hitTesters.delete(spatialID);
+    }
+
+    const eventMode = this._eventMode(spatialID);
+    for (const container of this._spatialContainers.get(spatialID) ?? []) {
+      container.eventMode = eventMode;
+    }
+  }
+
+
+  /**
+   * Finds the feature under the pointer.
+   *
+   * Pixi's hit test has an answer already (a pointer event's `target`), for everything except
+   * the spatial IDs whose layers find their own (`setHitTester`). Those layers are asked here,
+   * if the mode lets the pointer reach their data, and the answer is whichever feature is drawn
+   * on top, as it would be if Pixi had tested them all.
+   * @param point - The pointer's place in the stage's coordinates (a pointer event's `global`)
+   * @param target - What Pixi's hit test found there (a pointer event's `target`), if anything
+   * @return The feature, or `null` if the pointer is over none
+   */
+  public hitTest(point: PIXI.PointData, target: PIXI.Container | null = null): AbstractPixiFeature | null {
+    const origin = this.gfx.origin;
+
+    // The feature that Pixi's target belongs to: the nearest container above it that has one.
+    let best: AbstractPixiFeature | null = null;
+    for (let c: FeatureContainer | null = target; c; c = c.parent) {
+      if (c.__feature__) {
+        best = c.__feature__;
+        break;
+      }
+    }
+
+    if (!origin || !this._hitTesters.size) return best;
+
+    // Features are positioned in world coordinates under `origin`, as it was last drawn.
+    const world = origin.worldTransform.applyInverse(point, this._hitWorld);
+
+    for (const [spatialID, layer] of this._hitTesters) {
+      if (!this._isInteractive(spatialID)) continue;
+      const hit = layer.hitTest(point, world);
+      if (hit && (!best || featureOrder(hit, best) > 0)) {
+        best = hit;
+      }
+    }
+    return best;
+  }
+
+
+  /**
    * Applies the new mode's `interactiveSpatialIDs` to the spatial containers:
    * the pointer skips the whole subtree of a spatial ID the mode doesn't list.
    * @param mode - The mode just entered, or `null` before there is one
@@ -482,7 +584,7 @@ export class PixiScene extends EventEmitter {
     this._interactiveSpatialIDs = mode?.interactiveSpatialIDs ?? null;
 
     for (const [spatialID, containers] of this._spatialContainers) {
-      const eventMode = this._isInteractive(spatialID) ? 'passive' : 'none';
+      const eventMode = this._eventMode(spatialID);
       for (const container of containers) {
         container.eventMode = eventMode;
       }
@@ -518,6 +620,7 @@ export class PixiScene extends EventEmitter {
     // and scale that maps world coords → screen coords. Group containers themselves
     // need no extra transform (except the `labels` group which renders in screen space).
     this.updateLabelSpace(viewport);   // (the features mark what labels avoid as they're drawn)
+    this.setBatchViews(viewport);
 
     const times = new Map<LayerID, { renderMs: number, cullMs: number }>();
     for (const layer of this.layers.values()) {
@@ -659,6 +762,92 @@ export class PixiScene extends EventEmitter {
    */
   public removeFeature(feature: AbstractPixiFeature): void {
     this.features.delete(feature.id);
+  }
+
+
+  /**
+   * Tells the batches' shaders about the view: what a pixel is in world coordinates, and what
+   * the zoom does to how things are drawn. Every batch of a kind draws with these, whichever
+   * layer it belongs to, and nothing in a batch changes for a zoom.
+   * Lines are narrower below zoom 17, and have no casing and no markers (oneway arrows) below 16.
+   * @param viewport - The viewport that's being drawn
+   */
+  public setBatchViews(viewport: Viewport): void {
+    const map = this.context.systems.map;   // (the map isn't there in every test)
+
+    const viewZoom = viewport.transform.zoom;
+    const styleZoom = map?.effectiveZoom() ?? viewZoom;
+    const pixel = 2 ** (WORLD_ZOOM - viewZoom);
+    const isWireframe = !!map?.wireframeMode;
+    LineBatch.setView({
+      pixel: pixel,
+      narrow: (styleZoom < 16) ? 4 : (styleZoom < 17) ? 2 : 0,
+      wireframe: isWireframe,
+      casing: styleZoom >= 16,
+      markers: styleZoom >= 16
+    });
+    FillBatch.setView({ pixel: pixel, rotation: viewport.transform.rotation, wireframe: isWireframe });
+  }
+
+
+  /**
+   * Whether something that's shown moves by itself: the glow of what's hovered or highlighted
+   * breathes, and the dashes around what's selected march. While this is `true`,
+   * `GraphicsSystem` draws the scene again at a steady rate though nothing in it changed (see
+   * `animate`). Never for a user who asked their system for less motion.
+   * @return `true` if frames should keep coming
+   */
+  public get animated(): boolean {
+    if (this._reducedMotion?.matches) return false;
+    for (const classID of ANIMATED_CLASSES) {
+      if (this._classHasData.get(classID)?.size) return true;
+    }
+    return false;
+  }
+
+
+  /**
+   * Moves what moves by itself to where it is at a moment: tells the batches' shaders how
+   * bright a glow is and how far a selection's dashes have marched, and sets the opacity of
+   * the sprites that pulse. `GraphicsSystem` calls this before it draws a frame. Nothing in a
+   * batch is written, and no feature is drawn again.
+   * For a user who asked their system for less motion nothing moves: a glow is at its
+   * brightest, and the dashes stay where they are.
+   * @param now - The moment (`performance.now()`)
+   * @param isResting - Whether this is the last frame for a while (see `AnimationPacer`): a glow is at its brightest in it, and the dashes are where they'd be
+   */
+  public animate(now: number, isResting: boolean = false): void {
+    const isStill = !!this._reducedMotion?.matches;
+    const seconds = isStill ? 0 : now / 1000;
+
+    // A glow breathes: from its brightest down by `PULSE_DEPTH` and back, in `PULSE_SECONDS`.
+    const breath = (isStill || isResting) ? 0 : (0.5 - 0.5 * Math.cos(2 * Math.PI * seconds / PULSE_SECONDS));
+    const pulse = 1 - PULSE_DEPTH * breath;
+    LineBatch.setTime({ pulse: pulse, shift: (seconds * MARCH_SPEED) % MARCH_WRAP });
+    PointBatch.setTime(pulse);
+    for (const [sprite, alpha] of this._pulsing) {
+      sprite.alpha = alpha * pulse;
+    }
+  }
+
+
+  /**
+   * Makes a sprite's opacity follow the clock, like a glow that a batch draws: a feature that
+   * draws its own glow as a sprite says so here (and takes it back before destroying it).
+   * @param sprite - The sprite
+   * @param alpha - Its opacity when it's brightest
+   */
+  public addPulsing(sprite: PIXI.Sprite, alpha: number): void {
+    this._pulsing.set(sprite, alpha);
+  }
+
+
+  /**
+   * Stops a sprite's opacity following the clock (see `addPulsing`).
+   * @param sprite - The sprite
+   */
+  public removePulsing(sprite: PIXI.Sprite): void {
+    this._pulsing.delete(sprite);
   }
 
 

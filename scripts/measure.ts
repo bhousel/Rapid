@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 import { PLACES } from './places.ts';
 import { useTape } from './tape.ts';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
 
 //
@@ -15,6 +15,7 @@ import { parseArgs, styleText } from 'node:util';
 //   bun run measure --out stats.json        Also save every number as JSON
 //   bun run measure --fresh                 Reload the tab before each place (slower, but comparable)
 //   bun run measure --tape ../osm.tape.json Keep the OSM API's answers in a file, and answer from it
+//   bun run measure --setup off.js          Run a snippet in the page before each place is loaded
 //   bun run measure --list                  List the places
 //
 // Without `--fresh`, everything loaded at earlier places stays in memory and in the scene, so the
@@ -38,6 +39,12 @@ import { parseArgs, styleText } from 'node:util';
 //            draws what it has time for, and the frames after it the rest: the table has the first
 //            frame's times, how many frames it took in all, and how long until they were done.
 //
+// With `--setup`, a snippet runs in the page first (as with `bun run cdp eval`: an async function
+// body, with `rapidContext` there): before each place with `--fresh`, otherwise once. Use it to
+// compare two ways of drawing in one build, e.g. `rapidContext.systems.gfx.scene.layers.get('osm').useBatches = false;`,
+// or to make sure of what's shown (`…scene.enableLayers('labels')`): the tab's own settings
+// (layers, filters, area fill) apply to every run that doesn't set them.
+//
 // The places are in `scripts/places.ts`. To compare with other versions of Rapid, or with iD, which
 // have no frame stats, use `bun run compare`.
 //
@@ -50,6 +57,7 @@ const { values, positionals } = parseArgs({
     out:   { type: 'string' },
     fresh: { type: 'boolean', default: false },
     tape:  { type: 'string' },
+    setup: { type: 'string' },
     list:  { type: 'boolean', default: false }
   }
 });
@@ -68,6 +76,7 @@ if (unknown.length) {
 }
 const places = positionals.length ? PLACES.filter(p => positionals.includes(p.id)) : PLACES;
 const runs = Math.max(1, parseInt(values.runs, 10) || 9);
+const setup = values.setup ? `(async () => {\n${readFileSync(values.setup, 'utf8')}\n})()` : null;
 
 
 const cdpURL = 'http://127.0.0.1:9222';
@@ -246,6 +255,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
       gl: last.draw.gl,
       instructions: last.draw.instructions,
       batchTextures: last.draw.batchTextures,
+      triangles: last.draw.triangles,
       unbatched: last.draw.unbatched.length,
       unbatchedTop: last.draw.unbatched.slice(0, 5),
       layers
@@ -298,7 +308,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
 const results = [];
 const cols = [
   ['place', 14], ['load', 6], ['visible', 8],
-  ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6],
+  ['APP', 7], ['DRAW', 6], ['GPU', 6], ['draws', 6], ['masks', 6], ['unbat', 6], ['tris', 8],
   ['| pan APP', 10], ['DRAW', 6], ['GPU', 6],
   ['| cull APP', 11], ['DRAW', 6], ['of', 5],
   ['| glide fps', 11], ['long', 5], ['pass', 6],
@@ -329,12 +339,15 @@ for (const place of places) {
         await page.keyboard.press('Escape');   // the welcome screen
       }
     }
+    if (setup && (values.fresh || place === places[0])) {
+      await page.evaluate(setup);
+    }
     const r = await page.evaluate(measurePlace, { loc, zoom, runs });
     const visible = Object.values(r.redraw.layers).reduce((sum: number, l: any) => sum + l.visible, 0);
     console.log(row([
       place.id, `${(r.loadMs / 1000).toFixed(1)}s${r.loaded ? '' : '!'}`, visible,
       r.redraw.appMs, r.redraw.drawMs, r.redraw.gpuMs, r.redraw.gl?.draws,
-      r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched,
+      r.redraw.instructions.stencilMask ?? 0, r.redraw.unbatched, r.redraw.triangles,
       r.pan.kept.appMs, r.pan.kept.drawMs, r.pan.kept.gpuMs,
       r.pan.pass.appMs, r.pan.pass.drawMs, `${r.pan.pass.frames}/${r.pan.frames}`,
       r.glide.fps, r.glide.longFrames, r.glide.passMs,
@@ -349,7 +362,8 @@ for (const place of places) {
 
 console.log('\nTimes in ms. The first group is a frame where nothing changed. load ends with ! if the data was');
 console.log('still loading after a minute. visible = features shown, also those in the padding around the view.');
-console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch.');
+console.log('masks = stencil mask instructions (partial fills), unbat = graphics drawn outside a batch,');
+console.log('tris = triangles in everything Pixi has to draw.');
 console.log('pan = pan frames where the OSM layer kept its features as they were (also while a pass was held');
 console.log('back). cull = pan frames where the view left the cull box, and the layer followed it to a new one');
 console.log('(or did its whole pass); of = how many. glide = the view moving on every animation frame for');

@@ -32,15 +32,19 @@ frame pacing, the frame's deadline, the pass, garbage, labels). Numbers below ar
 said otherwise. Biggest or most wanted first.
 
 - **Garbage collection is the longest stall left** (section 13). A major collection is 420 to 480 ms of
-  the main thread, every 12 s of zooming. Left, by size: (1) Pixi's line builder is a quarter of what a
-  zoom allocates, most of it `round` joins and caps (try `bevel`/`butt` for thin lines, a visual call;
-  or our own line builder); (2) the 1.7 GB alive: a full copy of the style per feature (51 MB, below),
+  the main thread, every 12 s of zooming. Left, by size: (1) Pixi's line builder was a quarter of what a
+  zoom allocates: done on `linebuilder_refactor` (section 15, steps 3 to 5: a zoom allocates half of what it
+  did, and nothing of ours calls `buildLine` now; what Pixi still builds at every zoom is the areas' fills); (2) the 1.7 GB alive: a full copy of the style per feature (51 MB, below),
   a way's coordinates kept three times as arrays of pairs (`Float64Array`s would take a quarter), and
   an `Extent` each on a `Geometry` and its part; (3) Pixi's `syncShader` polyfill allocates on every
   draw call (5%, upstream); (4) a tile label string per feature drawn (4%); (5) whether the scheduler's
   long tail after a load leaves V8 idle time to collect in.
-- **A line builder of our own** (sections 4 and 7; Bryan: "I really want this"). Partial-fill bands
-  without stencil masks, hit areas, halos, dashes, and a quarter of a zoom's garbage.
+- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Done on
+  `linebuilder_refactor`: section 15's whole order of work (Nov 22 and 23) but the worker,
+  which was skipped. The OSM layer's lines, areas, points and line markers are drawn by three
+  kinds of batch with shaders of our own, in 13 to 22 draw calls where there were 279 to 672,
+  and none of them is in Pixi's scene. Left: section 15's open questions, the items around
+  this one, and merging the branch.
 - **Features keep a full copy of their style, and matching makes two** (Bryan: "this could be better").
   `styleMatch()` returns a copy, and `feature.style =` merges it with the defaults into another: 14% of
   the APP time of making features. `styleMatch()` once returned the base style by reference and
@@ -71,10 +75,37 @@ said otherwise. Biggest or most wanted first.
   container per tile for a class of lines with few members; hide the tiles outside the view so Pixi
   skips them. Watch for: wrong overlaps at tile edges (polygons; pins side by side across a tile edge
   are ordered by tile, 1% of overlapping pairs).
+- **Animation frames that don't draw the whole scene.** A glow breathes and a halo marches
+  (step 10 of section 15) by drawing every batch again 20 times a second: 13 ms of GPU a frame
+  in Užice on an M4. Drawing what's still into a texture once, and then that texture with what
+  moves over it, would make an animation frame two draw calls, and 60 a second affordable.
+  Wants numbers from weak hardware first: `AnimationPacer` slows the animation down there, and
+  nobody has seen it do so.
+- **How hovers and selections look, now that a shader draws them.** The first version is a
+  soft yellow glow that breathes and yellow dashes that march over a dark line. Open: more
+  than color and movement for a colorblind user (a pattern in the glow, a second color in the
+  dashes), a glow that shows on a yellow road, and the other layers' lines and areas, which
+  still glow by `GlowFilter`.
+- **A small area's edge, drawn by the fills' shader.** An area under 20 pixels is its fill
+  alone since step 9 (Bryan: a grey block is fine, something is drawn; a hover shows its
+  outline). Section 15 ("A lower level of detail for small areas") has a way to give it back
+  its edge for no more triangles, if the blocks turn out to be missed.
+- **Dashes of two colors** (meta/Rapid#1291, Bryan: for another time). An unpaved road's dashed
+  casing goes away on a background of its own color; alternating two contrasting colors would
+  show on any. The lines' batch makes its dashes in the shader from the distance along the
+  line, so a second color for the gaps is 4 more bytes a vertex and a line of the fragment
+  shader. (`LineMesh`es dash with a texture, which could hold two colors as it is.)
+- **The other layers' features in batches.** Only the OSM layer's are (section 15, steps 6 to 9).
+  The photo layers draw thousands of markers with viewfields, and the Rapid layer draws lines
+  with oneway arrows, areas and vertices like OSM's; each layer would give its features
+  batches of its own, as `PixiLayerOsm` does (`_lineBatch()`, `_polygonBatch()`,
+  `_placePoint()`).
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
   `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, batch sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another
-  machine (Bryan will try other hardware).
+  machine (Bryan will try other hardware). The same run should say what draw calls cost there:
+  on the M4 they cost next to nothing, and Bryan counts every one saved as a win for weaker
+  devices (Nov 23).
 - **Budget frames by the display's refresh, and show the misses** (Bryan, Nov 20). The gaps between
   animation frame timestamps give the refresh interval and the missed refreshes. `SchedulerSystem`
   could set a frame's budget so APP plus the expected DRAW ends just before a refresh, and the
@@ -102,19 +133,20 @@ said otherwise. Biggest or most wanted first.
   on a scratch graph whose commit calls `Graph._markTopologyChanged()` for the whole lineage: after a
   load, 1,438 entities nobody edited have answers that can't be memoized. Cheap today.
 - **Dashes differ from one load to the next, and after a big zoom change** (up to 12,000 pixels along
-  sidewalks in Seattle), which makes screenshot comparisons noisy. Ruled out (Nov 20): geometry, the
-  `DashLine` instructions and texture matrices, the cached textures' pixels, the anchor. Worth fixing
-  anyway: `DashLine._getTexture()` caches by dash pattern alone, but height and alpha come from
-  whichever feature asked first.
+  sidewalks in Seattle), which makes screenshot comparisons noisy. Seen with `DashLine`, which is
+  gone (Nov 22): a line's dashes are now a texture along its stroke mesh, by the distance along
+  the line. Not checked again since.
 - **OSM tiles that fail to load aren't retried until the map moves** (`OsmService.loadTiles()` returns
   early when the view is unchanged). A 429 is handled (the status bar counts down and the view loads
   when it's over); a 500 or a dropped connection still waits.
 - **Profiling pass** ([`design/profiling.md`](../design/profiling.md)): baselines for heap, GPU resources,
   the worker heap and listeners, and a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and
   reports what grows.
-- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 3): reordering spatial IDs (lift
-  OSM while drawing, or a layer-order UI); hit-testing by geometry instead of Pixi, so snapping doesn't
-  depend on stroke width and z-order.
+- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 4): reordering spatial IDs (lift
+  OSM while drawing, or a layer-order UI); snapping by distance instead of by what's drawn on top, so
+  it doesn't depend on stroke width and z-order (the OSM layer's features are found through the
+  spatial index since Nov 23, with the answer Pixi gave); the other layers' features through an
+  index too (`scene.setHitTester()`), which a dataset of buildings would need.
 - **Text rasterization without `Pixi.Text`**: canvas2D on the main thread first, or an `OffscreenCanvas`
   worker, fed to `PixiTextures.allocate('text', …)`; avoids nested `renderer.generateTexture()` and
   `readPixels`. A worker needs the same fonts (`FontFace` and a transferable `ArrayBuffer`).
@@ -304,7 +336,7 @@ the order people are likely to ask:
   a `sameKeys` disagreement (same place and direction, different tags).
 
 ## Conflation / buffers follow-ups (beyond Step 3)
-- **Replacing `lineToPoly`** with a line builder of our own is now planned for rendering (`design/graphics-system.md` section 4); the same builder could give conflation precise buffers.
+- **`lineToPoly` is gone** (Nov 22): `geomStrokeOutline()` in `modules/geo/stroke.ts` gives the rings at a distance from a line, for halos and labels. It doesn't clean up where an outline crosses itself, so it isn't a buffer polygon yet; that's step 5 of `design/graphics-system.md` section 15 (try Clipper2 first), and conflation's buffers want the same answer.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
 
 ## Performer-inspired statistics display
