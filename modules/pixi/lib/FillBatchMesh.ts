@@ -275,7 +275,7 @@ export class FillBatchShader extends PIXI.Shader {
  * (`FillBatchShader.setView()`) and nothing in any batch. What the batch does with its buffers (a
  * fill that changes, hiding, order, the place its coordinates start at) is `BatchMesh`'s.
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
 export class FillBatchMesh extends BatchMesh {
 

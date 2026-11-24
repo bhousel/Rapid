@@ -33,7 +33,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   Build a stroke mesh only when the line, its cap or its join changes (the feature's
   `GeometryPart` is a different object then). Don't go back to `graphics.stroke()` for them:
   Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms in
-  Užice allocated. See section 15 of `design/graphics-system.md`.
+  Užice allocated. See "The line builder" in `design/graphics-system.md`.
   - **The OSM layer's lines are in batches** (`lib/LineBatchMesh.ts`, a `Mesh` with our own shader):
     two for each level, one for every casing and one for every stroke, drawn in that order.
     The layer gives each line feature its two (`feature.casingBatch` and `feature.batch`, from
@@ -206,7 +206,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
   hover or a selection needs (a halo's outline is built in `updateHalo()`, for what's selected).
   Garbage is what brings the half-second collections
-  (`design/graphics-system.md` section 13).
+  (`design/graphics-system-log.md` section 13).
 - **A point that labels should keep clear of gets `feature.labelAvoid = true` from its layer**
   (OSM, Rapid and custom data points do; photo and QA markers don't). It then marks where it's
   drawn in `scene.labelSpace.avoidGrid` at the end of its `update()` (`updateAvoid()`), and unmarks when
@@ -262,8 +262,8 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 ## Frames, passes and redraw requests
 
 How a frame is made, the cull box, frame pacing and the frame's deadline are in
-[`design/graphics-system.md`](../../design/graphics-system.md) (sections 1, 3, 8, 9 and 10). The
-words for all of it (tick, frame, APP and DRAW phase, pass, held frame, animation draw, batch,
+[`design/graphics-system.md`](../../design/graphics-system.md), and the measurements behind them
+in [`design/graphics-system-log.md`](../../design/graphics-system-log.md). The words for all of it (tick, frame, APP and DRAW phase, pass, held frame, animation draw, batch,
 chunk, …) are defined in its "Words used here": use them that way. The rules that come out of it:
 
 - **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
@@ -306,7 +306,7 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
   set `needsStyle`.
 - **In a layer that keeps its features, draw with `this.updateFeature(feature, frame, viewport)`,**
   not `feature.update(viewport)`, and call `this.continueWaiting(frame, viewport)` on the frames
-  where `keepFeatures()` says yes. A feature may then be drawn a few frames late (section 10), so
+  where `keepFeatures()` says yes. A feature may then be drawn a few frames late, so
   don't read anything off a feature that's still `dirty` (its bounds, its hit area).
 - **A feature may not exist yet for data the layer has seen.** The OSM layer puts off making
   features that aren't needed at once (`_waitToMake()`), and makes them over the next frames.
@@ -334,8 +334,8 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
   expensive frames. With a layer's ID, only that layer is drawn at once (in a held frame, if a pass
   is waiting). For data that arrived, use `deferredRedraw()`.
 - **Don't change the frame loop's timing without measuring it.** `bun run measure` reports frames
-  a second and long ticks while the view moves on every tick (`glide`), and
-  section 9 has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
+  a second and long ticks while the view moves on every tick (`glide`), and section 9 of
+  `design/graphics-system-log.md` has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
   tests; `test/e2e/rendering.test.js` checks it in a browser.
 
 ## Working with Services

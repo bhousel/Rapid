@@ -195,7 +195,8 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
 
 
 // A deadline on the frame: after a zoom every feature has to be drawn again, and the ones a frame
-// has no time for are drawn in the frames after it (see `design/graphics-system.md`, section 10).
+// has no time for are drawn in the frames after it (see "A deadline on the frame" in
+// `design/graphics-system.md`).
 test('after a zoom, draws the features again over the following frames, with the styles they had', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -263,7 +264,7 @@ test('after a zoom, draws the features again over the following frames, with the
 
 
 // A line's casing and stroke, and each ring of an area's outline, are drawn from a stroke mesh
-// that's built once, for any width (see `design/graphics-system.md`, section 15).
+// that's built once, for any width (see "The line builder" in `design/graphics-system.md`).
 // - The lines are in batches (`LineBatchMesh`), one for the casings and one for the strokes of each
 //   level: a line is a run of vertices in its batches' buffers, and the shader works out its
 //   width. A zoom changes four numbers, and nothing in a batch. The line's feature isn't in the scene.
@@ -554,7 +555,8 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
 
 // A zoom changes how features are drawn, not which ones there are. So the OSM layer follows the
 // cull box to its new size without a pass, and runs its features through its `render…()`
-// functions again over the next frames (see `design/graphics-system.md`, section 12).
+// functions again over the next frames (see "A zoom without a pass" in
+// `design/graphics-system.md`).
 test('follows a zoom without a pass, and ends up with what a full pass shows', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -596,7 +598,7 @@ test('follows a zoom without a pass, and ends up with what a full pass shows', a
 
 
 // Labels are placed around the points and vertices: each of those marks where it's drawn in the
-// scene's avoid grid, and no label goes there (see `design/graphics-system.md`, section 14).
+// scene's avoid grid, and no label goes there (see "Label placement" in `design/graphics-system.md`).
 // (For a while the avoids were made for whole map tiles of points, wherever those were at the time.)
 test('marks every point in view for labels to avoid, and puts no label over a point', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);

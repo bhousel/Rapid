@@ -28,7 +28,7 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 
 ## LineMesh
 
-A line feature's casing and stroke are each a `LineMesh`, unless its layer gave it a `LineBatchMesh`. The triangles come from `geomStrokeMesh()`, which builds them once for any width, so a zoom only works out where the vertices are (`setStroke()`), in the array the mesh has. Dashes are a texture that repeats along the line (`PixiTextures.getDashTexture()`). It's always batched. See [`design/graphics-system.md`](../../../design/graphics-system.md) section 15.
+A line feature's casing and stroke are each a `LineMesh`, unless its layer gave it a `LineBatchMesh`. The triangles come from `geomStrokeMesh()`, which builds them once for any width, so a zoom only works out where the vertices are (`setStroke()`), in the array the mesh has. Dashes are a texture that repeats along the line (`PixiTextures.getDashTexture()`). It's always batched. See "The line builder" in [`design/graphics-system.md`](../../../design/graphics-system.md).
 
 The lasso is drawn with `drawRings()` in [`../helpers.ts`](../helpers.ts): a `LineMesh` for each ring, dashed. (`DashLine.ts`, which drew dashes on a `Graphics`, is gone. Halos are in a `LineBatchMesh` now: see below.)
 

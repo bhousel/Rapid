@@ -48,7 +48,7 @@ type BatchKind = keyof ContainerBatches;
  * destroys the ones that empty (`removeEmpty`).
  *
  * A layer gives each feature the batch it should draw in (`feature.batch = batches.lineBatch(…)`),
- * and the feature does the rest. See `design/graphics-system.md` section 15.
+ * and the feature does the rest. See "Batches" in `design/graphics-system.md`.
  */
 export class LayerBatches {
   /** The shaders that the batches draw with: the scene's */

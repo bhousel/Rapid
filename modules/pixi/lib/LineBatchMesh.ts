@@ -528,7 +528,7 @@ export class LineBatchShader extends PIXI.Shader {
  * buffers (a line that changes, hiding, order, the place its coordinates start at) is
  * `BatchMesh`'s.
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
 export class LineBatchMesh extends BatchMesh {
 

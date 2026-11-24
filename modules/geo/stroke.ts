@@ -1,6 +1,6 @@
 // What a line builder makes from a line: the triangles that draw it (built without knowing how
 // wide the line is), the outline of the line at a distance, and whether a point is within a distance.
-// See `design/graphics-system.md` section 15, "The line builder".
+// See "The line builder" in `design/graphics-system.md`.
 
 /** How a line ends: at its last point (`butt`), half a width past it (`square`), or in a half circle (`round`) */
 export type StrokeCap = 'butt' | 'round' | 'square';

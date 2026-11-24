@@ -10,7 +10,7 @@ import { PointBatchShader } from './PointBatchMesh.ts';
  * them (`scene.batchShaders`): it gives them the view and the clock, and `PixiTextures` gives
  * them the textures.
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
 export class BatchShaders {
   /** The shader of every `LineBatchMesh`: casings, strokes, outlines, glows and halos */

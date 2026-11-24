@@ -140,7 +140,7 @@ function sidedKind(image: Nullable<string>): LineMarkerKind | null | undefined {
  * The glow of a hovered or highlighted line is a strip in the strokes' batch as well
  * (`glowItem`), which the shader fades out from the line's edge. For a line without batches
  * it's a filter on the container.
- * (See `design/graphics-system.md` section 15.)
+ * (See "Hovers, selections and animation draws" in `design/graphics-system.md`.)
  *
  * Properties available:
  * - `batch`       - `LineBatchMesh` that draws the stroke, if the layer gave it one

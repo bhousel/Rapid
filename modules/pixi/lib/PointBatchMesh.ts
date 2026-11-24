@@ -295,7 +295,7 @@ function quadIndices(count: number): Uint16Array {
  * What the batch does with its buffers (a point that changes, hiding, order, the place its
  * coordinates start at) is `BatchMesh`'s.
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
 export class PointBatchMesh extends BatchMesh {
 

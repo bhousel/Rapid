@@ -1,6 +1,7 @@
 # Lessons: Measuring performance
 
-How to measure frames, memory and garbage without fooling yourself. See also `design/graphics-system.md`.
+How to measure frames, memory and garbage without fooling yourself. See also "Measuring" in
+`design/graphics-system.md`, and the measurements themselves in `design/graphics-system-log.md`.
 
 - **Measure a frame the way it happens for the user** — `bun run measure` used to call `immediateRedraw()` after each pan step, which (a) says "something changed", so no layer could keep its features, and (b) runs the passes back to back. A real drag makes no redraw request and its APP phases came 250 ms apart (the throttle before frame pacing), where the same pass costs about twice as much (21.6 ms against 11 in Seattle, nothing moving). Drive real pointer events at least once before trusting a scripted number: a real drag over a new area also showed the Rapid datasets' tiles asking for a redraw of everything. And start a scripted drag where nothing is under the pointer, or it drags a node.
 - **Compare two builds in one session** — `bun run measure` on the same build, hours apart, gave Seattle's redraw frame as 10.8 and 17.5 ms and Staten Island's cull frames as 63 and 100 ms. To see what a change did: measure, stash the change, build, measure, pop, build, measure again (one place is enough, with `--runs 15`).

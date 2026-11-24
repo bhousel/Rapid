@@ -7,7 +7,7 @@ import { parseArgs, styleText } from 'node:util';
 //
 // Compares how any map editor keeps up with panning and zooming at the difficult places: this
 // build, another version of Rapid, or iD. (See "Against other versions, and iD" in
-// `design/graphics-system.md`.)
+// `design/graphics-system-log.md`.)
 //
 // `bun run measure` reads Rapid's own frame stats, which older versions and iD don't have. This
 // measures from outside: it opens the page in a new tab of the Chrome started with

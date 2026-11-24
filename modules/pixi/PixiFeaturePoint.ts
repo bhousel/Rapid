@@ -107,7 +107,7 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
  * Without a batch, the pictures are sprites in the feature's container, which is scaled and
  * turned to undo the map's zoom and rotation. A hovered or highlighted point has one picture
  * more, either way: a glow behind the others.
- * (See `design/graphics-system.md` section 15.)
+ * (See "Batches" in `design/graphics-system.md`.)
  *
  * Properties available:
  * - `batch`       - `PointBatchMesh` that draws the point, if the layer gave it one

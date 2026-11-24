@@ -53,7 +53,7 @@ function mixColors(a: number, b: number, t: number): number {
  * A partial fill fills a band along the inside of the polygon's edge, 32 pixels wide. The band
  * is real geometry (`geomAreaBand()`): the `fill` draws its polygons, and a click hits them.
  * There's no stencil mask. Most polygons are too narrow to have a middle that the band leaves
- * empty, and are filled whole (see `_bandFor`, and `design/graphics-system.md` section 15).
+ * empty, and are filled whole (see `_bandFor`, and "The line builder" in `design/graphics-system.md`).
  *
  * A layer that draws many polygons gives the feature two batches: a `FillBatchMesh` for its fill and
  * a `LineBatchMesh` for its outlines (the layer draws every fill, then every outline). The fill is

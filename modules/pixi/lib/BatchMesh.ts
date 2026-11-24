@@ -111,7 +111,7 @@ const _state = PIXI.State.for2d();
  * - **What changed is sent to the GPU when the batch is next rendered,** once, however much
  *   changed (`flush()`, which Pixi calls through `onRender`).
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
 export abstract class BatchMesh extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
 

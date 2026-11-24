@@ -26,9 +26,11 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   physical-key fallback.
 
 ## Pixi rendering follow-ups
-The plans and measurements are in [`design/graphics-system.md`](../design/graphics-system.md) (frame
-stats, partial fills without stencil masks, our own line builder, dashes, GPU time, the cull box,
-frame pacing, the frame's deadline, the pass, garbage, labels). Numbers below are Užice at z16 unless
+How the renderer works is in [`design/graphics-system.md`](../design/graphics-system.md), and the
+measurements and plans behind it in [`design/graphics-system-log.md`](../design/graphics-system-log.md)
+(frame stats, partial fills without stencil masks, our own line builder, dashes, GPU time, the cull
+box, frame pacing, the frame's deadline, the pass, garbage, labels): "section N" below means a
+section of the log. Numbers below are Užice at z16 unless
 said otherwise. Biggest or most wanted first.
 
 - **Garbage collection is the longest stall left** (section 13). A major collection is 420 to 480 ms of
@@ -337,11 +339,11 @@ the order people are likely to ask:
   a `sameKeys` disagreement (same place and direction, different tags).
 
 ## Conflation / buffers follow-ups (beyond Step 3)
-- **`lineToPoly` is gone** (Nov 22): `geomStrokeOutline()` in `modules/geo/stroke.ts` gives the rings at a distance from a line, for halos and labels. It doesn't clean up where an outline crosses itself, so it isn't a buffer polygon yet; that's step 5 of `design/graphics-system.md` section 15 (try Clipper2 first), and conflation's buffers want the same answer.
+- **`lineToPoly` is gone** (Nov 22): `geomStrokeOutline()` in `modules/geo/stroke.ts` gives the rings at a distance from a line, for halos and labels. It doesn't clean up where an outline crosses itself, so it isn't a buffer polygon yet; that was step 5 of `design/graphics-system-log.md` section 15 (try Clipper2 first), and conflation's buffers want the same answer.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
 
 ## Performer-inspired statistics display
-- Now frame stats and a rendering info card (`UiRenderingCard`, ⌘⇧F) in [`design/graphics-system.md`](../design/graphics-system.md) (sections 3 and 7). The card shows the scheduler's queue, pressure and dropped frames too.
+- Now frame stats and a rendering info card (`UiRenderingCard`, ⌘⇧F) in [`design/graphics-system.md`](../design/graphics-system.md) ("Frame stats"). The card shows the scheduler's queue, pressure and dropped frames too.
 - Also worth showing: texture usage, vertices per layer.
 - Inspiration: SGI Performer's `pfStats`/`pfFrameStats` system (Chapter 23 of Performer Programmer's Guide)
 

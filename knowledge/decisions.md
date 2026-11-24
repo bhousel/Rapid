@@ -56,7 +56,7 @@ stencil mask (a stroke along the inside of the edge); it's now the band itself, 
 (`geomAreaBand()`): the area minus the area shrunk by 32 pixels. Chosen for the shrinking and its
 cleanup: `clipper2-ts`, a TypeScript port of Clipper2 (18 KB gzipped, BSL-1.0, pinned to an exact
 version: its versions look like prereleases). Measured on every partial fill of three dense views
-(`design/graphics-system.md` section 15, step 5).
+(`design/graphics-system-log.md` section 15, step 5).
 Rejected: `clipper2-wasm` (twice as fast, but 96 KB, an asynchronous start, and it needs
 `'wasm-unsafe-eval'` in our CSP), `clipper-lib` (Clipper 1, unmaintained since 2019), `clipper2-js`
 (wrong answers on our data), and writing the cleanup ourselves (it's a sweep-line clipper: what
@@ -86,7 +86,7 @@ Rejected:
   casings any size. Each feature says how far it can be hit from its geometry (`hitReach`).
 
 ## The OSM layer's lines are drawn in batches, with a shader of our own (Nov 2026)
-Section 15 of `design/graphics-system.md`, step 6. A `LineBatchMesh` is one `Mesh` whose shader places
+Section 15 of `design/graphics-system-log.md`, step 6, and "Batches" in `design/graphics-system.md`. A `LineBatchMesh` is one `Mesh` whose shader places
 each vertex for the line's width in pixels at the current zoom. Choices someone might undo:
 - **Two batches for each level: every casing, then every stroke** (Bryan, Nov 23). Where roads
   meet, neither's casing crosses the other's stroke; he judged the few pixels of difference
@@ -356,7 +356,7 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 
 - **Frames that only move the view aren't paced; frames with a pass to do are, by their cost.**
   After a pass frame the next waits twice what it cost, at most 250 ms (`FramePacer`,
-  `design/graphics-system.md` section 9). A deferred redraw request alone waits at least 250 ms, as
+  "Frame pacing" in `design/graphics-system.md`). A deferred redraw request alone waits at least 250 ms, as
   it did under the fixed throttle, so data that streams in still batches up.
 - **Why twice the cost:** passes then take at most a third of the time, and with the 250 ms cap
   nothing waits longer than it did. Not tuned further; change it with measurements.
@@ -374,7 +374,7 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 
 - **A dirty feature and a feature that needs its style worked out are two things.** `dirty` means
   draw it again; `needsStyle` means match its style and label to its data again. A zoom sets only
-  the first (`scene.dirtyTransform()`). See `design/graphics-system.md` section 10.
+  the first (`scene.dirtyTransform()`). See "A deadline on the frame" in `design/graphics-system.md`.
 - **What waits is drawing a feature again, by where it is and why it's dirty:** outside the view
   always; in view once the frame is out of time; and in a frame the user asked for, only if
   nothing but the zoom made it dirty. Rejected: no deadline at all in frames the user asked for.
@@ -524,7 +524,7 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 ## Pixi Labels and Atlas Textures
 
 - **Measure labels during render, rasterize after render** — `PixiLayerLabels` uses `PIXI.CanvasTextMetrics.measureText()` for placement math inside `render()`, then queues texture creation through `SchedulerSystem.schedule()` so `renderer.generateTexture()` runs in the scheduler drain phase after all frame callbacks complete. This fixes Pixi v8 renderer re-entry corruption while preserving the existing Pixi.Text rasterizer for now.
-- **Labels are managed features, placement data is not** — `PixiLayerLabels` places labels (their boxes in its spatial cache, avoids in `scene.labelSpace.avoidGrid`, `graphics-system.md` section 14) and keeps `PixiFeatureLabelProps` placeholders. A `PixiFeatureLabel` is made only for a visible placeholder and owns its `Sprite` / `BitmapText` / `MeshRope`; culling destroys display objects, not placements.
+- **Labels are managed features, placement data is not** — `PixiLayerLabels` places labels (their boxes in its spatial cache, avoids in `scene.labelSpace.avoidGrid`, "Label placement" in `graphics-system.md`) and keeps `PixiFeatureLabelProps` placeholders. A `PixiFeatureLabel` is made only for a visible placeholder and owns its `Sprite` / `BitmapText` / `MeshRope`; culling destroys display objects, not placements.
 - **Atlas items store uploadable sources, not just ImageData** — `AtlasAllocator` accepts `ImageData`, `HTMLCanvasElement`, `HTMLImageElement`, and `ImageBitmap`. WebGL uploads use the 7-arg `texSubImage2D` DOM-source overload, WebGPU uses `copyExternalImageToTexture`, and the canvas renderer blits the same source into its backing canvas. This avoids the previous `drawImage` → `getImageData` readback for images, bitmaps, and canvases.
 - **Tile-only edge replication** — The atlas still reserves a 1px ring around every texture frame, but only tile imagery needs that ring filled with edge-replicated pixels to prevent seams under bilinear sampling. `PixiTextures._fromEdgePaddedCanvas()` builds a `(w+2) x (h+2)` source for tile atlas entries with two `drawImage` passes. Symbol/text/icon entries upload at the inner frame position and leave the reserved ring transparent.
 

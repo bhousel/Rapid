@@ -4,7 +4,7 @@ import { PixiLayerBackgroundTiles } from '../../../modules/pixi/PixiLayerBackgro
 
 describe('PixiLayerBackgroundTiles', () => {
 
-  // A filter on the imagery costs a full-screen pass on every frame (see `design/graphics-system.md`,
+  // A filter on the imagery costs a full-screen pass on every frame (see `design/graphics-system-log.md`,
   // section 6), so there should be none until a display setting is changed.
   describe('applyFilters', () => {
     function makeLayer() {

@@ -28,7 +28,7 @@ let _zeros = new Float32Array(4096);
  * a mesh in Pixi's `'auto'` mode that crosses 100 vertices can crash Pixi (Rapid#1636, pixijs#12437).
  * A dashed line samples a texture that repeats along the line (`PixiTextures.getDashTexture()`).
  *
- * See `design/graphics-system.md` section 15.
+ * See "The line builder" in `design/graphics-system.md`.
  */
 export class LineMesh extends PIXI.Mesh<PIXI.MeshGeometry> {
 

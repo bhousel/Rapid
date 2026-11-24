@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
 
 //
-// Measures frame stats on a set of difficult places (see `design/graphics-system.md`, plan step 2).
+// Measures frame stats on a set of difficult places (see "Measuring" in `design/graphics-system.md`).
 // It attaches to a Chrome started with `bun run start:chrome`, like `bun run cdp`, so it measures the
 // developer's real GPU. It moves the map, so it changes what the developer is looking at.
 //

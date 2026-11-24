@@ -615,7 +615,7 @@ what the developer is seeing when they report a problem.
    - `bun run cdp press <key>`: press a key (e.g. `Escape` closes the welcome screen after a reload)
 4. To measure what a frame costs, `bun run measure` visits a set of difficult places in that Chrome and
    prints each one's frame stats (`--fresh` for numbers you can compare between builds; see
-   `design/graphics-system.md`). It moves the developer's map. It measures with the layers and
+   "Measuring" in `design/graphics-system.md`). It moves the developer's map. It measures with the layers and
    filters the tab has on: `--setup snippet.js` runs a snippet before each place, to set those,
    or to compare two ways of drawing in one build.
 5. To compare with another build, an older Rapid or iD, `bun run compare <label> <url> <place>` pans

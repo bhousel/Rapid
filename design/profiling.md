@@ -68,9 +68,11 @@ Reading, not measurement, so treat these as the first places to look, not findin
 
 ## Rendering: draw calls
 
-Rendering cost now has its own doc, [`graphics-system.md`](graphics-system.md), with measurements
-(Nov 2026: most draw calls come from the partial-fill masks) and a plan. This section stays as the
-background for its `RenderLayer` step.
+Rendering cost now has its own docs: [`graphics-system.md`](graphics-system.md) for how the map
+is drawn, and [`graphics-system-log.md`](graphics-system-log.md) for the measurements (Nov 2026:
+most draw calls came from the partial-fill masks, since replaced by geometry) and the plans that
+were built. This section stays as the background for the log's `RenderLayer` step; the batches
+of our own that were built in its place are in the design doc's "Batches".
 
 Spector shows alternating casing, stroke, casing, stroke draw calls for lines, one pair per feature,
 instead of all casings then all strokes. Each `PixiFeatureLine` owns a container with a casing

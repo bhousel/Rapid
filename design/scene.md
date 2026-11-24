@@ -172,14 +172,14 @@ and the areas left the scene, Pixi can't be asked about them: `test/e2e/select.t
 the index against asking every feature of the layer. The points left it too (step 8): the test
 draws them with sprites once more, and checks that the batch's points are hit where Pixi hits
 those.
-The numbers are in `design/graphics-system.md` section 15 (step 6).
+The numbers are in `design/graphics-system-log.md` section 15 (step 6).
 
 ## 3. Render groups
 
 Pixi keeps one list of drawing instructions per *render group*, and until Nov 18 the whole scene was
 one group. Any change to what's drawn (a feature scrolls into view, a hover adds a halo) made Pixi
 collect every object again, and moving `origin` gave every object a new transform. On a pan frame
-that cost about 2 µs per visible feature (`design/graphics-system.md`, section 2).
+that cost about 2 µs per visible feature (`design/graphics-system-log.md`, section 2).
 
 Now every structural container is its own render group: the groups under `origin`, each spatial
 container, and the containers a layer makes under one with `_childContainer()` (`polygons`, `lines`,
@@ -277,7 +277,7 @@ Since Nov 19. In Užice all 49,259 points were one group and level 0 of the line
 Pixi collected the whole group again whenever one of its features was made, removed, shown, hidden
 or (for a line) drawn again: 35 ms of DRAW for one changed line or one new point, on every frame
 that had one. That's a hover, each frame of a drag, and every frame of a load or a pan that makes
-features (`graphics-system.md` section 10).
+features ("A deadline on the frame" in `graphics-system.md`).
 
 **What a render group costs, and what it saves.** Pixi's DRAW phase does two things with a group:
 - It **builds** the group's list of instructions and its vertex buffer, only when the group's
@@ -298,7 +298,7 @@ changed. A frame of Užice replays about 3,400 draw calls in 6 ms.
 
 **Points** (`_pointTileContainer()`): a container per tile, for points, vertices and the POI pins.
 *(Since Nov 23 the layer's batch draws them, in one draw call, from north to south everywhere:
-see `graphics-system.md` section 15, step 8. The tiles hold the few points that draw themselves,
+see "Batches" in `graphics-system.md`. The tiles hold the few points that draw themselves,
 and what follows is how those are ordered.)*
 - Points are drawn from north to south, so that a pin overlaps the pins above it on the map. The
   tiles' containers are ordered by row, and points within a tile as before.
@@ -363,7 +363,7 @@ What it changed (dev build, from tapes; DRAW in ms):
   splitting only the classes that are big would get most of that back. Not tried.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
   touches a big group. *(Done, Nov 23: halos are one batch in the `ui` group, and a hover's glow is
-  in a small batch beside what it's around. See section 15 of `graphics-system.md`, step 10.)*
+  in a small batch beside what it's around. See "Hovers, selections and animation draws" in `graphics-system.md`.)*
 
 ## 4. Later
 

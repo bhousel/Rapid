@@ -32,21 +32,32 @@ Still to do:
 - **`RELEASE.md`** still describes Facebook's release flow (`deploy.yml`, facebook/Rapid links).
 
 ## Rendering: what's next
-`pixi-8.23` (PR #10) and `label-avoids` (PR #11) are merged (`completed.md`); the plans and measurements
-are in [`design/graphics-system.md`](../design/graphics-system.md). What's left is under "Pixi rendering
-follow-ups" in `backlog.md`.
+`pixi-8.23` (PR #10), `label-avoids` (PR #11) and `linebuilder_refactor` (PR #12) are merged
+(`completed.md`). How the renderer works is in [`design/graphics-system.md`](../design/graphics-system.md),
+and the measurements and plans behind it in [`design/graphics-system-log.md`](../design/graphics-system-log.md).
+What's left is under "Pixi rendering follow-ups" in `backlog.md`.
 
-**Active, on `graphics-vocabulary`: names and words for the renderer** (Bryan, Nov 24). The
-batch classes are `BatchMesh` (from `PIXI.Mesh`) and `LineBatchMesh`, `FillBatchMesh`,
-`PointBatchMesh`, so a subclass is named after its parent. The frame loop's words are settled
-and defined in "Words used here" in `design/graphics-system.md`: a **tick** is a
-`requestAnimationFrame` callback (`addTickCallback()`, `TickMetrics`), a **frame** is everything
-needed to draw the map once (one in flight, maybe over several ticks), **APP and DRAW are phases**,
-a **pass** is a layer's walk over its data, an **animation draw** is a DRAW with no frame
-(`gfx.animationDraws`), and a **chunk** is a few entities taken at a time (`MAKE_CHUNK`).
-"Batch" alone means ours; Pixi's is always "Pixi's batch".
+**Active, on `graphics-sharpen`: a `/sharpen` pass over the renderer** (Bryan, Nov 24; not pushed,
+no PR yet). Done, a commit each:
+- Names and words: the batch classes are `BatchMesh` and `LineBatchMesh`, `FillBatchMesh`,
+  `PointBatchMesh`; a **tick** is a `requestAnimationFrame` callback, a **frame** everything
+  needed to draw the map once, **APP and DRAW are phases**, a **pass** is a layer's walk over its
+  data, an **animation draw** a DRAW with no frame. All defined in "Words used here" in
+  `design/graphics-system.md`. "Batch" alone means ours; Pixi's is always "Pixi's batch".
+- `GuillotineAllocator` (was misspelled) and `AtlasTextureSource`.
+- The scene asks for a frame itself when a class or data changes.
+- Classes of their own for the batches' shaders (`BatchShaders`), a layer's batches
+  (`LayerBatches`) and label space (`LabelSpace`).
+- Redraw requests name their layer when only one layer's drawing changed (39 of 53).
+- The design doc split into how it works now and a log (Nov 24).
 
-**Merged in PR #12 (Nov 24): a line builder of our own** (section 15 has the direction, the
+Left from the review, for Bryan to pick: the features' two ways of drawing (batch or own
+objects), the near-duplicate QA and photo layers, label rasterization out of `PixiLayerLabels`,
+a class for `AbstractPixiLayer`'s data bindings, `triangulate()` and `ringsContain()` to
+`modules/geo/`, splitting `GraphicsSystem._app()`, and a sentence for each class's job in the
+READMEs.
+
+**Merged in PR #12 (Nov 24): a line builder of our own** (section 15 of the log has the direction, the
 order of work, Bryan's decisions and the measurements): steps 1 to 6 and 8 to 10; step 7 (a
 worker) was skipped as probably unnecessary (Bryan).
 - The OSM layer's lines, areas and points are drawn in batches with shaders of our own

@@ -39,7 +39,7 @@ export const ANIMATION_REST_MS = 30000;
  *   draw settles it (a glow at its brightest), and it goes on when something is drawn again.
  *
  * It owns no clock: callers pass the time in (`performance.now()`).
- * See section 15 of `design/graphics-system.md` (step 10, "Animation draws").
+ * See "Animation draws" in `design/graphics-system.md`.
  */
 export class AnimationPacer {
   /** How long the next animation draw waits after the scene was last drawn, in milliseconds */
