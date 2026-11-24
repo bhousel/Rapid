@@ -678,8 +678,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
     if (changedIDs.size) {
-      scene.dataChanged('osm', [...changedIDs]);
-      gfx.requestFrame();
+      scene.dataChanged('osm', [...changedIDs]);   // (and asks for a frame)
     }
   }
 

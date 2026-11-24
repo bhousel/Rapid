@@ -108,7 +108,9 @@ pointer event (outside the loop) → PixiEvents → scene.hitTest() → a layer'
   the map draws has changed, so layers need a pass: it asks for APP work, not only a DRAW. Moving
   the view isn't one.
 - **`requestFrame()`:** asks for a frame without saying anything changed, after the layers were
-  told some other way (a class was set, a texture arrived).
+  told some other way. The scene calls it when a class changes, when it's told of data that
+  changed or arrived (`dataChanged()`, `dataArrived()`), and when textures arrive, so callers of
+  those don't.
 
 **Outside the frame**
 - **Hit test:** finding what's under the pointer. It runs on each pointer event, not in a frame:
@@ -1032,7 +1034,8 @@ or changed one), and `hasTime()` counts it. Without that, one frame drew 7,000 n
   tick makes another, pass or no pass. These frames aren't paced: they're cheap by construction.
   (Except where DRAW has a big fixed cost, as in Užice: see "What a frame costs when little is
   done in it".) `gfx.requestFrame()` asks for such a frame from outside, when something the
-  waiting work needed has arrived (a texture), or a class changed (a hover).
+  waiting work needed has arrived (a texture). The scene asks for one itself when a class
+  changes (a hover) and when it's told of data that changed or arrived.
   `gfx.pending` is `true` until nothing is left, and scripts and tests wait for that.
 
 ### What it does
@@ -1415,8 +1418,9 @@ everything. Nothing else.
 
 - `PixiScene.setClass()` and `unsetClass()` tell the layers which data changed class
   (`AbstractPixiLayer.classChanged()`). The OSM layer remembers it.
-- The caller asks for a frame, not for a redraw: `gfx.requestFrame()`. No layer has to do its
+- The scene asks for a frame, not for a redraw: `gfx.requestFrame()`. No layer has to do its
   pass for that. (`immediateRedraw()` still works after a class change, and still costs a pass.)
+  Until Nov 24 the caller had to ask, and some asked for a redraw instead.
 - On a frame where the OSM layer keeps its features, `_renderChanged()` runs the changed data,
   and whatever was or is now related to it, through the same `render…()` functions as a pass
   does. It leaves out what a pass wouldn't have gathered (hidden, or outside the cull box), and

@@ -647,7 +647,8 @@ describe('PixiScene', () => {
         _classHasData: new Map(),
         _pulsing: new Map(),
         _reducedMotion: { matches: false },
-        layers: new Map()
+        layers: new Map(),
+        gfx: { requestFrame: () => {} }
       };
       const names = ['setClass', 'unsetClass', 'clearClass', '_classChanged', 'animate', 'addPulsing', 'removePulsing'];
       for (const name of names) {
@@ -820,20 +821,25 @@ describe('PixiScene', () => {
         layers: new Map([
           ['osm', { classChanged: dataID => told.push(`osm ${dataID}`) }],
           ['rapid', { classChanged: dataID => told.push(`rapid ${dataID}`) }]
-        ])
+        ]),
+        gfx: {
+          requestFrame: () => told.push('frame'),
+          deferredRedraw: () => told.push('redraw'),
+          immediateRedraw: () => told.push('redraw')
+        }
       };
       for (const name of ['setClass', 'unsetClass', 'clearClass', 'getDataWithClass', 'getClasses', '_classChanged']) {
         scene[name] = PixiScene.prototype[name];
       }
     });
 
-    it('tells every layer when a class is set on some data, once', () => {
+    it('tells every layer when a class is set on some data, once, and asks for a frame (not a redraw)', () => {
       scene.setClass('hover', 'w1');
-      assert.deepEqual(told, ['osm w1', 'rapid w1']);
+      assert.deepEqual(told, ['osm w1', 'rapid w1', 'frame']);
       assert.deepEqual([...scene.getClasses('w1')], ['hover']);
 
       scene.setClass('hover', 'w1');   // it has it already
-      assert.strictEqual(told.length, 2);
+      assert.strictEqual(told.length, 3);
     });
 
     it('tells every layer when a class is unset, and not when the data never had it', () => {
@@ -845,7 +851,7 @@ describe('PixiScene', () => {
       assert.deepEqual(told, []);
 
       scene.unsetClass('hover', 'w1');
-      assert.deepEqual(told, ['osm w1', 'rapid w1']);
+      assert.deepEqual(told, ['osm w1', 'rapid w1', 'frame']);
       assert.strictEqual(scene.getDataWithClass('hover').size, 0);
     });
 
@@ -856,40 +862,62 @@ describe('PixiScene', () => {
       told.length = 0;
 
       scene.clearClass('hover');
-      assert.sameMembers(told, ['osm w1', 'rapid w1', 'osm n1', 'rapid n1']);
+      assert.sameMembers(told.filter(what => what !== 'frame'), ['osm w1', 'rapid w1', 'osm n1', 'rapid n1']);
+      assert.include(told, 'frame');
+      assert.notInclude(told, 'redraw');
+
+      told.length = 0;
+      scene.clearClass('hover');   // nothing has it now
+      assert.deepEqual(told, []);
       assert.deepEqual([...scene.getDataWithClass('select')], ['w2']);
     });
   });
 
 
   describe('dataChanged', () => {
-    it('tells the one layer which data changed', () => {
+    it('tells the one layer which data changed, and asks for a frame (not a redraw)', () => {
       const told = [];
       const scene = {
         layers: new Map([
           ['osm', { dataChanged: dataIDs => told.push(['osm', ...dataIDs]) }],
           ['rapid', { dataChanged: dataIDs => told.push(['rapid', ...dataIDs]) }]
-        ])
+        ]),
+        gfx: {
+          requestFrame: () => told.push('frame'),
+          deferredRedraw: () => told.push('redraw'),
+          immediateRedraw: () => told.push('redraw')
+        }
       };
       PixiScene.prototype.dataChanged.call(scene, 'osm', ['w1', 'n1']);
+      assert.deepEqual(told, [['osm', 'w1', 'n1'], 'frame']);
+
+      told.length = 0;
       PixiScene.prototype.dataChanged.call(scene, 'no-such-layer', ['w1']);
-      assert.deepEqual(told, [['osm', 'w1', 'n1']]);
+      assert.deepEqual(told.filter(Array.isArray), []);   // no other layer is told
     });
   });
 
 
   describe('dataArrived', () => {
-    it('tells the one layer which data arrived', () => {
+    it('tells the one layer which data arrived, and asks for a frame (not a redraw)', () => {
       const told = [];
       const scene = {
         layers: new Map([
           ['osm', { dataArrived: dataIDs => told.push(['osm', ...dataIDs]) }],
           ['rapid', { dataArrived: dataIDs => told.push(['rapid', ...dataIDs]) }]
-        ])
+        ]),
+        gfx: {
+          requestFrame: () => told.push('frame'),
+          deferredRedraw: () => told.push('redraw'),
+          immediateRedraw: () => told.push('redraw')
+        }
       };
       PixiScene.prototype.dataArrived.call(scene, 'osm', new Set(['w1', 'n1']));
+      assert.deepEqual(told, [['osm', 'w1', 'n1'], 'frame']);
+
+      told.length = 0;
       PixiScene.prototype.dataArrived.call(scene, 'no-such-layer', ['w1']);
-      assert.deepEqual(told, [['osm', 'w1', 'n1']]);
+      assert.deepEqual(told.filter(Array.isArray), []);   // no other layer is told
     });
   });
 

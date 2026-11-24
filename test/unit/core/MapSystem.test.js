@@ -316,13 +316,13 @@ describe('MapSystem', () => {
       assert.strictEqual(n1.key, oldKey);   // other graphs share the object, so it isn't touched
       assert.isFalse(filters._cache.has(n1));
       assert.deepEqual(changed, ['osm', 'n1']);
-      assert.deepEqual(asked, ['frame']);   // not a redraw of everything: a drag is an edit on every pointer move
+      assert.deepEqual(asked, []);   // not a redraw of everything: a drag is an edit on every pointer move (the scene asks for a frame)
     });
   });
 
 
   describe('merge', () => {
-    it('tells the scene what arrived, and asks for a frame, not for a redraw of everything', async () => {
+    it('tells the scene what arrived, not asking for a redraw of everything', async () => {
       const ctx = new Rapid.MockContext();
       const editor = new Rapid.MockSystem(ctx);
       const filters = new Rapid.FilterSystem(ctx);
@@ -352,7 +352,7 @@ describe('MapSystem', () => {
       editor.emit('merge', new Set(['n1', 'n2']));   // (`n2` isn't in this graph: a deleted node, say)
       assert.isFalse(filters._cache.has(n1));        // what was matched for it may be different now
       assert.deepEqual(arrived, ['osm', 'n1', 'n2']);
-      assert.deepEqual(asked, ['frame']);
+      assert.deepEqual(asked, []);   // not a redraw of everything (the scene asks for a frame)
     });
   });
 

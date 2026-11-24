@@ -854,7 +854,7 @@ export class PixiScene extends EventEmitter {
   /**
    * Sets a dataID as being classed a certain way (e.g. 'hover').
    * Data IDs are unique across Rapid, so whichever layer draws the data shows the class
-   * (see `design/data-ids.md`).
+   * (see `design/data-ids.md`). If that's a change, the layers are told and a frame is asked for.
    * @param classID - classID (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123', 'fbRoads:w-1')
    */
@@ -881,7 +881,8 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Unsets a dataID from being classed a certain way (e.g. 'hover')
+   * Unsets a dataID from being classed a certain way (e.g. 'hover').
+   * If that's a change, the layers are told and a frame is asked for.
    * @param classID - classID (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123')
    */
@@ -912,13 +913,14 @@ export class PixiScene extends EventEmitter {
   /**
    * Tells the layers that the classes of some data changed, so that a layer that keeps its
    * features can draw that data's again without doing its whole pass
-   * (see `AbstractPixiLayer.classChanged`).
+   * (see `AbstractPixiLayer.classChanged`), and asks for a frame to show it.
    * @param dataID - The data whose classes changed
    */
   protected _classChanged(dataID: DataID): void {
     for (const layer of this.layers.values()) {
       layer.classChanged(dataID);
     }
+    this.gfx.requestFrame();
   }
 
 
@@ -1162,26 +1164,28 @@ export class PixiScene extends EventEmitter {
   /**
    * Says that some of a layer's data changed (an edit), and nothing else in it did. The layer
    * draws that data again on the next frame, without doing its whole pass if it can
-   * (see `AbstractPixiLayer.dataChanged`). Follow it with `gfx.requestFrame()`.
+   * (see `AbstractPixiLayer.dataChanged`). Asks for a frame to show it.
    * @param layerID - layerID that is rendering the data
    * @param dataIDs - Everything the change affects: what changed, was added or was removed, and
    *   whatever is drawn differently because of it (for an OSM edit, `Difference.complete()`)
    */
   public dataChanged(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
     this.layers.get(layerID)?.dataChanged(dataIDs);
+    this.gfx.requestFrame();
   }
 
 
   /**
    * Says that more of a layer's data arrived (a tile loaded), and nothing else in it changed. The
    * layer makes and draws that data over the next frames, without doing its whole pass if it can
-   * (see `AbstractPixiLayer.dataArrived`). Follow it with `gfx.requestFrame()`.
+   * (see `AbstractPixiLayer.dataArrived`). Asks for a frame to start on it.
    * @param layerID - layerID that is rendering the data
    * @param dataIDs - What arrived, and whatever it changes the look of (for OSM, what the `merge`
    *   event lists)
    */
   public dataArrived(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
     this.layers.get(layerID)?.dataArrived(dataIDs);
+    this.gfx.requestFrame();
   }
 
 

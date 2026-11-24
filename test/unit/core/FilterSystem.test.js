@@ -998,18 +998,18 @@ describe('FilterSystem', () => {
           told.length = 0;
 
           _filters.forceVisible(['w1']);            // a way brings its nodes
-          assert.deepEqual(told, ['osm w1 n1 n2', 'frame']);
+          assert.deepEqual(told, ['osm w1 n1 n2']);   // (the scene asks for the frame)
 
           told.length = 0;
           _filters.forceVisible(['w1']);            // the same again: nothing changed
           assert.deepEqual(told, []);
 
           _filters.forceVisible(['p1']);            // `w1` may be hidden again, `p1` is shown
-          assert.deepEqual(told, ['osm w1 n1 n2 p1', 'frame']);
+          assert.deepEqual(told, ['osm w1 n1 n2 p1']);
 
           told.length = 0;
           _filters.forceVisible([]);
-          assert.deepEqual(told, ['osm p1', 'frame']);
+          assert.deepEqual(told, ['osm p1']);
 
           // With no filter hiding anything, it changes nothing on the map
           _filters.enableAll();

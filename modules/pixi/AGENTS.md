@@ -180,14 +180,15 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   visible, and the shader faded it to nothing. So the e2e tests count the pixels a glow
   changes (`glowPixels()` in `test/e2e/select.test.js`): **for something a shader draws,
   test the pixels,** not only the state that asks for it.
-- **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
-  for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
-  that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in
-  Užice costs 3 ms of APP that way, and 175 with `immediateRedraw()`.
-- **For an edit, `scene.dataChanged('osm', ids)` and `gfx.requestFrame()`,** with everything the
-  edit affects (`Difference.complete()`). `MapSystem` does this for `stagingchange`. The layer
-  draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
-- **For data that arrived, `scene.dataArrived('osm', ids)` and `gfx.requestFrame()`.**
+- **`scene.setClass()`, `unsetClass()` and `clearClass()` ask for a frame themselves:** don't
+  follow them with a redraw request. The scene tells the layers which data changed class, and
+  the OSM layer draws that data's features again without its pass
+  (`PixiLayerOsm._renderChanged()`): a hover in Užice costs 3 ms of APP that way, and 175 with
+  `immediateRedraw()`.
+- **For an edit, `scene.dataChanged('osm', ids)`,** with everything the edit affects
+  (`Difference.complete()`). It asks for a frame. `MapSystem` does this for `stagingchange`. The
+  layer draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
+- **For data that arrived, `scene.dataArrived('osm', ids)`,** which asks for a frame too.
   `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
   A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
 - **Destroy the Pixi objects you replace.** `removeChildren()` and assigning a new
@@ -275,8 +276,7 @@ chunk, …) are defined in its "Words used here": use them that way. The rules t
 - **Every change to what a layer draws needs a redraw request.** Moving the view doesn't make one,
   and the OSM layer skips its pass on frames that come only from a move. Marking features dirty
   (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their layer do its next pass, but doesn't
-  ask for a frame. Changing a class (`scene.setClass()`) tells the layers which data it was, and
-  doesn't ask for a frame either: follow it with `gfx.requestFrame()` (above).
+  ask for a frame. (Changing a class, `dataChanged()` and `dataArrived()` do ask for one: above.)
 - **A layer that can skip its pass gathers by `frame.cullBox`, not by the view.** The box is the
   view and padding around it. Call `this.keepFeatures(frame)` in `render()`, after anything that
   must happen on every frame (asking the service for the view's tiles), and return if it says

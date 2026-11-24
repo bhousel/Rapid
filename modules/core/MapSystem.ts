@@ -144,11 +144,10 @@ export class MapSystem extends AbstractSystem {
                   filters?.clearEntity(entity);
                 }
               }
-              // A frame, not a redraw of everything: the OSM layer makes and draws what arrived
-              // as its frames have time. (`entityIDs` is everything on the tile, also what we had
+              // A frame, not a redraw of everything (`dataArrived` asks for one): the OSM layer
+              // makes and draws what arrived as its frames have time. (`entityIDs` is everything on the tile, also what we had
               // already, and what the new data reshaped. See `PixiLayerOsm.dataArrived`.)
               scene.dataArrived('osm', entityIDs);
-              gfx.requestFrame();
             } else {
               gfx.deferredRedraw();
             }
@@ -164,10 +163,10 @@ export class MapSystem extends AbstractSystem {
                 filters?.clearEntity(entity);  // clear feature filter cache
               }
             }
-            // (A frame, not a redraw of everything: the OSM layer draws what the edit affects, and
-            // a drag makes an edit on every pointer move. See `PixiLayerOsm._renderChanged`.)
+            // (A frame, not a redraw of everything: `dataChanged` asks for one. The OSM layer draws
+            // what the edit affects, and a drag makes an edit on every pointer move. See
+            // `PixiLayerOsm._renderChanged`.)
             scene.dataChanged('osm', [...complete.keys()]);
-            gfx.requestFrame();
           })
           .on('historyjump', (prevIndex: number, currIndex: number) => {
             this._historyJumped(prevIndex, currIndex);

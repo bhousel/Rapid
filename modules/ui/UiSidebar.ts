@@ -282,9 +282,7 @@ export class UiSidebar {
         scene.setClass('hover', dataID);
       }
     }
-
-    // A frame, not a redraw of everything: the scene told the layers which data changed class.
-    gfx.requestFrame();
+    // (A frame, not a redraw of everything: the scene asks for one when a class changes.)
   }
 
 
