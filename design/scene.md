@@ -5,7 +5,9 @@ mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines a
 tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
 two batches a level, every casing and then every stroke, its areas in two, every fill and
 then every outline, and its points in one; a feature that its batches draw isn't in the scene
-(Nov 23). Every other layer that draws data does the same since Nov 24. Section 4 is ideas with nothing built.
+(Nov 23). Every other layer that draws data does the same since Nov 24. Section 4 (a scene per
+view, for the minimap and the turn restriction editor) is a plan, and section 5 is ideas; nothing in
+either is built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -372,7 +374,110 @@ What it changed (dev build, from tapes; DRAW in ms):
   touches a big group. *(Done, Nov 23: halos are one batch in the `ui` group, and a hover's glow is
   in a small batch beside what it's around. See "Hovers, selections and animation draws" in `graphics-system.md`.)*
 
-## 4. Later
+## 4. A scene per view (planned, Nov 25)
+
+Rapid draws OSM data in one place, the main map, but it has had two other views: the minimap, and
+iD's turn restriction editor, a small map in the sidebar of the intersection around a selected
+vertex. The minimap draws through a mock `gfx` and a mock scene (`UiMinimap.initAsync()`), and the
+turn restriction editor was never brought back after the move to Pixi: `UiFieldRestrictions` renders
+an empty container, and `UiSectionPresetFields` doesn't make it. The plan is for a `PixiScene` to be
+one view, and for `GraphicsSystem` to run several.
+
+### What a scene owns, and what `GraphicsSystem` keeps
+
+- **A scene owns its view:** its canvas, stage, `origin`, viewport, the layers it draws (a list
+  given when it's made, not all of them), its `PixiEvents`, its classes (a hover or a selection
+  in one view isn't one in another), its cull box and its hit index.
+- **`GraphicsSystem` keeps what's shared:** the Pixi application and renderer, the textures, and the
+  one frame loop, which draws each scene that asked for a frame. What only the main map needs stays
+  with the main scene: frame pacing, deadlines, the held-frame CSS transform on the
+  `supersurface`, labels. A small scene draws when it's dirty, and all of its features each time.
+- **Layers and features ask their scene, never the main map.** Layers already take the viewport in
+  `render(frame, viewport)`. What still reaches for the main map: `context.viewport` (in
+  `AbstractPixiLayer`, `PixiLayerOsm`, `PixiFeaturePolygon`, `PixiEvents`), `map.effectiveZoom`
+  and `map.wireframeMode` (in the line, polygon and point features), and `gfx.origin`,
+  `gfx.stage` and `gfx.immediateRedraw` (in the layers). `PixiLayerBackgroundTiles`'s
+  `isMinimap` goes away.
+
+### The minimap
+
+A scene with the background tile layer and a small layer for the viewport box, in place of the mock
+`gfx` and scene. Until Nov 24 the mock's `origin` was its stage, with no transform, so the tiles
+were drawn at their world coordinates, far off its canvas: it was black from the move to world
+coordinates (May) until `UiMinimap._updateOrigin()`. `test/e2e/minimap.test.js` checks that a tile
+covers the middle of its canvas.
+
+### The turn restriction editor
+
+What it needs is still here, except the drawing:
+
+- **Data:** `osmIntersection()` (`modules/lib/intersection.ts`) builds a graph of its own: the
+  roads within a distance of the vertex, split at the key vertices, with `__from`, `__via` and
+  `__to` on each way, and the turns between them (`intersection.turns(fromWayID, maxViaWay)`).
+  Its shapes are that graph's (`graph.geometry(way)`), so a layer can draw it like any graph.
+- **Editing:** `actionRestrictTurn`, `actionUnrestrictTurn` and `osmInferRestriction()`. Clicking
+  a turn cycles it from allowed to NO to ONLY and back. A change is the intersection's own
+  `actions` (the splits, replayed on the real graph) and then the restriction.
+- **The old field**, 644 lines kept commented out until `c0fa4837e` (Aug 2026), has the clicks,
+  the hints, the distance and via-way controls and the viewport: fitted to the key vertices, up
+  to z22, the sidebar's width less 50 px by 370 px, with 35 px at the top for the hint. Only its
+  drawing (`svgLines`, `svgVertices`, `svgTurns`) was built on what was removed.
+- **Icons:** `svg/rapid-sprite/turns/`.
+
+The plan:
+
+- **A layer of its own** (`PixiLayerIntersection`, say), not `PixiLayerOsm`: the OSM layer draws
+  the editor's graph, through its spatial index, tiles and cull box, with everything editing needs.
+  This one draws the intersection's ways with `PixiFeatureLine` in the usual road styles, the key
+  vertices with `PixiFeaturePoint`, and the turns as sprites: tens of features, all drawn each time.
+- **The field owns the scene:** it makes it when it renders, destroys it when it goes away, and
+  stops drawing while it's collapsed. A change to the editor's graph builds the intersection again;
+  a resize of the sidebar fits the viewport again.
+- **Clicks and hovers come from the scene's own events and hit index.** The chosen "from" way is a
+  class in that scene, not the map's selection. `osmInferRestriction()` takes the scene's viewport.
+- **Bring back** its settings (`ui.restrictions.maxDistance` and `viaWay0`: `UiSystem` unregisters
+  them now, though `SettingsSystem` still migrates them from iD's keys), and make the field again in
+  `UiSectionPresetFields`.
+
+### Renderers, and `multiView`
+
+A view that shares a renderer with another needs `multiView`, which is a setting of the whole
+renderer: Pixi draws into a hidden WebGL canvas and copies the result onto each view's canvas with a
+2D `drawImage()` after every render. For the main map that copy costs 1.5 to 2 ms a frame on the M4
+(section 6 of `graphics-system-log.md`), and more with more pixels.
+
+- **A renderer per small view doesn't work with the textures as they are.** `AtlasItem.uploaded` is
+  one flag, not one per renderer: whichever renderer uploads an item first marks it done, and the
+  other never gets it. And at high quality the atlas pages are 8192² (256 MB each), with the main
+  map's tiles and symbols in them. Pixi's own textures would be fine: in 8.23 a `TextureSource`
+  keeps its GPU data per renderer (`_gpuData[renderer.uid]`).
+- **The plan: the main map on a renderer of its own, without `multiView`, and one second renderer,
+  with it, for every small view.** Two WebGL contexts however many small views there are (three
+  with the 3D map), and the copy only for small canvases. The second renderer gets its own
+  `PixiTextures`, with small atlases (1024² or 2048²) holding only what its views use, so
+  `PixiTextures` becomes something made per renderer rather than one on `gfx`. Destroy a renderer
+  without `releaseGlobalResources`, which would release Pixi's pools that the other one shares.
+- **Not these:** Pixi's canvas renderer (back in 8.23) needs no second context, but our imagery
+  filters are shaders and wouldn't run there (CSS filters on the canvas could stand in, so it's
+  the fallback if a second context costs something). Drawing a small view through the main
+  renderer and reading its pixels back stalls the GPU, on every frame of a pan for the minimap.
+  Drawing the minimap inside the main canvas moves it with the held frame's CSS transform.
+
+### Order
+
+1. **A scene per view, with the minimap as one.** Most of the refactoring, on one renderer with
+   `multiView` still on, and the mock `gfx` goes.
+2. **The turn restriction editor**, as a third scene. Mostly new code (its layer, the field), and
+   the old logic ported.
+3. **Measure the copy on weak hardware, then split the renderers** if it's worth it. The log's
+   section 6 measured the M4, which hides GPU costs. It also found that its timer-query bursts didn't
+   work with `multiView` off; find out why before trusting new GPU numbers. Then `bun run measure
+   --fresh` for an empty frame and a pan, with the minimap shown and without.
+
+Checks to add: that a small view's textures aren't the main atlas's pages, and that the main
+renderer's context canvas is the `surface`.
+
+## 5. Later
 
 - **Reordering spatial IDs.** With an explicit `zIndex` per spatial container, lifting OSM above the
   datasets while drawing, or a layer-order UI, is a `zIndex` write. We don't reorder while drawing by

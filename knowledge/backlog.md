@@ -121,8 +121,12 @@ said otherwise. Biggest or most wanted first.
   tenth fewer labels than with boxes, not all of it the 2 px cells. Labels on long lines walk the whole
   line (five transatlantic cables at Smith Point: 350 ms a zoom; clip to the view before
   `placeRopeLabel()`).
-- **GPU time is mostly fixed costs** (section 6): render without `multiView` and give the minimap its
-  own copy (1.5 to 2 ms); decide whether device pixel ratio 2 needs MSAA (4 ms; compare screenshots).
+- **GPU time is mostly fixed costs** (section 6): render without `multiView` (1.5 to 2 ms), which
+  needs the small views on a renderer of their own (the plan is in [`design/scene.md`](../design/scene.md)
+  section 4); decide whether device pixel ratio 2 needs MSAA (4 ms; compare screenshots).
+- **A scene per view, and the turn restriction editor back** ([`design/scene.md`](../design/scene.md)
+  section 4): `GraphicsSystem` runs several `PixiScene`s; the minimap becomes one (no more mock
+  `gfx`), and the turn restriction editor, missing since the move to Pixi, a third.
 - **Small things from the cull box** (section 8): vertices appear at effective zoom 16, which depends on
   latitude, so a north-south pan across that line shows them up to 256 px late; a held frame during a
   zoom could be drawn at the new zoom in place of the CSS transform.
@@ -148,7 +152,7 @@ said otherwise. Biggest or most wanted first.
 - **Profiling pass** ([`design/profiling.md`](../design/profiling.md)): baselines for heap, GPU resources,
   the worker heap and listeners, and a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and
   reports what grows.
-- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 4): reordering spatial IDs (lift
+- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 5): reordering spatial IDs (lift
   OSM while drawing, or a layer-order UI); snapping by distance instead of by what's drawn on top, so
   it doesn't depend on stroke width and z-order (the OSM layer's features are found through the
   spatial index since Nov 23, with the answer Pixi gave, and every other layer's that draws data
