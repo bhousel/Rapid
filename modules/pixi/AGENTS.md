@@ -27,7 +27,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 - **Features draw in z16 world coordinates**, under the `origin` container (which scales them), positioned at
   their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
   counter-scale to stay screen-sized (a batch's shader does that for what's in it). The skill's screen-pixel examples need converting. See
-  "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
+  "Pixi World-Coord Rendering" in [`knowledge/decisions/rendering.md`](../../knowledge/decisions/rendering.md).
 - **A line's casing and stroke, and an area's outlines, are drawn from stroke meshes**
   (`geomStrokeMesh()` in `modules/geo/stroke.ts`, built once for any width), not by `Graphics`.
   Build a stroke mesh only when the line, its cap or its join changes (the feature's

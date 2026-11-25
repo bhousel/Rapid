@@ -3514,7 +3514,7 @@ settles how typed arrays reach Pixi before the hard geometry starts.
 - **Snapping by distance.** The pointer finds the OSM layer's features through the spatial index
   (step 6), and each still answers with its drawn hit area, in drawing order. Choosing the
   nearest line, or a vertex before a line, is a redesign of hover and snapping
-  ([`scene.md`](scene.md) section 4).
+  ([`scene.md`](scene.md) section 5).
 - **The other layers' features are still found by Pixi's walk.** Rapid's datasets, custom data,
   photos and QA items: few features next to OSM's, until a dataset of buildings is on.
   A layer takes its own with `scene.setHitTester()` and a `hitTest()` like the OSM layer's.

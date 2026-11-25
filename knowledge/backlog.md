@@ -35,18 +35,17 @@ said otherwise. Biggest or most wanted first.
 
 - **Garbage collection is the longest stall left** (section 13). A major collection is 420 to 480 ms of
   the main thread, every 12 s of zooming. Left, by size: (1) Pixi's line builder was a quarter of what a
-  zoom allocates: done on `linebuilder_refactor` (section 15, steps 3 to 5: a zoom allocates half of what it
+  zoom allocates: done in PR #12 (section 15, steps 3 to 5: a zoom allocates half of what it
   did, and nothing of ours calls `buildLine` now; what Pixi still builds at every zoom is the areas' fills); (2) the 1.7 GB alive: a full copy of the style per feature (51 MB, below),
   a way's coordinates kept three times as arrays of pairs (`Float64Array`s would take a quarter), and
   an `Extent` each on a `Geometry` and its part; (3) Pixi's `syncShader` polyfill allocates on every
   draw call (5%, upstream); (4) a tile label string per feature drawn (4%); (5) whether the scheduler's
   long tail after a load leaves V8 idle time to collect in.
-- **A line builder of our own** (sections 4, 7 and 15; Bryan: "I really want this"). Done on
-  `linebuilder_refactor`: section 15's whole order of work (Nov 22 and 23) but the worker,
-  which was skipped. The OSM layer's lines, areas, points and line markers are drawn by three
-  kinds of batch with shaders of our own, in 13 to 22 draw calls where there were 279 to 672,
-  and none of them is in Pixi's scene. Left: section 15's open questions, the items around
-  this one, and merging the branch.
+- **Left from the `/sharpen` review** (Nov 24), for Bryan to pick: the features' two ways of
+  drawing (batch or own objects), the near-duplicate QA and photo layers, label rasterization out
+  of `PixiLayerLabels`, a class for `AbstractPixiLayer`'s data bindings, `triangulate()` and
+  `ringsContain()` to `modules/geo/`, splitting `GraphicsSystem._app()`, and a sentence for each
+  class's job in the READMEs.
 - **Features keep a full copy of their style, and matching makes two** (Bryan: "this could be better").
   `styleMatch()` returns a copy, and `feature.style =` merges it with the defaults into another: 14% of
   the APP time of making features. `styleMatch()` once returned the base style by reference and

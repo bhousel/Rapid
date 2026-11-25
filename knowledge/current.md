@@ -13,8 +13,9 @@ pinhead stays at 15). Careful with `cloc`: its real versions end in `-cloc`, so 
 "upgrades" `2.12.0-cloc` to a 2022 `2.11.0`.
 
 Still to do:
-- **`bunfig.toml`'s `minimumReleaseAgeExcludes`**: country-coder and location-conflation are past the
-  3-day window now and can come off the list.
+- **`bunfig.toml`'s `minimumReleaseAgeExcludes`**: country-coder, location-conflation and
+  name-suggestion-index (9, Nov 22) are past the 3-day window now and can come off the list; check
+  the `@rapid-sdk` packages too.
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
   `directionalCombo`, which Rapid doesn't support (iD's rename and generalization of the `cycleway` field;
@@ -32,74 +33,18 @@ Still to do:
 - **`RELEASE.md`** still describes Facebook's release flow (`deploy.yml`, facebook/Rapid links).
 
 ## Rendering: what's next
-`pixi-8.23` (PR #10), `label-avoids` (PR #11) and `linebuilder_refactor` (PR #12) are merged
-(`completed.md`). How the renderer works is in [`design/graphics-system.md`](../design/graphics-system.md),
-and the measurements and plans behind it in [`design/graphics-system-log.md`](../design/graphics-system-log.md).
-What's left is under "Pixi rendering follow-ups" in `backlog.md`.
-
-**Active, on `graphics-sharpen`: a `/sharpen` pass over the renderer** (Bryan, Nov 24; not pushed,
-no PR yet). Done, a commit each:
-- Names and words: the batch classes are `BatchMesh` and `LineBatchMesh`, `FillBatchMesh`,
-  `PointBatchMesh`; a **tick** is a `requestAnimationFrame` callback, a **frame** everything
-  needed to draw the map once, **APP and DRAW are phases**, a **pass** is a layer's walk over its
-  data, an **animation draw** a DRAW with no frame. All defined in "Words used here" in
-  `design/graphics-system.md`. "Batch" alone means ours; Pixi's is always "Pixi's batch".
-- `GuillotineAllocator` (was misspelled) and `AtlasTextureSource`.
-- The scene asks for a frame itself when a class or data changes.
-- Classes of their own for the batches' shaders (`BatchShaders`), a layer's batches
-  (`LayerBatches`) and label space (`LabelSpace`).
-- Redraw requests name their layer when only one layer's drawing changed (39 of 53).
-- The design doc split into how it works now and a log (Nov 24).
-- Every layer that draws data draws in batches, and finds its own features under the pointer
-  (`AbstractPixiLayer.updateFeature()` with a container, and `hitTest()`; the log's section 16). With photos and
-  detections on in Bellevue, a pan's DRAW went from 22.6 to 1.5 ms.
-- Every data layer keeps its features while the view moves inside the cull box (the log's section
-  17): a pan frame there is 0.8 ms of APP where it was 22. The photo filters had stopped asking
-  for any frame, and now ask their layers for a redraw.
-- They follow the cull box too, gathering only the strips it moved over, and cull what it left
-  behind when a frame has time (Bryan's idea: CULL as its own stage; the log's section 18). The
-  frame where the view leaves the box is 26 to 35 ms at worst in Bellevue, where it was 90.
-- `SpatialSystem` says what changed in its caches (`datachange`), and the layers draw what arrived
-  without a pass; the services stopped asking for redraws. The OSM layer listens to the editor
-  itself, and `FilterSystem` clears its own cache (the log's section 19).
-- Measured what culling leaves for the collector (the log's section 20): the destroying is small
-  and spread out, but hidden features are kept for 20 moves however many there are (147 MB after
-  one long pan). Next, for Bryan to pick: a bounded queue destroyed as frames have time, or a pool.
-
-Left from the review, for Bryan to pick: the features' two ways of drawing (batch or own
-objects), the near-duplicate QA and photo layers, label rasterization out of `PixiLayerLabels`,
-a class for `AbstractPixiLayer`'s data bindings, `triangulate()` and `ringsContain()` to
-`modules/geo/`, splitting `GraphicsSystem._app()`, and a sentence for each class's job in the
-READMEs.
-
-**Merged in PR #12 (Nov 24): a line builder of our own** (section 15 of the log has the direction, the
-order of work, Bryan's decisions and the measurements): steps 1 to 6 and 8 to 10; step 7 (a
-worker) was skipped as probably unnecessary (Bryan).
-- The OSM layer's lines, areas and points are drawn in batches with shaders of our own
-  (`modules/pixi/lib/`: `LineBatchMesh`, `FillBatchMesh`, `PointBatchMesh`), from stroke meshes and bands
-  built once (`modules/geo/stroke.ts`, `band.ts`). A zoom changes nothing in a batch. The
-  layer finds its features under the pointer through the spatial index. Seattle is 20 draw
-  calls where it was 385.
-- **Step 10 (Nov 23): hovers and selections in the shaders, animated.**
-  - A hover's glow is a strip (lines, areas) or a picture (points) in a small batch of glows;
-    a selection's halo is two marching lines for each ring in the map UI layer's batch. No
-    OSM feature is in Pixi's scene for a hover or a selection, and none has a filter.
-  - While something is hovered or selected the scene is drawn again 20 times a second
-    (`AnimationPacer`): less on a machine that doesn't keep up, not after 30 seconds without
-    a change, never with `prefers-reduced-motion`. Bryan has seen it and wouldn't change
-    anything (Nov 23); the numbers are still first guesses.
-  - A midpoint points the way its line is drawn, whatever `oneway=-1` says (Bryan asked).
-  - The map was black under `renderer=webgpu` on the way (a WGSL reserved word); fixed, and
-    WebGPU's atlas uploads are premultiplied now.
-
-Next: nothing of section 15's order of work is left. Candidates, for Bryan to pick: numbers
-from weaker hardware (the animation's pacing is untested where the GPU is slow), animation
-draws that don't draw the whole scene, the other layers' features in batches (`backlog.md`).
-Bryan (Nov 23): fewer draw calls are a result in themselves, since the M4 we measure on hides
-their cost. `renderer=canvas` is blank since the lines became meshes, and stays that way
-(`quirks.md`).
-
-Waiting on Pixi: pixijs#12437 (every `LineMesh` is always batched until it's fixed).
+`pixi-8.23` (PR #10), `label-avoids` (PR #11), `linebuilder_refactor` (PR #12) and `graphics-sharpen`
+(PR #13, Nov 25) are merged (`completed.md`). How the renderer works is in
+[`design/graphics-system.md`](../design/graphics-system.md), and the measurements and plans behind it in
+[`design/graphics-system-log.md`](../design/graphics-system-log.md). What's left is under "Pixi rendering
+follow-ups" in `backlog.md`, for Bryan to pick. Nothing is active.
+- **Planned, for later** (Bryan, Nov 25): a scene per view, with the minimap as one and the turn
+  restriction editor back, then the main map off `multiView` ([`design/scene.md`](../design/scene.md)
+  section 4).
+- **On hold** (Bryan, Nov 24): how many hidden features are kept (147 MB after 50 pans in Bellevue).
+  Making features makes more garbage than destroying them (the log's section 20).
+- **Waiting on Pixi:** pixijs#12437 (every `LineMesh` is always batched until it's fixed).
+- `renderer=canvas` is blank since the lines became meshes, and stays that way (`quirks.md`).
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first

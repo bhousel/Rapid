@@ -4,6 +4,27 @@ Newest first, by month. Details live in git history and the design docs; these a
 
 ## November 2026
 
+- **Every data layer works like the OSM layer** (Nov 25 2026, PR #13, `graphics-system-log.md`
+  sections 16 to 20) — the photo, detection, QA, Rapid, custom data and GeoScribble layers draw in
+  batches, find their own features under the pointer, keep their features while the view moves,
+  follow the cull box by the strips it moved over, and hide what it left when a frame has time.
+  `SpatialSystem` reports what changed in its caches (`datachange`), so data that arrives is drawn
+  without a pass, and the services stopped asking for redraws. In Bellevue with photos on, a pan's
+  DRAW went from 22.6 to 1.5 ms, its APP from 22 to 0.8, and the worst frame of a pan from 90 to
+  26–35 ms. It began as a `/sharpen` pass: settled names (`BatchMesh`; tick, frame, phase, pass),
+  owners for the batch shaders, a layer's batches and label space, and layers named in redraw
+  requests. Also: the minimap draws again (black since the move to world coordinates in May), and
+  the design doc split into how it works now and a log.
+
+- **A line builder of our own** (Nov 23 2026, PR #12, `graphics-system-log.md` section 15) — the
+  OSM layer's lines, areas and points are drawn in a few batches with shaders of our own, from
+  stroke meshes and bands built once (`modules/geo/stroke.ts`, `band.ts`); partial fills are real
+  geometry, not stencil masks; a line is hit by its distance; oneway arrows come from the lines'
+  shader; hovers and selections are drawn by the shaders, and move. Seattle went from 385 draw
+  calls to 20, and sixteen zooms in Užice allocate 2.9 GB where they took 13.7.
+
+- **id-tagging-schema 7.3 and name-suggestion-index 9** (Nov 22 2026, Bryan) — pinhead stays at 15.
+
 - **Partial fill masks are always batched** (Nov 20 2026) — a mask that crossed Pixi's 100-vertex
   batching line in a frame where its tile was rebuilt crashed every later frame that moved the tile
   (seen loading Newark). Same cause as Rapid#1636, whose workaround had been removed in May when
@@ -38,7 +59,7 @@ Newest first, by month. Details live in git history and the design docs; these a
   dev build in Chromium: startup with no console errors, OSM data drawn, the 3D map, selecting a road,
   drawing a line and undoing it, adding a Rapid dataset feature. Requests are live, recorded in a HAR,
   stubbed or blocked, by host. CI runs them on every PR to `main` (about 2 minutes). `test/browser`
-  became `test/dom` (it needed a DOM, not a browser), and mocha is gone. See `decisions.md`.
+  became `test/dom` (it needed a DOM, not a browser), and mocha is gone. See `decisions/tooling.md`.
 
 - **OSM tiles no longer load their `bounds` as an entity** (Nov 18 2026, PR #8) — found by the first e2e
   startup test. Since the `skipSeen` removal (Oct), `EditSystem.merge` had made the map response's
@@ -51,7 +72,7 @@ Newest first, by month. Details live in git history and the design docs; these a
 - **CDN pins come from `package.json`** (Nov 18 2026) — `utilCDNPath()` and `utilDependencyVersion()` in
   `modules/util/dependencies.ts`. What users loaded had drifted from what was installed and tested
   (MapLibre 5.15 vs 5.24, id-tagging-schema 6.6 vs 6.19, osm-community-index 5.9 vs 6.2). See
-  `decisions.md`.
+  `decisions/tooling.md`.
 
 - **Dependency checkup** (Nov 18 2026) — removed `@pixi/jsdoc-template` and `@mapbox/geojson-area`
   (unused); happy-dom 21, geojson-vt 5, cssnano 9, @transifex/api 8 and in-range updates; current
@@ -76,7 +97,7 @@ Newest first, by month. Details live in git history and the design docs; these a
   all passed, plus ~220 random UI steps with invariant checks. Its one bug (matched Rapid lines taking
   the pointer in draw mode) became the scene work; the rest is in `backlog.md`.
 
-- **The scene stacks by spatial ID, and a mode says what the pointer can reach** (Nov 11 2026, `design/scene.md`) — every layer draws under `<group>/<spatialID>` (`basemap/osm/lines/<level>`, `points/<dataset>`, `qa/<layer>`), never straight into a group, and `AbstractMode.interactiveSpatialIDs` (`['osm']` for draw, add-point and drag-node) has the scene skip the other subtrees. Fixes drawing not connecting to the OSM line under an already-mapped Rapid line, a photo marker or a QA item (pre.4 release check). Checked live on agency sidewalk data: 22 of 22 OSM midpoints hit in draw mode (was 39 of 50), browse unchanged. See `decisions.md`.
+- **The scene stacks by spatial ID, and a mode says what the pointer can reach** (Nov 11 2026, `design/scene.md`) — every layer draws under `<group>/<spatialID>` (`basemap/osm/lines/<level>`, `points/<dataset>`, `qa/<layer>`), never straight into a group, and `AbstractMode.interactiveSpatialIDs` (`['osm']` for draw, add-point and drag-node) has the scene skip the other subtrees. Fixes drawing not connecting to the OSM line under an already-mapped Rapid line, a photo marker or a QA item (pre.4 release check). Checked live on agency sidewalk data: 22 of 22 OSM midpoints hit in draw mode (was 39 of 50), browse unchanged. See `decisions/rendering.md`.
 - **A data ID's first part is its `spatialID`** (Nov 10 2026, `design/data-ids.md` Terms) — the data prop `namespace` is now `spatialID`, like the `SpatialID` type, `SpatialSystem`'s parameters and `RapidDataset.spatialID` (Bryan found "namespace" confusing: it's the spatial cache's ID, or a resolver's for OSM and vector tiles). Code, tests and docs; data IDs themselves didn't change.
 
 - **Mapillary traffic signs have their own cache** (Nov 10 2026, `design/data-ids.md`) — `mapillary-signs`, apart from the other detections. A sign's data ID starts with that cache ID, and the layer has the same ID, so a link to a sign turns on the signs layer, and nothing guesses the layer from `object_type`. Signs' data IDs changed (no shim, per the pre.4 plan).
@@ -85,17 +106,17 @@ Newest first, by month. Details live in git history and the design docs; these a
 
 - **A new changeset when OSM closed the open one** (Nov 10 2026, `design/uploader-system.md` "A closed changeset") — the service forgets a changeset the API says is closed (it used to keep it, so every save got the same 409 until a reload), and the uploader uploads again in a new changeset, once.
 
-- **Settings declare how they're kept** (Nov 10 2026, `design/settings-system.md` "What syncs") — `registerSync`, `registerLocal` and `unregister`, like Chrome or VS Code. The sync deletes the account's copies of local and retired settings and v1's `meta`; unknown keys are left alone. `imagery.lastUsed` and `imagery.overlays` sync; datasets stay local. See `decisions.md`.
+- **Settings declare how they're kept** (Nov 10 2026, `design/settings-system.md` "What syncs") — `registerSync`, `registerLocal` and `unregister`, like Chrome or VS Code. The sync deletes the account's copies of local and retired settings and v1's `meta`; unknown keys are left alone. `imagery.lastUsed` and `imagery.overlays` sync; datasets stay local. See `decisions/data.md`.
 
-- **Second bug hunt** (Nov 4–10 2026, `/bughunt`) — 40 findings before handing the branch to testers, all fixed except the conflation ones (now "Known bugs" in `design/conflation-system.md`): the database upgrade blocked by another tab, upload marks and "can't tell" uploads, conflict choices on shared nodes, redacted base versions, settings sync, the selection after undo and redo, custom-data links, walkthrough sessions, MapRoulette (auth turned off: MapRoulette expired the keys), layer parent-child links and midpoints, editing between an upload and the reset, arrow keys, validating the nodes next to a connection, building crossings, curbs on short crossings. Clean coverage: 400 seeds × 250 steps of random `EditSystem` histories with 2,432 backup round trips, and two live soaks on Seattle data. See `decisions.md`.
+- **Second bug hunt** (Nov 4–10 2026, `/bughunt`) — 40 findings before handing the branch to testers, all fixed except the conflation ones (now "Known bugs" in `design/conflation-system.md`): the database upgrade blocked by another tab, upload marks and "can't tell" uploads, conflict choices on shared nodes, redacted base versions, settings sync, the selection after undo and redo, custom-data links, walkthrough sessions, MapRoulette (auth turned off: MapRoulette expired the keys), layer parent-child links and midpoints, editing between an upload and the reset, arrow keys, validating the nodes next to a connection, building crossings, curbs on short crossings. Clean coverage: 400 seeds × 250 steps of random `EditSystem` histories with 2,432 backup round trips, and two live soaks on Seattle data. See `decisions/data.md`.
 
-- **The url holds overrides, not state** (Nov 9 2026, `design/settings-system.md` Step 1 bullets) — Rapid only writes `map`, `id`, `photo` and `detection` as you go. Every other param (layers, filters, imagery, datasets, photo filters, MapRoulette challenges, `map3d`) is read, stays as the link had it until the state no longer matches, then is dropped; changes are saved one at a time. New `imagery.overlays` setting; the system saves `imagery.lastUsed`. See `decisions.md`.
+- **The url holds overrides, not state** (Nov 9 2026, `design/settings-system.md` Step 1 bullets) — Rapid only writes `map`, `id`, `photo` and `detection` as you go. Every other param (layers, filters, imagery, datasets, photo filters, MapRoulette challenges, `map3d`) is read, stays as the link had it until the state no longer matches, then is dropped; changes are saved one at a time. New `imagery.overlays` setting; the system saves `imagery.lastUsed`. See `decisions/data.md`.
 
 - **First bug hunt** (Nov 3 2026, `/bughunt`) — 36 findings before handing the branch to testers, all fixed: iD#2085 restores per graph, sessions per API, the conflict screen's choices and Cancel, conflation runs as their own data, QA editors that keep their state while typing, undo during drag and draw, stable IDs in links and backups.
 
 - **One autofix runner** (Nov 2 2026, `design/validation-system.md` rollout item 5) — `actionAutofix` applies one fix at a time and validates again, for autoconnect and Autofix All (`ValidationSystem.autofixAction`, which finds the shown issues again by kind and entities, via `issue.foundOnID`). Closes the validation audit.
 
-- **Graph versions and their geometry** (Oct 30 – Nov 2 2026, `design/graph-geometry.md` steps 0–10) — Fixed validation audit findings 1 (shared geometry) and 2 (wrong spatial index) by construction. Graphs share structure (`PersistentVector` records, O(1) derive, structural diffs), emit from a change journal, keep their own shapes, and catch up with rebases and schema changes (`syncWithBase()`). Backups hold each edit's own changes. One base spatial index plus local indexes for stable and staging, searchable for any graph (`editor.entitiesInBox`). No data changed in place: `touch()` gone, every layer rebinds by object. Reference model test in `test/unit/lib/graph_model.test.js`. Step 7 (memos in records) measured and left for later. See `decisions.md`.
+- **Graph versions and their geometry** (Oct 30 – Nov 2 2026, `design/graph-geometry.md` steps 0–10) — Fixed validation audit findings 1 (shared geometry) and 2 (wrong spatial index) by construction. Graphs share structure (`PersistentVector` records, O(1) derive, structural diffs), emit from a change journal, keep their own shapes, and catch up with rebases and schema changes (`syncWithBase()`). Backups hold each edit's own changes. One base spatial index plus local indexes for stable and staging, searchable for any graph (`editor.entitiesInBox`). No data changed in place: `touch()` gone, every layer rebinds by object. Reference model test in `test/unit/lib/graph_model.test.js`. Step 7 (memos in records) measured and left for later. See `decisions/data.md`.
 
 ## October 2026
 
@@ -124,9 +145,9 @@ Newest first, by month. Details live in git history and the design docs; these a
   registered settings sync to the OSM account; custom datasets and changes to shipped datasets are
   kept in the `DatabaseSystem` `datasets` store.
 
-- **OSM features lost after a cancelled request** (Oct 2026) — Removed `skipSeen` and the parsers' seen cache (and the `osmService:reset` / `network:reset` listeners that cleared it); `EditSystem.merge` now skips entities already in the base graph instead. A tile request cancelled or timed out after the worker parsed it no longer hides its features until reload. See `decisions.md`.
+- **OSM features lost after a cancelled request** (Oct 2026) — Removed `skipSeen` and the parsers' seen cache (and the `osmService:reset` / `network:reset` listeners that cleared it); `EditSystem.merge` now skips entities already in the base graph instead. A tile request cancelled or timed out after the worker parsed it no longer hides its features until reload. See `decisions/data.md`.
 
-- **Agent tooling for Claude Code + Copilot** (Oct 2026) — Prompts → Agent Skills in `.claude/skills/` (agent-practices PR #1, then `/sync` to AGENTS.md v4). `.github/instructions/` → nested `modules/{ui,pixi}/AGENTS.md`. See `decisions.md`.
+- **Agent tooling for Claude Code + Copilot** (Oct 2026) — Prompts → Agent Skills in `.claude/skills/` (agent-practices PR #1, then `/sync` to AGENTS.md v4). `.github/instructions/` → nested `modules/{ui,pixi}/AGENTS.md`. See `decisions/tooling.md`.
 
 - **File-backed custom Rapid datasets** (Oct 2026, facebook/Rapid#1078) — `UiRapidAddDataset` file picker restored, plus a `priority: 1` `DragAndDropSystem` consumer. Files are stored through `DatabaseSystem` and referenced by `RapidDataset.sourceFileID`, and deleted with their dataset.
 
@@ -134,7 +155,7 @@ Newest first, by month. Details live in git history and the design docs; these a
 
 - **NSI startup off the main startup chain** (Oct 2026) — `NsiService` now starts on its own promise chain, so it no longer blocks Rapid startup.
 
-- **Global-symbol leak in browser bundles** (Oct 2026) — `scripts/build_js.ts` sets `format: 'iife'` on every browser bundle. Bun's default `esm` left our export-less entry points' top-level declarations on `window`, and d3-selection's `dispatchEvent` clobbered the native one. See `lessons/build.md` and `decisions.md`.
+- **Global-symbol leak in browser bundles** (Oct 2026) — `scripts/build_js.ts` sets `format: 'iife'` on every browser bundle. Bun's default `esm` left our export-less entry points' top-level declarations on `window`, and d3-selection's `dispatchEvent` clobbered the native one. See `lessons/build.md` and `decisions/tooling.md`.
 
 - **`DatabaseSystem` phase 4, storage management** (Oct 2026) — `estimateQuotaAsync` / `canStoreAsync` / `requestPersistentAsync`. Write-time per-store stats counters were tried and reverted (a `JSON.stringify` on the hot path, and drift on overwrites). See `design/database-system.md`.
 
@@ -143,12 +164,12 @@ Newest first, by month. Details live in git history and the design docs; these a
 - **TypeScript conversion of `modules/` complete** — every folder is TS. Only the entry points (`index.js`, `main_dev.js`, `main_prod.js`, `headless.js`) and the 2 quarantined React-demo `ui/sections/*.jsx` remain JS.
 - **`DatabaseSystem` + `DragAndDropSystem`** (facebook/Rapid#1078, `design/database-system.md`, `design/draganddrop-system.md`) — an IndexedDB store (`idb`) with a manifest-driven schema; edit backups go to IndexedDB, `UiRestore` lists sessions, and a heartbeat keeps tabs from offering each other's live sessions; files are stored as Blobs; drops go through a claim-based registry.
 - **`KeyboardSystem`** (`design/keyboard-system.md`) — `utilKeybinding` became a system with named scopes that can be turned on and off; one callback per key event across all scopes, matching on `event.key` only. Remapping phases 2–3 are in `backlog.md`.
-- **Operations are `ThingOperation` classes** — 17 factories became `AbstractOperation` subclasses with `run()` and an `operations.available` registry. See `decisions.md`.
+- **Operations are `ThingOperation` classes** — 17 factories became `AbstractOperation` subclasses with `run()` and an `operations.available` registry. See `decisions/architecture.md`.
 - **UI rerender guards** — listeners call zero-arg wrappers, so an event's arguments can't be taken for a parent selection.
 
 ## August 2026
 
-- **UI primitives became classes** — `UiModal` / `UiConfirm` with the modal stack owned by `UiSystem` (Esc and Backspace go to the top modal; the nested-modal hacks are gone), `UiTooltip` (about 28 `any`s removed), `UiCombobox`, `UiDisclosure`, `UiLoading`. `d3_dispatch` and `utilRebind` were replaced by `EventEmitter` (tseep) everywhere. See `decisions.md`.
+- **UI primitives became classes** — `UiModal` / `UiConfirm` with the modal stack owned by `UiSystem` (Esc and Backspace go to the top modal; the nested-modal hacks are gone), `UiTooltip` (about 28 `any`s removed), `UiCombobox`, `UiDisclosure`, `UiLoading`. `d3_dispatch` and `utilRebind` were replaced by `EventEmitter` (tseep) everywhere. See `decisions/architecture.md`.
 - **UI fields: inheritance over composition** — the 14 `UiFieldX` classes extend `UiField`, built by `createUiField()`; this broke an import cycle. `UiFieldRestrictions` is a stub until the turn-restriction editor is redone in Pixi.
 - **UI modernization Phases 6, 7 and 9** — `modules/ui/` is all TypeScript. Fixed the `UiCurtain` `botom` typo (the bottom-toolbar trim never applied).
 

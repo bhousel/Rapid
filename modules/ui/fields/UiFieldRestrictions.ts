@@ -15,7 +15,8 @@ import type { UiFieldOptions } from './AbstractUiField.ts';
  * system (`svgLayers`/`svgVertices`/`svgLines`/`svgTurns`), which was removed in favor of Pixi.
  * Until that preview is reimplemented, `render` only creates an empty placeholder container.
  * The field is registered in `uiFields`, but is intentionally not yet instantiated by
- * `UiSectionPresetFields`.
+ * `UiSectionPresetFields`. The plan to bring it back, as a `PixiScene` of its own, is in
+ * `design/scene.md`, section 4.
  */
 export class UiFieldRestrictions extends AbstractUiField {
   // D3 selections

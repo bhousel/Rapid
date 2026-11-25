@@ -18,6 +18,8 @@ const MAX_K = geoZoomToScale(MAX_Z);
  * `UiMinimap` renders a small overview map ("map-in-map") that floats over the
  * main map, showing the current viewport as a bounding box. It has its own Pixi scene
  * and d3-zoom behavior, and can be toggled on/off.
+ * Its scene is a mock for now; the plan to make it a real `PixiScene` is in `design/scene.md`,
+ * section 4.
  */
 export class UiMinimap {
   public context: Context;

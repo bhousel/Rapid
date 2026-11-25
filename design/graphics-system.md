@@ -4,7 +4,7 @@ How `GraphicsSystem` and the Pixi scene under it draw the map: what owns what, h
 and paced, how layers keep the work of a frame small, how features are drawn in batches with
 shaders of our own, and the decisions behind it.
 
-> **Status:** Built (Nov 2026), merged with PRs #10, #11 and #12. Pixi 8.23 is the GPU runtime: it
+> **Status:** Built (Nov 2026), merged with PRs #10 to #13. Pixi 8.23 is the GPU runtime: it
 > owns the WebGL and WebGPU state, textures, render groups and the draw calls. The frame loop, the
 > cull box, pacing, the frame's deadline, label placement, the batches and their shaders, the hit
 > test and the line builder are ours. What's left is under "Where it's heading", below, and in
@@ -1053,6 +1053,9 @@ direction, from the log's section 15:
 - **Animation draws that don't draw the whole scene:** what's still drawn to a texture once, and an
   animation draw that texture and what moves over it. Then the rate could be 60. It wants numbers
   from weak hardware first.
+- **A scene per view** ([`scene.md`](scene.md) section 4): `GraphicsSystem` running several
+  `PixiScene`s, for the minimap and the turn restriction editor, and then the main map on a
+  renderer of its own, without `multiView`'s copy of every frame.
 - **A level of detail decided by the filter** ([`filter-system.md`](filter-system.md) section 6):
   Performer's load management.
 - **Frame budgets set by the display's refresh,** and measured on other machines: 6 and 24 ms are
@@ -1089,6 +1092,6 @@ section 15, "What the other map renderers do").
 - **Color still does most of a hover's work.** Movement helps a colorblind user find it; a glow's
   yellow on a yellow road is still weak.
 - **Snapping by distance:** choosing the nearest line, or a vertex before a line, is a redesign of
-  hover and snapping ([`scene.md`](scene.md) section 4).
+  hover and snapping ([`scene.md`](scene.md) section 5).
 - **`syncShader` for each batch:** Pixi's `unsafe-eval` polyfill, which our CSP needs, sets every
   uniform again for each mesh with a shader of its own, and makes garbage doing it.
