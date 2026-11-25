@@ -3796,3 +3796,17 @@ So the fix is less about time-slicing the destroys than about how much is kept: 
 oldest hidden features first, as frames have time, and keeping about as many as a cull box shows
 (enough to pan back), would bound it. Reusing features' objects (a pool per kind) would take away
 both the making and the destroying, and is the bigger change.
+
+
+## 21. The minimap draws again (Nov 24)
+
+The minimap had been black since the layers began drawing in world coordinates (commit
+`9d46afca3`). It gives its background tile layer a mock `gfx` whose `origin` was the minimap's stage,
+with no transform, so the tiles were drawn at their world coordinates, millions of pixels off its
+200×150 canvas. Its stage now has an `origin` container under it, which `UiMinimap._updateOrigin`
+places for the minimap's viewport (`screen = (world - WORLD_HALF) * scale + translation`, as
+`GraphicsSystem` does, without the rotation), and the tile layer's group goes in that. The
+viewport box stays on the stage, in canvas pixels.
+
+`test/e2e/minimap.test.js` checks that a tile covers the middle of the minimap's canvas. The
+tests' imagery is a transparent pixel, so it looks at where the tiles are, not at the pixels.

@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { selection } from 'd3-selection';
 import { zoom, zoomIdentity } from 'd3-zoom';
-import { HALF_PI, Viewport, geoScaleToZoom, geoZoomToScale, numClamp, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
+import { HALF_PI, Viewport, WORLD_HALF, WORLD_ZOOM, geoScaleToZoom, geoZoomToScale, numClamp, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
 import { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
 
 import type { Context } from '../Context.ts';
@@ -24,6 +24,8 @@ export class UiMinimap {
 
   public viewMini: Viewport;
   public stage: any;          // PIXI.Container() that lives at the root of this scene
+  /** The container that maps world coordinates to the minimap's canvas, as the main map's `origin` does (see `_updateOrigin`) */
+  public origin: PIXI.Container | null;
   public layer: any;          // Background Tile layer for the minimap
 
   protected _isHidden: boolean;
@@ -50,6 +52,7 @@ export class UiMinimap {
 
     this.viewMini = new Viewport();
     this.stage = null;          // PIXI.Container() that lives at the root of this scene
+    this.origin = null;
     this.layer = null;          // Background Tile layer for the minimap
 
     this._isHidden = true;      // start out hidden
@@ -163,6 +166,7 @@ export class UiMinimap {
     if (!gfx.pixi || !gfx.textureManager?.loaded) return;  // called too early?
 
     this._updateTransform();
+    this._updateOrigin();
     this._updateBoundingBox();
     this._draw();
   }
@@ -274,6 +278,25 @@ export class UiMinimap {
     zoom.scaleExtent([MIN_K, geoZoomToScale(zMain - 3)]);
     this.$supersurface!.call(zoom.transform, zoomIdentity.translate(xy[0], xy[1]).scale(kMini));
     this._skipEvents = false;
+  }
+
+
+  /**
+   * Places the `origin` container for the minimap's viewport: the imagery is drawn in world
+   * coordinates under it (Mercator pre-scaled to `WORLD_ZOOM`), as on the main map, and this maps
+   * them to the minimap's canvas, the same way `GraphicsSystem` places the main map's `origin`:
+   * `screen = (world - WORLD_HALF) * scale + translation`. (The minimap doesn't turn with the map,
+   * and its stage is at `[0, 0]`.)
+   */
+  protected _updateOrigin(): void {
+    const origin = this.origin;
+    if (!origin) return;
+
+    const t = this.viewMini.transform;
+    const [x, y] = t.translation;
+    const worldScale = 2 ** (t.zoom - WORLD_ZOOM);
+    origin.position.set(x - WORLD_HALF * worldScale, y - WORLD_HALF * worldScale);
+    origin.scale.set(worldScale, worldScale);
   }
 
 
@@ -453,12 +476,19 @@ export class UiMinimap {
     gfx.on('draw', this._update);
     gfx.on('statuschange', this._onGfxStatusChange);
 
-    // Mock Stage
+    // Mock Stage, in the minimap canvas's pixels (the viewport box goes straight on it)
     const stage = new PIXI.Container();
     stage.label = 'mini-stage';
     stage.sortableChildren = false;
     stage.eventMode = 'none';
     this.stage = stage;
+
+    // ..and under it the origin, where the imagery is drawn in world coordinates (see `_updateOrigin`)
+    const origin = new PIXI.Container();
+    origin.label = 'mini-origin';
+    origin.eventMode = 'none';
+    stage.addChild(origin);
+    this.origin = origin;
 
     // Mock Graphics System
     const miniGfx: any = {
@@ -467,7 +497,7 @@ export class UiMinimap {
       supersurface: this.$supersurface!.node(),
       surface: this.$surface!.node(),
       stage: stage,
-      origin: stage,
+      origin: origin,
       pixi: gfx.pixi,
       textureManager: gfx.textureManager,
       deferredRedraw: gfx.deferredRedraw,
@@ -487,7 +517,7 @@ export class UiMinimap {
     // Mock Group Container
     const groupContainer = new PIXI.Container();
     groupContainer.label = 'background';
-    stage.addChild(groupContainer);
+    origin.addChild(groupContainer);
     miniScene.groups.set('background', groupContainer);
 
     // Layer
@@ -530,6 +560,7 @@ export class UiMinimap {
     if (this.stage) {
       this.stage.destroy({ children: true });
       this.stage = null;
+      this.origin = null;
     }
 
     this._initPromise = null;

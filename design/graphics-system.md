@@ -240,8 +240,10 @@ once per tick. A tick does this:
    itself and `AnimationPacer` says one is due ("Animation draws").
 
 Both phases leave performance measures (`app-N`, `draw-N`) in a DevTools recording. The minimap
-renders the same stage a second time into its own canvas (`UiMinimap`), which is why the renderer
-has `multiView` on.
+draws its own small stage (a background tile layer) into its own canvas (`UiMinimap`), with the
+same renderer, which is why the renderer has `multiView` on. Its tiles are in world coordinates
+too, so its stage has an `origin` of its own, placed for the minimap's viewport the way
+`GraphicsSystem` places the map's.
 
 **What makes Rapid unlike a game:** we don't know what we're drawing until the APP phase has run.
 The user can put the map anywhere in the world, at any zoom, with any layers on. A street grid in
