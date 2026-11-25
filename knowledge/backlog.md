@@ -26,9 +26,11 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   physical-key fallback.
 
 ## Pixi rendering follow-ups
-The plans and measurements are in [`design/graphics-system.md`](../design/graphics-system.md) (frame
-stats, partial fills without stencil masks, our own line builder, dashes, GPU time, the CULL pass,
-frame pacing, the frame's deadline, the pass, garbage, labels). Numbers below are Užice at z16 unless
+How the renderer works is in [`design/graphics-system.md`](../design/graphics-system.md), and the
+measurements and plans behind it in [`design/graphics-system-log.md`](../design/graphics-system-log.md)
+(frame stats, partial fills without stencil masks, our own line builder, dashes, GPU time, the cull
+box, frame pacing, the frame's deadline, the pass, garbage, labels): "section N" below means a
+section of the log. Numbers below are Užice at z16 unless
 said otherwise. Biggest or most wanted first.
 
 - **Garbage collection is the longest stall left** (section 13). A major collection is 420 to 480 ms of
@@ -51,9 +53,19 @@ said otherwise. Biggest or most wanted first.
   rendering changed it by accident; the layers still change what they get (`markerStyle.marker.image =
   'pin'`), so sharing needs frozen styles with overrides built apart, or a cache of the finished style
   per kind of feature.
-- **The other layers still do a pass on every frame** (Bryan: worth doing). Only the OSM layer keeps its
-  features (`keepFeatures()`), follows the cull box, and takes arrivals and edits without a pass. The
-  Rapid layer first: it draws the same kinds of feature with the same classes.
+- **The other data layers without a pass for a hover or a zoom, and making features in chunks.**
+  They keep their features, follow the cull box, cull later, and draw what arrived without a pass
+  since Nov 24 (sections 17 to 19), but a hovered photo or a zoom is a pass of its layer (15 to
+  34 ms for Mapillary in Bellevue), and a tile of 1,000 photos is made in one frame (13.7 ms).
+- **How many hidden features are kept.** A feature hidden for 20 moves of the cull box is destroyed
+  (a number picked by feel), so what's hidden stays however much it is: 79,500 features (147 MB)
+  after 50 pans in Bellevue with photos on, and if the view stops they stay (log section 20).
+  Destroying wasn't where the garbage came from (a few hundred a frame); making features was.
+  Ideas (Bryan, Nov 24): destroy the oldest hidden first as frames have time, keeping about a cull
+  box's worth; reuse features' objects (a pool per kind).
+- **Mapillary's layers in a dense city:** downtown Seattle at z17.5 has 107,000 photo features and
+  295,000 detection features in the cull box, all drawn (Nov 24). A level of detail would leave
+  most out at that zoom (`design/filter-system.md` section 6).
 - **What still asks for the OSM layer's pass** (section 12): a filter and the styles. The pass is 134 ms:
   71 of looking at each shown feature and finding nothing to do, 30 of vertices in the spatial index,
   30 of sorting, plus asking each entity for its geometry twice (`FilterSystem.filterScene()`, then to
@@ -68,24 +80,23 @@ said otherwise. Biggest or most wanted first.
   task: the longest gaps of a pan. Not looked into: where the time goes, and whether a tile can merge
   in parts.
 - **The first pass and the first DRAW after a load** (section 8): `FilterSystem` matches every entity
-  for the first time (87 ms at Staten Island), and the first DRAW pass with anything in it costs 76 to
+  for the first time (87 ms at Staten Island), and the first DRAW phase with anything in it costs 76 to
   128 ms.
 - **Every render group costs a few microseconds on every frame** (Bryan: backlog). The split of lines
   and points by tile added 1 to 2 ms to a frame that only moves the view (580 groups). Ideas: no
   container per tile for a class of lines with few members; hide the tiles outside the view so Pixi
   skips them. Watch for: wrong overlaps at tile edges (polygons; pins side by side across a tile edge
   are ordered by tile, 1% of overlapping pairs).
-- **Animation frames that don't draw the whole scene.** A glow breathes and a halo marches
+- **Animation draws that don't draw the whole scene.** A glow breathes and a halo marches
   (step 10 of section 15) by drawing every batch again 20 times a second: 13 ms of GPU a frame
   in Užice on an M4. Drawing what's still into a texture once, and then that texture with what
-  moves over it, would make an animation frame two draw calls, and 60 a second affordable.
+  moves over it, would make an animation draw two draw calls, and 60 a second affordable.
   Wants numbers from weak hardware first: `AnimationPacer` slows the animation down there, and
   nobody has seen it do so.
 - **How hovers and selections look, now that a shader draws them.** The first version is a
   soft yellow glow that breathes and yellow dashes that march over a dark line. Open: more
   than color and movement for a colorblind user (a pattern in the glow, a second color in the
-  dashes), a glow that shows on a yellow road, and the other layers' lines and areas, which
-  still glow by `GlowFilter`.
+  dashes), and a glow that shows on a yellow road.
 - **A small area's edge, drawn by the fills' shader.** An area under 20 pixels is its fill
   alone since step 9 (Bryan: a grey block is fine, something is drawn; a hover shows its
   outline). Section 15 ("A lower level of detail for small areas") has a way to give it back
@@ -95,19 +106,14 @@ said otherwise. Biggest or most wanted first.
   show on any. The lines' batch makes its dashes in the shader from the distance along the
   line, so a second color for the gaps is 4 more bytes a vertex and a line of the fragment
   shader. (`LineMesh`es dash with a texture, which could hold two colors as it is.)
-- **The other layers' features in batches.** Only the OSM layer's are (section 15, steps 6 to 9).
-  The photo layers draw thousands of markers with viewfields, and the Rapid layer draws lines
-  with oneway arrows, areas and vertices like OSM's; each layer would give its features
-  batches of its own, as `PixiLayerOsm` does (`_lineBatch()`, `_polygonBatch()`,
-  `_placePoint()`).
 - **The frame budgets are first guesses**, picked once on an M4 at 120 Hz (`APP_BUDGET_MS` 6,
-  `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, batch sizes 64/1,000/4). A load's frames at 24 + 9 ms land
+  `STILL_BUDGET_MS` 24, `MIN_NORMAL_MS` 4, chunk sizes 64/1,000/4). A load's frames at 24 + 9 ms land
   just past two 120 Hz refreshes and wait for a third. Sweep them with `bun run measure` on another
   machine (Bryan will try other hardware). The same run should say what draw calls cost there:
   on the M4 they cost next to nothing, and Bryan counts every one saved as a win for weaker
   devices (Nov 23).
 - **Budget frames by the display's refresh, and show the misses** (Bryan, Nov 20). The gaps between
-  animation frame timestamps give the refresh interval and the missed refreshes. `SchedulerSystem`
+  tick timestamps give the refresh interval and the missed refreshes. `SchedulerSystem`
   could set a frame's budget so APP plus the expected DRAW ends just before a refresh, and the
   Rendering card could draw a bar per refresh with the misses marked (SGI Performer's statistics).
 - **Labels: what's left** (section 14, "Open questions"): a selected way often has no room for its own
@@ -115,9 +121,13 @@ said otherwise. Biggest or most wanted first.
   tenth fewer labels than with boxes, not all of it the 2 px cells. Labels on long lines walk the whole
   line (five transatlantic cables at Smith Point: 350 ms a zoom; clip to the view before
   `placeRopeLabel()`).
-- **GPU time is mostly fixed costs** (section 6): render without `multiView` and give the minimap its
-  own copy (1.5 to 2 ms); decide whether device pixel ratio 2 needs MSAA (4 ms; compare screenshots).
-- **Small things from the CULL pass** (section 8): vertices appear at effective zoom 16, which depends on
+- **GPU time is mostly fixed costs** (section 6): render without `multiView` (1.5 to 2 ms), which
+  needs the small views on a renderer of their own (the plan is in [`design/scene.md`](../design/scene.md)
+  section 4); decide whether device pixel ratio 2 needs MSAA (4 ms; compare screenshots).
+- **A scene per view, and the turn restriction editor back** ([`design/scene.md`](../design/scene.md)
+  section 4): `GraphicsSystem` runs several `PixiScene`s; the minimap becomes one (no more mock
+  `gfx`), and the turn restriction editor, missing since the move to Pixi, a third.
+- **Small things from the cull box** (section 8): vertices appear at effective zoom 16, which depends on
   latitude, so a north-south pan across that line shows them up to 256 px late; a held frame during a
   zoom could be drawn at the new zoom in place of the CSS transform.
 - **The footer's count of hidden features is stale.** It's counted in the OSM layer's pass, which pans,
@@ -142,11 +152,11 @@ said otherwise. Biggest or most wanted first.
 - **Profiling pass** ([`design/profiling.md`](../design/profiling.md)): baselines for heap, GPU resources,
   the worker heap and listeners, and a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and
   reports what grows.
-- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 4): reordering spatial IDs (lift
+- **Scene follow-ups** ([`design/scene.md`](../design/scene.md) section 5): reordering spatial IDs (lift
   OSM while drawing, or a layer-order UI); snapping by distance instead of by what's drawn on top, so
   it doesn't depend on stroke width and z-order (the OSM layer's features are found through the
-  spatial index since Nov 23, with the answer Pixi gave); the other layers' features through an
-  index too (`scene.setHitTester()`), which a dataset of buildings would need.
+  spatial index since Nov 23, with the answer Pixi gave, and every other layer's that draws data
+  through an index of its own since Nov 24).
 - **Text rasterization without `Pixi.Text`**: canvas2D on the main thread first, or an `OffscreenCanvas`
   worker, fed to `PixiTextures.allocate('text', …)`; avoids nested `renderer.generateTexture()` and
   `readPixels`. A worker needs the same fonts (`FontFace` and a transferable `ArrayBuffer`).
@@ -226,7 +236,7 @@ its harnesses lived in a session's scratch folder and are gone. Make it a suite:
 - Count operations where we can (copies per derive, recomputes per merge, O(L) scans per event), and
   keep wall-clock numbers for reports: timing limits in CI are flaky.
 - A baseline to compare a branch against, and a plan for which numbers each design doc tracks.
-- A drag frame, not only a full APP pass: a full pass is mostly restyling, which hides per-frame costs
+- A drag frame, not only a full pass: a full pass is mostly restyling, which hides per-frame costs
   (graph step 7 measured 5.7 vs 9.4 ms per drag frame where the full pass showed no difference).
 
 ## Renderer: keep the node answers in the layer, not in graph memos
@@ -336,11 +346,11 @@ the order people are likely to ask:
   a `sameKeys` disagreement (same place and direction, different tags).
 
 ## Conflation / buffers follow-ups (beyond Step 3)
-- **`lineToPoly` is gone** (Nov 22): `geomStrokeOutline()` in `modules/geo/stroke.ts` gives the rings at a distance from a line, for halos and labels. It doesn't clean up where an outline crosses itself, so it isn't a buffer polygon yet; that's step 5 of `design/graphics-system.md` section 15 (try Clipper2 first), and conflation's buffers want the same answer.
+- **`lineToPoly` is gone** (Nov 22): `geomStrokeOutline()` in `modules/geo/stroke.ts` gives the rings at a distance from a line, for halos and labels. It doesn't clean up where an outline crosses itself, so it isn't a buffer polygon yet; that was step 5 of `design/graphics-system-log.md` section 15 (try Clipper2 first), and conflation's buffers want the same answer.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
 
 ## Performer-inspired statistics display
-- Now frame stats and a rendering info card (`UiRenderingCard`, ⌘⇧F) in [`design/graphics-system.md`](../design/graphics-system.md) (sections 3 and 7). The card shows the scheduler's queue, pressure and dropped frames too.
+- Now frame stats and a rendering info card (`UiRenderingCard`, ⌘⇧F) in [`design/graphics-system.md`](../design/graphics-system.md) ("Frame stats"). The card shows the scheduler's queue, pressure and dropped frames too.
 - Also worth showing: texture usage, vertices per layer.
 - Inspiration: SGI Performer's `pfStats`/`pfFrameStats` system (Chapter 23 of Performer Programmer's Guide)
 

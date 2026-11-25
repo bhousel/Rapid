@@ -1,12 +1,16 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode` and `interactiveChildren`, as a renderer does in the app
 import { GlowFilter } from 'pixi-filters';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { LineMesh } from '../../../modules/pixi/lib/LineMesh.ts';
 import {
   containerHit, drawHalo, drawOrder, drawRings, featureOrder, glowColor, ringsContain, setGlowFilter, triangulate,
   HIGHLIGHT_COLOR, HOVER_COLOR
 } from '../../../modules/pixi/helpers.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 describe('pixi helpers', () => {
@@ -74,7 +78,7 @@ describe('pixi helpers', () => {
     let batch;
 
     beforeEach(() => {
-      batch = new LineBatch();
+      batch = new LineBatchMesh(batchShaders.lines);
     });
     afterEach(() => {
       if (!batch.destroyed) batch.destroy();
@@ -185,7 +189,7 @@ describe('pixi helpers', () => {
     });
 
     it('moves a halo that was in another batch into this one', () => {
-      const other = new LineBatch();
+      const other = new LineBatchMesh(batchShaders.lines);
       const items = [];
       drawHalo(other, items, [square], 0, 0);
       assert.strictEqual(other.size, 2);
@@ -403,10 +407,22 @@ describe('pixi helpers', () => {
       it('goes by the scene first, whatever the orders are', () => {
         assert.isAbove(featureOrder(feature(a2, 0), feature(a1, 100)), 0);
       });
+
+      // (Photos taken at one place have the same order: the batch draws the one it was given last on top.)
+      it('puts two features with the same order in one batch in the order the batch draws them', () => {
+        const batch = new LineBatchMesh(batchShaders.lines);
+        const first = { sceneContainer: batch, sceneOrder: 7, sceneItem: { batch: batch, order: 7 } };
+        const second = { sceneContainer: batch, sceneOrder: 7, sceneItem: { batch: batch, order: 7 } };
+        batch.drawIndex = item => (item === first.sceneItem ? 0 : 1);
+        assert.isAbove(featureOrder(second, first), 0);
+        assert.isBelow(featureOrder(first, second), 0);
+        assert.strictEqual(featureOrder(feature(a1, 7), feature(a1, 7)), 0);   // no batch says more
+        batch.destroy();
+      });
     });
   });
 
-  // The triangles that fill polygons, for a `FillBatch`
+  // The triangles that fill polygons, for a `FillBatchMesh`
   describe('triangulate', () => {
     // The area that triangles cover
     function areaOf({ positions, indices }) {

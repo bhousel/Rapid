@@ -1,8 +1,13 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
-import { FillBatch } from '../../../modules/pixi/lib/FillBatch.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeaturePolygon } from '../../../modules/pixi/PixiFeaturePolygon.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+import { LayerBatches } from '../../../modules/pixi/lib/LayerBatches.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 // A polygon is drawn at one of three levels of detail, by its size on screen: not at all, as a
@@ -22,7 +27,7 @@ describe('PixiFeaturePolygon', () => {
     feature.update(viewportAt(zoom));
   }
 
-  // What a line in a `LineBatch` holds in its first vertex: 12 floats (10 is its width in
+  // What a line in a `LineBatchMesh` holds in its first vertex: 12 floats (10 is its width in
   // pixels, negative for a line whose dashes march) and 8 bytes (its color and opacity, then
   // its dashes; for a glow, 5 and the least width of the line it's around in sixteenths)
   const floatsOf = item => Array.from(item.batch._floats.subarray(item.first * 12, item.first * 12 + 12));
@@ -53,9 +58,9 @@ describe('PixiFeaturePolygon', () => {
       },
       pixi: { renderer: { type: 0 } }
     };
-    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, labelSpace: { featureChanged: () => {}, avoidFreed: () => {} } };
     // The map UI layer has the batch that draws every halo. (Its place in the world isn't the polygon's.)
-    halos = new LineBatch();
+    halos = new LineBatchMesh(batchShaders.lines);
     halos.position.set(8388600, 8388590);
     scene.layers.set('map-ui', { haloBatchAt: () => halos });
     layer = new AbstractPixiLayer(scene);
@@ -508,8 +513,8 @@ describe('PixiFeaturePolygon', () => {
     });
   });
 
-  // A layer that draws many polygons gives each two batches: a `FillBatch` for its fill and a
-  // `LineBatch` for its outlines. The polygon has nothing of its own then, at any size.
+  // A layer that draws many polygons gives each two batches: a `FillBatchMesh` for its fill and a
+  // `LineBatchMesh` for its outlines. The polygon has nothing of its own then, at any size.
   describe('in batches', () => {
     // A square 400 world units wide (400 px at zoom 16), with a hole in it
     const BIG = { type: 'Polygon', coordinates: [
@@ -542,8 +547,8 @@ describe('PixiFeaturePolygon', () => {
     beforeEach(() => {
       context = layer.context;
       context.viewport = { transform: { rotation: 0, zoom: 16 } };
-      fills = new FillBatch();
-      outlines = new LineBatch();
+      fills = new FillBatchMesh(batchShaders.fills);
+      outlines = new LineBatchMesh(batchShaders.lines);
       for (const each of [fills, outlines]) {
         each.position.set(8388608, 8388608);    // the world's middle, where the polygon is
       }
@@ -836,7 +841,7 @@ describe('PixiFeaturePolygon', () => {
       // A layer with many polygons gives the outlines' batch a small batch for the glows: one
       // that comes or goes doesn't have the outlines' index buffer built again.
       it('has its glows in the batch that the outlines\' batch has for glows, and leaves the outlines\' batch as it is', () => {
-        const glows = new LineBatch();
+        const glows = new LineBatchMesh(batchShaders.lines);
         outlines.glows = glows;
         setShape(BIG);
         drawAt(16);
@@ -1179,5 +1184,47 @@ describe('PixiFeaturePolygon', () => {
     feature.destroy();
     assert.isTrue(fill.destroyed);
     assert.isNull(feature.fill);
+  });
+
+
+  // A layer gives a polygon the batches of the container it's drawn for (`AbstractPixiLayer._drawInBatches`)
+  describe('placeInBatches', () => {
+    let batches, parent, other;
+    beforeEach(() => {
+      batches = new LayerBatches(batchShaders);
+      parent = new PIXI.Container();
+      other = new PIXI.Container();
+    });
+    afterEach(() => {
+      parent.destroy({ children: true });
+      other.destroy({ children: true });
+    });
+
+    it('takes the container\'s batches for fills and outlines, and keeps them', () => {
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.fillBatch, batches.fillBatch(parent, [0, 0]));
+      assert.strictEqual(feature.strokeBatch, batches.outlineBatch(parent, [0, 0]));
+
+      const fillBatch = feature.fillBatch;
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.fillBatch, fillBatch);
+      assert.strictEqual(fillBatch.users, 1);
+      assert.isFalse(feature.drawsInContainer());
+    });
+
+    it('takes another container\'s when it\'s drawn for that one', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(batches, other);
+      assert.strictEqual(feature.fillBatch.parent, other);
+      assert.strictEqual(feature.strokeBatch.parent, other);
+    });
+
+    it('gives them back, and draws itself, without the layer\'s batches', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(null, parent);
+      assert.isNull(feature.fillBatch);
+      assert.isNull(feature.strokeBatch);
+      assert.isTrue(feature.drawsInContainer());
+    });
   });
 });

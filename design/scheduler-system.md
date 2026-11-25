@@ -1,12 +1,14 @@
 # Scheduler System Design
 
-This document describes the design for Rapid's centralized work scheduling system, including the frame-aware execution model, task types, backpressure management, and migration path from the current ad-hoc scheduling.
+This document describes the design for Rapid's centralized work scheduling system, including the tick-aware execution model, task types, backpressure management, and migration path from the current ad-hoc scheduling.
+
+A **tick** is one `requestAnimationFrame` callback. The scheduler knows only ticks; a **frame**, everything needed to draw the map once, belongs to `GraphicsSystem` and may take more than one tick. See "Words used here" in [`graphics-system.md`](graphics-system.md).
 
 ## Problem
 
-Rapid is a map editor built on a **game loop** — a Pixi.js Ticker calling `requestAnimationFrame` to render the map at a consistent frame rate. The target frame budget is 16.7ms (60fps) or 33.3ms (30fps).
+Rapid is a map editor built on a **game loop** — a Pixi.js Ticker calling `requestAnimationFrame` to render the map at a consistent tick rate. The target tick budget is 16.7ms (60fps) or 33.3ms (30fps).
 
-Today, deferred work is scheduled against the **browser's event loop** using raw `setTimeout`, `setInterval`, `requestIdleCallback`, and lodash `debounce`/`throttle`. These mechanisms fire whenever the browser decides — potentially right in the middle of a frame that GraphicsSystem is trying to render. Every interruption eats into the frame budget.
+Today, deferred work is scheduled against the **browser's event loop** using raw `setTimeout`, `setInterval`, `requestIdleCallback`, and lodash `debounce`/`throttle`. These mechanisms fire whenever the browser decides — potentially right in the middle of a tick that GraphicsSystem is trying to render. Every interruption eats into the tick budget.
 
 Current pain points:
 - **~26 `setTimeout` call sites** with manual handle tracking and cleanup
@@ -18,8 +20,8 @@ Current pain points:
 ## Goals
 
 1. **Single coordination point** — All deferred work routes through SchedulerSystem, which decides *when* work actually runs relative to the render loop
-2. **Frame-budget-aware** — Background tasks run in leftover frame time, never stealing from rendering
-3. **Backpressure** — When frames are dropping, the scheduler defers non-essential work automatically
+2. **Tick-budget-aware** — Background tasks run in leftover tick time, never stealing from rendering
+3. **Backpressure** — When ticks run over budget, the scheduler defers non-essential work automatically
 4. **Familiar API** — Callers schedule work using wall-clock semantics (`setTimeout`, `debounce`, etc.), while the scheduler handles the timing internally
 5. **Lifecycle management** — All managed work auto-cancels on `resetAsync()`, eliminating manual handle tracking
 6. **Worker-ready** — The same API can route work to web workers when the task doesn't need main-thread access
@@ -27,7 +29,7 @@ Current pain points:
 ## Non-Goals (for now)
 
 - Preemptive task interruption — tasks run to completion once started
-- Sub-frame phase budgeting (splitting APP into geometry/labels/styles) — a future concern for GraphicsSystem, not the scheduler
+- Sub-tick budgeting (splitting APP into geometry/labels/styles) — a future concern for GraphicsSystem, not the scheduler
 
 ## Design
 
@@ -35,14 +37,14 @@ Current pain points:
 
 Today, GraphicsSystem owns a `PIXI.Ticker.shared` instance that drives a `requestAnimationFrame` loop. The ticker is used minimally: `ticker.start()`, `ticker.stop()`, `ticker.deltaMS`, and a single registered listener (`_tick`). No other system accesses it.
 
-**Under this design, SchedulerSystem owns the game loop.** It calls `requestAnimationFrame` directly and orchestrates each frame. GraphicsSystem becomes a *client* of the scheduler — it registers a render callback, and the scheduler calls it with a budget.
+**Under this design, SchedulerSystem owns the game loop.** It calls `requestAnimationFrame` directly and orchestrates each tick. GraphicsSystem becomes a *client* of the scheduler — it registers a render callback, and the scheduler calls it with a budget.
 
-This replaces `PIXI.Ticker` entirely. The features we used from it (`deltaMS`, start/stop, FPS) are trivial to compute ourselves, and owning the loop gives the scheduler full control over frame timing, budget allocation, and backpressure — which is the whole point.
+This replaces `PIXI.Ticker` entirely. The features we used from it (`deltaMS`, start/stop, FPS) are trivial to compute ourselves, and owning the loop gives the scheduler full control over tick timing, budget allocation, and backpressure — which is the whole point.
 
 ```
-scheduler._onFrame(timestamp)          ← owns the rAF
-  ├─ compute deltaMS, record frame start
-  ├─ gfx._tick(frameBudgetMs)          ← scheduler calls graphics
+scheduler._onTick(timestamp)          ← owns the rAF
+  ├─ compute deltaMS, record tick start
+  ├─ gfx._tick(tickBudgetMs)          ← scheduler calls graphics
   │   ├─ _updateTransform()            — transform easing, viewport sync
   │   ├─ _app()                        — scene graph updates
   │   └─ _draw()                       — pixi.render()
@@ -51,12 +53,12 @@ scheduler._onFrame(timestamp)          ← owns the rAF
   │   ├─ urgent tasks first
   │   ├─ normal tasks
   │   └─ idle tasks (only if budget permits)
-  └─ record frame metrics, update backpressure
+  └─ record tick metrics, update backpressure
 ```
 
-**Boundary**: The scheduler owns *when* work happens. GraphicsSystem owns *what* rendering work to do. The scheduler doesn't import Pixi or know about the scene graph. GraphicsSystem doesn't call `requestAnimationFrame` or track frame timing.
+**Boundary**: The scheduler owns *when* work happens. GraphicsSystem owns *what* rendering work to do. The scheduler doesn't import Pixi or know about the scene graph. GraphicsSystem doesn't call `requestAnimationFrame` or track tick timing.
 
-**Frame rate target**: The scheduler owns the target frame rate and computes the per-frame budget. It can dynamically adjust (e.g., drop from 60fps to 30fps under heavy pressure). How often GraphicsSystem re-prepares the scene graph stays in GraphicsSystem — that's a rendering concern, not a frame-timing concern. (Until Nov 2026 that was a fixed `THROTTLE = 250ms` after each draw. Now a `FramePacer` spaces the expensive frames by what they cost, and cheap ones are drawn on every tick: see "Frame pacing" in [`graphics-system.md`](graphics-system.md).)
+**Tick rate target**: The scheduler owns the target tick rate and computes the per-tick budget. It can dynamically adjust (e.g., drop from 60fps to 30fps under heavy pressure). How often GraphicsSystem re-prepares the scene graph stays in GraphicsSystem — that's a rendering concern, not a tick-timing concern. (Until Nov 2026 that was a fixed `THROTTLE = 250ms` after each draw. Now a `FramePacer` spaces the expensive frames by what they cost, and cheap ones are drawn on every tick: see "Frame pacing" in [`graphics-system.md`](graphics-system.md).)
 
 **Context loss**: When WebGL context is lost, GraphicsSystem calls `scheduler.pause()` (which it already supports via the reference-counted pause/resume mechanism). On context restore, it releases the pause. The scheduler stops the rAF loop while paused and resumes it on unpause.
 
@@ -127,11 +129,11 @@ scheduler.schedule(workID, fn, { priority: 'idle' });
 
 | Priority | Meaning | When it runs |
 |----------|---------|-------------|
-| `'urgent'` | Must run this frame if possible | Before idle work, within remaining budget |
-| `'normal'` | Run when convenient | During idle phase, respects budget, but gets at least 4 ms of every tick (decision 6) |
-| `'idle'` | Run whenever there's spare time | Only when frames are consistently under budget |
+| `'urgent'` | Must run this tick if possible | Before idle work, within remaining budget |
+| `'normal'` | Run when convenient | When the queues drain, respects budget, but gets at least 4 ms of every tick (decision 6) |
+| `'idle'` | Run whenever there's spare time | Only when ticks are consistently under budget |
 
-This covers the `requestIdleCallback` use case (`'idle'` priority) and could eventually cover `requestAnimationFrame`-like scheduling (`'urgent'` priority) for work that needs to happen every frame but isn't part of the core render.
+This covers the `requestIdleCallback` use case (`'idle'` priority) and could eventually cover `requestAnimationFrame`-like scheduling (`'urgent'` priority) for work that needs to happen every tick but isn't part of the core render.
 
 ### The `workID` Pattern
 
@@ -146,7 +148,7 @@ Callers choose descriptive IDs: `'validation-ui-render'`, `'hash-update'`, `'tag
 
 ### Idle Work Execution
 
-After rendering completes each frame, the scheduler drains its idle queue with whatever budget remains:
+After rendering completes each tick, the scheduler drains its idle queue with whatever budget remains:
 
 ```typescript
 private _drainIdleQueue(deadline: number): void {
@@ -172,28 +174,28 @@ private _drainIdleQueue(deadline: number): void {
 }
 ```
 
-The scheduler maintains an exponential moving average of each `workID`'s execution time. Before starting a task, it checks whether the estimated duration fits in the remaining budget. If not, the task waits for the next frame. Urgent tasks always drain before normal, and normal before idle.
+The scheduler maintains an exponential moving average of each `workID`'s execution time. Before starting a task, it checks whether the estimated duration fits in the remaining budget. If not, the task waits for the next tick. Urgent tasks always drain before normal, and normal before idle.
 
 ### Backpressure
 
-The scheduler tracks frame timing to detect when the system is under pressure:
+The scheduler tracks tick timing to detect when the system is under pressure:
 
 ```typescript
-interface FrameMetrics {
-  avgFrameTime: number;      // Exponential moving average of total frame time
+interface TickMetrics {
+  avgTickTime: number;       // Exponential moving average of total tick time
   avgRenderTime: number;     // EMA of APP + DRAW time
   avgIdleTime: number;       // EMA of idle work time
-  droppedFrames: number;     // Count of frames exceeding budget in recent window
-  targetFrameTime: number;   // Current target (16.7ms or 33.3ms)
+  longTicks: number;         // Count of ticks over budget in recent window
+  targetTickTime: number;    // Current target (16.7ms or 33.3ms)
 }
 ```
 
 **Responses to backpressure:**
 
-1. **Light pressure** (occasional dropped frames) — Reduce idle work per frame, allow tasks to float longer
+1. **Light pressure** (occasional long ticks) — Reduce idle work per tick, allow tasks to float longer
 2. **Moderate pressure** (consistent drops) — Stop running idle tasks entirely, let rendering catch up
-3. **Heavy pressure** (sustained frame drops) — Signal GraphicsSystem to reduce quality (`highQuality = false`), throttle expensive tasks
-4. **Recovery** — When frames are consistently under budget again, gradually allow idle work back in
+3. **Heavy pressure** (sustained long ticks) — Signal GraphicsSystem to reduce quality (`highQuality = false`), throttle expensive tasks
+4. **Recovery** — When ticks are consistently under budget again, gradually allow idle work back in
 
 The scheduler emits events so other systems can react:
 
@@ -203,15 +205,15 @@ scheduler.on('pressurechange', (level: 'light' | 'moderate' | 'heavy' | 'none') 
 
 ### Timer Float
 
-A key design decision: managed timeouts and intervals don't fire at their exact wall-clock time. Instead, when the timer expires, the task enters the idle queue and runs at the next opportunity within the frame budget.
+A key design decision: managed timeouts and intervals don't fire at their exact wall-clock time. Instead, when the timer expires, the task enters the idle queue and runs at the next opportunity within the tick budget.
 
 For a `scheduler.setTimeout(id, fn, { ms: 250 })`:
 1. At t=0, the scheduler records the deadline (now + 250ms)
-2. Each frame, the scheduler checks expired timers before running the idle queue
-3. At t=250ms (or the first frame after), the task moves to the idle queue
-4. The task runs when budget permits — likely within the same frame, worst case next frame
+2. Each tick, the scheduler checks expired timers before running the idle queue
+3. At t=250ms (or the first tick after), the task moves to the idle queue
+4. The task runs when budget permits — likely within the same tick, worst case next tick
 
-This "float" means actual execution is 250ms + 0–16ms, which is fine for all current use cases (UI debouncing, deferred renders, API polling). The benefit is that the work doesn't interrupt a frame in progress.
+This "float" means actual execution is 250ms + 0–16ms, which is fine for all current use cases (UI debouncing, deferred renders, API polling). The benefit is that the work doesn't interrupt a tick in progress.
 
 Code that truly needs exact wall-clock timing (e.g., long-press detection at 750ms in SelectBehavior) should use `globalThis.setTimeout` directly — there's no need to opt into the scheduler for those cases.
 
@@ -241,37 +243,37 @@ SchedulerSystem exists with managed `scheduleIdleTask`, `scheduleTimeout`, and `
 
 ### Phase 2 — Own the Game Loop (done)
 
-- SchedulerSystem owns the `requestAnimationFrame` loop via `_onFrame(timestamp)`
+- SchedulerSystem owns the `requestAnimationFrame` loop via `_onTick(timestamp)`
 - Computes `deltaMS` (capped at 100ms) and exposes it via a getter
-- Frame callback registration API: `addFrameCallback(id, fn)` / `removeFrameCallback(id)`
-- GraphicsSystem registers `_tick(deltaMS)` as a frame callback instead of using `PIXI.Ticker`
+- Tick callback registration API: `addTickCallback(id, fn)` / `removeTickCallback(id)`
+- GraphicsSystem registers `_tick(deltaMS)` as a tick callback instead of using `PIXI.Ticker`
 - `PIXI.Ticker.shared` is stopped but no longer used — the scheduler is the sole rAF owner
 - Loop stops on `pause()`, restarts on `resume()` (via event handlers)
 - WebGL context loss/restore handled through GraphicsSystem's own pause/resume
 - Added `requestAnimationFrame`/`cancelAnimationFrame` polyfill for test environments
 - 60 tests passing (12 new game loop tests)
 
-### Phase 3 — Frame-Aware Idle Execution (done)
+### Phase 3 — Tick-Aware Idle Execution (done)
 
 - Replaced `requestIdleCallback`/`cancelIdleCallback` backing with internal priority queues
-- Three queues drained per-frame in priority order: urgent > normal > idle
+- Three queues drained per-tick in priority order: urgent > normal > idle
 - New `schedule(fn, opts)` API with `{ priority: 'urgent' | 'normal' | 'idle' }` (default: `'normal'`)
 - `scheduleIdleTask(fn)` is now a convenience wrapper for `schedule(fn, { priority: 'idle' })`
-- Urgent tasks always drain (even if over budget); normal and idle respect the frame budget
-- `targetFrameTime` property (default ~16.7ms / 60fps) controls the per-frame deadline
+- Urgent tasks always drain (even if over budget); normal and idle respect the tick budget
+- `targetTickTime` property (default ~16.7ms / 60fps) controls the per-tick deadline
 - No more `requestIdleCallback` / `cancelIdleCallback` usage — tasks accumulate in queues
   naturally while paused and drain when the game loop resumes
 - Removed `_scheduleOne`, `_drainPending`, `_idleTasks`, `_pendingTasks`
 - Error handling: throwing tasks reject their Promise; subsequent tasks still drain
 - Task duration tracking (EMA per `workID`) deferred to Phase 4 when workIDs are introduced
-- 72 tests passing (12 new: schedule API, priority ordering, error handling, targetFrameTime)
+- 72 tests passing (12 new: schedule API, priority ordering, error handling, targetTickTime)
 
 ### Phase 4 — Unified Timer API with `workID` (done)
 
 - New workID-keyed timer methods: `setTimeout(workID, fn, opts)`, `setInterval(workID, fn, opts)`,
   `debounce(workID, fn, opts)`, `throttle(workID, fn, opts)`
 - **Timer float**: when a timer matures, its task enters the priority queue and runs at the
-  next frame's drain phase — never mid-frame.  ~0–16ms float, acceptable for all use cases.
+  next tick's drain — never mid-tick.  ~0–16ms float, acceptable for all use cases.
 - `cancel(workID)` cancels both the timer entry and any queued tasks bearing that workID
 - `cancelAllTimers()` cancels all workID-keyed timers.  `resetAsync()` calls both
   `cancelAllTimers()` and the legacy `cancelAllTimeouts()`/`cancelAllIntervals()`.
@@ -330,19 +332,19 @@ Migration notes:
 
 ### Phase 5 — Backpressure (done)
 
-- Frame timing metrics tracked via EMA: total frame time, render time, idle time
-- Dropped-frame ring buffer (60-frame window ≈ 1 second at 60fps)
+- Tick timing metrics tracked via EMA: total tick time, render time, idle time
+- Long-tick ring buffer (60-tick window ≈ 1 second at 60fps)
 - Four pressure levels: `none` → `light` → `moderate` → `heavy`
 - Hysteresis thresholds prevent oscillation (escalation thresholds > recovery thresholds)
 - Idle queue draining automatically throttled under pressure:
-  - `none`: unlimited idle tasks per frame
-  - `light`: max 3 idle tasks per frame
-  - `moderate`: max 1 idle tasks per frame
+  - `none`: unlimited idle tasks per tick
+  - `light`: max 3 idle tasks per tick
+  - `moderate`: max 1 idle tasks per tick
   - `heavy`: idle tasks blocked entirely
 - `pressure` event emitted on level changes
-- `metrics` getter exposes `FrameMetrics` snapshot (avgFrameTime, avgRenderTime,
-  avgIdleTime, droppedFrames, targetFrameTime, pressure)
-- Dynamic frame rate adjustment (drop to 30fps) and GraphicsSystem quality wiring
+- `metrics` getter exposes `TickMetrics` snapshot (avgTickTime, avgRenderTime,
+  avgIdleTime, longTicks, targetTickTime, pressure)
+- Dynamic tick rate adjustment (drop to 30fps) and GraphicsSystem quality wiring
   deferred — `highQuality` is only read at Pixi renderer initialization, so toggling
   it at runtime requires re-creating the renderer (a separate concern)
 - 117 tests passing (19 new backpressure tests)
@@ -417,14 +419,14 @@ can branch on status codes.  Write operations (changeset, notes) remain
 Worker `onmessage` resolves promises immediately, which triggers `.then()`
 chains as microtasks.  Microtasks are non-preemptible — the browser must
 drain them all before the next `requestAnimationFrame`.  When multiple tile
-results arrive in one frame, the cascading main-thread work (entity
+results arrive in one tick, the cascading main-thread work (entity
 construction via `createOsmEntity`, `graph.rebase`, `tree.rebase` — ~11ms
-per tile) blows the frame budget.
+per tile) blows the tick budget.
 
 Fix: `WorkerSystem.dispatch()` accepts `DispatchOptions.resultPriority`
 (`'urgent' | 'normal' | 'idle'`).  When set, the result is deferred through
 `scheduler.schedule()` instead of resolving immediately.  Each deferred
-result gets its own slot in `_drainQueues`, so the frame loop can check the
+result gets its own slot in `_drainQueues`, so the tick loop can check the
 budget and yield between results.  When `SchedulerSystem` is not available
 (tests, CLI), resolution is immediate — no worse than before.
 
@@ -453,31 +455,31 @@ Resolved design questions (kept for context):
 
 3. **Urgent tasks always preempt** normal and idle. Starvation of idle tasks is acceptable by definition.
 
-4. **SchedulerSystem owns the game loop and the target frame rate.** It replaces `PIXI.Ticker` entirely (Option A — roll our own `requestAnimationFrame` loop). The Pixi Ticker was used for very little (`deltaMS`, start/stop, one listener), and owning the loop gives the scheduler full control over frame timing, budget, and backpressure. See "Ownership of the Game Loop" section above.
+4. **SchedulerSystem owns the game loop and the target tick rate.** It replaces `PIXI.Ticker` entirely (Option A — roll our own `requestAnimationFrame` loop). The Pixi Ticker was used for very little (`deltaMS`, start/stop, one listener), and owning the loop gives the scheduler full control over tick timing, budget, and backpressure. See "Ownership of the Game Loop" section above.
 
 5. **"Game loop"** is the term of art for the `requestAnimationFrame` loop throughout code and docs.
 
-6. **Normal tasks get a share of every tick** (Nov 2026, `MIN_NORMAL_MS` = 4 ms). They used to run only in what the frame callbacks left of the 16.7 ms tick. In a dense place the map's frames take longer than a tick for seconds at a time (while it makes features after a load, or draws them again after a zoom), and then nothing was left: measured in Užice over a 10 s catch-up, no normal task ran on 214 of the 258 ticks that had one waiting, and tasks waited up to 2.4 s. Those tasks are the UI's own updates (the scale bar, the url, the undo button) and the results of tile requests. With the share, none of the ticks went without, and the longest wait was 141 ms. A tick that's already late gets up to 4 ms later; a single task still runs whole, however long it takes.
+6. **Normal tasks get a share of every tick** (Nov 2026, `MIN_NORMAL_MS` = 4 ms). They used to run only in what the tick callbacks left of the 16.7 ms tick. In a dense place the map's frames take longer than a tick for seconds at a time (while it makes features after a load, or draws them again after a zoom), and then nothing was left: measured in Užice over a 10 s catch-up, no normal task ran on 214 of the 258 ticks that had one waiting, and tasks waited up to 2.4 s. Those tasks are the UI's own updates (the scale bar, the url, the undo button) and the results of tile requests. With the share, none of the ticks went without, and the longest wait was 141 ms. A tick that's already late gets up to 4 ms later; a single task still runs whole, however long it takes.
    - Idle tasks have no share. Under pressure they wait, as before (decision 3).
-   - `GraphicsSystem` used to give its frames a smaller budget while this scheduler had tasks waiting, to leave them time. That never helped (a small budget didn't make the frame fit in a tick), and it kept the budget small for as long as the map's own `draw` listeners kept queueing tasks, which was always. It goes by the view alone now (`design/graphics-system.md` section 10).
+   - `GraphicsSystem` used to give its frames a smaller budget while this scheduler had tasks waiting, to leave them time. That never helped (a small budget didn't make the frame fit in a tick), and it kept the budget small for as long as the map's own `draw` listeners kept queueing tasks, which was always. It goes by the view alone now ("A deadline on the frame" in `design/graphics-system.md`).
 
 ## Open Questions
 
-1. **Frame callback registration API** — Should GraphicsSystem call `scheduler.addFrameCallback(fn)` to register, or should the scheduler call `gfx._tick()` directly? The callback approach is more decoupled (any system could register frame work), but direct calling is simpler and GraphicsSystem is the only consumer for now. Leaning toward callback registration for extensibility.
+1. **Tick callback registration API** — Should GraphicsSystem call `scheduler.addTickCallback(fn)` to register, or should the scheduler call `gfx._tick()` directly? The callback approach is more decoupled (any system could register tick work), but direct calling is simpler and GraphicsSystem is the only consumer for now. Leaning toward callback registration for extensibility.
 
-2. **Render throttle interaction** — GraphicsSystem currently throttles rendering to every 250ms via `_timeToNextRender`. With the scheduler owning frame timing, should this logic move to the scheduler (as a render-specific policy), or stay in GraphicsSystem (since it's a rendering concern)? Leaning toward keeping it in GraphicsSystem — the scheduler provides the budget, GraphicsSystem decides whether it's time to actually re-render. **Answered (Nov 2026):** it stayed in GraphicsSystem, as a `FramePacer` (see "Frame pacing" in [`graphics-system.md`](graphics-system.md)). It doesn't read the scheduler's pressure level: at a dense place the scheduler's queues emptied in the same time with 16 times the frames drawn. (They take about 25 s after the place is drawn, for about 5 s of work: see `knowledge/backlog.md`.)
+2. **Render throttle interaction** — GraphicsSystem currently throttles rendering to every 250ms via `_timeToNextRender`. With the scheduler owning tick timing, should this logic move to the scheduler (as a render-specific policy), or stay in GraphicsSystem (since it's a rendering concern)? Leaning toward keeping it in GraphicsSystem — the scheduler provides the budget, GraphicsSystem decides whether it's time to actually re-render. **Answered (Nov 2026):** it stayed in GraphicsSystem, as a `FramePacer` (see "Frame pacing" in [`graphics-system.md`](graphics-system.md)). It doesn't read the scheduler's pressure level: at a dense place the scheduler's queues emptied in the same time with 16 times the frames drawn. (They take about 25 s after the place is drawn, for about 5 s of work: see `knowledge/backlog.md`.)
 
-3. **`performance.now()` vs `timestamp` from rAF** — `requestAnimationFrame` provides a `DOMHighResTimeStamp`. Should we use that as the frame's reference time, or call `performance.now()` ourselves? The rAF timestamp is more accurate (it's the time the frame started, not when our callback runs). Leaning toward using the rAF timestamp.
+3. **`performance.now()` vs `timestamp` from rAF** — `requestAnimationFrame` provides a `DOMHighResTimeStamp`. Should we use that as the tick's reference time, or call `performance.now()` ourselves? The rAF timestamp is more accurate (it's the time the tick started, not when our callback runs). Leaning toward using the rAF timestamp.
 
 ## Known Issues — `d3-transition` and `d3-timer`
 
 `d3-transition` is used extensively in the Rapid codebase (~49 `.transition()` call sites across ~25 UI files). Internally, `d3-transition` depends on `d3-timer`, which spins up its **own `requestAnimationFrame` loop** — completely uncoordinated with the Pixi/scheduler game loop.
 
-Every active d3 transition is a separate rAF competitor that can manipulate the DOM, trigger layout/reflow, and consume frame budget outside the scheduler's control. We've hit this before: d3 transitions were once used for map transform easing and caused jittery rendering. That's been fixed, but the underlying conflict remains for UI animations.
+Every active d3 transition is a separate rAF competitor that can manipulate the DOM, trigger layout/reflow, and consume tick budget outside the scheduler's control. We've hit this before: d3 transitions were once used for map transform easing and caused jittery rendering. That's been fixed, but the underlying conflict remains for UI animations.
 
 **Current state:**
 - **`d3-transition`**: 49 call sites, all doing DOM animations (opacity fades, height collapses, panel slides). All in UI code — none touch the Pixi render path. They come in via `d3-selection`'s `.transition()` method, so there's no explicit import to grep for.
 
-**Stretch goal (future phase):** Replace `d3-transition` usage with scheduler-managed tween/transition helpers. The scheduler could provide a `scheduler.tween(workID, fn, { duration, easing })` API that runs the animation callback within the frame loop's idle budget — or in a dedicated "UI animation" phase — keeping DOM animation work coordinated with rendering. CSS transitions/animations could also replace many of these cases, since the browser's compositor can run those off the main thread entirely.
+**Stretch goal (future phase):** Replace `d3-transition` usage with scheduler-managed tween/transition helpers. The scheduler could provide a `scheduler.tween(workID, fn, { duration, easing })` API that runs the animation callback within the tick loop's idle budget — or in a dedicated "UI animation" phase — keeping DOM animation work coordinated with rendering. CSS transitions/animations could also replace many of these cases, since the browser's compositor can run those off the main thread entirely.
 
 **For now:** No action needed. The d3 transitions are all in UI code, they're short-lived, and removing them is a large surface area change best done during the UI TypeScript conversion. We're no worse off than today.

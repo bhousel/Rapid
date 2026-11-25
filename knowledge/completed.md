@@ -10,8 +10,8 @@ Newest first, by month. Details live in git history and the design docs; these a
   pixijs#11207 looked fixed. Filed as pixijs#12437; `batchMode = 'batch'` measured the same as `'auto'`.
   E2e tests for the crash and for a mask never showing without its fill (pixijs#12388).
 
-- **Label placement against a grid, over several frames** (Nov 20 2026, PR #11, `graphics-system.md`
-  section 14) — points mark what labels avoid in `scene.avoidGrid` as they're drawn (they had stopped
+- **Label placement against a grid, over several frames** (Nov 20 2026, PR #11,
+  `graphics-system-log.md` section 14) — points mark what labels avoid in `scene.avoidGrid` as they're drawn (they had stopped
   being avoided one by one when points were split by tile), features tell the scene when they change
   so the labels layer walks nothing, a hover moves no label, and labels are placed from a queue, not
   during a zoom or rotation. In Užice the frame that placed everything after a zoom went from 104 to
@@ -20,7 +20,7 @@ Newest first, by month. Details live in git history and the design docs; these a
 - **pixi.js 8.23 and the frame work** (Nov 20 2026, PR #10, `design/graphics-system.md`,
   `design/scene.md`) — frame stats, the rendering card and `bun run measure`/`compare` with tapes; the
   scene's containers are render groups at an anchor, OSM polygons, lines and points split by map tile;
-  a CULL pass, frame pacing in place of the 250 ms throttle, and a deadline on the frame. A hover, an
+  a cull box, frame pacing in place of the 250 ms throttle, and a deadline on the frame. A hover, an
   edit, a change of mode, arriving tiles and a zoom no longer do the OSM layer's whole pass, and a
   smaller heap (Užice 2.26 → 1.69 GB) means fewer, shorter collections. Against `main` in Užice: a pan
   into new data at 38 to 44 frames a second (was 12), a pinch in 2 s (was 32). Also: the rate limit bar

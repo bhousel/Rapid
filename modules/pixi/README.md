@@ -15,7 +15,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 
 | File | Description |
 |------|-------------|
-| `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph; finds the feature under the pointer (`hitTest()`) |
+| `PixiScene.ts` | Manages the scene's layers and features; renders and culls the scene graph; finds the feature under the pointer (`hitTest()`). Owns the batches' shaders (`batchShaders`) and label space (`labelSpace`), in `lib/` |
 | `PixiEvents.ts` | Binds pointer/keyboard/wheel events once and re-dispatches them to other code, with the feature under the pointer on each pointer event |
 | `PixiTextures.ts` | Texture atlas management and sprite generation |
 | `RenderFrame.ts` | One frame of the map, with the stats gathered while it's made (see `design/graphics-system.md`) |
@@ -26,7 +26,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 
 | File | Description |
 |------|-------------|
-| `AbstractPixiLayer.ts` | Base class for all rendering layers |
+| `AbstractPixiLayer.ts` | Base class for all rendering layers: features and their data, passes, waiting work, drawing in the layer's batches, and finding its features under the pointer |
 | `AbstractPixiFeature.ts` | Base class for all renderable features |
 
 ### Feature Types
@@ -68,11 +68,11 @@ Helper libraries for Pixi rendering (see [`lib/README.md`](lib/README.md)):
 | File | Description |
 |------|-------------|
 | `LineMesh.ts` | Draws one line from a stroke mesh: the lasso, and the lines and outlines of a layer that doesn't batch them |
-| `VertexBatch.ts` | The base of the batches: many things in one draw call, each a run of vertices in its buffers |
-| `LineBatch.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes, the outlines of its areas, the glows of what's hovered, and the halos of what's selected (which move) |
-| `FillBatch.ts` | Draws the fills of many areas in one draw call, with their patterns from one atlas texture |
-| `PointBatch.ts` | Draws many points in one draw call: their markers, icons and viewfields, from the symbol atlas, at a size on screen, and the glow behind a hovered one |
+| `BatchMesh.ts` | The base of the batches: many things in one draw call, each a run of vertices in its buffers |
+| `LineBatchMesh.ts` | Draws many lines in one draw call, with a shader that works out their widths: the OSM layer's casings and strokes, the outlines of its areas, the glows of what's hovered, and the halos of what's selected (which move) |
+| `FillBatchMesh.ts` | Draws the fills of many areas in one draw call, with their patterns from one atlas texture |
+| `PointBatchMesh.ts` | Draws many points in one draw call: their markers, icons and viewfields, from the symbol atlas, at a size on screen, and the glow behind a hovered one |
 | `LineHitArea.ts` | The hit area of a line or of a polygon's ring: within a few pixels of it |
 | `AtlasAllocator.ts` | Texture atlas allocation |
-| `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
+| `GuillotineAllocator.ts` | Guillotine bin-packing algorithm |
 | `RenderStats.ts` | Frame stats from Pixi's instructions, WebGL call counts, GPU timing |

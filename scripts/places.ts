@@ -1,6 +1,6 @@
 //
 // The difficult places that `bun run measure` and `bun run compare` visit
-// (see `design/graphics-system.md`, plan step 2).
+// (see "Measuring" in `design/graphics-system.md`).
 //
 // OSM changes, so a place can stop being difficult. Add new ones here, and to the table in the design doc.
 //

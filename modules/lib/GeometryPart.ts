@@ -96,7 +96,7 @@ type Unset = typeof UNSET;
  *
  * They're getters on the class, not properties defined on each object: a part with a closure
  * and an accessor for each product took 3 KB before any was read, 2.3 KB of it for those
- * (see "Garbage collection" in `design/graphics-system.md`).
+ * (see section 13 of `design/graphics-system-log.md`).
  * Computing in local space reduces floating point errors; `WorldFrame` translates the results.
  */
 class LocalFrame implements GeometryPartLocalData {

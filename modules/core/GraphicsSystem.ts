@@ -18,13 +18,13 @@ import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
 /**
- * The DRAW pass runs in the same tick as the APP pass when the tick has used less than this many
- * milliseconds (about half of a frame at 60 per second). Otherwise it waits for the next tick.
+ * The DRAW phase runs in the same tick as the APP phase when the tick has used less than this many
+ * milliseconds (about half of a tick at 60 a second). Otherwise it waits for the next tick.
  */
 const DRAW_SAME_TICK_MS = 8;
 
 /**
- * How long an APP pass takes on work that can wait, in milliseconds: features to draw again that
+ * How long an APP phase takes on work that can wait, in milliseconds: features to draw again that
  * aren't needed at once, and label placement (see `RenderFrame.deadline`). What it can't put off
  * (gathering the data, anything the user just changed) takes as long as it takes. It's under
  * `DRAW_SAME_TICK_MS`, so a frame that only catches up on work that waited draws in the same tick.
@@ -95,7 +95,7 @@ interface TransformEase {
  * - `textureManager` - `PixiTextures` manages the textures
  *
  * Events available:
- * - `draw`            Fires after a full redraw
+ * - `draw`            Fires after a frame's DRAW phase (not after an animation draw)
  * - `move`            Fires after the map's transform has changed (can fire frequently)
  *                     ('move' is mostly for when you want to update some content that floats over the map)
  * - `statuschange`    Fires on status changes, receives 'contextlost' or 'contextrestored'
@@ -131,7 +131,7 @@ export class GraphicsSystem extends AbstractSystem {
   protected _pixiViewport: Viewport | null;
   /** The map transform that the last frame was drawn at (used to compute CSS pan offsets) */
   protected _prevTransform: TransformProps;
-  /** The map transform that the APP pass ran at, for the frame whose DRAW pass is pending */
+  /** The map transform that the APP phase ran at, for the frame whose DRAW phase is pending */
   protected _appTransform: TransformProps | null;
   /** Whether a temporary CSS transform is currently applied to `supersurface` */
   protected _isTempTransformed: boolean;
@@ -141,7 +141,7 @@ export class GraphicsSystem extends AbstractSystem {
   protected _frame: number;
   /** Decides when a frame may do a pass (see "Frame pacing" in `design/graphics-system.md`) */
   protected _pacer: FramePacer;
-  /** Whether the frame whose DRAW pass is pending did a pass (it wasn't only a move of the view) */
+  /** Whether the frame whose DRAW phase is pending did a pass (it wasn't only a move of the view) */
   protected _appWasPass: boolean;
   /** Whether a frame is wanted: the view moved, or a redraw was requested and hasn't been drawn */
   protected _appPending: boolean;
@@ -153,11 +153,11 @@ export class GraphicsSystem extends AbstractSystem {
   protected _drawPending: boolean;
   /**
    * Whether `deferredRedraw()` or `immediateRedraw()` was called for the whole scene since the last
-   * APP pass. An APP pass that's pending without it, and without `_redrawLayerIDs`, happens only
+   * APP phase. An APP phase that's pending without it, and without `_redrawLayerIDs`, happens only
    * because the view moved (see `RenderFrame.contentChanged`).
    */
   protected _redrawRequested: boolean;
-  /** The layers that `deferredRedraw()` or `immediateRedraw()` was called for since the last APP pass */
+  /** The layers that `deferredRedraw()` or `immediateRedraw()` was called for since the last APP phase */
   protected _redrawLayerIDs: Set<LayerID>;
   /** The layers among `_redrawLayerIDs` that `immediateRedraw()` was called for: they don't wait for a pass */
   protected _urgentLayerIDs: Set<LayerID>;
@@ -173,7 +173,7 @@ export class GraphicsSystem extends AbstractSystem {
   protected _isApplyingUrl: boolean;
   /** Recent frames with their stats, oldest first (at most `RENDER_FRAME_HISTORY`) */
   protected _renderFrames: RenderFrame[];
-  /** The frame whose APP pass has run and whose DRAW pass is pending */
+  /** The frame whose APP phase has run and whose DRAW phase is pending */
   protected _appFrame: RenderFrame | null;
   /** Counts WebGL calls while detailed stats are on */
   protected _glCounter: GLCallCounter | null;
@@ -183,8 +183,8 @@ export class GraphicsSystem extends AbstractSystem {
   protected _pixiTickTime: number;
   /** Decides when the scene is drawn again only because something in it moves by itself */
   protected _animationPacer: AnimationPacer;
-  /** How many times the scene was drawn again only because something in it moves by itself (see `animationFrames`) */
-  protected _animationFrames: number;
+  /** How many times the scene was drawn again only because something in it moves by itself (see `animationDraws`) */
+  protected _animationDraws: number;
 
 
   /**
@@ -250,7 +250,7 @@ export class GraphicsSystem extends AbstractSystem {
     this._glTimer = null;
     this._pixiTickTime = 0;
     this._animationPacer = new AnimationPacer();
-    this._animationFrames = 0;
+    this._animationDraws = 0;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -356,7 +356,7 @@ export class GraphicsSystem extends AbstractSystem {
         this._startLayers();
         this._started = true;
         // Register our tick function with the scheduler's game loop.
-        scheduler.addFrameCallback('gfx', this._tick);
+        scheduler.addTickCallback('gfx', this._tick);
       });
   }
 
@@ -486,11 +486,11 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Called once per frame by the SchedulerSystem's game loop.
-   * We can use this to determine the true frame rate that we're running at,
-   * and schedule work to happen at opportune times (within animation frame boundaries).
+   * Called once per tick (a `requestAnimationFrame` callback) by the SchedulerSystem's game loop.
+   * A tick does the APP phase, the DRAW phase, both, an animation draw, or nothing: see "How a
+   * frame is made" in `design/graphics-system.md`.
    *
-   * @param deltaMS - Milliseconds elapsed since the previous frame
+   * @param deltaMS - Milliseconds elapsed since the previous tick
    */
   protected _tick(deltaMS: number): void {
     if (!this._started || this._paused) return;
@@ -505,7 +505,7 @@ export class GraphicsSystem extends AbstractSystem {
       PIXI.Ticker.system.update(now);
     }
 
-    // The tick after an animation frame says how the machine keeps up with them.
+    // The tick after an animation draw says how the machine keeps up with them.
     this._animationPacer.tick(deltaMS);
 
     // Collect any GPU times that have arrived for earlier frames.
@@ -571,9 +571,10 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Draws the scene again as the last frame left it, at a later moment: what moves by itself
-   * has moved (see `PixiScene.animate`). There's no APP pass, no frame for the stats and no
-   * `draw` event: nothing changed that anyone has to hear about. `AnimationPacer` says when:
+   * Makes an animation draw: the scene drawn again as the last frame left it, at a later
+   * moment, when what moves by itself has moved (see `PixiScene.animate`). There's no APP
+   * phase, no frame for the stats and no `draw` event: nothing changed that anyone has to hear
+   * about. `AnimationPacer` says when:
    * no more often than the machine keeps up with, and not for long after the last change (the
    * last one before a rest draws what moves where it stays).
    * @param now - The moment (`performance.now()`)
@@ -585,7 +586,7 @@ export class GraphicsSystem extends AbstractSystem {
     this.scene.animate(now, pacer.isResting(now));
     this.pixi.render();
     pacer.animated(now);
-    this._animationFrames++;
+    this._animationDraws++;
   }
 
 
@@ -623,8 +624,8 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Recent frames with their stats, oldest first: what each layer cost in the APP pass, and what Pixi
-   * drew in the DRAW pass. Only frames whose DRAW pass has run are included.
+   * Recent frames with their stats, oldest first: what each layer cost in the APP phase, and what Pixi
+   * drew in the DRAW phase. Only frames whose DRAW phase has run are included.
    * See "Frame stats" in `design/graphics-system.md`.
    * @return A copy of the list of recent frames
    */
@@ -638,13 +639,13 @@ export class GraphicsSystem extends AbstractSystem {
    * (the glow of a hover, the dashes around a selection). Those aren't in `renderFrames`.
    * @return The count since the system started
    */
-  public get animationFrames(): number {
-    return this._animationFrames;
+  public get animationDraws(): number {
+    return this._animationDraws;
   }
 
 
   /**
-   * The most recent frame whose DRAW pass has run, with its stats.
+   * The most recent frame whose DRAW phase has run, with its stats.
    * @return The frame, or `undefined` if nothing has been drawn yet
    */
   public get lastRenderFrame(): RenderFrame | undefined {
@@ -663,7 +664,7 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Whether a frame is still to come: one is wanted and hasn't been made, its DRAW pass hasn't
+   * Whether a frame is still to come: one is wanted and hasn't been made, its DRAW phase hasn't
    * run, or the last one left work for the next (features to draw again, labels to place).
    * Scripts and tests wait for this to be `false` before they look at the map.
    * @return `true` if the map isn't settled yet
@@ -712,11 +713,11 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * Asks for a redraw, when its turn comes (see `FramePacer`).
    * This is intended for most situations where new data is streaming in, but we can
-   * allow the changes to batch up over several animation frames before rendering.
+   * allow the changes to collect over several ticks before they are drawn.
    *
    * A request says that something the map draws has changed. Without a layer, that can be anything,
    * so every layer does its work for the frame. With one, the other layers may keep their features
-   * as they are (see `RenderFrame.changedFor` and "A CULL pass" in `design/graphics-system.md`).
+   * as they are (see `RenderFrame.changedFor` and "The cull box" in `design/graphics-system.md`).
    * @param layerID - The one layer whose content changed, if the caller knows nothing else did
    */
   public deferredRedraw(layerID?: LayerID): void {
@@ -728,7 +729,7 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * Asks for a redraw on the next available tick, without waiting for a turn.
    * This is intended for interactive situations where the user did a thing and we want
-   * the map to update on the next available animation frame to show their change.
+   * the map to update on the next available tick to show their change.
    * @param layerID - The one layer whose content changed, if the caller knows nothing else did
    *   (see `deferredRedraw`). Then only that layer is drawn at once: whatever else is waiting for
    *   its turn keeps waiting.
@@ -1075,7 +1076,7 @@ export class GraphicsSystem extends AbstractSystem {
       this._urgentLayerIDs = new Set<LayerID>();
 
       // ..and which part of the world to have features ready for: the view and some padding. It stays
-      // the same while the view moves around inside it (see "A CULL pass" in `design/graphics-system.md`).
+      // the same while the view moves around inside it (see "The cull box" in `design/graphics-system.md`).
       const prevCullBox = scene.cullBox;
       frame.cullBox = scene.updateCullBox(mapViewport);
 
@@ -1184,7 +1185,7 @@ export class GraphicsSystem extends AbstractSystem {
       this._isTempTransformed = false;
     }
 
-    // The frame was drawn at the transform its APP pass saw. If the map has moved since
+    // The frame was drawn at the transform its APP phase saw. If the map has moved since
     // (APP and DRAW in different ticks), the CSS transform takes up the difference.
     const tPrev = this._prevTransform;
     const tDrawn = this._appTransform ?? this.context.viewport.transform.props;
@@ -1317,7 +1318,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     const options = {
       // Pixi 8.22+ turns on its accessibility layer when Tab is pressed, and then walks the scene every
-      // frame. Rapid's scene has no accessible objects, and Tab is for moving between the UI's fields.
+      // tick. Rapid's scene has no accessible objects, and Tab is for moving between the UI's fields.
       accessibilityOptions: { activateOnTab: false },
       antialias: this.highQuality,
       autoDensity: this.highQuality,
@@ -1373,7 +1374,7 @@ export class GraphicsSystem extends AbstractSystem {
       // https://github.com/bfanger/pixi-inspector
       (globalThis as any).__PIXI_APP__ = this.pixi;
 
-      (window as any).__PIXI_DEVTOOLS__ = {
+      (globalThis as any).__PIXI_DEVTOOLS__ = {
         pixi: PIXI,
         app: this.pixi
       };
@@ -1409,7 +1410,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     // Pixi's events ticker sends a pointer move again, a few times a second, for objects that
     // move under a pointer that's still. Only `eventMode: 'dynamic'` asks for that, and nothing
-    // of ours has it, so it was a call on every animation frame that did nothing.
+    // of ours has it, so it was a call on every tick that did nothing.
     // (Whatever is under the pointer is found on each pointer event: `PixiScene.hitTest()`.)
     PIXI.EventsTicker.removeTickerListener();
 
@@ -1519,7 +1520,7 @@ export class GraphicsSystem extends AbstractSystem {
 
         this._isContextLost = false;
         this.eventManager?.enable();   // resume listening
-        this._unpauseFn!();            // resume rendering — _tick will run again on next frame
+        this._unpauseFn!();            // resume rendering — _tick will run again on the next tick
         this._unpauseFn = null;
         this.emit('statuschange', 'contextrestored');
       });

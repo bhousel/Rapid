@@ -4,7 +4,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 
@@ -20,6 +20,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osm-notes';
+    this.useBatches = true;
   }
 
 
@@ -55,7 +56,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
@@ -64,13 +65,14 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    * Renders the OSM note markers for this frame.
    * @param  frame    -  The frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const osm = this.context.services.osm;
     if (!osm?.started) return;
 
     const parentContainer = this._spatialContainer('qa', this.id);
-    const notes = osm.getNotes();
+    const notes = this._gatherIn(extents, extent => osm.getNotes(extent));
 
     for (const d of notes) {
       const dataID = d.id;
@@ -83,7 +85,6 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       // Create feature if necessary..
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       // If data has changed, replace it.. (Changed data is a new object: data isn't changed in place.)
@@ -115,9 +116,20 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
       this.retainFeature(feature, frame);
     }
+  }
+
+
+  /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * the OSM notes.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'osm-notes';
   }
 
 
@@ -132,7 +144,9 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     if (!this.enabled || !osm?.started || viewZoom < MINZOOM) return;
 
     osm.loadNotes();
-    this.renderMarkers(frame, viewport);
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+    this.renderMarkers(frame, viewport, extents);
   }
 
 }

@@ -170,7 +170,7 @@ export class UiGeolocateControl {
 
     this.unblock();
     layer.geolocationData = null;
-    gfx.deferredRedraw();
+    gfx.deferredRedraw('map-ui');
   }
 
 
@@ -192,7 +192,7 @@ export class UiGeolocateControl {
       const coords = result.coords;
       const extent = new Extent([coords.longitude, coords.latitude]).padByMeters(coords.accuracy);
       layer.geolocationData = result;
-      gfx.deferredRedraw();
+      gfx.deferredRedraw('map-ui');
 
       // If `_isInitial`, this is the first successful result we've received.
       // Recenter the map and clear the timeout.

@@ -64,7 +64,7 @@ describe('UiRenderingCard', () => {
   const valueOf = id => $container.select(`.rendering-row-${id} .rendering-value`).text();
 
 
-  it('shows the times of the APP and DRAW passes, the features and Pixi\'s instructions', () => {
+  it('shows the times of the APP and DRAW phases, the features and Pixi\'s instructions', () => {
     makeCard(makeContext([makeFrame(1, 9.7, 0.8)]));
 
     assert.deepEqual(rowIDs(), ['frames', 'app', 'draw','features', 'layers', 'instructions', 'groups']);

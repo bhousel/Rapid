@@ -215,19 +215,20 @@ export class MapRouletteService extends AbstractSystem {
       }
     }
     const gfx = this.context.systems.gfx;
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('maproulette');
     this._mapRouletteChanged();
   }
 
 
   /**
    * Get already loaded data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(): MapRouletteTask[] {
+  public getData(extent?: Extent): MapRouletteTask[] {
     const spatial = this.context.systems.spatial!;
 
-    return (spatial.getVisibleItems('maproulette')
+    return (spatial.getVisibleItems('maproulette', extent)
       .map(hit => hit.contents) as MapRouletteTask[])
       .filter(task => {
         if (this._challengeIDs.size) {
@@ -322,14 +323,10 @@ export class MapRouletteService extends AbstractSystem {
   protected _drainChallengeQueue(): void {
     if (this._paused) return;
 
-    const context = this.context;
-    const gfx = context.systems.gfx;
-
     for (const challengeID of this._challengeQueue) {
       this._challengeQueue.delete(challengeID);
       this.loadChallengeAsync(challengeID);
     }
-    gfx?.deferredRedraw('maproulette');
   }
 
 
@@ -684,7 +681,7 @@ export class MapRouletteService extends AbstractSystem {
     if (ids.size || utilExtractValues(newVal).includes('true')) {
       scene.enableLayers('maproulette');   // will trigger 'layerchange'
     }
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('maproulette');
   }
 
 

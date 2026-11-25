@@ -16,7 +16,7 @@ Note: The code here should probably be moved into either `/util` or into [`@rapi
 | `geom.ts` | Line layout, coverage boxes, and self-intersection tests |
 | `ortho.ts` | Orthogonalization utilities (squaring corners) |
 | `band.ts` | The band along the inside of an area's edge, which a partial fill fills: the area minus its middle (offsetting by [Clipper2](https://github.com/countertype/clipper2-ts)) |
-| `stroke.ts` | What a line builder makes from a line: the triangles that draw it (built once for any width), its outline at a distance, and whether a point is within a distance of it (see [`design/graphics-system.md`](../../design/graphics-system.md) section 15) |
+| `stroke.ts` | What a line builder makes from a line: the triangles that draw it (built once for any width), its outline at a distance, and whether a point is within a distance of it (see "The line builder" in [`design/graphics-system.md`](../../design/graphics-system.md)) |
 | `index.ts` | Barrel export file |
 
 ## Common Functions

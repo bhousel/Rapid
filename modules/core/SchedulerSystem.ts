@@ -3,7 +3,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import type { Context } from '../Context.ts';
 
 
-/** Task priority — determines scheduling order within each frame */
+/** Task priority — determines scheduling order within each tick */
 export type PriorityLevel = 'urgent' | 'normal' | 'idle';
 
 /** Pressure levels from least to most severe */
@@ -12,18 +12,18 @@ export type PressureLevel = 'none' | 'light' | 'moderate' | 'heavy';
 /** Supported timer types */
 export type TimerType = 'timeout' | 'interval' | 'debounce' | 'throttle';
 
-/** Frame timing metrics exposed to consumers */
-export interface FrameMetrics {
-  /** Exponential moving average of total frame time (ms) */
-  avgFrameTime: number;
-  /** EMA of frame callback time — APP + DRAW (ms) */
+/** Tick timing metrics exposed to consumers */
+export interface TickMetrics {
+  /** Exponential moving average of total tick time (ms) */
+  avgTickTime: number;
+  /** EMA of tick callback time — APP + DRAW (ms) */
   avgRenderTime: number;
   /** EMA of queue drain time (ms) */
   avgIdleTime: number;
-  /** Count of over-budget frames in the recent window */
-  droppedFrames: number;
-  /** Current target frame time (ms) */
-  targetFrameTime: number;
+  /** Count of over-budget ticks in the recent window */
+  longTicks: number;
+  /** Current target tick time (ms) */
+  targetTickTime: number;
   /** Current pressure level */
   pressure: PressureLevel;
 }
@@ -65,22 +65,22 @@ export interface TimerEntry {
   trailingFn: (() => void) | null;
 }
 
-/** Callback registered to run once per frame in the game loop */
-export type FrameCallback = (deltaMS: number) => void;
+/** Callback registered to run once per tick in the game loop */
+export type TickCallback = (deltaMS: number) => void;
 
 
 /**
- * Maximum deltaMS we'll report between frames.
+ * Maximum deltaMS we'll report between ticks.
  * Prevents huge jumps after tab switches, debugger pauses, or context loss recovery.
  */
 const MAX_DELTA_MS = 100;
 
 /** Default target: 60fps */
-const DEFAULT_TARGET_FRAME_TIME = 1000 / 60;
+const DEFAULT_TARGET_TICK_TIME = 1000 / 60;
 
 /**
- * Normal tasks get at least this long (ms) on every tick, even when the frame callbacks have
- * used the whole tick. Without it, a run of long frames kept them from running at all: measured
+ * Normal tasks get at least this long (ms) on every tick, even when the tick callbacks have
+ * used the whole tick. Without it, a run of long ticks kept them from running at all: measured
  * Nov 2026 in Užice, while the map made 100,000 features over 10 s, no normal task ran on 214 of
  * the 258 ticks that had one waiting, and the UI's own updates waited up to 2.4 s.
  * (Idle tasks have no such share: under pressure they wait, by design.)
@@ -88,26 +88,26 @@ const DEFAULT_TARGET_FRAME_TIME = 1000 / 60;
 const MIN_NORMAL_MS = 4;
 
 /**
- * EMA smoothing factor for frame timing metrics.
+ * EMA smoothing factor for tick timing metrics.
  * alpha = 2 / (N + 1) where N is the effective window.
- * 0.05 ≈ 39-frame window — responsive without jitter.
+ * 0.05 ≈ 39-tick window — responsive without jitter.
  */
 const EMA_ALPHA = 0.05;
 
 /**
- * Number of recent frames to track for dropped-frame ratio.
+ * Number of recent ticks to track for long-tick ratio.
  * At 60fps this is ~1 second of history.
  */
 const PRESSURE_WINDOW = 60;
 
-/** Dropped-frame ratio thresholds for escalating pressure */
+/** Long-tick ratio thresholds for escalating pressure */
 const PRESSURE_ESCALATE = {
-  light:    0.15,   // 9+ of 60 frames dropped
-  moderate: 0.35,   // 21+ of 60 frames dropped
-  heavy:    0.50,   // 30+ of 60 frames dropped
+  light:    0.15,   // 9+ of 60 ticks over budget
+  moderate: 0.35,   // 21+ of 60 ticks over budget
+  heavy:    0.50,   // 30+ of 60 ticks over budget
 } as const;
 
-/** Dropped-frame ratio thresholds for recovering (lower = more hysteresis) */
+/** Long-tick ratio thresholds for recovering (lower = more hysteresis) */
 const PRESSURE_RECOVER = {
   heavy:    0.40,   // heavy → moderate when below 40%
   moderate: 0.20,   // moderate → light when below 20%
@@ -119,12 +119,12 @@ const PRESSURE_RECOVER = {
  * `SchedulerSystem` centralizes deferred and background work scheduling.
  *
  * **Game loop** — Owns the `requestAnimationFrame` loop.  Other systems
- * (notably `GraphicsSystem`) register frame callbacks that the scheduler
- * calls each frame with the elapsed time (`deltaMS`).
+ * (notably `GraphicsSystem`) register tick callbacks that the scheduler
+ * calls each tick with the elapsed time (`deltaMS`).
  *
- * **Task scheduling** — Queued tasks are drained at the end of each frame
- * within the remaining frame budget.  Callers specify priority:
- *   - `'urgent'`  — always runs this frame, even if over budget
+ * **Task scheduling** — Queued tasks are drained at the end of each tick
+ * within the remaining tick budget.  Callers specify priority:
+ *   - `'urgent'`  — always runs this tick, even if over budget
  *   - `'normal'`  — runs if budget remains after urgent tasks
  *   - `'idle'`    — runs only if budget remains after normal tasks
  *
@@ -137,7 +137,7 @@ const PRESSURE_RECOVER = {
  *
  * Web workers are managed by `WorkerSystem`, not here. When `WorkerSystem.dispatch()`
  * is given a `resultPriority`, the worker results are handed back through this
- * system's priority queue so they stay within the frame budget.
+ * system's priority queue so they stay within the tick budget.
  *
  * Events available:
  * - `paused`         - Fires when the system transitions from unpaused to paused
@@ -148,42 +148,42 @@ const PRESSURE_RECOVER = {
  */
 export class SchedulerSystem extends AbstractSystem {
 
-  /** Registered frame callbacks, keyed by a string identifier */
-  protected _frameCallbacks: Map<string, FrameCallback>;
+  /** Registered tick callbacks, keyed by a string identifier */
+  protected _tickCallbacks: Map<string, TickCallback>;
   /** The handle from `requestAnimationFrame`, or 0 if the loop is not running */
   protected _rafHandle: number;
-  /** Timestamp of the previous frame (from the rAF callback), for computing deltaMS */
+  /** Timestamp of the previous tick (from the rAF callback), for computing deltaMS */
   protected _lastTimestamp: number;
-  /** Milliseconds elapsed since the previous frame */
+  /** Milliseconds elapsed since the previous tick */
   protected _deltaMS: number;
-  /** Target frame time in milliseconds — determines idle budget */
-  protected _targetFrameTime: number;
+  /** Target tick time in milliseconds — determines idle budget */
+  protected _targetTickTime: number;
 
-  // Task queues (drained per-frame in priority order)
-  /** Highest-priority tasks that will run before rendering this frame */
+  // Task queues (drained per-tick in priority order)
+  /** Highest-priority tasks that will run before rendering this tick */
   protected _urgentQueue: QueuedTask[];
   /** Normal-priority tasks run after urgent work when time allows */
   protected _normalQueue: QueuedTask[];
-  /** Low-priority tasks run only during idle time at the end of a frame */
+  /** Low-priority tasks run only during idle time at the end of a tick */
   protected _idleQueue: QueuedTask[];
 
   // WorkID-keyed timers (timeout, interval, debounce, throttle)
   /** Named timers (timeout / interval / debounce / throttle) keyed by workID */
   protected _timers: Map<WorkID, TimerEntry>;
 
-  // Backpressure — frame timing metrics and pressure tracking
-  /** EMA of total frame time (ms) */
-  protected _avgFrameTime: number;
-  /** EMA of frame callback time (ms) */
+  // Backpressure — tick timing metrics and pressure tracking
+  /** EMA of total tick time (ms) */
+  protected _avgTickTime: number;
+  /** EMA of tick callback time (ms) */
   protected _avgRenderTime: number;
   /** EMA of queue drain time (ms) */
   protected _avgIdleTime: number;
-  /** Ring buffer: true if that frame exceeded the budget */
-  protected _droppedFrameRing: boolean[];
+  /** Ring buffer: true if that tick exceeded the budget */
+  protected _longTickRing: boolean[];
   /** Write index into the ring buffer */
   protected _ringIndex: number;
   /** Cached count of `true` values in the ring buffer */
-  protected _droppedCount: number;
+  protected _longCount: number;
   /** Current pressure level */
   protected _pressure: PressureLevel;
 
@@ -198,23 +198,23 @@ export class SchedulerSystem extends AbstractSystem {
     this.requiredDependencies = new Set<SystemID>();
     this.optionalDependencies = new Set<SystemID>();
 
-    this._frameCallbacks = new Map<string, FrameCallback>();
+    this._tickCallbacks = new Map<string, TickCallback>();
     this._rafHandle = 0;
     this._lastTimestamp = 0;
     this._deltaMS = 0;
-    this._targetFrameTime = DEFAULT_TARGET_FRAME_TIME;
+    this._targetTickTime = DEFAULT_TARGET_TICK_TIME;
 
     this._urgentQueue = [];
     this._normalQueue = [];
     this._idleQueue = [];
     this._timers = new Map<WorkID, TimerEntry>();
 
-    this._avgFrameTime = 0;
+    this._avgTickTime = 0;
     this._avgRenderTime = 0;
     this._avgIdleTime = 0;
-    this._droppedFrameRing = new Array<boolean>(PRESSURE_WINDOW).fill(false);
+    this._longTickRing = new Array<boolean>(PRESSURE_WINDOW).fill(false);
     this._ringIndex = 0;
-    this._droppedCount = 0;
+    this._longCount = 0;
     this._pressure = 'none';
 
   }
@@ -256,7 +256,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Called after completing an edit session to reset any internal state.
    * Cancels all transient work (idle tasks, timers) but preserves
-   * frame callbacks and the game loop — those are structural registrations.
+   * tick callbacks and the game loop — those are structural registrations.
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
@@ -264,12 +264,12 @@ export class SchedulerSystem extends AbstractSystem {
     this.cancelAllTimers();
 
     // Reset backpressure metrics so recovered state doesn't carry over
-    this._avgFrameTime = 0;
+    this._avgTickTime = 0;
     this._avgRenderTime = 0;
     this._avgIdleTime = 0;
-    this._droppedFrameRing.fill(false);
+    this._longTickRing.fill(false);
     this._ringIndex = 0;
-    this._droppedCount = 0;
+    this._longCount = 0;
     if (this._pressure !== 'none') {
       this._pressure = 'none';
       this.emit('pressurechange', 'none');
@@ -280,12 +280,12 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Queues a function to run at the end of a future frame within the
-   * remaining frame budget.  Returns a Promise that resolves after the
+   * Queues a function to run at the end of a future tick within the
+   * remaining tick budget.  Returns a Promise that resolves after the
    * task has executed.
    *
    * Priority controls ordering:
-   * - `'urgent'`  — always runs this frame, even if over budget
+   * - `'urgent'`  — always runs this tick, even if over budget
    * - `'normal'`  — runs if budget remains after urgent tasks (default)
    * - `'idle'`    — runs only if budget remains after normal tasks
    *
@@ -351,20 +351,20 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Target frame duration in milliseconds.  Tasks are drained at the end
-   * of each frame only while `performance.now()` is below the deadline
-   * (`frameStart + targetFrameTime`).  Defaults to ~16.7ms (60 fps).
-   * @return  Target frame budget in milliseconds
+   * Target tick duration in milliseconds.  Tasks are drained at the end
+   * of each tick only while `performance.now()` is below the deadline
+   * (`tickStart + targetTickTime`).  Defaults to ~16.7ms (60 fps).
+   * @return  Target tick budget in milliseconds
    */
-  public get targetFrameTime(): number {
-    return this._targetFrameTime;
+  public get targetTickTime(): number {
+    return this._targetTickTime;
   }
   /**
-   * Sets the target frame time budget in milliseconds (minimum 1 ms).
-   * @param ms - Frame budget in milliseconds; values below 1 are clamped to 1
+   * Sets the target tick time budget in milliseconds (minimum 1 ms).
+   * @param ms - Tick budget in milliseconds; values below 1 are clamped to 1
    */
-  public set targetFrameTime(ms: number) {
-    this._targetFrameTime = Math.max(1, ms);
+  public set targetTickTime(ms: number) {
+    this._targetTickTime = Math.max(1, ms);
   }
 
 
@@ -374,7 +374,7 @@ export class SchedulerSystem extends AbstractSystem {
   // These methods track timers by a string key (`workID`).
   // When a timer matures, its task enters the priority queue
   // ("float") rather than firing directly — so execution is
-  // synchronized with the game loop's frame budget.
+  // synchronized with the game loop's tick budget.
   //
   // Cancel by name: `scheduler.cancel(workID)`
   // Cancel all:     `scheduler.cancelAllTimers()`
@@ -382,8 +382,8 @@ export class SchedulerSystem extends AbstractSystem {
 
   /**
    * Schedules `fn` to run once after `ms` milliseconds.  When the timer
-   * expires, the task enters the priority queue and runs at the next
-   * frame's drain phase.
+   * expires, the task enters the priority queue and runs when the
+   * next tick drains the queues.
    *
    * Calling again with the same `workID` cancels the previous timer and
    * starts a new one.
@@ -599,7 +599,7 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Milliseconds elapsed since the previous frame.
+   * Milliseconds elapsed since the previous tick.
    * Useful for frame-rate-independent calculations.
    * @return  Delta time in milliseconds
    * @readonly
@@ -622,53 +622,53 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Snapshot of the current frame timing metrics.
+   * Snapshot of the current tick timing metrics.
    * All time values are in milliseconds.
-   * @return  `FrameMetrics` snapshot for the current frame
+   * @return  `TickMetrics` snapshot for the current tick
    * @readonly
    */
-  public get metrics(): FrameMetrics {
+  public get metrics(): TickMetrics {
     return {
-      avgFrameTime: this._avgFrameTime,
+      avgTickTime: this._avgTickTime,
       avgRenderTime: this._avgRenderTime,
       avgIdleTime: this._avgIdleTime,
-      droppedFrames: this._droppedCount,
-      targetFrameTime: this._targetFrameTime,
+      longTicks: this._longCount,
+      targetTickTime: this._targetTickTime,
       pressure: this._pressure,
     };
   }
 
 
   /**
-   * Registers a callback to run once per frame in the game loop.
-   * The callback receives `deltaMS` — milliseconds since the previous frame.
+   * Registers a callback to run once per tick in the game loop.
+   * The callback receives `deltaMS` — milliseconds since the previous tick.
    *
    * @param id - A unique string identifier (e.g. `'gfx'`)
-   * @param fn - The callback to invoke each frame
+   * @param fn - The callback to invoke each tick
    */
-  public addFrameCallback(id: string, fn: FrameCallback): void {
-    this._frameCallbacks.set(id, fn);
+  public addTickCallback(id: string, fn: TickCallback): void {
+    this._tickCallbacks.set(id, fn);
   }
 
 
   /**
-   * Unregisters a previously registered frame callback.
+   * Unregisters a previously registered tick callback.
    *
-   * @param id - The identifier passed to `addFrameCallback`
+   * @param id - The identifier passed to `addTickCallback`
    */
-  public removeFrameCallback(id: string): void {
-    this._frameCallbacks.delete(id);
+  public removeTickCallback(id: string): void {
+    this._tickCallbacks.delete(id);
   }
 
 
   /**
-   * Number of registered frame callbacks.
+   * Number of registered tick callbacks.
    * Useful for debugging and tests.
-   * @return  Count of active frame callbacks
+   * @return  Count of active tick callbacks
    * @readonly
    */
-  public get numFrameCallbacks(): number {
-    return this._frameCallbacks.size;
+  public get numTickCallbacks(): number {
+    return this._tickCallbacks.size;
   }
 
 
@@ -754,7 +754,7 @@ export class SchedulerSystem extends AbstractSystem {
     if (!this._started) return;
     if (this._rafHandle) return;  // already running
     this._lastTimestamp = 0;
-    this._rafHandle = globalThis.requestAnimationFrame((ts) => this._onFrame(ts));
+    this._rafHandle = globalThis.requestAnimationFrame((ts) => this._onTick(ts));
   }
 
 
@@ -772,15 +772,15 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * The core game loop callback, driven by `requestAnimationFrame`.
    * Computes `deltaMS` from the browser-provided timestamp, calls
-   * all registered frame callbacks, then drains queued tasks with
-   * whatever frame budget remains.
+   * all registered tick callbacks, then drains queued tasks with
+   * whatever tick budget remains.
    *
    * @param timestamp - `DOMHighResTimeStamp` from `requestAnimationFrame`
    */
-  protected _onFrame(timestamp: DOMHighResTimeStamp): void {
-    // Schedule next frame first (standard game loop pattern).
+  protected _onTick(timestamp: DOMHighResTimeStamp): void {
+    // Schedule next tick first (standard game loop pattern).
     // If something pauses us during a callback, _stopLoop will cancel it.
-    this._rafHandle = globalThis.requestAnimationFrame((ts) => this._onFrame(ts));
+    this._rafHandle = globalThis.requestAnimationFrame((ts) => this._onTick(ts));
 
     // Compute deltaMS from the rAF timestamp, capped to avoid huge jumps
     // (e.g., after a tab switch, debugger pause, or context loss recovery).
@@ -788,38 +788,38 @@ export class SchedulerSystem extends AbstractSystem {
     this._lastTimestamp = timestamp;
     this._deltaMS = deltaMS;
 
-    const frameStart = performance.now();
+    const tickStart = performance.now();
 
-    // Call registered frame callbacks
-    for (const [id, fn] of this._frameCallbacks) {
+    // Call registered tick callbacks
+    for (const [id, fn] of this._tickCallbacks) {
       try {
         fn(deltaMS);
       } catch (err) {
-        console.error(`SchedulerSystem: frame callback '${id}' threw:`, err);  // eslint-disable-line no-console
+        console.error(`SchedulerSystem: tick callback '${id}' threw:`, err);  // eslint-disable-line no-console
       }
     }
 
     const renderEnd = performance.now();
 
-    // Drain queued tasks with remaining frame budget
-    const deadline = timestamp + this._targetFrameTime;
+    // Drain queued tasks with remaining tick budget
+    const deadline = timestamp + this._targetTickTime;
     this._drainQueues(deadline);
 
-    const frameEnd = performance.now();
+    const tickEnd = performance.now();
 
-    // Update timing metrics (skip the first frame where deltaMS is 0)
+    // Update timing metrics (skip the first tick where deltaMS is 0)
     if (deltaMS > 0) {
-      this._updateMetrics(frameEnd - frameStart, renderEnd - frameStart, frameEnd - renderEnd);
+      this._updateMetrics(tickEnd - tickStart, renderEnd - tickStart, tickEnd - renderEnd);
     }
   }
 
 
   /**
-   * Processes queued tasks in priority order within the frame budget.
+   * Processes queued tasks in priority order within the tick budget.
    * Urgent tasks always drain (even if over budget).  Normal and idle
    * tasks only run while `performance.now()` is below the deadline,
    * except that normal tasks always get `MIN_NORMAL_MS`: a tick that the
-   * frame callbacks used up still runs a few of them.
+   * tick callbacks used up still runs a few of them.
    *
    * Under backpressure, idle queue draining is reduced or skipped:
    * - `'light'`    — idle tasks get half the remaining budget
@@ -876,36 +876,36 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Called at the end of each frame to update the exponential moving
-   * averages, the dropped-frame ring buffer, and the pressure level.
+   * Called at the end of each tick to update the exponential moving
+   * averages, the long-tick ring buffer, and the pressure level.
    *
-   * @param frameTime - Total frame time (ms)
-   * @param renderTime - Frame callback time (ms)
+   * @param tickTime - Total tick time (ms)
+   * @param renderTime - Tick callback time (ms)
    * @param idleTime - Queue drain time (ms)
    */
-  protected _updateMetrics(frameTime: number, renderTime: number, idleTime: number): void {
+  protected _updateMetrics(tickTime: number, renderTime: number, idleTime: number): void {
     const alpha = EMA_ALPHA;
 
-    // Bootstrap EMA on the first real frame
-    if (this._avgFrameTime === 0) {
-      this._avgFrameTime = frameTime;
+    // Bootstrap EMA on the first real tick
+    if (this._avgTickTime === 0) {
+      this._avgTickTime = tickTime;
       this._avgRenderTime = renderTime;
       this._avgIdleTime = idleTime;
     } else {
-      this._avgFrameTime = alpha * frameTime + (1 - alpha) * this._avgFrameTime;
+      this._avgTickTime = alpha * tickTime + (1 - alpha) * this._avgTickTime;
       this._avgRenderTime = alpha * renderTime + (1 - alpha) * this._avgRenderTime;
       this._avgIdleTime = alpha * idleTime + (1 - alpha) * this._avgIdleTime;
     }
 
-    // Update dropped-frame ring buffer
-    const dropped = frameTime > this._targetFrameTime;
+    // Update long-tick ring buffer
+    const isLong = tickTime > this._targetTickTime;
     const idx = this._ringIndex % PRESSURE_WINDOW;
-    if (this._droppedFrameRing[idx] && !dropped) {
-      this._droppedCount--;
-    } else if (!this._droppedFrameRing[idx] && dropped) {
-      this._droppedCount++;
+    if (this._longTickRing[idx] && !isLong) {
+      this._longCount--;
+    } else if (!this._longTickRing[idx] && isLong) {
+      this._longCount++;
     }
-    this._droppedFrameRing[idx] = dropped;
+    this._longTickRing[idx] = isLong;
     this._ringIndex++;
 
     // Compute pressure level with hysteresis
@@ -914,12 +914,12 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Determines the pressure level from the dropped-frame ratio and
+   * Determines the pressure level from the long-tick ratio and
    * emits a `'pressurechange'` event if it changed.  Uses separate escalation
    * and recovery thresholds to prevent oscillation.
    */
   protected _computePressure(): void {
-    const ratio = this._droppedCount / PRESSURE_WINDOW;
+    const ratio = this._longCount / PRESSURE_WINDOW;
     const prev = this._pressure;
     let next: PressureLevel;
 

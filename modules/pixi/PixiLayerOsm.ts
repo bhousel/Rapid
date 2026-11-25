@@ -1,18 +1,16 @@
 import * as PIXI from 'pixi.js';
-import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { FillBatch } from './lib/FillBatch.ts';
+import { AbstractPixiLayer, HIT_REACH_MARGIN } from './AbstractPixiLayer.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
-import { LineBatch } from './lib/LineBatch.ts';
 import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { PointBatch } from './lib/PointBatch.ts';
-import { featureOrder } from './helpers.ts';
+import { extentMinus, featureOrder } from './helpers.ts';
 import { Extent, projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { Difference } from '../lib/Difference.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
@@ -21,7 +19,6 @@ import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Preset } from '../lib/Preset.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { VertexBatch } from './lib/VertexBatch.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
@@ -46,37 +43,6 @@ const POLYGON_TILE_ZOOM = 1;
  */
 const LINE_TILE_ZOOM = 0;
 const POINT_TILE_ZOOM = 0;
-
-/**
- * The casings and strokes of lines are drawn in batches (see `_lineBatch`): for each level, one
- * for every casing and one for every stroke. In a level's container the casings are drawn first,
- * then the strokes, and both before the containers of the road classes, which hold what a
- * line's feature draws itself (oneway arrows, a hovered line). Road classes go from -20 to 0
- * (`getzIndex`).
- */
-const CASING_BATCH = -2000;
-const STROKE_BATCH = -1000;
-
-/**
- * Polygons are drawn in two batches too (see `_polygonBatch`): every fill, then every outline,
- * both before the tile containers, which hold what a polygon's feature draws itself (the
- * outlines of a hovered one). In each the polygons are in the order of their size, the largest
- * first. (A tile container's `zIndex` is -1 or more.)
- */
-const FILL_BATCH = -2000;
-const OUTLINE_BATCH = -1000;
-
-// The batch that draws the points, among the containers of the points that draw themselves
-// (a hovered one, above the others)
-const POINT_BATCH = -1000;
-
-/**
- * A batch's vertices are 32-bit floats, relative to a place in the world near its lines. The
- * layer moves that place to the view's center when it's so far from it that a float could be
- * off by this much of a pixel at the view's zoom (see `_moveBatchOrigins`). At zoom 16 that's
- * 260,000 pixels away, at zoom 19 a 32,000 world units, at zoom 22 4,000.
- */
-const BATCH_PRECISION = 1 / 32;
 
 /** Highway type z-index stacking order (motorway on top, footway on bottom) */
 const HIGHWAYSTACK: Record<string, number> = {
@@ -116,12 +82,6 @@ interface RelatedIDs {
   handleIDs: Set<EntityID>;
 }
 
-/** The batches that draw the lines of one level (see `PixiLayerOsm._lineBatch`) */
-interface LineBatchPair {
-  casings: LineBatch | null;
-  strokes: LineBatch | null;
-}
-
 /** The kinds of OSM data the layer draws, as it sorts them in `OsmData` */
 type OsmDataKind = keyof OsmData;
 
@@ -156,7 +116,7 @@ interface TilePlace {
  */
 const MIN_RETILE = 4;
 
-/** What moving a feature to another tile container costs the DRAW pass, which rebuilds both (ms) */
+/** What moving a feature to another tile container costs the DRAW phase, which rebuilds both (ms) */
 const RETILE_DRAW_MS = 0.002;
 
 /**
@@ -168,15 +128,15 @@ const MIN_VERTEX_ZOOM = 16;
 /**
  * While the layer goes through the entities that arrived (see `_renderArrived`), most of them
  * need nothing done (vertices that only shape their way). It looks at up to this many for each
- * batch, so that a frame can't spend all of its time passing them by.
+ * chunk, so that a frame can't spend all of its time passing them by.
  */
 const ARRIVED_LOOK = 8000;
 
 /**
  * When the layer makes features after its pass (see `_makeWaiting`), it takes this many entities
- * at a time, and checks the frame's time between them. At least one batch is made on every call.
+ * at a time, and checks the frame's time between them. At least one chunk is made on every call.
  */
-const MAKE_BATCH = 64;
+const MAKE_CHUNK = 64;
 
 /**
  * How many changed entities the layer draws again one by one (see `_renderChanged`). Beyond this
@@ -188,22 +148,10 @@ const MAX_CHANGED = 5000;
 /**
  * Entities that arrived (a tile loaded, or the cull box moved over them) are sorted and looked at
  * this many at a time, with a check of the frame's time between (see `_renderArrived`). Most are
- * vertices that aren't drawn, so a batch takes about a millisecond.
+ * vertices that aren't drawn, so a chunk takes about a millisecond.
  */
-const ARRIVED_BATCH = 1000;
+const ARRIVED_CHUNK = 1000;
 
-/**
- * How many moves of the cull box (or passes) a hidden feature is kept for before it's destroyed.
- * Panning back within that many finds it still made.
- */
-const KEEP_HIDDEN_MOVES = 20;
-
-/**
- * Pixels added to the furthest a feature can be hit from the box of its entity (`hitReach`),
- * when the layer asks the spatial index for the entities near the pointer (see `hitTest`).
- * The pointer and the features are placed by the frame that was drawn, the index isn't.
- */
-const HIT_REACH_MARGIN = 4;
 
 /** Midpoint properties */
 interface MidpointProps extends MarkerProps {
@@ -257,34 +205,6 @@ function entityOrder(entityID: EntityID): number {
 
 
 /**
- * Returns the parts of one box that another doesn't cover, as up to four boxes: left and right of
- * the other at full height, and above and below it in between.
- * @param a - The box
- * @param b - The box to take away from it
- * @returns The parts of `a` outside `b` (`a` itself if they don't overlap)
- */
-function extentMinus(a: Extent, b: Extent): Extent[] {
-  if (!a.intersects(b)) return [a];
-
-  const [ax0, ay0] = a.min;
-  const [ax1, ay1] = a.max;
-  const [bx0, by0] = b.min;
-  const [bx1, by1] = b.max;
-  const parts: Extent[] = [];
-
-  if (bx0 > ax0)  parts.push(new Extent([ax0, ay0], [bx0, ay1]));
-  if (bx1 < ax1)  parts.push(new Extent([bx1, ay0], [ax1, ay1]));
-
-  const x0 = Math.max(ax0, bx0);
-  const x1 = Math.min(ax1, bx1);
-  if (by0 > ay0)  parts.push(new Extent([x0, ay0], [x1, by0]));
-  if (by1 < ay1)  parts.push(new Extent([x0, by1], [x1, ay1]));
-
-  return parts;
-}
-
-
-/**
  * Whether an entity's shape reaches into a box (in world coordinates).
  * A node is asked for its location, not its geometry: asking for that builds and keeps one, and
  * the cull box moves over thousands of nodes that are never drawn (see `OsmEntity.geoms`).
@@ -332,22 +252,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /** Container for points, vertices and virtual POI pins (`points/osm`, split by tile) */
   public pointContainer: PIXI.Container | null;
 
-  /**
-   * Whether lines and polygons are drawn in batches (see `_lineBatch`, `_polygonBatch`), not by
-   * display objects of each feature's own. Change it and `reset()` the layer to compare the two.
-   */
-  public useBatches: boolean;
-
   /** The containers that features are split into, by parent and label (see `_tileContainer`) */
   protected _tileContainers: Map<PIXI.Container, Map<string, PIXI.Container>>;
-  /** The batches that lines are drawn in, by the container of their level: one for the casings, one for the strokes (see `_lineBatch`) */
-  protected _lineBatches: Map<PIXI.Container, LineBatchPair>;
-  /** The batch that draws the polygons' fills (see `_polygonBatch`) */
-  protected _polygonFills: FillBatch | null;
-  /** The batch that draws the polygons' outlines, above their fills */
-  protected _polygonOutlines: LineBatch | null;
-  /** The batch that draws the points, vertices and virtual pins (see `_pointBatch`) */
-  protected _points: PointBatch | null;
   /** collection of calculated midpoints */
   protected _midpoints: Map<DataID, Midpoint>;
   /** Entities in view that the last pass saw, whose features aren't made yet (see `_waitToMake`) */
@@ -368,10 +274,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _modeDirty: boolean;
   /** Entities that arrived since the last pass, to sort and draw when frames have time (see `dataArrived`, `_moveBox`) */
   protected _arrivedIDs: Set<EntityID>;
-  /** How many times the cull box moved, or a pass was done: hidden features age by this */
-  protected _moves: number;
-  /** The features that are hidden, and the value of `_moves` when each was (see `_forgetHidden`) */
-  protected _hiddenAt: Map<FeatureID, number>;
   /** Whether the zoom was high enough for vertices the last time the layer looked (see `MIN_VERTEX_ZOOM`) */
   protected _showsVertices: boolean;
   /** Whether the features were marked to be drawn again for a new zoom or rotation (see `dirtyTransform`) */
@@ -396,13 +298,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.lineContainer = null;
     this.pointContainer = null;
 
+    // Lines, polygons and points are drawn in batches (`batches`): for each level of lines, one
+    // for the casings and one for the strokes; one for the polygons' fills and one for their
+    // outlines; one for the points, vertices and virtual pins. Change it and `reset()` the
+    // layer to compare with display objects of each feature's own.
     this.useBatches = true;
 
     this._tileContainers = new Map<PIXI.Container, Map<string, PIXI.Container>>();
-    this._lineBatches = new Map<PIXI.Container, LineBatchPair>();
-    this._polygonFills = null;
-    this._polygonOutlines = null;
-    this._points = null;
     this._midpoints = new Map<DataID, Midpoint>();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
@@ -413,13 +315,54 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._seenFeatureIDs = null;
     this._modeDirty = false;
     this._arrivedIDs = new Set<EntityID>();
-    this._moves = 0;
-    this._hiddenAt = new Map<FeatureID, number>();
     this._showsVertices = false;
     this._zoomed = false;
     this._tileFloor = 0;
     this._tilePlace = new WeakMap<PIXI.Container, TilePlace>();
     this._oldTiles = new Set<PIXI.Container>();
+
+    // The data comes from the editor: what arrived from the OSM API (`merge`), and what an edit
+    // changed (`stagingchange`). The layer draws just that, without its pass, when its frames
+    // have time (`dataArrived`, `dataChanged`).
+    this._merged = this._merged.bind(this);
+    this._stagingChanged = this._stagingChanged.bind(this);
+    const editor = this.context.systems.editor;    // (not in some tests)
+    editor?.on('merge', this._merged);
+    editor?.on('stagingchange', this._stagingChanged);
+  }
+
+
+  /**
+   * OSM data arrived from the API, and `EditSystem` merged it (`merge`). The layer makes and draws
+   * what arrived as its frames have time (see `dataArrived`), and the scene asks for a frame, not a
+   * redraw. (`entityIDs` is everything on the tile, also what we had already, and what the new data
+   * reshaped.) Without a list, it's a redraw of the layer.
+   * @param entityIDs - What arrived, or `undefined` if that isn't known
+   */
+  protected _merged(entityIDs?: Iterable<EntityID>): void {
+    const gfx = this.gfx;
+    const scene = this.scene;
+
+    if (entityIDs) {
+      scene.dataArrived(this.id, [...entityIDs]);
+    } else {
+      gfx.deferredRedraw(this.id);
+    }
+  }
+
+
+  /**
+   * An edit changed staging (`stagingchange`). The layer draws again what it affects, without
+   * its pass (see `dataChanged`, `_renderChanged`): a drag makes an edit on every pointer move.
+   * `EditSystem` emits with staging's geometry already current. The renderer binds each feature to
+   * its entity and its part of staging's geometry, and binds again when either is a different
+   * object; these are marked dirty to restyle them, since what changed may be only their topology
+   * (a vertex that's now shared).
+   * @param difference - What the edit changed
+   */
+  protected _stagingChanged(difference: Difference): void {
+    const scene = this.scene;
+    scene.dataChanged(this.id, [...difference.complete().keys()]);
   }
 
 
@@ -455,7 +398,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
@@ -467,17 +410,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     super.reset();
 
     this._tileContainers.clear();
-    this._lineBatches.clear();    // (`super.reset()` destroyed them, with the containers they were in)
-    this._polygonFills = null;
-    this._polygonOutlines = null;
-    this._points = null;
     this._oldTiles.clear();
     this._midpoints.clear();
     this._unmadeInView = this._newUnmade();
     this._unmadeOutside = this._newUnmade();
     this._changedIDs.clear();
     this._arrivedIDs.clear();
-    this._hiddenAt.clear();
 
     // This layer finds its own features under the pointer (see `hitTest`)
     this.scene.setHitTester('osm', this);
@@ -487,44 +425,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.polygonContainer = this._childContainer(basemap, 'polygons', 0);
     this.lineContainer = this._childContainer(basemap, 'lines', 1);
     this.pointContainer = this._spatialContainer('points', 'osm');
-  }
-
-
-  /**
-   * The batches that draw the lines' casings and strokes (see `_lineBatch`)
-   * @return The batches, in no particular order
-   * @readonly
-   */
-  public get lineBatches(): LineBatch[] {
-    const batches: LineBatch[] = [];
-    for (const pair of this._lineBatches.values()) {
-      if (pair.casings) batches.push(pair.casings);
-      if (pair.strokes) batches.push(pair.strokes);
-    }
-    return batches;
-  }
-
-
-  /**
-   * The batches that draw the polygons' fills and outlines (see `_polygonBatch`)
-   * @return The fills' batch and the outlines' batch, each if there is one
-   * @readonly
-   */
-  public get polygonBatches(): VertexBatch[] {
-    const batches: VertexBatch[] = [];
-    if (this._polygonFills) batches.push(this._polygonFills);
-    if (this._polygonOutlines) batches.push(this._polygonOutlines);
-    return batches;
-  }
-
-
-  /**
-   * The batch that draws the points, vertices and virtual pins, if there is one (see `_pointBatch`)
-   * @return The batch, or `null`
-   * @readonly
-   */
-  public get pointBatch(): PointBatch | null {
-    return this._points;
   }
 
 
@@ -551,6 +451,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const viewport = context.viewport;
 
     if (!this._numVisible) return null;   // disabled, or zoomed out too far to draw
+    if (!this.scene.isInteractive('osm')) return null;   // the mode keeps the pointer from it
 
     // How far from the box of an entity one of its features can be hit, in world coordinates:
     // a line a few pixels from it, a pin above its point (the furthest of any feature drawn so far).
@@ -605,9 +506,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    // (The scene has told the batches' shaders about the view: see `PixiScene.setBatchViews`.)
+    // (The scene has told the batches' shaders about the view, and the batches have followed it:
+    // see `PixiScene.setBatchViews`.)
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
-    this._moveBatchOrigins(viewport);
 
     const showsVertices = styleZoom >= MIN_VERTEX_ZOOM;
 
@@ -764,7 +665,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   protected _waitToMake(kind: OsmDataKind, entityID: EntityID, extent: Extent | undefined, frame: RenderFrame, needed: boolean): boolean {
     const inView = !extent || extent.intersects(frame.viewBox);
     // After the pass, a few are made on every call even with no time left, so the work always gets done.
-    const hasTime = frame.hasTime() || (this._catchingUp && this._madeCount < MAKE_BATCH);
+    const hasTime = frame.hasTime() || (this._catchingUp && this._madeCount < MAKE_CHUNK);
 
     let wait: boolean;
     if (!inView) {
@@ -912,42 +813,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Notes which features are hidden, and since when (see `_forgetHidden`).
-   * @param feature - The feature
-   * @param visible - Whether it's visible now
-   */
-  public override visibilityChanged(feature: AbstractPixiFeature, visible: boolean): void {
-    super.visibilityChanged(feature, visible);
-    if (visible) {
-      this._hiddenAt.delete(feature.id);
-    } else {
-      this._hiddenAt.set(feature.id, this._moves);
-    }
-  }
-
-
-  /**
-   * Adds a feature to the layer (see `AbstractPixiLayer.addFeature`). A new feature is visible,
-   * whatever became of an earlier one with its ID.
-   * @param feature - The feature
-   */
-  public override addFeature(feature: AbstractPixiFeature): void {
-    super.addFeature(feature);
-    this._hiddenAt.delete(feature.id);
-  }
-
-
-  /**
-   * Removes a feature from the layer (see `AbstractPixiLayer.removeFeature`).
-   * @param feature - The feature
-   */
-  public override removeFeature(feature: AbstractPixiFeature): void {
-    super.removeFeature(feature);
-    this._hiddenAt.delete(feature.id);
-  }
-
-
-  /**
    * Retains a feature (see `AbstractPixiLayer.retainFeature`), and notes that it was seen, while
    * `_renderChanged()` is watching for the features that aren't.
    * @param feature - The feature
@@ -956,9 +821,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   public override retainFeature(feature: AbstractPixiFeature, frame: RenderFrame): void {
     super.retainFeature(feature, frame);
     this._seenFeatureIDs?.add(feature.id);
-    if (this._hiddenAt.size) {
-      this._hiddenAt.delete(feature.id);   // wanted, even if it isn't shown at this zoom
-    }
   }
 
 
@@ -1285,9 +1147,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Sorts and draws the entities that arrived (a tile loaded, or the cull box moved over them),
-   * a batch at a time while the frame has time, and at least one batch.
+   * a chunk at a time while the frame has time, and at least one chunk.
    * A new entity gets its feature now or in a later frame, like any other (`_waitToMake`).
-   * The vertices that need nothing done aren't part of a batch (see `_isIdleVertex`).
+   * The vertices that need nothing done aren't part of a chunk (see `_isIdleVertex`).
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
@@ -1296,18 +1158,18 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     const arrivedIDs = this._arrivedIDs;
     do {
-      const batch = new Set<DataID>();
+      const chunk = new Set<DataID>();
       let looked = 0;
       for (const entityID of arrivedIDs) {
         arrivedIDs.delete(entityID);   // (deleting from a Set while iterating over it is safe)
         if (!this._isIdleVertex(graph.hasEntity(entityID))) {
-          batch.add(entityID);
-          if (batch.size >= ARRIVED_BATCH) break;
+          chunk.add(entityID);
+          if (chunk.size >= ARRIVED_CHUNK) break;
         }
         if (++looked >= ARRIVED_LOOK) break;
       }
-      if (batch.size) {
-        this._renderChanged(frame, viewport, batch, false);
+      if (chunk.size) {
+        this._renderChanged(frame, viewport, chunk, false);
       }
     } while (arrivedIDs.size && frame.hasTime());
   }
@@ -1323,7 +1185,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    *   made over the next frames (`_renderArrived`).
    * - After a zoom, what stays is remembered as having arrived too. Its features are drawn for
    *   another zoom, and may belong in other tiles' containers and need other details (a line's
-   *   arrows). The `render…()` functions see to all of that, a batch at a time, where a pass
+   *   arrows). The `render…()` functions see to all of that, a chunk at a time, where a pass
    *   would do it for everything in one frame.
    * @param frame - The frame being rendered
    * @param prevBox - The cull box that the layer's features were current for
@@ -1437,21 +1299,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Destroys the features that have been hidden for more than `KEEP_HIDDEN_MOVES` moves of the
-   * cull box (or passes). A pass does this for what it hasn't seen in a while (`cull()`), but
-   * while the view only moves there are no passes, and what the box leaves behind would pile up.
-   */
-  protected _forgetHidden(): void {
-    for (const [featureID, hiddenAt] of this._hiddenAt) {
-      if (this._moves - hiddenAt <= KEEP_HIDDEN_MOVES) continue;
-      this._hiddenAt.delete(featureID);    // (deleting from a Map while iterating over it is safe)
-      this.features.get(featureID)?.destroy();
-    }
-  }
-
-
-  /**
-   * Makes features for entities that waited, a batch at a time, by running them through the same
+   * Makes features for entities that waited, a chunk at a time, by running them through the same
    * `render…()` functions as a pass does. Each function asks `_waitToMake()` again, so an entity
    * that still can't be made goes back to waiting.
    * @param frame - The frame being rendered
@@ -1464,24 +1312,24 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     const waiting = outside ? this._unmadeOutside : this._unmadeInView;
 
-    const newBatch = (): OsmData => ({
+    const newChunk = (): OsmData => ({
       polygons: new Map<EntityID, OsmWay | OsmRelation>(),
       lines: new Map<EntityID, OsmWay>(),
       points: new Map<EntityID, OsmNode>(),
       vertices: new Map<EntityID, OsmNode>()
     });
 
-    let batch = newBatch();
-    let batchSize = 0;
+    let chunk = newChunk();
+    let chunkSize = 0;
     let stopped = false;
 
-    const makeBatch = (): void => {
-      if (batch.polygons.size)  this.renderPolygons(frame, viewport, batch);
-      if (batch.lines.size)     this.renderLines(frame, viewport, batch);
-      if (batch.points.size)    this.renderPoints(frame, viewport, batch);
-      if (batch.vertices.size)  this.renderVertices(frame, viewport, batch, this._lastRelated);
-      batch = newBatch();
-      batchSize = 0;
+    const makeChunk = (): void => {
+      if (chunk.polygons.size)  this.renderPolygons(frame, viewport, chunk);
+      if (chunk.lines.size)     this.renderLines(frame, viewport, chunk);
+      if (chunk.points.size)    this.renderPoints(frame, viewport, chunk);
+      if (chunk.vertices.size)  this.renderVertices(frame, viewport, chunk, this._lastRelated);
+      chunk = newChunk();
+      chunkSize = 0;
       stopped = !frame.hasTime();
     };
 
@@ -1502,16 +1350,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const extent = graph.geometry(entity).world?.extent;
         if (extent && !extent.intersects(frame.cullBox)) continue;
 
-        (batch[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
-        if (++batchSize >= MAKE_BATCH) {
-          makeBatch();
+        (chunk[kind] as Map<EntityID, OsmEntity>).set(entityID, entity);
+        if (++chunkSize >= MAKE_CHUNK) {
+          makeChunk();
           if (stopped) return;
         }
       }
     }
 
-    if (batchSize) {
-      makeBatch();
+    if (chunkSize) {
+      makeChunk();
     }
   }
 
@@ -1670,13 +1518,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         // The batches that draw its fill and its outlines
         if (feature.dirty) {
-          if (!this.useBatches) {
-            feature.fillBatch = null;
-            feature.strokeBatch = null;
-          } else if (!feature.fillBatch || feature.fillBatch.destroyed || !feature.strokeBatch || feature.strokeBatch.destroyed) {
-            feature.fillBatch = this._polygonBatch(true, part);
-            feature.strokeBatch = this._polygonBatch(false, part);
-          }
+          feature.placeInBatches(this.useBatches ? this.batches : null, this.polygonContainer!);
         }
 
         // (Not after a change of zoom alone: what it is hasn't changed, see `needsStyle`)
@@ -2057,7 +1899,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Removes the containers that features were split into and that have emptied: their features
-   * moved to other tiles after a change of zoom, or were destroyed after scrolling away.
+   * moved to other tiles after a change of zoom, or were destroyed after scrolling away. And
+   * the batches that have emptied.
    */
   protected _removeEmptyContainers(): void {
     for (const [parent, byLabel] of this._tileContainers) {
@@ -2072,193 +1915,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-    for (const [parent, pair] of this._lineBatches) {
-      // (Not a batch that a feature is waiting to be drawn in: it's empty until then.)
-      if (pair.casings && !pair.casings.size && !pair.casings.users) {
-        pair.casings.destroy();
-        pair.casings = null;
-      }
-      if (pair.strokes && !pair.strokes.size && !pair.strokes.users) {
-        pair.strokes.destroy();
-        pair.strokes = null;
-      }
-      if (!pair.casings && !pair.strokes) {
-        this._lineBatches.delete(parent);
-      }
-    }
-    if (this._polygonFills && !this._polygonFills.size && !this._polygonFills.users) {
-      this._polygonFills.destroy();
-      this._polygonFills = null;
-    }
-    if (this._polygonOutlines && !this._polygonOutlines.size && !this._polygonOutlines.users) {
-      this._polygonOutlines.destroy();
-      this._polygonOutlines = null;
-    }
-    if (this._points && !this._points.size && !this._points.users) {
-      this._points.destroy();
-      this._points = null;
-    }
-  }
-
-
-  /**
-   * Returns the batch that draws the polygons' fills, or the one that draws their outlines,
-   * making it if there's none. Every fill is drawn before every outline, so a polygon's outline
-   * is never under another's fill. In each batch the polygons are in the order of their
-   * feature's `zIndex`: by size, the largest first.
-   * @param isFill - Whether the batch is for the fills, not the outlines
-   * @param part - The geometry of the polygon that the batch is wanted for
-   * @return The batch to draw the polygon's fill or outlines in
-   */
-  protected _polygonBatch(isFill: true, part: GeometryPart): FillBatch;
-  protected _polygonBatch(isFill: false, part: GeometryPart): LineBatch;
-  protected _polygonBatch(isFill: boolean, part: GeometryPart): FillBatch | LineBatch {
-    const existing = isFill ? this._polygonFills : this._polygonOutlines;
-    if (existing && !existing.destroyed) return existing;
-
-    // The batch's coordinates start near its polygons: at the first of them (see `_moveBatchOrigins`).
-    const origin = part.world!.origin!;
-    const batch = isFill ? new FillBatch() : new LineBatch();
-    batch.label = isFill ? 'fills' : 'outlines';
-    batch.zIndex = isFill ? FILL_BATCH : OUTLINE_BATCH;
-    batch.position.set(origin[0], origin[1]);
-    this.polygonContainer!.addChild(batch);
-    if (isFill) {
-      this._polygonFills = batch as FillBatch;
-    } else {
-      this._polygonOutlines = batch as LineBatch;
-      this._polygonOutlines.glows = this._glowBatch(this.polygonContainer!, OUTLINE_BATCH + 1, origin);
-    }
-    return batch;
-  }
-
-
-  /**
-   * Makes the batch that draws the glows of a batch's lines, while they're hovered or
-   * highlighted: over all of them. It's a batch of its own because a glow comes and goes with
-   * every move of the pointer, and a batch that gets or loses a line builds its index buffer
-   * again and sends its vertices to the GPU again: 9 ms for the batch of a town's roads. This
-   * one holds a glow or two. (While it holds none, it draws nothing.)
-   * @param parent - The container that the lines' batch is in
-   * @param zIndex - Where it's drawn there: after the lines' batch
-   * @param origin - Where its coordinates start, in the world's (see `_moveBatchOrigins`)
-   * @return The batch
-   */
-  protected _glowBatch(parent: PIXI.Container, zIndex: number, origin: Vec2): LineBatch {
-    const batch = new LineBatch();
-    batch.label = 'glows';
-    batch.zIndex = zIndex;
-    batch.position.set(origin[0], origin[1]);
-    parent.addChild(batch);
-    return batch;
-  }
-
-
-  /**
-   * Returns the batch that draws the points, the vertices and the virtual pins, making it if
-   * there's none. It's one mesh and one draw call for all of them (see `PointBatch`), drawn
-   * under the containers of the few points that draw themselves (`PixiFeaturePoint.drawsInContainer`).
-   * In the batch the points are in the order they were in before: from north to south, and the
-   * ones with viewfields over the others (`PixiFeaturePoint.sceneOrder`).
-   * @param part - The geometry of the point that the batch is wanted for
-   * @return The batch to draw the point in
-   */
-  protected _pointBatch(part: GeometryPart): PointBatch {
-    const existing = this._points;
-    if (existing && !existing.destroyed) return existing;
-
-    // The batch's coordinates start near its points: at the first of them (see `_moveBatchOrigins`).
-    const origin = part.world!.origin!;
-    const batch = new PointBatch();
-    batch.label = 'points';
-    batch.zIndex = POINT_BATCH;
-    batch.position.set(origin[0], origin[1]);
-    this.pointContainer!.addChild(batch);
-    this._points = batch;
-
-    // The glows of hovered points, under every point: a batch of its own, as the lines' glows
-    // have (see `_glowBatch`), so that a hover leaves the points' batch as it is.
-    const glows = new PointBatch();
-    glows.label = 'glows';
-    glows.zIndex = POINT_BATCH - 1;
-    glows.position.set(origin[0], origin[1]);
-    this.pointContainer!.addChild(glows);
-    batch.glows = glows;
-    return batch;
-  }
-
-
-  /**
-   * Returns the batch that draws the casings, or the strokes, of a level's lines, making it if
-   * there's none. A batch is one mesh and one draw call for all of its lines (see `LineBatch`).
-   *
-   * A level's casings are all drawn before its strokes, so where two roads meet, neither's
-   * casing crosses the other's stroke. In a batch the lines are in the order of their
-   * feature's `zIndex`: by road class, then by the way's ID.
-   * @param levelContainer - The container of the line's level (`way.layer()`)
-   * @param isCasing - Whether the batch is for the casings, not the strokes
-   * @param part - The geometry of the line that the batch is wanted for
-   * @return The batch to draw the line's casing or stroke in
-   */
-  protected _lineBatch(levelContainer: PIXI.Container, isCasing: boolean, part: GeometryPart): LineBatch {
-    let pair = this._lineBatches.get(levelContainer);
-    if (!pair) {
-      pair = { casings: null, strokes: null };
-      this._lineBatches.set(levelContainer, pair);
-    }
-
-    let batch = isCasing ? pair.casings : pair.strokes;
-    if (!batch || batch.destroyed) {
-      batch = new LineBatch();
-      batch.label = isCasing ? 'casings' : 'strokes';
-      batch.zIndex = isCasing ? CASING_BATCH : STROKE_BATCH;
-
-      // The batch's coordinates start near its lines: at the first of them. (Its buffers hold
-      // 32-bit floats, which world coordinates don't fit in. See `_moveBatchOrigins`.)
-      const origin = part.world!.origin!;
-      batch.position.set(origin[0], origin[1]);
-      levelContainer.addChild(batch);
-      if (isCasing) {
-        pair.casings = batch;
-      } else {
-        pair.strokes = batch;
-        batch.glows = this._glowBatch(levelContainer, STROKE_BATCH + 1, origin);
-      }
-    }
-    return batch;
-  }
-
-
-  /**
-   * Keeps the batches' coordinates fine enough for the view's zoom. A batch's vertices are
-   * 32-bit floats relative to its place in the world, which is where its first line was. When
-   * the view is far from there (after a long pan), and zoomed in enough for it to show, the
-   * batch's place moves to the view's center, and its vertices with it.
-   * @param viewport - The viewport that's being drawn
-   */
-  protected _moveBatchOrigins(viewport: Viewport): void {
-    if (!this._lineBatches.size && !this._polygonFills && !this._polygonOutlines && !this._points) return;
-
-    // How far from its place a batch's floats are still good to a part of a pixel, at this zoom
-    const reach = BATCH_PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
-    const [x, y] = viewport.screenToWorld(viewport.center());
-
-    const isFar = (batch: VertexBatch | null): batch is VertexBatch => {
-      return !!batch && !batch.destroyed && (Math.abs(batch.position.x - x) > reach || Math.abs(batch.position.y - y) > reach);
-    };
-    for (const pair of this._lineBatches.values()) {
-      if (isFar(pair.casings)) pair.casings.moveOrigin(Math.round(x), Math.round(y));
-      if (isFar(pair.strokes)) pair.strokes.moveOrigin(Math.round(x), Math.round(y));
-      const glows = pair.strokes?.glows ?? null;
-      if (isFar(glows)) glows.moveOrigin(Math.round(x), Math.round(y));
-    }
-    const outlineGlows = this._polygonOutlines?.glows ?? null;
-    if (isFar(outlineGlows)) outlineGlows.moveOrigin(Math.round(x), Math.round(y));
-    if (isFar(this._polygonFills)) this._polygonFills.moveOrigin(Math.round(x), Math.round(y));
-    if (isFar(this._polygonOutlines)) this._polygonOutlines.moveOrigin(Math.round(x), Math.round(y));
-    if (isFar(this._points)) this._points.moveOrigin(Math.round(x), Math.round(y));
-    const pointGlows = this._points?.glows ?? null;
-    if (isFar(pointGlows)) pointGlows.moveOrigin(Math.round(x), Math.round(y));
+    this.batches.removeEmpty();
   }
 
 
@@ -2322,13 +1979,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (feature.dirty) {
           // Its level's batches. (A new level puts it in others.)
-          if (!this.useBatches) {
-            feature.batch = null;
-            feature.casingBatch = null;
-          } else if (feature.batch?.parent !== levelContainer || feature.casingBatch?.parent !== levelContainer) {
-            feature.batch = this._lineBatch(levelContainer, false, part);
-            feature.casingBatch = this._lineBatch(levelContainer, true, part);
-          }
+          feature.placeInBatches(this.useBatches ? this.batches : null, levelContainer);
         }
 
         if (feature.needsStyle) {
@@ -2529,7 +2180,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const part = feature.geometry;
     if (!part?.world?.origin) return;
 
-    feature.batch = this.useBatches ? this._pointBatch(part) : null;
+    feature.placeInBatches(this.useBatches ? this.batches : null, this.pointContainer!);
 
     if (feature.drawsInContainer()) {
       const hasViewfields = (feature.style?.viewfield?.angles?.length ?? 0) > 0;

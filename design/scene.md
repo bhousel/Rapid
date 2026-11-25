@@ -5,7 +5,9 @@ mode) are done (Nov 11), and so is section 3 (render groups, Nov 18; OSM lines a
 tile, Nov 19). The OSM layer finds its own features under the pointer, and draws its lines in
 two batches a level, every casing and then every stroke, its areas in two, every fill and
 then every outline, and its points in one; a feature that its batches draw isn't in the scene
-(Nov 23). Section 4 is ideas with nothing built.
+(Nov 23). Every other layer that draws data does the same since Nov 24. Section 4 (a scene per
+view, for the minimap and the turn restriction editor) is a plan, and section 5 is ideas; nothing in
+either is built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:
@@ -16,8 +18,8 @@ then every outline, and its points in one; a feature that its batches draw isn't
   over everything.
 - **Hit-testing.** Pixi tests the tree top-down and stops at the first container with
   `eventMode: 'static'`. A container with `eventMode: 'none'` is skipped along with its whole subtree.
-  (The OSM layer's features are found through the spatial index instead, with the same answer:
-  "Who finds the feature under the pointer", below.)
+  (The features of layers that draw in batches, OSM's and every other data layer's, are found
+  through an index instead, with the same answer: "Who finds the feature under the pointer", below.)
   Whatever draws on top takes the pointer, which is right for selecting and wrong for drawing: a muted
   "already mapped" Rapid line lies exactly on the OSM sidewalk it matched, so a line started on that
   sidewalk ended up as a loose node (pre.4 release check, Nov 2026). Photo markers and QA items over
@@ -36,20 +38,20 @@ origin
 ├ basemap
 │  ├ osm                 zIndex 0
 │  │  ├ polygons
-│  │  │  ├ fills         a `FillBatch`: every polygon's fill, the largest first
-│  │  │  ├ outlines      a `LineBatch`: every polygon's outlines, above every fill (a polygon
+│  │  │  ├ fills         a `FillBatchMesh`: every polygon's fill, the largest first
+│  │  │  ├ outlines      a `LineBatchMesh`: every polygon's outlines, above every fill (a polygon
 │  │  │  │               under 20 pixels has none)
-│  │  │  ├ glows         a `LineBatch`: the glow around the outlines of a hovered polygon
+│  │  │  ├ glows         a `LineBatchMesh`: the glow around the outlines of a hovered polygon
 │  │  │  ├ large         polygons bigger than a tile, below the tiles (section 3)
 │  │  │  └ <x,y,zoom>    one per map tile; in each, sorted by area, biggest first (zIndex = -area).
 │  │  │                  Only the polygons that draw something themselves are in these (none,
 │  │  │                  while the layer draws in batches): the rest aren't in the scene
 │  │  └ lines
 │  │     └ <level>       one per `way.layer()`, zIndex = level
-│  │        ├ casings              a `LineBatch`: every casing of the level's lines, by road class
-│  │        ├ strokes              a `LineBatch`: every stroke, above every casing, and then the
+│  │        ├ casings              a `LineBatchMesh`: every casing of the level's lines, by road class
+│  │        ├ strokes              a `LineBatchMesh`: every stroke, above every casing, and then the
 │  │        │                      markers along the lines (oneway arrows), above every stroke
-│  │        ├ glows                a `LineBatch`: the glow around a hovered line of the level
+│  │        ├ glows                a `LineBatchMesh`: the glow around a hovered line of the level
 │  │        ├ <class>/large        lines bigger than a tile, per road class (`getzIndex(tags)`)
 │  │        └ <class>/<x,y,zoom>   one per road class and map tile; ordered by class, then by tile.
 │  │                               Only the lines that draw themselves are in these (one with
@@ -61,8 +63,8 @@ origin
 │  └ …
 ├ points
 │  ├ osm                 OSM points, interesting vertices and the virtual POI pins
-│  │  ├ glows            a `PointBatch`: the glow behind a hovered point, under every point
-│  │  ├ points           a `PointBatch`: every one of them, from north to south, the ones with
+│  │  ├ glows            a `PointBatchMesh`: the glow behind a hovered point, under every point
+│  │  ├ points           a `PointBatchMesh`: every one of them, from north to south, the ones with
 │  │  │                  viewfields last
 │  │  ├ <x,y,zoom>       one per map tile, ordered by row; in each, sorted by latitude. Only the
 │  │  │                  points that draw themselves are in these (one with a picture from
@@ -78,7 +80,7 @@ origin
 ├ labels                 screen-space, not interactive
 ├ blocks                 edit blocks, straight in the group: always interactive (they catch the pointer
 │                        on purpose, and show `not-allowed`)
-└ ui                     PixiLayerMapUI: lasso, geolocation, `halo` (one `LineBatch` for the halos of
+└ ui                     PixiLayerMapUI: lasso, geolocation, `halo` (one `LineBatchMesh` for the halos of
                          everything that's selected, in any layer), and `selected` (the vertices and
                          midpoints of the selected/hovered ways, so the user can grab them above
                          everything)
@@ -144,13 +146,15 @@ index can ask the few features near the pointer instead, so a layer can take its
 testing from Pixi:
 
 - **The layer says so:** `scene.setHitTester('osm', layer)`. The scene then gives that spatial
-  ID's containers `eventMode: 'none'` whatever the mode, and Pixi's walk skips them.
+  ID's containers `eventMode: 'none'` whatever the mode, and Pixi's walk skips them. A layer that
+  draws in batches (`useBatches`) says so for every spatial ID it makes containers for.
 - **`PixiEvents` asks the scene for the feature on every pointer event** (`scene.hitTest()`), and
   puts it on the event (`_feature`). `AbstractBehavior._getEventData()` reads it from there; the
   behaviors and modes are unchanged.
 - **The scene takes whichever is drawn on top:** the feature that Pixi's own target belongs to, or
-  the one a layer found (`drawOrder()` in `helpers.ts` compares their places in the tree). A layer
-  whose spatial ID the mode keeps from the pointer isn't asked.
+  the one a layer found (`drawOrder()` in `helpers.ts` compares their places in the tree). Each
+  layer is asked once, and looks only at the spatial IDs the mode lets the pointer reach
+  (`scene.isInteractive()`).
 - **The OSM layer's `hitTest()`** asks `editor.entitiesInBox()` for the entities whose box is
   within reach of the pointer (the furthest any feature drawn so far can be hit from its
   geometry: `hitReach`), and asks each of their features (`AbstractPixiFeature.hitTest()`). A
@@ -159,9 +163,13 @@ testing from Pixi:
   from its rings or by being in its fill. None of that is Pixi's: a feature that its batches
   draw isn't in the scene. (One that draws itself, like a vertex of what's selected, answers by
   the rules Pixi has for one container: `containerHit()`.)
+- **The other layers' `hitTest()`** (`AbstractPixiLayer.hitTest()`, Nov 24) asks an R-tree of
+  where the features it drew are (written when a feature's box changes), and the same
+  `AbstractPixiFeature.hitTest()` of each near the pointer.
 - **The feature on top is the one drawn last** (`featureOrder()`): by the place in the scene of
   what draws each (`sceneContainer`: a feature's own container, a line's strokes' batch, an
-  area's fills' batch, the points' batch), and in one batch by the feature's order there.
+  area's fills' batch, the points' batch), in one batch by the feature's order there, and of two
+  with the same order by which the batch draws later (`BatchMesh.drawIndex()`).
 - **The vertices and midpoints of what's selected** are in the map UI's container, which isn't a
   spatial container: Pixi still finds those.
 
@@ -172,14 +180,14 @@ and the areas left the scene, Pixi can't be asked about them: `test/e2e/select.t
 the index against asking every feature of the layer. The points left it too (step 8): the test
 draws them with sprites once more, and checks that the batch's points are hit where Pixi hits
 those.
-The numbers are in `design/graphics-system.md` section 15 (step 6).
+The numbers are in `design/graphics-system-log.md` section 15 (step 6).
 
 ## 3. Render groups
 
 Pixi keeps one list of drawing instructions per *render group*, and until Nov 18 the whole scene was
 one group. Any change to what's drawn (a feature scrolls into view, a hover adds a halo) made Pixi
 collect every object again, and moving `origin` gave every object a new transform. On a pan frame
-that cost about 2 µs per visible feature (`design/graphics-system.md`, section 2).
+that cost about 2 µs per visible feature (`design/graphics-system-log.md`, section 2).
 
 Now every structural container is its own render group: the groups under `origin`, each spatial
 container, and the containers a layer makes under one with `_childContainer()` (`polygons`, `lines`,
@@ -219,7 +227,7 @@ Rules:
   draw in screen coordinates, which are small.
 - **`origin` is not a render group**, for the reason above.
 
-What it changed (M4, `bun run measure --fresh`, DRAW pass in ms):
+What it changed (M4, `bun run measure --fresh`, DRAW phase in ms):
 
 | | Seattle | Bochum | Staten Island | Golmud |
 |---|---|---|---|---|
@@ -256,7 +264,7 @@ small over big. Now:
   building; nothing at Staten Island or Bochum. Decided with Bryan (Nov 18): try it, and watch for
   tile edges.
 
-What it changed, on top of the render groups (DRAW pass in ms; tiles at the view's zoom, then one
+What it changed, on top of the render groups (DRAW phase in ms; tiles at the view's zoom, then one
 level past it):
 
 | | Seattle | Staten Island | Golmud |
@@ -277,9 +285,9 @@ Since Nov 19. In Užice all 49,259 points were one group and level 0 of the line
 Pixi collected the whole group again whenever one of its features was made, removed, shown, hidden
 or (for a line) drawn again: 35 ms of DRAW for one changed line or one new point, on every frame
 that had one. That's a hover, each frame of a drag, and every frame of a load or a pan that makes
-features (`graphics-system.md` section 10).
+features ("A deadline on the frame" in `graphics-system.md`).
 
-**What a render group costs, and what it saves.** Pixi's DRAW pass does two things with a group:
+**What a render group costs, and what it saves.** Pixi's DRAW phase does two things with a group:
 - It **builds** the group's list of instructions and its vertex buffer, only when the group's
   structure changed. That walks everything in the group, so it costs what the group holds, not
   what changed.
@@ -298,7 +306,7 @@ changed. A frame of Užice replays about 3,400 draw calls in 6 ms.
 
 **Points** (`_pointTileContainer()`): a container per tile, for points, vertices and the POI pins.
 *(Since Nov 23 the layer's batch draws them, in one draw call, from north to south everywhere:
-see `graphics-system.md` section 15, step 8. The tiles hold the few points that draw themselves,
+see "Batches" in `graphics-system.md`. The tiles hold the few points that draw themselves,
 and what follows is how those are ordered.)*
 - Points are drawn from north to south, so that a pin overlaps the pins above it on the map. The
   tiles' containers are ordered by row, and points within a tile as before.
@@ -349,8 +357,9 @@ What it changed (dev build, from tapes; DRAW in ms):
   some feature's `visible` on every frame.~~ **Done for the OSM layer (Nov 19).** At Staten Island
   even a 2 px pan flipped 30 to 50 features, and a rebuild costs the same whether 1 feature changed
   or 1,800. The answer was to cull less often, not more cleverly: the OSM layer has features ready
-  for a box bigger than the view, and leaves them alone while the view moves inside it. See "A CULL
-  pass" in `graphics-system.md`. Other layers still cull on every frame.
+  for a box bigger than the view, and leaves them alone while the view moves inside it. See "The
+  cull box" in `graphics-system.md`. Since Nov 24 every layer that draws data does; the imagery
+  and the labels still cull on every frame.
 - **Pixi's own culling doesn't help here.** `Culler` (and `CullerPlugin`) walks every `cullable`
   object on every frame, tests its bounds against the screen, and sets `culled`, which marks the
   render group changed exactly as `visible` does. We already know what's in view from the spatial
@@ -363,9 +372,112 @@ What it changed (dev build, from tapes; DRAW in ms):
   splitting only the classes that are big would get most of that back. Not tried.
 - **Halos and other things that come and go could live in the `ui` group**, so that hovering never
   touches a big group. *(Done, Nov 23: halos are one batch in the `ui` group, and a hover's glow is
-  in a small batch beside what it's around. See section 15 of `graphics-system.md`, step 10.)*
+  in a small batch beside what it's around. See "Hovers, selections and animation draws" in `graphics-system.md`.)*
 
-## 4. Later
+## 4. A scene per view (planned, Nov 25)
+
+Rapid draws OSM data in one place, the main map, but it has had two other views: the minimap, and
+iD's turn restriction editor, a small map in the sidebar of the intersection around a selected
+vertex. The minimap draws through a mock `gfx` and a mock scene (`UiMinimap.initAsync()`), and the
+turn restriction editor was never brought back after the move to Pixi: `UiFieldRestrictions` renders
+an empty container, and `UiSectionPresetFields` doesn't make it. The plan is for a `PixiScene` to be
+one view, and for `GraphicsSystem` to run several.
+
+### What a scene owns, and what `GraphicsSystem` keeps
+
+- **A scene owns its view:** its canvas, stage, `origin`, viewport, the layers it draws (a list
+  given when it's made, not all of them), its `PixiEvents`, its classes (a hover or a selection
+  in one view isn't one in another), its cull box and its hit index.
+- **`GraphicsSystem` keeps what's shared:** the Pixi application and renderer, the textures, and the
+  one frame loop, which draws each scene that asked for a frame. What only the main map needs stays
+  with the main scene: frame pacing, deadlines, the held-frame CSS transform on the
+  `supersurface`, labels. A small scene draws when it's dirty, and all of its features each time.
+- **Layers and features ask their scene, never the main map.** Layers already take the viewport in
+  `render(frame, viewport)`. What still reaches for the main map: `context.viewport` (in
+  `AbstractPixiLayer`, `PixiLayerOsm`, `PixiFeaturePolygon`, `PixiEvents`), `map.effectiveZoom`
+  and `map.wireframeMode` (in the line, polygon and point features), and `gfx.origin`,
+  `gfx.stage` and `gfx.immediateRedraw` (in the layers). `PixiLayerBackgroundTiles`'s
+  `isMinimap` goes away.
+
+### The minimap
+
+A scene with the background tile layer and a small layer for the viewport box, in place of the mock
+`gfx` and scene. Until Nov 24 the mock's `origin` was its stage, with no transform, so the tiles
+were drawn at their world coordinates, far off its canvas: it was black from the move to world
+coordinates (May) until `UiMinimap._updateOrigin()`. `test/e2e/minimap.test.js` checks that a tile
+covers the middle of its canvas.
+
+### The turn restriction editor
+
+What it needs is still here, except the drawing:
+
+- **Data:** `osmIntersection()` (`modules/lib/intersection.ts`) builds a graph of its own: the
+  roads within a distance of the vertex, split at the key vertices, with `__from`, `__via` and
+  `__to` on each way, and the turns between them (`intersection.turns(fromWayID, maxViaWay)`).
+  Its shapes are that graph's (`graph.geometry(way)`), so a layer can draw it like any graph.
+- **Editing:** `actionRestrictTurn`, `actionUnrestrictTurn` and `osmInferRestriction()`. Clicking
+  a turn cycles it from allowed to NO to ONLY and back. A change is the intersection's own
+  `actions` (the splits, replayed on the real graph) and then the restriction.
+- **The old field**, 644 lines kept commented out until `c0fa4837e` (Aug 2026), has the clicks,
+  the hints, the distance and via-way controls and the viewport: fitted to the key vertices, up
+  to z22, the sidebar's width less 50 px by 370 px, with 35 px at the top for the hint. Only its
+  drawing (`svgLines`, `svgVertices`, `svgTurns`) was built on what was removed.
+- **Icons:** `svg/rapid-sprite/turns/`.
+
+The plan:
+
+- **A layer of its own** (`PixiLayerIntersection`, say), not `PixiLayerOsm`: the OSM layer draws
+  the editor's graph, through its spatial index, tiles and cull box, with everything editing needs.
+  This one draws the intersection's ways with `PixiFeatureLine` in the usual road styles, the key
+  vertices with `PixiFeaturePoint`, and the turns as sprites: tens of features, all drawn each time.
+- **The field owns the scene:** it makes it when it renders, destroys it when it goes away, and
+  stops drawing while it's collapsed. A change to the editor's graph builds the intersection again;
+  a resize of the sidebar fits the viewport again.
+- **Clicks and hovers come from the scene's own events and hit index.** The chosen "from" way is a
+  class in that scene, not the map's selection. `osmInferRestriction()` takes the scene's viewport.
+- **Bring back** its settings (`ui.restrictions.maxDistance` and `viaWay0`: `UiSystem` unregisters
+  them now, though `SettingsSystem` still migrates them from iD's keys), and make the field again in
+  `UiSectionPresetFields`.
+
+### Renderers, and `multiView`
+
+A view that shares a renderer with another needs `multiView`, which is a setting of the whole
+renderer: Pixi draws into a hidden WebGL canvas and copies the result onto each view's canvas with a
+2D `drawImage()` after every render. For the main map that copy costs 1.5 to 2 ms a frame on the M4
+(section 6 of `graphics-system-log.md`), and more with more pixels.
+
+- **A renderer per small view doesn't work with the textures as they are.** `AtlasItem.uploaded` is
+  one flag, not one per renderer: whichever renderer uploads an item first marks it done, and the
+  other never gets it. And at high quality the atlas pages are 8192² (256 MB each), with the main
+  map's tiles and symbols in them. Pixi's own textures would be fine: in 8.23 a `TextureSource`
+  keeps its GPU data per renderer (`_gpuData[renderer.uid]`).
+- **The plan: the main map on a renderer of its own, without `multiView`, and one second renderer,
+  with it, for every small view.** Two WebGL contexts however many small views there are (three
+  with the 3D map), and the copy only for small canvases. The second renderer gets its own
+  `PixiTextures`, with small atlases (1024² or 2048²) holding only what its views use, so
+  `PixiTextures` becomes something made per renderer rather than one on `gfx`. Destroy a renderer
+  without `releaseGlobalResources`, which would release Pixi's pools that the other one shares.
+- **Not these:** Pixi's canvas renderer (back in 8.23) needs no second context, but our imagery
+  filters are shaders and wouldn't run there (CSS filters on the canvas could stand in, so it's
+  the fallback if a second context costs something). Drawing a small view through the main
+  renderer and reading its pixels back stalls the GPU, on every frame of a pan for the minimap.
+  Drawing the minimap inside the main canvas moves it with the held frame's CSS transform.
+
+### Order
+
+1. **A scene per view, with the minimap as one.** Most of the refactoring, on one renderer with
+   `multiView` still on, and the mock `gfx` goes.
+2. **The turn restriction editor**, as a third scene. Mostly new code (its layer, the field), and
+   the old logic ported.
+3. **Measure the copy on weak hardware, then split the renderers** if it's worth it. The log's
+   section 6 measured the M4, which hides GPU costs. It also found that its timer-query bursts didn't
+   work with `multiView` off; find out why before trusting new GPU numbers. Then `bun run measure
+   --fresh` for an empty frame and a pan, with the minimap shown and without.
+
+Checks to add: that a small view's textures aren't the main atlas's pages, and that the main
+renderer's context canvas is the `surface`.
+
+## 5. Later
 
 - **Reordering spatial IDs.** With an explicit `zIndex` per spatial container, lifting OSM above the
   datasets while drawing, or a layer-order UI, is a `zIndex` write. We don't reorder while drawing by

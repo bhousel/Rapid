@@ -13,7 +13,7 @@ import type { DrawFrameStats, GLCallCounts, UnbatchedGraphic } from '../RenderFr
  * @param renderer - The Pixi renderer
  * @param root - The container whose render groups to read (the stage)
  * @param rebuilt - The render groups Pixi rebuilt in this render (from `findChangedRenderGroups`, before it)
- * @return The DRAW pass stats, without timings
+ * @return The DRAW phase stats, without timings
  */
 export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Container, rebuilt: Set<PIXI.RenderGroup>): Omit<DrawFrameStats, 'ms'> {
   const instructions: Record<string, number> = {};
@@ -45,7 +45,7 @@ export function readInstructionStats(renderer: PIXI.Renderer, root: PIXI.Contain
         indices += (instruction as PIXI.Batch).size;
 
       } else if (pipeID === 'mesh' && instruction instanceof PIXI.Mesh) {
-        // (What's drawn of the index buffer: a `LineBatch` has room in it for more.)
+        // (What's drawn of the index buffer: a `LineBatchMesh` has room in it for more.)
         const geometry = instruction.geometry;
         indices += geometry?.indexCount || (geometry?.indexBuffer?.data.length ?? 0);
 

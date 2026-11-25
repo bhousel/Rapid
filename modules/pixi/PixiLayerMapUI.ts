@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { drawRings } from './helpers.ts';
-import { LineBatch } from './lib/LineBatch.ts';
+import { LineBatchMesh } from './lib/LineBatchMesh.ts';
 import { geoMetersToLon, projWgs84ToWorld, vecSubtract, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { PixiScene } from './PixiScene.ts';
@@ -11,8 +11,6 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const LASSO_DASH = [6, 3];
 
-// How fine the halos' coordinates stay, in pixels (see `render`)
-const HALO_PRECISION = 1 / 32;
 
 
 /**
@@ -50,7 +48,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /** Container that holds the halos of what's selected: one batch of lines (see `haloBatchAt`) */
   public halo: PIXI.Container | null;
   /** The batch that draws the halos of what's selected, in the `halo` container */
-  protected _haloBatch: LineBatch | null;
+  protected _haloBatch: LineBatchMesh | null;
   /** Container that holds the lasso selection polygon graphics */
   public lasso: PIXI.Container | null;
 
@@ -89,12 +87,12 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * @param y - The same, for y
    * @return The batch, or `null` before the layer has its containers
    */
-  public haloBatchAt(x: number, y: number): LineBatch | null {
+  public haloBatchAt(x: number, y: number): LineBatchMesh | null {
     const existing = this._haloBatch;
     if (existing && !existing.destroyed) return existing;
     if (!this.halo) return null;
 
-    const batch = new LineBatch();
+    const batch = new LineBatchMesh(this.scene.batchShaders.lines);
     batch.label = 'halos';
     batch.position.set(x, y);
     this.halo.addChild(batch);
@@ -108,7 +106,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * @return The batch, or `null`
    * @readonly
    */
-  public get haloBatch(): LineBatch | null {
+  public get haloBatch(): LineBatchMesh | null {
     return this._haloBatch;
   }
 
@@ -255,25 +253,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       this.renderLasso(frame, viewport);
     }
 
-    this._moveHaloOrigin(viewport);
-  }
-
-
-  /**
-   * Keeps the halos' coordinates fine enough for the view's zoom: they're 32-bit floats from
-   * the batch's place in the world, which moves to the view when the view has gone far from
-   * it (as `PixiLayerOsm._moveBatchOrigins` does for its batches).
-   * @param viewport - The viewport that's being drawn
-   */
-  protected _moveHaloOrigin(viewport: Viewport): void {
-    const haloBatch = this._haloBatch;
-    if (!haloBatch || haloBatch.destroyed) return;
-
-    const reach = HALO_PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
-    const [x, y] = viewport.screenToWorld(viewport.center());
-    if (Math.abs(haloBatch.position.x - x) > reach || Math.abs(haloBatch.position.y - y) > reach) {
-      haloBatch.moveOrigin(Math.round(x), Math.round(y));
-    }
+    this._haloBatch?.followView(viewport);   // (32-bit floats from its place: see `BatchMesh.followView`)
   }
 
 

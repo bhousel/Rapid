@@ -1,5 +1,5 @@
 // The band along the inside of an area's edge: what a partial fill fills.
-// See `design/graphics-system.md` sections 4 and 15.
+// See "The line builder" in `design/graphics-system.md`.
 import { ClipType, EndType, FillRule, JoinType, PolyTree64, booleanOpWithPolyTree, difference, inflatePaths } from 'clipper2-ts';
 
 import type { Path64, Paths64, PolyPath64 } from 'clipper2-ts';

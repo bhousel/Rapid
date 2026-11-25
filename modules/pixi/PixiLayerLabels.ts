@@ -249,7 +249,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     spatial.clearCache(SPATIAL_LABELS);
     spatial.clearCache(SPATIAL_DEBUG);
-    this.scene.avoidGrid?.clearLabels();
+    this.scene.labelSpace.avoidGrid.clearLabels();
     this._labeled.clear();
     this._placeholders.clear();
     this._debugSprites.clear();
@@ -329,10 +329,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         if (contents.type === 'label' || contents.type === 'avoid') {
           spatial.removeItems(SPATIAL_LABELS, boxID);
           if (contents.cells) {
-            const size = this.scene.avoidGrid.cellSize;
+            const size = this.scene.labelSpace.avoidGrid.cellSize;
             const c = contents.cells;
             this._freed.push([c[0] * size, c[1] * size, (c[2] + 1) * size, (c[3] + 1) * size]);
-            this.scene.avoidGrid.unmark('label', contents.cells);
+            this.scene.labelSpace.avoidGrid.unmark('label', contents.cells);
             contents.cells = null;
           }
         }
@@ -376,13 +376,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /**
    * The labels layer has no features of its own to draw again later. It reports 1 while placing
    * labels is waiting for a later frame, so that the frame comes (see `render`): placement was
-   * put off, or something was drawn over a label after this frame's placement.
+   * put off, something was drawn over a label after this frame's placement, or a feature changed
+   * after this frame's placement (drawn in the scene's catch-up after every layer, or hidden by a
+   * deferred cull) and the layer hasn't looked at it.
    * @return 1 if placement is waiting, otherwise 0
    */
   public override get numWaiting(): number {
-    if (this._placementWaiting || this.scene.numAvoidHits > 0) return 1;
+    const labelSpace = this.scene.labelSpace;
+    if (this._placementWaiting || labelSpace.numAvoidHits > 0 || labelSpace.numChangedFeatures > 0) return 1;
     // Room was made, and something is waiting for room
-    if (this._unplaced.size > 0 && (this._freed.length > 0 || this.scene.numAvoidFrees > 0)) return 1;
+    if (this._unplaced.size > 0 && (this._freed.length > 0 || this.scene.labelSpace.numAvoidFrees > 0)) return 1;
     return 0;
   }
 
@@ -411,8 +414,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         this._isOff = true;
         this.reset();
       }
-      this.scene.takeAvoidHits();
-      this.scene.takeAvoidFrees();
+      this.scene.labelSpace.takeAvoidHits();
+      this.scene.labelSpace.takeAvoidFrees();
+      this.scene.labelSpace.takeChangedFeatures();    // (all are looked at when labels are back, `_placeAll`)
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
       this._placementWaiting = false;
@@ -436,7 +440,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // The features that were drawn, shown, hidden or destroyed since the last frame said so
     // to the scene. Those are the only ones whose labels can need anything.
-    const changedIDs = this.scene.takeChangedFeatures();
+    const changedIDs = this.scene.labelSpace.takeChangedFeatures();
     for (const featureID of changedIDs) {
       this._pending.add(featureID);
     }
@@ -449,9 +453,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const bearing = viewport.transform.rotation;
     const worldScale = origin.scale.x;
 
-    // Label space (the screen minus `labelOffset`) is the scene's, worked out before the layers
-    // render: see `PixiScene.updateLabelSpace`.
-    const labelOffset = this.scene.labelOffset;
+    // Label space (the screen minus its offset) is the scene's, worked out before the layers
+    // render: see `LabelSpace.update`.
+    const labelOffset = this.scene.labelSpace.offset;
 
     // Position the labels group to render in screen space.
     // `origin` now carries both the pan offset and world-scale transforms,
@@ -661,7 +665,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * Rasterize queued labels into the text atlas.
-   * Called from the scheduler's drain phase, NOT from render() — see `_scheduleRasterDrain`.
+   * Called when the scheduler drains its queues, NOT from render() — see `_scheduleRasterDrain`.
    */
   protected _drainPendingRasters(): void {
     this._rasterDrainScheduled = false;
@@ -696,9 +700,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   public resolveAvoidHits(): void {
     const spatial = this.context.systems.spatial!;
-    const size = this.scene.avoidGrid.cellSize;
+    const size = this.scene.labelSpace.avoidGrid.cellSize;
 
-    for (const cells of this.scene.takeAvoidHits()) {
+    for (const cells of this.scene.labelSpace.takeAvoidHits()) {
       const box = { minX: cells[0] * size, minY: cells[1] * size, maxX: (cells[2] + 1) * size, maxY: (cells[3] + 1) * size };
       for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, box)) {
         const hit = item.contents as LabelContents;
@@ -756,7 +760,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       if (!this._didPlace) {   // no room: remember where it would have gone (anywhere around the point)
         const origin = feature.geometry?.world?.origin;
         if (origin) {
-          const [x, y] = this.scene.worldToLabel(origin[0], origin[1], tempVec);
+          const [x, y] = this.scene.labelSpace.worldToLabel(origin[0], origin[1], tempVec);
           const dx = measurement.width + 50;
           const dy = measurement.height + 50;
           this._unplaced.set(featureID, [x - dx, y - dy, x + dx, y + dy]);
@@ -785,7 +789,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     const temp = new PIXI.Point();
     const world = new PIXI.Point();
-    const labelOffset = this.scene.labelOffset;
+    const labelOffset = this.scene.labelSpace.offset;
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -849,7 +853,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     const temp = new PIXI.Point();
     const world = new PIXI.Point();
-    const labelOffset = this.scene.labelOffset;
+    const labelOffset = this.scene.labelSpace.offset;
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -981,11 +985,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * Nothing else would try them again: a feature is only looked at when it changes.
    */
   protected _retryUnplaced(): void {
-    const size = this.scene.avoidGrid.cellSize;
+    const size = this.scene.labelSpace.avoidGrid.cellSize;
 
     let freed = this._freed;
     this._freed = [];
-    for (const c of this.scene.takeAvoidFrees()) {
+    for (const c of this.scene.labelSpace.takeAvoidFrees()) {
       freed.push([c[0] * size, c[1] * size, (c[2] + 1) * size, (c[3] + 1) * size]);
     }
     if (!freed.length || !this._unplaced.size) return;
@@ -1025,7 +1029,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature) return;
 
     const spatial = this.context.systems.spatial!;
-    const grid = this.scene.avoidGrid;
+    const grid = this.scene.labelSpace.avoidGrid;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
@@ -1211,7 +1215,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const spatial = this.context.systems.spatial!;
-    const grid = this.scene.avoidGrid;
+    const grid = this.scene.labelSpace.avoidGrid;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
 
@@ -1428,7 +1432,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
-    const labelOffset = this.scene.labelOffset;
+    const labelOffset = this.scene.labelSpace.offset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
       minY: screen.y - labelOffset.y,
@@ -1487,7 +1491,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * for the debug view only.)
    */
   public renderDebugAvoids(): void {
-    const size = this.scene.avoidGrid.cellSize;
+    const size = this.scene.labelSpace.avoidGrid.cellSize;
     const debugAvoids = this._debugAvoids;
     const seen = new Set<FeatureID>();
 
@@ -1525,7 +1529,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const spatial = this.context.systems.spatial!;
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
-    const labelOffset = this.scene.labelOffset;
+    const labelOffset = this.scene.labelSpace.offset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
       minY: screen.y - labelOffset.y,

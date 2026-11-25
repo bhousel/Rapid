@@ -1,7 +1,11 @@
 import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
 import { AbstractPixiFeature } from '../../../modules/pixi/AbstractPixiFeature.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 describe('AbstractPixiFeature', () => {
@@ -17,7 +21,7 @@ describe('AbstractPixiFeature', () => {
 
   beforeEach(() => {
     const context = new Rapid.MockContext();
-    const scene = { context: context, gfx: {}, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    const scene = { context: context, gfx: {}, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, labelSpace: { featureChanged: () => {}, avoidFreed: () => {} } };
     layer = new AbstractPixiLayer(scene);
   });
 
@@ -83,7 +87,7 @@ describe('AbstractPixiFeature', () => {
     const alphaOf = item => batch._bytes[item.first * BYTES + 3];
 
     beforeEach(() => {
-      batch = new LineBatch();
+      batch = new LineBatchMesh(batchShaders.lines);
       asked = [];
       layer.scene.layers.set('map-ui', { haloBatchAt: (x, y) => { asked.push([x, y]); return batch; } });
     });
@@ -305,7 +309,7 @@ describe('AbstractPixiFeature', () => {
 
     it('tells the scene when it is drawn, hidden, relabeled or destroyed', () => {
       const told = [];
-      layer.scene.featureChanged = feature => told.push(feature.id);
+      layer.scene.labelSpace.featureChanged = feature => told.push(feature.id);
       const feature = makeFeature('f1');
       assert.deepEqual(told, ['f1']);                 // drawn
 

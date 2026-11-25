@@ -254,11 +254,10 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * Called whenever the photo changes.
-   * This will update the urlhash (the current photo and detection), ask for a frame, and emit a 'photochange' event.
+   * This will update the urlhash (the current photo and detection), and emit a 'photochange' event.
    */
   protected _photoChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
     if (urlhash) {
@@ -277,11 +276,24 @@ export class PhotoSystem extends AbstractSystem {
       urlhash.setParam('detection', detectionString);
     }
 
-    // A frame, not a redraw of everything: what changed on the map is the classes of a photo or a
-    // detection, and the scene has told the layers (`scene.setClass`). Select mode calls this on
-    // every exit, with or without a photo, and a redraw makes the OSM layer do its whole pass.
-    gfx?.requestFrame();
+    // No redraw: what changed on the map is the classes of a photo or a detection, and the scene
+    // asks for a frame when a class changes (`scene.setClass`). Select mode calls this on every
+    // exit, with or without a photo, and a redraw makes the OSM layer do its whole pass.
     this.emit('photochange');
+  }
+
+
+  /**
+   * Called when a filter changed (the dates, the usernames, the kinds of photo): the layers that
+   * draw photos and detections draw again what they show. They keep their features while only
+   * the view moves, so each has to be told.
+   */
+  protected _filtersChanged(): void {
+    const gfx = this.context.systems.gfx;   // optional
+
+    for (const layerID of this.layerIDs) {
+      gfx?.immediateRedraw(layerID);
+    }
   }
 
 
@@ -625,6 +637,7 @@ export class PhotoSystem extends AbstractSystem {
 
     if (didChange) {
       this._photoChanged();
+      this._filtersChanged();
     }
   }
 
@@ -644,6 +657,7 @@ export class PhotoSystem extends AbstractSystem {
     const usernames = [...utilIterable(val)];
     this._filterUsernames = usernames.length ? usernames : null;
     this._photoChanged();
+    this._filtersChanged();
   }
 
 
@@ -660,6 +674,7 @@ export class PhotoSystem extends AbstractSystem {
       this._filterPhotoTypes.add(which);
     }
     this._photoChanged();
+    this._filtersChanged();
   }
 
 

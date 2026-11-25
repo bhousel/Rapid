@@ -4,6 +4,7 @@ import { VectorTileService } from './VectorTileService.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONData } from '../data/GeoJSONData.ts';
+import type { Extent } from '@rapid-sdk/math';
 
 
 /**
@@ -17,6 +18,13 @@ const WANTED_THEMES = new Set(['buildings', 'places', 'transportation']);
 
 /** Minimum zoom level for loading data */
 const MINZOOM = 14;
+
+/** The theme of the Overture release that each dataset's data comes from */
+const THEMES: Record<DatasetID, string> = {
+  'overture-places': 'places',
+  'overture-buildings': 'buildings',
+  'overture-tomtom-roads': 'transportation'
+};
 
 
 /**
@@ -208,27 +216,42 @@ export class OvertureService extends VectorTileService {
 
 
   /**
+   * Whether a spatial cache holds a dataset's data (one of its vector tiles' caches, see
+   * `VectorTileService.holdsData`).
+   * @param datasetID - The dataset
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if the cache is one of the dataset's
+   */
+  public override holdsData(datasetID: DatasetID, spatialID: SpatialID): boolean {
+    const theme = THEMES[datasetID];
+    const url = theme && this._pmtilesUrls.get(theme);
+    return !!url && super.holdsData(url, spatialID);
+  }
+
+
+  /**
    * Get already loaded data that appears in the current map view
    * @param  datasetID - datasetID to get data for
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of data
    */
-  public getData(datasetID: DatasetID): GeoJSONData[] {
+  public override getData(datasetID: DatasetID, extent?: Extent): GeoJSONData[] {
     const context = this.context;
     const zoom = context.viewport.transform.zoom;
 
     if (datasetID === 'overture-places') {
       const url = this._pmtilesUrls.get('places');
-      if (url) return super.getData(url);
+      if (url) return super.getData(url, extent);
 
     } else if (datasetID === 'overture-buildings') {
       if (zoom < MINZOOM) return [];
       const url = this._pmtilesUrls.get('buildings');
-      if (url) return super.getData(url);
+      if (url) return super.getData(url, extent);
 
     } else if (datasetID === 'overture-tomtom-roads') {
       if (zoom < MINZOOM) return [];
       const url = this._pmtilesUrls.get('transportation');
-      if (url) return super.getData(url);
+      if (url) return super.getData(url, extent);
     }
 
     return [];

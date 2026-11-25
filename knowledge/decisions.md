@@ -56,7 +56,7 @@ stencil mask (a stroke along the inside of the edge); it's now the band itself, 
 (`geomAreaBand()`): the area minus the area shrunk by 32 pixels. Chosen for the shrinking and its
 cleanup: `clipper2-ts`, a TypeScript port of Clipper2 (18 KB gzipped, BSL-1.0, pinned to an exact
 version: its versions look like prereleases). Measured on every partial fill of three dense views
-(`design/graphics-system.md` section 15, step 5).
+(`design/graphics-system-log.md` section 15, step 5).
 Rejected: `clipper2-wasm` (twice as fast, but 96 KB, an asynchronous start, and it needs
 `'wasm-unsafe-eval'` in our CSP), `clipper-lib` (Clipper 1, unmaintained since 2019), `clipper2-js`
 (wrong answers on our data), and writing the cleanup ourselves (it's a sweep-line clipper: what
@@ -86,7 +86,7 @@ Rejected:
   casings any size. Each feature says how far it can be hit from its geometry (`hitReach`).
 
 ## The OSM layer's lines are drawn in batches, with a shader of our own (Nov 2026)
-Section 15 of `design/graphics-system.md`, step 6. A `LineBatch` is one `Mesh` whose shader places
+Section 15 of `design/graphics-system-log.md`, step 6, and "Batches" in `design/graphics-system.md`. A `LineBatchMesh` is one `Mesh` whose shader places
 each vertex for the line's width in pixels at the current zoom. Choices someone might undo:
 - **Two batches for each level: every casing, then every stroke** (Bryan, Nov 23). Where roads
   meet, neither's casing crosses the other's stroke; he judged the few pixels of difference
@@ -108,6 +108,41 @@ each vertex for the line's width in pixels at the current zoom. Choices someone 
   batches: a drag measured the same either way.
 - **Dashes the vertex can't hold** (more than four numbers, fractions, over 255 pixels) fall back
   to `LineMesh`es with a dash texture. None of Rapid's styles has one.
+
+## Every layer that draws data draws in batches (Nov 24, 2026)
+Section 16 of `design/graphics-system-log.md`. Choices someone might undo:
+- **One way for any layer** (`AbstractPixiLayer.updateFeature()` with a container, and `useBatches`), with each
+  kind of feature knowing which batches it takes (`placeInBatches()`), not a copy of the OSM
+  layer's placement in each layer. The OSM layer still places its features in its levels and
+  tiles itself, with the same `placeInBatches()`.
+- **A layer's own hit test is an R-tree of what it drew** (`_featureIndex`), written when a
+  feature's box changes. Not the data's spatial caches: the Rapid layer draws data from
+  services' graphs and line pieces that aren't in one, and a feature's box is what it's hit by.
+- **The edit blocks are left out:** they draw into a group (no spatial container, so no anchor
+  near the view for a batch's floats, and no spatial ID to hit-test by), are never interactive,
+  and are seldom there.
+- **More draw calls, fewer containers:** 25 → 28 in Bellevue with every layer on, since each
+  layer has its own batches where Pixi merged sprites across layers. It's what took a pan's
+  DRAW from 22.6 to 1.5 ms and Pixi's hit test from 1.8 to 0.006 ms.
+- **They keep their features while only the view moves, follow the box by gathering the strips it
+  moved over** (`_gatherExtents()`, sections 17 and 18 of the log), and do their whole pass for
+  anything else: a class on their own data (a hovered photo), a zoom, data that arrived. The OSM
+  layer's ways of doing those without a pass (`_renderChanged()`, `_renderArrived()`) weren't
+  copied: the other layers' passes are short.
+- **CULL is a stage of its own, run when a frame has time** (Bryan, Nov 24): what a cull box left
+  behind is outside the view, so hiding and destroying it waits (`cullLater()`). It goes by what a
+  pass would gather (`_gatheredInBox()`), so that a pass after it changes nothing shown. The OSM
+  layer still hides what its box left at once, through its index.
+- **A service's getter takes an extent** (`getData(…, extent)`), not a box the graphics system
+  sets for the frame somewhere the services read: what a layer gathers by is in its own code.
+- **`SpatialSystem` says what changed in its caches, and services don't ask the renderer to draw**
+  (Bryan, Nov 24; section 19 of the log). Every write is noted and reported once the writing task
+  is done (`datachange`), and the scene routes it to the layers that draw from the cache. Rejected:
+  an arrival event from each service that its layer listens to (15 services to change, and the
+  same thing to forget next time; Mapillary's old `loaded…` events were that, and nothing listened
+  anymore); reporting data IDs (the layers gather by extent, not by datum).
+- **The OSM layer listens to the editor itself** (`merge`, `stagingchange`), and `FilterSystem`
+  clears its own cache; `MapSystem` stopped passing them on.
 
 ## Areas are drawn in two batches: fills, then outlines (Nov 2026)
 Step 8 of section 15, the first part. Choices someone might undo:
@@ -206,7 +241,7 @@ on color alone, with frames at regular intervals). Choices someone might undo:
   what it's around, each hover had that batch's index buffer built again (11 ms in Užice).
 - **A halo is two lines,** a dark one under the yellow dashes, so that it shows on any
   background. Its dashes march; a glow breathes. Both are a uniform from the clock.
-- **20 animation frames a second, not 60,** because each one draws the whole scene. Enough for
+- **20 animation draws a second, not 60,** because each one draws the whole scene. Enough for
   dashes that move a pixel a frame.
 - **The animation gives way:** to a slow machine (it takes a third of the ticks at most, by
   how long the browser takes to come back), to idleness (it rests after 30 seconds without a
@@ -214,10 +249,11 @@ on color alone, with frames at regular intervals). Choices someone might undo:
   `AnimationPacer` and `PixiScene.animated`. Bryan didn't ask for them, and kept them when
   he saw the result (Nov 23: "wouldn't change anything about it"). The numbers are guesses.
 - **Rejected for now: drawing the still scene to a texture,** and animating over it. It would
-  make an animation frame nearly free and allow 60 a second. It's a change to how every frame
+  make an animation draw nearly free and allow 60 a second. It's a change to how every frame
   is drawn, and wants numbers from weak hardware first.
-- **`GlowFilter` stays for features that draw themselves** in layers without batches (Rapid's
-  and custom data's lines and areas). Every layer's points have the new glow.
+- **`GlowFilter` stays for features that draw themselves** in layers without batches. Since Nov 24
+  every layer that draws data draws in batches, so that's next to nothing (a line whose dashes a
+  batch can't draw).
 
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
@@ -356,7 +392,7 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 
 - **Frames that only move the view aren't paced; frames with a pass to do are, by their cost.**
   After a pass frame the next waits twice what it cost, at most 250 ms (`FramePacer`,
-  `design/graphics-system.md` section 9). A deferred redraw request alone waits at least 250 ms, as
+  "Frame pacing" in `design/graphics-system.md`). A deferred redraw request alone waits at least 250 ms, as
   it did under the fixed throttle, so data that streams in still batches up.
 - **Why twice the cost:** passes then take at most a third of the time, and with the 250 ms cap
   nothing waits longer than it did. Not tuned further; change it with measurements.
@@ -374,7 +410,7 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
 
 - **A dirty feature and a feature that needs its style worked out are two things.** `dirty` means
   draw it again; `needsStyle` means match its style and label to its data again. A zoom sets only
-  the first (`scene.dirtyTransform()`). See `design/graphics-system.md` section 10.
+  the first (`scene.dirtyTransform()`). See "A deadline on the frame" in `design/graphics-system.md`.
 - **What waits is drawing a feature again, by where it is and why it's dirty:** outside the view
   always; in view once the frame is out of time; and in a frame the user asked for, only if
   nothing but the zoom made it dirty. Rejected: no deadline at all in frames the user asked for.
@@ -385,7 +421,7 @@ system because it's runtime state, and a CLI build without `ui` has no modals.
   neither, and at least half of what recent frames cost** (up to 50 ms). Catching up fast matters
   more than 60 frames a second only when nothing else wants the time. And each frame pays a fixed
   cost, so where that's high, small steps take longer in all.
-- **What a feature will cost in the DRAW pass counts against the frame's budget** (fixed
+- **What a feature will cost in the DRAW phase counts against the frame's budget** (fixed
   estimates per feature, `RenderFrame.drawDebt`). Rejected: estimating it from recent frames.
   DRAW has a fixed part and a part per feature, one frame doesn't tell them apart, and a wrong
   estimate feeds back into the next frame's budget.
@@ -524,7 +560,7 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 ## Pixi Labels and Atlas Textures
 
 - **Measure labels during render, rasterize after render** — `PixiLayerLabels` uses `PIXI.CanvasTextMetrics.measureText()` for placement math inside `render()`, then queues texture creation through `SchedulerSystem.schedule()` so `renderer.generateTexture()` runs in the scheduler drain phase after all frame callbacks complete. This fixes Pixi v8 renderer re-entry corruption while preserving the existing Pixi.Text rasterizer for now.
-- **Labels are managed features, placement data is not** — `PixiLayerLabels` places labels (their boxes in its spatial cache, avoids in `scene.avoidGrid`, `graphics-system.md` section 14) and keeps `PixiFeatureLabelProps` placeholders. A `PixiFeatureLabel` is made only for a visible placeholder and owns its `Sprite` / `BitmapText` / `MeshRope`; culling destroys display objects, not placements.
+- **Labels are managed features, placement data is not** — `PixiLayerLabels` places labels (their boxes in its spatial cache, avoids in `scene.labelSpace.avoidGrid`, "Label placement" in `graphics-system.md`) and keeps `PixiFeatureLabelProps` placeholders. A `PixiFeatureLabel` is made only for a visible placeholder and owns its `Sprite` / `BitmapText` / `MeshRope`; culling destroys display objects, not placements.
 - **Atlas items store uploadable sources, not just ImageData** — `AtlasAllocator` accepts `ImageData`, `HTMLCanvasElement`, `HTMLImageElement`, and `ImageBitmap`. WebGL uploads use the 7-arg `texSubImage2D` DOM-source overload, WebGPU uses `copyExternalImageToTexture`, and the canvas renderer blits the same source into its backing canvas. This avoids the previous `drawImage` → `getImageData` readback for images, bitmaps, and canvases.
 - **Tile-only edge replication** — The atlas still reserves a 1px ring around every texture frame, but only tile imagery needs that ring filled with edge-replicated pixels to prevent seams under bilinear sampling. `PixiTextures._fromEdgePaddedCanvas()` builds a `(w+2) x (h+2)` source for tile atlas entries with two `drawImage` passes. Symbol/text/icon entries upload at the inner frame position and leave the reserved ring transparent.
 
@@ -532,7 +568,7 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 
 - **Pixi's canvas renderer has no upload pipeline**: it draws `TextureSource.resource` directly. So with
   `useCanvas: true` (only when `RendererType.CANVAS` is detected, saving ~16 MB per slab otherwise),
-  `AtlasSource` keeps a backing canvas as its `resource`, and `AtlasAllocator.allocate()` blits each item
+  `AtlasTextureSource` keeps a backing canvas as its `resource`, and `AtlasAllocator.allocate()` blits each item
   into it. The `(this as any).resource = canvas` cast is intentional: the generic expects a typed array.
 - **Freed regions aren't cleared**, as on GL/GPU: they're overwritten when reallocated.
 

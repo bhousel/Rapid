@@ -1,24 +1,24 @@
 import * as PIXI from 'pixi.js';
-import { VertexBatch } from './VertexBatch.ts';
+import { BatchMesh } from './BatchMesh.ts';
 
-import type { BatchItem, BatchLayout } from './VertexBatch.ts';
+import type { BatchMeshItem, BatchMeshLayout } from './BatchMesh.ts';
 
 
 /** How one fill of a batch is drawn */
-export interface FillBatchStyle {
+export interface FillBatchMeshStyle {
   /** The color, as 0xRRGGBB */
   color: number;
   /** The opacity, from 0 to 1 */
   alpha: number;
-  /** Which pattern it's filled with: its number in the pattern atlas (`FillBatch.setPatterns`), or 0 for none */
+  /** Which pattern it's filled with: its number in the pattern atlas (`FillBatchShader.setPatterns`), or 0 for none */
   pattern?: number;
 }
 
-/** One fill in a batch. `FillBatch.add()` returns it, and the caller keeps it to change the fill or take it out. */
-export type FillBatchItem = BatchItem;
+/** One fill in a batch. `FillBatchMesh.add()` returns it, and the caller keeps it to change the fill or take it out. */
+export type FillBatchMeshItem = BatchMeshItem;
 
-/** What the view says about how the fills of every batch are drawn (see `FillBatch.setView`) */
-export interface FillBatchView {
+/** What the view says about how the fills of every batch are drawn (see `FillBatchShader.setView`) */
+export interface FillBatchShaderView {
   /** How many units of the fills' coordinates a pixel is */
   pixel: number;
   /** The map's rotation, in radians: patterns stay upright on screen */
@@ -27,7 +27,7 @@ export interface FillBatchView {
   wireframe: boolean;
 }
 
-/** The patterns that fills can have, as one texture (see `FillBatch.setPatterns`) */
+/** The patterns that fills can have, as one texture (see `FillBatchShader.setPatterns`) */
 export interface FillPatternAtlas {
   /** The texture: a grid of cells, each a pattern's tile with a border of the texels that wrap around to it */
   texture: PIXI.Texture;
@@ -48,7 +48,7 @@ export interface FillPatternAtlas {
 const FLOATS = 2;
 const BYTES = 8;
 
-const LAYOUT: BatchLayout = {
+const LAYOUT: BatchMeshLayout = {
   floats: FLOATS,
   bytes: BYTES,
   alphaByte: 3,
@@ -200,68 +200,33 @@ fn mainFrag(
 `;
 
 
-// Every batch draws with the same shader, the same numbers about the view, and the same patterns.
-let _shader: PIXI.Shader | null = null;
-let _uniforms: PIXI.UniformGroup | null = null;
-const _atlas = new Float32Array([1, 1, 1, 0]);    // columns, a cell's size, a tile's size (in texels), not used
-const _atlasSize = new Float32Array([1, 1]);      // the atlas texture's size, in texels
-const _rotation = new Float32Array([1, 0]);       // the cosine and the sine of the map's rotation
-
 /**
- * Returns the uniforms that say how the fills of every batch are drawn for the current view.
- * (In the order of the shader's `FillUniforms`.)
- * @return The uniform group
+ * The shader that every `FillBatchMesh` of a scene draws with (see `BatchShaders`). Its uniforms
+ * say how fills are drawn for the current view, and it holds the texture of every pattern.
  */
-function fillUniforms(): PIXI.UniformGroup {
-  _uniforms ??= new PIXI.UniformGroup({
-    uAtlas: { value: _atlas, type: 'vec4<f32>' },
-    uRotation: { value: _rotation, type: 'vec2<f32>' },
-    uAtlasSize: { value: _atlasSize, type: 'vec2<f32>' },
-    uPixel: { value: 1, type: 'f32' },
-    uWireframe: { value: 0, type: 'f32' }
-  });
-  return _uniforms;
-}
+export class FillBatchShader extends PIXI.Shader {
 
-/**
- * Returns the shader that every batch draws with, making it the first time.
- * @return The shader
- */
-function fillShader(): PIXI.Shader {
-  _shader ??= PIXI.Shader.from({
-    gl: { vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'fill-batch' },
-    gpu: {
-      vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
-      fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
-    },
-    resources: {
-      fillUniforms: fillUniforms(),
-      uPatterns: PIXI.Texture.WHITE.source,
-      uPatternsSampler: PIXI.Texture.WHITE.source.style
-    }
-  });
-  return _shader;
-}
-
-
-/**
- * A `FillBatch` draws the fills of many areas as one mesh, in one draw call. Each fill is a run
- * of vertices in the batch's buffers (the corners of its triangles), with its color, opacity
- * and pattern in every vertex.
- *
- * A fill's triangles are worked out once, for any zoom. Its pattern is laid out by the shader:
- * tiles of the same size on screen at every zoom, upright however the map is turned, from one
- * texture that holds every pattern (`FillBatch.setPatterns()`). So a zoom changes a few numbers
- * (`FillBatch.setView()`) and nothing in any batch. What the batch does with its buffers (a
- * fill that changes, hiding, order, the place its coordinates start at) is `VertexBatch`'s.
- *
- * See `design/graphics-system.md` section 15.
- */
-export class FillBatch extends VertexBatch {
-
-  /** Makes a batch with no fills in it. It draws nothing until one is added. */
+  /** Makes the shader, with no patterns (a fill with one is drawn in its plain color until it has them). */
   public constructor() {
-    super(LAYOUT, fillShader());
+    super({
+      glProgram: PIXI.GlProgram.from({ vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'fill-batch' }),
+      gpuProgram: PIXI.GpuProgram.from({
+        vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
+        fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
+      }),
+      resources: {
+        // (In the order of the shader's `FillUniforms`.)
+        fillUniforms: new PIXI.UniformGroup({
+          uAtlas: { value: new Float32Array([1, 1, 1, 0]), type: 'vec4<f32>' },   // columns, a cell's size, a tile's size (in texels), not used
+          uRotation: { value: new Float32Array([1, 0]), type: 'vec2<f32>' },      // the cosine and the sine of the map's rotation
+          uAtlasSize: { value: new Float32Array([1, 1]), type: 'vec2<f32>' },     // the atlas texture's size, in texels
+          uPixel: { value: 1, type: 'f32' },
+          uWireframe: { value: 0, type: 'f32' }
+        }),
+        uPatterns: PIXI.Texture.WHITE.source,
+        uPatternsSampler: PIXI.Texture.WHITE.source.style
+      }
+    });
   }
 
 
@@ -270,12 +235,12 @@ export class FillBatch extends VertexBatch {
    * the rotation or the fill mode changes: nothing else has to be done to a batch for those.
    * @param view - What a pixel is in the fills' coordinates, how the map is turned, and whether fills are drawn
    */
-  public static setView(view: FillBatchView): void {
-    const uniforms = fillUniforms().uniforms;
+  public setView(view: FillBatchShaderView): void {
+    const uniforms = this.resources.fillUniforms.uniforms;
     uniforms.uPixel = view.pixel;
     uniforms.uWireframe = view.wireframe ? 1 : 0;
-    _rotation[0] = Math.cos(view.rotation);
-    _rotation[1] = Math.sin(view.rotation);
+    uniforms.uRotation[0] = Math.cos(view.rotation);
+    uniforms.uRotation[1] = Math.sin(view.rotation);
   }
 
 
@@ -284,17 +249,42 @@ export class FillBatch extends VertexBatch {
    * drawn in its plain color.
    * @param atlas - The patterns in one texture, and how they're laid out in it
    */
-  public static setPatterns(atlas: FillPatternAtlas): void {
-    const shader = fillShader();
+  public setPatterns(atlas: FillPatternAtlas): void {
     const source = atlas.texture.source;
-    shader.resources.uPatterns = source;
-    shader.resources.uPatternsSampler = source.style;
+    this.resources.uPatterns = source;
+    this.resources.uPatternsSampler = source.style;
 
-    _atlas[0] = atlas.columns;
-    _atlas[1] = atlas.cell;
-    _atlas[2] = atlas.tile;
-    _atlasSize[0] = source.pixelWidth;
-    _atlasSize[1] = source.pixelHeight;
+    const uniforms = this.resources.fillUniforms.uniforms;
+    uniforms.uAtlas[0] = atlas.columns;
+    uniforms.uAtlas[1] = atlas.cell;
+    uniforms.uAtlas[2] = atlas.tile;
+    uniforms.uAtlasSize[0] = source.pixelWidth;
+    uniforms.uAtlasSize[1] = source.pixelHeight;
+  }
+}
+
+
+/**
+ * A `FillBatchMesh` draws the fills of many areas as one mesh, in one draw call. Each fill is a run
+ * of vertices in the batch's buffers (the corners of its triangles), with its color, opacity
+ * and pattern in every vertex.
+ *
+ * A fill's triangles are worked out once, for any zoom. Its pattern is laid out by the shader:
+ * tiles of the same size on screen at every zoom, upright however the map is turned, from one
+ * texture that holds every pattern (`FillBatchShader.setPatterns()`). So a zoom changes a few numbers
+ * (`FillBatchShader.setView()`) and nothing in any batch. What the batch does with its buffers (a
+ * fill that changes, hiding, order, the place its coordinates start at) is `BatchMesh`'s.
+ *
+ * See "Batches" in `design/graphics-system.md`.
+ */
+export class FillBatchMesh extends BatchMesh {
+
+  /**
+   * Makes a batch with no fills in it. It draws nothing until one is added.
+   * @param shader - The shader it draws with: its scene's, which every fill batch there shares (`BatchShaders.fills`)
+   */
+  public constructor(shader: FillBatchShader) {
+    super(LAYOUT, shader);
   }
 
 
@@ -308,7 +298,7 @@ export class FillBatch extends VertexBatch {
    * @param order - Where it's drawn among the others (higher is on top; fills with the same number in the order they were added)
    * @return The fill in the batch, to change or remove it with
    */
-  public add(positions: ArrayLike<number>, indices: ArrayLike<number>, dx: number, dy: number, style: FillBatchStyle, order: number = 0): FillBatchItem {
+  public add(positions: ArrayLike<number>, indices: ArrayLike<number>, dx: number, dy: number, style: FillBatchMeshStyle, order: number = 0): FillBatchMeshItem {
     const item = this._addItem(positions.length >> 1, indices, order);
     this._writePositions(item, positions, dx, dy);
     this._writeStyle(item, style);
@@ -325,7 +315,7 @@ export class FillBatch extends VertexBatch {
    * @param dx - Where the fill's coordinates start, in the batch's
    * @param dy - The same, for y
    */
-  public setFill(item: FillBatchItem, positions: ArrayLike<number>, indices: ArrayLike<number>, dx: number, dy: number): void {
+  public setFill(item: FillBatchMeshItem, positions: ArrayLike<number>, indices: ArrayLike<number>, dx: number, dy: number): void {
     if (item.batch !== this) return;
 
     // The style goes along if the fill moves: it's the same in all of a fill's vertices.
@@ -343,7 +333,7 @@ export class FillBatch extends VertexBatch {
    * @param item - The fill
    * @param style - How it's drawn
    */
-  public setStyle(item: FillBatchItem, style: FillBatchStyle): void {
+  public setStyle(item: FillBatchMeshItem, style: FillBatchMeshStyle): void {
     if (item.batch !== this) return;
     this._writeStyle(item, style);
   }
@@ -356,7 +346,7 @@ export class FillBatch extends VertexBatch {
    * @param dx - Where the fill's coordinates start, in the batch's
    * @param dy - The same, for y
    */
-  protected _writePositions(item: FillBatchItem, positions: ArrayLike<number>, dx: number, dy: number): void {
+  protected _writePositions(item: FillBatchMeshItem, positions: ArrayLike<number>, dx: number, dy: number): void {
     const floats = this._floats;
     const count = item.count;
     for (let i = 0, o = item.first * FLOATS; i < count; i++, o += FLOATS) {
@@ -372,7 +362,7 @@ export class FillBatch extends VertexBatch {
    * @param item - The fill
    * @param style - How it's drawn
    */
-  protected _writeStyle(item: FillBatchItem, style: FillBatchStyle): void {
+  protected _writeStyle(item: FillBatchMeshItem, style: FillBatchMeshStyle): void {
     const bytes = this._bytes;
     const count = item.count;
 
@@ -402,7 +392,7 @@ export class FillBatch extends VertexBatch {
    * @param alpha - The fill's opacity when it's drawn, from 1 to 255 (a hidden fill's vertices don't have it)
    * @return The style that was written there
    */
-  protected _readStyle(vertex: number, alpha: number): FillBatchStyle {
+  protected _readStyle(vertex: number, alpha: number): FillBatchMeshStyle {
     const p = vertex * BYTES;
     const bytes = this._bytes;
     return {

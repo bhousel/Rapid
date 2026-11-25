@@ -41,13 +41,16 @@ describe('PixiLayerLabels', () => {
     const scene = {
       context: context,
       gfx: {},
-      avoidGrid: grid,
-      labelOffset: new PIXI.Point(0, 0),
-      takeAvoidHits: () => hits.splice(0),
-      numAvoidHits: 0,
-      takeAvoidFrees: () => frees.splice(0),
-      get numAvoidFrees() { return frees.length; },
-      takeChangedFeatures: () => new Set(changed.splice(0)),
+      labelSpace: {
+        avoidGrid: grid,
+        offset: new PIXI.Point(0, 0),
+        takeAvoidHits: () => hits.splice(0),
+        numAvoidHits: 0,
+        takeAvoidFrees: () => frees.splice(0),
+        get numAvoidFrees() { return frees.length; },
+        takeChangedFeatures: () => new Set(changed.splice(0)),
+        get numChangedFeatures() { return changed.length; }
+      },
       features: new Map()
     };
     frees = [];
@@ -171,6 +174,14 @@ describe('PixiLayerLabels', () => {
       assert.isTrue(layer._pending.has('osm-w1'));
     });
 
+    // A feature can change after the layer placed this frame's labels (drawn in the scene's catch-up
+    // after every layer, or hidden by a deferred cull): another frame has to come to look at it.
+    it('asks for a frame while a feature changed since it last looked', () => {
+      assert.strictEqual(layer.numWaiting, 0);
+      changed.push('osm-n1');
+      assert.strictEqual(layer.numWaiting, 1);
+    });
+
     it('asks for a frame while room was made and something waits for it', () => {
       assert.strictEqual(layer.numWaiting, 0);
       frees.push(grid.cellsOf(200, 104, 210, 114));
@@ -209,16 +220,18 @@ describe('PixiLayerLabels', () => {
 
     it('waits for nothing, whatever is drawn over a label or makes room for one meanwhile', () => {
       layer.render(FRAME, { transform: { zoom: 17 } });
+      changed.push('osm-n1');                                     // a feature changed meanwhile
       layer._unplaced.set('osm-w1', [100, 100, 300, 120]);       // (if anything were still remembered)
       frees.push(grid.cellsOf(200, 104, 210, 114));
       hits.push(grid.cellsOf(200, 104, 210, 114));
-      layer.scene.numAvoidHits = 1;
+      layer.scene.labelSpace.numAvoidHits = 1;
       assert.strictEqual(layer.numWaiting, 1);
 
-      layer.scene.numAvoidHits = 0;      // (the stand-in scene's count doesn't follow its list)
+      layer.scene.labelSpace.numAvoidHits = 0;      // (the stand-in label space's count doesn't follow its list)
       layer.render(FRAME, { transform: { zoom: 17 } });
       assert.lengthOf(frees, 0);
       assert.lengthOf(hits, 0);
+      assert.lengthOf(changed, 0);
       assert.strictEqual(layer.numWaiting, 0);
     });
 
@@ -234,7 +247,7 @@ describe('PixiLayerLabels', () => {
   describe('labelPoints', () => {
     it('remembers a point that got no room for its label', () => {
       layer.measureLabel = () => MEASURE;
-      layer.scene.worldToLabel = (x, y, out) => { out[0] = 105; out[1] = 105; return out; };
+      layer.scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 105; out[1] = 105; return out; };
       grid.mark('avoid', grid.cellsOf(0, 0, 400, 400));    // everything around it is taken
       const point = pointAt('osm-n1', 100, 100);
       point.label = 'Cafe';

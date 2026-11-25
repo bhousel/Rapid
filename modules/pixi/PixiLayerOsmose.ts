@@ -20,6 +20,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osmose';
+    this.useBatches = true;
   }
 
 
@@ -55,8 +56,19 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     const osmose = context.services.osmose;
     if (val && osmose) {
       osmose.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
+  }
+
+
+  /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * Osmose's issues.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'osmose';
   }
 
 
@@ -72,10 +84,12 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
     // Fetch new data, if needed..
     osmose.loadTiles();
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
     // Render the data that we have..
     const parentContainer = this._spatialContainer('qa', this.id);
-    const items = osmose.getData();
+    const items = this._gatherIn(extents, extent => osmose.getData(extent));
 
     for (const d of items) {
       const part = d.geoms.parts[0];
@@ -93,7 +107,6 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -102,10 +115,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
-      if (!feature.props.isCircular) {  // offset the icon to fit better in the "osmose" pin
-        feature.icon?.position.set(0, -17);
-      }
+      this.updateFeature(feature, frame, viewport, parentContainer);
 
       this.retainFeature(feature, frame);
     }

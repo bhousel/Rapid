@@ -16,8 +16,8 @@ How Pixi behaves, and what that means for Rapid.
 - **`PIXI.CanvasTextMetrics.measureText(str, style)` measures without rasterizing** — pure CPU canvas-2D `measureText`, internally cached, returns `{ width, height, ... }`. Prefer this when you only need glyph dimensions for placement; don't pay for a `new PIXI.Text()` + `generateTexture()` + `readPixels` round-trip just to read `getLocalBounds().width`. Texture frame size adds padding: `frame = ceil(measured + style._getFinalPadding() * 2)`.
 - **`BatchableMesh.uvs` returns RAW geometry UVs when `textureMatrix.isSimple === true`** — `isSimple` is true when the texture frame matches its source dimensions, rotate is 0, and no trim. Atlas textures (where the frame is a small sub-rect of a 2048² source) are reliably NOT simple, so this isn't a bug for the labels/symbols/tiles atlases. But it's a footgun for full-source textures (e.g. a one-off pattern that happens to be exactly source size): a `MeshRope`/`MeshPlane` built with a geometry that assumes atlas UVs will skip the UV-remap and draw garbage. If you find a mesh drawing the right glyph at the wrong UVs, check whether the texture frame == source dimensions.
 - **A Pixi render group stores its vertices as 32-bit floats relative to the group** — so a group's children must have small coordinates. Ours are in z16 world coordinates, and `isRenderGroup` on `origin` drew circles as ovals in Bochum at z18 (a float32 is exact to 1 world unit there, 4 screen pixels). The timings looked great and showed nothing wrong: look at a screenshot too, somewhere far east and zoomed in. `PixiScene.worldContainer()` puts each render group at an anchor near the view (`design/scene.md` section 3).
-- **Drawing a feature costs little in the APP pass and a lot in DRAW** — `feature.update()` took 2 to 3 µs, so a frame with 19 ms of APP budget drew 7,000 new features, and Pixi then spent 212 ms building their geometry in the DRAW pass. A budget on APP time alone doesn't bound a frame: count what the work will cost in DRAW too (`RenderFrame.drawDebt`).
-- **Many small frames can cost more than one big one** — each frame pays for a DRAW pass, and in a dense place Pixi's DRAW costs 50 ms whatever changed. Spreading Užice's restyle over frames of 6 ms of work took 44 frames and 2.2 s; with each frame's budget as long as the last DRAW pass, 12 frames and 1.0 s.
+- **Drawing a feature costs little in the APP phase and a lot in DRAW** — `feature.update()` took 2 to 3 µs, so a frame with 19 ms of APP budget drew 7,000 new features, and Pixi then spent 212 ms building their geometry in the DRAW phase. A budget on APP time alone doesn't bound a frame: count what the work will cost in DRAW too (`RenderFrame.drawDebt`).
+- **Many small frames can cost more than one big one** — each frame pays for a DRAW phase, and in a dense place Pixi's DRAW costs 50 ms whatever changed. Spreading Užice's restyle over frames of 6 ms of work took 44 frames and 2.2 s; with each frame's budget as long as the last DRAW phase, 12 frames and 1.0 s.
 - **A render group is rebuilt whole, and replayed every frame** — Pixi collects everything in a group again when one thing in it is added, removed, shown, hidden or (for a `Graphics`) redrawn: 35 ms for one line among Užice's 18,882. Draw calls aren't a one-time cost, but they're cheap (about 3,400 replayed in 6 ms there); each group adds a few microseconds a frame. So split big groups by something that keeps the draw order (lines: road class, then tile), and measure both sides: the changed frame and the frame that only moves the view.
 - **Moving many children between Pixi containers: empty the old one whole** — moving features to other tile containers one by one made Pixi rebuild both containers on every frame it happened (40 to 100 ms of DRAW, for 30 frames). Moving them all in one frame was 250 ms. `removeChildren()` on a whole old container, a few containers a frame, costs each new container one or two rebuilds and no frame more than 20 ms.
 - **Removing a Pixi object isn't freeing it** — `removeChildren()` and a new `mesh.geometry` left the old objects to Pixi's own collector, which frees what's been unused for a minute. Under use that was 550 MB alive that nothing showed. A heap that falls by itself after a minute of idling is this.
@@ -39,14 +39,14 @@ How Pixi behaves, and what that means for Rapid.
   that the masks are gone, calls `mesh.unload()` first).
 - **A container's bounds are what its children draw.** When a feature stops drawing in its own
   container, everything that asked the container for its size gets nothing. The OSM layer's lines
-  moved into batches (`LineBatch`, Nov 2026), and `PixiLayerLabels` skipped every line as "too
+  moved into batches (`LineBatchMesh`, Nov 2026), and `PixiLayerLabels` skipped every line as "too
   small": it read `feature.container.getBounds()`. No test looked for street names. It showed as
   a label that turned up in the freed room in a test about hovering, and as names missing from
   one of two screenshots. Before moving drawing out of a container, grep for `getBounds`.
 - **Something handed out before it's used can be cleaned up as unused.** A line feature gets its
   batch in the layer's pass and may be drawn some frames later (the frame's deadline). The pass
   ended by destroying batches with no lines in them, which that one still was. Count who holds a
-  thing (`LineBatch.users`), not only what's in it.
+  thing (`LineBatchMesh.users`), not only what's in it.
 - **Pixi's events mixin isn't on `Container` until a renderer is made.** In a DOM test,
   `interactiveChildren` is `undefined` and nothing below a container is "interactive", so code
   that follows Pixi's hit-test rules behaves differently than in the app. `import 'pixi.js/events'`
@@ -73,7 +73,7 @@ How Pixi behaves, and what that means for Rapid.
   chart. To see what runs: `PIXI.Ticker.system.started`, and walk `_head.next` for its listeners.
   `GraphicsSystem` stops both and gives the system ticker a turn once a second.
 - **A batch draws what a level-of-detail sprite was there to avoid.** The `lowRes` sprite for a
-  small area existed because a `Graphics` per building was too much. In a `FillBatch` a small
+  small area existed because a `Graphics` per building was too much. In a `FillBatchMesh` a small
   area's own triangles cost no object and no draw call, so the special case went away. When
   moving something into a batch, ask what its workarounds were for.
   *(Later the same day: the fill is nearly free, but the outline isn't. A small rectangle's
@@ -127,6 +127,6 @@ How Pixi behaves, and what that means for Rapid.
   uploader left `premultipliedAlpha` off, and the WebGL one sets `UNPACK_PREMULTIPLY_ALPHA`.
   Icons hid it (their faint edges are a pixel wide); a picture that fades over 16 pixels was
   a hard disc.
-- **An animation frame is a whole DRAW.** Pixi renders the scene or nothing, so moving one
+- **An animation draw is a whole DRAW.** Pixi renders the scene or nothing, so moving one
   halo's dashes draws every batch: 0.2 ms on the CPU, and 5 to 14 ms of GPU on an M4. That's
   why what moves is paced (`AnimationPacer`), and rests.

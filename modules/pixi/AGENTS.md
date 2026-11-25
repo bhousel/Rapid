@@ -33,28 +33,28 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   Build a stroke mesh only when the line, its cap or its join changes (the feature's
   `GeometryPart` is a different object then). Don't go back to `graphics.stroke()` for them:
   Pixi built every line's vertices again at every zoom, 5 GB of the 13 that sixteen zooms in
-  Užice allocated. See section 15 of `design/graphics-system.md`.
-  - **The OSM layer's lines are in batches** (`lib/LineBatch.ts`, a `Mesh` with our own shader):
+  Užice allocated. See "The line builder" in `design/graphics-system.md`.
+  - **The OSM layer's lines are in batches** (`lib/LineBatchMesh.ts`, a `Mesh` with our own shader):
     two for each level, one for every casing and one for every stroke, drawn in that order.
     The layer gives each line feature its two (`feature.casingBatch` and `feature.batch`, from
-    `_lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
+    `layer.batches.lineBatch()`), and the feature's casing and stroke are items in them: it has no mesh of
     its own. The shader works out widths, the narrowing below zoom 17, the casing's absence
     below 16, wireframe and dashes from five numbers the layer sets on every frame
-    (`LineBatch.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
+    (`LineBatchShader.setView()`), so **a zoom must change nothing in a batch**: keep whatever depends
     on the zoom out of the vertices. Don't split the batches (by road class, by tile) without
     counting the draw calls: fewer is the point, and the order of the classes is in the batch.
   - **The markers along a line are in the strokes' batch too** (`feature.arrowItem`,
     `feature.sidedItem`): oneway arrows, and the triangles on the right of a line with sides.
-    They're a strip along the line (`LineBatch.addMarkers()`), over every stroke of the level,
+    They're a strip along the line (`LineBatchMesh.addMarkers()`), over every stroke of the level,
     and the fragment shader draws the shapes in it from the distance along the line and to
-    its side. So the shapes are in the shaders (GLSL and WGSL, in `LineBatch.ts`), with their
+    its side. So the shapes are in the shaders (GLSL and WGSL, in `LineBatchMesh.ts`), with their
     spacing and the strip's width in `LINE_MARKERS`; the sprites that a line draws when it
     draws itself (`PixiTextures`' `oneway`, `twoway` and `sided`) have to look the same.
     A new kind of marker needs both. `test/e2e/rendering.test.js` compares the two by
     their pixels: run it after touching either.
-  - **The OSM layer's areas are in batches too:** every fill in a `FillBatch`
-    (`lib/FillBatch.ts`), then every outline in a `LineBatch`, in the order of their size
-    (`feature.fillBatch` and `feature.strokeBatch`, from `_polygonBatch()`). A fill's triangles
+  - **The OSM layer's areas are in batches too:** every fill in a `FillBatchMesh`
+    (`lib/FillBatchMesh.ts`), then every outline in a `LineBatchMesh`, in the order of their size
+    (`feature.fillBatch` and `feature.strokeBatch`, from `layer.batches.fillBatch()` and `outlineBatch()`). A fill's triangles
     are worked out once (`triangulate()` in `helpers.ts`); a partial fill's band is triangles
     in the same batch, worked out again when the zoom changes its width. Patterns come from
     the atlas that `PixiTextures` builds (`getPatternNumber()`), and the shader lays them out.
@@ -63,7 +63,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     3 triangles a corner; `SMALL_SIZE`), except in wireframe mode, where the outline is all
     there is. Draw something imperfect before drawing nothing (Bryan): don't add a level of
     detail that leaves a mapped thing invisible.
-  - **The OSM layer's points are in one batch** (`lib/PointBatch.ts`): points, vertices and the
+  - **The OSM layer's points are in one batch** (`lib/PointBatchMesh.ts`): points, vertices and the
     pins of areas, from north to south, the ones with viewfields over the others. The layer
     gives each its batch and its place with `_placePoint()`. A point is a few pictures (its
     viewfields, its marker, its icon), each a rectangle of the symbol atlas, a number of pixels
@@ -77,7 +77,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
       for the batch and for sprites alike. A new picture, size or anchor goes there.
     - **Where a point is on screen is `feature.labelBox()`,** from arithmetic. Labels and the
       avoid grid use it.
-    - **A batch draws from one texture,** the symbol atlas's first (`PointBatch.setTexture()`,
+    - **A batch draws from one texture,** the symbol atlas's first (`PointBatchShader.setTexture()`,
       from `PixiTextures.reset()`). A point with a picture from anywhere else draws itself with
       sprites, and finds that out as it's drawn: `PixiLayerOsm._drawFeature()` gives it its
       place in the scene then.
@@ -93,7 +93,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     texture, a vertex that's drawn above everything. A hover or a selection isn't a reason:
     their glow and halo are in batches too (below). Anything new that a feature draws in its
     own container has to be said there, or it's drawn nowhere.
-  - **A hover's glow is in a batch of glows** (`LineBatch.glows`, `PointBatch.glows`): a strip
+  - **A hover's glow is in a batch of glows** (`LineBatchMesh.glows`, `PointBatchMesh.glows`): a strip
     around a line or around each ring of an area (`feature.glowItem`, `glowItems`), and a
     picture behind a point (`glowItem`, or the `glow` sprite of a point that draws itself). An
     area's fill is tinted meanwhile. **A hover has to show:** if a change takes away what a
@@ -105,23 +105,41 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     each ring, a dark one and yellow dashes that march over it. There's no `feature.halo`
     container. A halo's rings are the outline of its feature at the distance a click reaches
     (`geomStrokeOutline()`), given in the feature's container's coordinates.
-  - **What the batches share is `VertexBatch`** (`lib/VertexBatch.ts`): the buffers, a thing
+  - **What the batches share is `BatchMesh`** (`lib/BatchMesh.ts`): the buffers, a thing
     that changes in place, hiding by an opacity of 0 (which each shader must draw nothing
     for), the order, the origin that follows the view. A new kind of batch says what a vertex
     holds, and writes it.
-  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): the lasso, and the lines and
-    outlines of layers that give no batch. Call `setStroke()` for a new width: it
+  - **Everything else is a `LineMesh`** (`lib/LineMesh.ts`): the lasso, and a line whose dashes
+    a batch can't draw. Call `setStroke()` for a new width: it
     moves the vertices it has. Dashes are `PixiTextures.getDashTexture()`, color and opacity
     are the mesh's `tint` and `alpha`.
   - **A line feature may have no `stroke` or `casing` mesh** (`null` while a batch draws it).
     To know what's drawn, read `strokeItem`, `casingItem`, `arrowItem`, `sidedItem` and `glowItem`.
+- **Every layer that draws data draws it in batches,** not only OSM: the Rapid datasets, custom
+  data, the photo, detection and QA layers, GeoScribble.
+  - **Set `this.useBatches = true` in the constructor, and draw with
+    `this.updateFeature(feature, frame, viewport, container)`** where you'd call
+    `feature.update(viewport)`, with the container you'd have put the feature in. When it's drawn
+    (now, or in a later frame if it's outside the view or past the deadline), it takes that
+    container's batches (`feature.placeInBatches()`), and goes in the container only if it draws
+    something itself (`drawsInContainer()`). Don't set `feature.parentContainer` yourself.
+  - **Lines, polygons and points in one container are drawn in their batches' order there**
+    (see `LayerBatches`). If they share a spatial container, give each kind a child container
+    (`_childContainer(parent, 'lines', 0)`, `'points', 1`) in the order you want them drawn.
+  - **Such a layer finds its own features under the pointer** (`AbstractPixiLayer.hitTest()`),
+    from an index of where it drew them in batches: a feature drawn any other way isn't found.
+  - **Don't change a feature's sprites after it's drawn** (`feature.icon.position.set(…)`): a
+    feature in a batch has none. Say it in the style, or in `PixiFeaturePoint._layout()`.
+  - After converting a layer, compare it with sprites in one build: `layer.useBatches = false`
+    and `layer.reset()`, then the same with `true`, for the map's pixels and for what
+    `scene.hitTest()` finds on a grid of points.
 - **The lasso is `LineMesh`es too,** drawn with `drawRings()` (`helpers.ts`) into a container
   that keeps its meshes from one call to the next. There's
   no `DashLine` anymore, and nothing of ours calls Pixi's `buildLine`. Don't use Pixi's
   `DashLineShader`: it needs `SmoothGraphics`, and a context with it is never batched.
 - **What moves by itself is moved by a shader, from the clock.** A glow breathes and a halo's
-  dashes march because of two uniforms that every batch shares (`LineBatch.setTime()`,
-  `PointBatch.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
+  dashes march because of two uniforms that every batch shares (`LineBatchShader.setTime()`,
+  `PointBatchShader.setTime()`), which `PixiScene.animate()` sets before a frame is drawn. Rules:
   - **Don't write to a batch, or draw a feature again, to animate something.** Give the
     shader what it needs in the vertices once, and a uniform for the moment.
   - **`PixiScene.animated` says whether frames should keep coming** (something has the
@@ -130,7 +148,7 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
     not after 30 seconds without a change, never with `prefers-reduced-motion`. Something new
     that moves has to make `animated` true while it's shown, and has to look right standing
     still (reduced motion, the rest).
-  - **An animation frame is a whole DRAW** (13 ms of GPU in Užice on an M4), with no APP and
+  - **An animation draw is a whole DRAW** (13 ms of GPU in Užice on an M4), with no APP and
     no `draw` event. Don't raise the rate, or animate something that's always on screen,
     without measuring what that does where the GPU is weak.
   - **A sprite that should pulse with the glows** is registered with `scene.addPulsing()`,
@@ -155,9 +173,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   Don't add pointer listeners to features, and don't listen for `globalpointermove`: with
   `globalMove` on, every pointer move visits every interactive object in the scene.
 - **The feature under the pointer is `scene.hitTest()`'s answer, not `e.target`.** Pixi's hit
-  test doesn't look at the OSM layer's features: the layer finds them through the editor's
-  spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in Užice where Pixi's
-  walk took 8). `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
+  test doesn't look at the features of layers that draw in batches: the OSM layer finds them
+  through the editor's spatial index (`PixiLayerOsm.hitTest()`, 0.07 ms for a pointer event in
+  Užice where Pixi's walk took 8), and the others through an index of their own
+  (`AbstractPixiLayer.hitTest()`). Each checks `scene.isInteractive()` for the spatial IDs it finds. `PixiEvents` puts the scene's answer on each pointer event (`_feature`), and
   `AbstractBehavior._getEventData()` reads it. Rules that follow:
   - A point is hit in its `hitArea`, a shape in pixels around where the point is on screen
     (`PixiFeaturePoint.hitTest()`; one that draws itself is asked as Pixi would,
@@ -180,16 +199,22 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   visible, and the shader faded it to nothing. So the e2e tests count the pixels a glow
   changes (`glowPixels()` in `test/e2e/select.test.js`): **for something a shader draws,
   test the pixels,** not only the state that asks for it.
-- **After `scene.setClass()` or `unsetClass()`, ask for a frame with `gfx.requestFrame()`,** not
-  for a redraw. The scene tells the layers which data changed class, and the OSM layer draws
-  that data's features again without its pass (`PixiLayerOsm._renderChanged()`): a hover in
-  Užice costs 3 ms of APP that way, and 175 with `immediateRedraw()`.
-- **For an edit, `scene.dataChanged('osm', ids)` and `gfx.requestFrame()`,** with everything the
-  edit affects (`Difference.complete()`). `MapSystem` does this for `stagingchange`. The layer
-  draws those entities again without its pass; `scene.dirtyData()` still means "do the pass".
-- **For data that arrived, `scene.dataArrived('osm', ids)` and `gfx.requestFrame()`.**
-  `MapSystem` does this for `merge`. The layer sorts and draws it when its frames have time.
-  A service whose data another layer draws names that layer: `gfx.deferredRedraw('mapillary')`.
+- **`scene.setClass()`, `unsetClass()` and `clearClass()` ask for a frame themselves:** don't
+  follow them with a redraw request. The scene tells the layers which data changed class, and
+  the OSM layer draws that data's features again without its pass
+  (`PixiLayerOsm._renderChanged()`): a hover in Užice costs 3 ms of APP that way, and 175 with
+  `immediateRedraw()`.
+- **For an edit, `scene.dataChanged('osm', ids)`,** with everything the edit affects
+  (`Difference.complete()`). It asks for a frame. The OSM layer does this itself, for the
+  editor's `stagingchange`. It draws those entities again without its pass; `scene.dirtyData()`
+  still means "do the pass".
+- **For OSM data that arrived, `scene.dataArrived('osm', ids)`,** which asks for a frame too. The
+  OSM layer does this itself, for the editor's `merge`, and sorts and draws it when its frames have
+  time.
+- **A service doesn't ask the renderer to draw the data it loads.** It writes it to its spatial
+  cache, `SpatialSystem` says what changed there (`datachange`), and the scene passes that to the
+  layers that draw from the cache (`gathersFrom()`), which gather there without a pass. Don't add
+  `gfx.deferredRedraw()` after a write to a cache.
 - **Destroy the Pixi objects you replace.** `removeChildren()` and assigning a new
   `mesh.geometry` leave the old ones alive: Pixi keeps what it built for them until they're
   destroyed, or until its own collector finds them unused a minute later. After a zoom that
@@ -205,16 +230,16 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
   `map.values()`, not `for (const [id, feature] of map)`. Don't work out a shape that only a
   hover or a selection needs (a halo's outline is built in `updateHalo()`, for what's selected).
   Garbage is what brings the half-second collections
-  (`design/graphics-system.md` section 13).
+  (`design/graphics-system-log.md` section 13).
 - **A point that labels should keep clear of gets `feature.labelAvoid = true` from its layer**
   (OSM, Rapid and custom data points do; photo and QA markers don't). It then marks where it's
-  drawn in `scene.avoidGrid` at the end of its `update()` (`updateAvoid()`), and unmarks when
+  drawn in `scene.labelSpace.avoidGrid` at the end of its `update()` (`updateAvoid()`), and unmarks when
   it's hidden or destroyed. Nothing gathers avoids from containers anymore. A new kind of
   feature that labels should avoid overrides `updateAvoid()` and calls `_setAvoid()` with its
-  box in label space (`scene.worldToLabel()`).
+  box in label space (`scene.labelSpace.worldToLabel()`).
   Vertices and midpoints that are only drawn because their way is hovered aren't avoids
   (`related.handleIDs` in `PixiLayerOsm`): a hover must leave every label where it is.
-- **A feature's `update()` ends with `this.scene.featureChanged(this)`.** That's how the labels
+- **A feature's `update()` ends with `this.scene.labelSpace.featureChanged(this)`.** That's how the labels
   layer knows which features to look at; it doesn't walk the scene. Setting `visible` or
   `label`, and `destroy()`, say so themselves. A class (`setClass()`) doesn't mark the label
   out of date, so don't make a hover or a selection set `dirty = true` on a feature.
@@ -260,9 +285,10 @@ skill and Rapid disagree, follow Rapid, and don't "fix" these:
 
 ## Frames, passes and redraw requests
 
-How a frame is made, the CULL pass, frame pacing and the frame's deadline are in
-[`design/graphics-system.md`](../../design/graphics-system.md) (sections 1, 3, 8, 9 and 10). The
-rules that come out of it:
+How a frame is made, the cull box, frame pacing and the frame's deadline are in
+[`design/graphics-system.md`](../../design/graphics-system.md), and the measurements behind them
+in [`design/graphics-system-log.md`](../../design/graphics-system-log.md). The words for all of it (tick, frame, APP and DRAW phase, pass, held frame, animation draw, batch,
+chunk, …) are defined in its "Words used here": use them that way. The rules that come out of it:
 
 - **A layer's `render()` and `cull()` take the `RenderFrame`**, and so does `retainFeature()`. Pass it
   on to the layer's own `render…()` helpers.
@@ -270,17 +296,37 @@ rules that come out of it:
   `gfx.deferredRedraw()` and `gfx.immediateRedraw()` make every layer do its whole pass on the next
   frame. When what changed is drawn by one layer only (a tile of imagery arrived, a label texture
   was made, a dataset's data loaded), pass that layer's ID: `gfx.deferredRedraw(this.id)`. Then
-  layers like OSM can keep their features as they are.
+  layers like OSM can keep their features as they are. Turning a layer on or off asks for a
+  redraw of that layer alone (`scene.enableLayers()` and the others). The requests left without
+  a layer are for changes that reach every layer: the styles, the locale, the schema, the area
+  fill, the color scheme, debug flags, a reset, another OSM connection or user. Nothing on the
+  map changed (a filter on a container, frame stats turned on)? Ask for a frame:
+  `gfx.requestFrame()`.
 - **Every change to what a layer draws needs a redraw request.** Moving the view doesn't make one,
   and the OSM layer skips its pass on frames that come only from a move. Marking features dirty
   (`dirtyScene()`, `dirtyLayers()`, `dirtyData()`) makes their layer do its next pass, but doesn't
-  ask for a frame. Changing a class (`scene.setClass()`) tells the layers which data it was, and
-  doesn't ask for a frame either: follow it with `gfx.requestFrame()` (above).
+  ask for a frame. (Changing a class, `dataChanged()` and `dataArrived()` do ask for one: above.)
 - **A layer that can skip its pass gathers by `frame.cullBox`, not by the view.** The box is the
   view and padding around it. Call `this.keepFeatures(frame)` in `render()`, after anything that
   must happen on every frame (asking the service for the view's tiles), and return if it says
-  `true`. Only the OSM layer does this so far. Don't use it in a layer whose features depend on the
-  view itself (the labels, the imagery tiles).
+  `true`. Every layer that draws data does (OSM, Rapid, custom data, photos, detections, QA,
+  GeoScribble). Don't use it in a layer whose features depend on the view itself (the labels, the
+  imagery tiles).
+  - **Ask `this._gatherExtents(frame, viewport)` what to gather,** after asking the service for
+    the view's tiles, and return if it gives none. It gives the cull box for a pass, and only the
+    strips the box moved over when the view left it; gather in each with
+    `this._gatherIn(extents, extent => service.getData(…, extent))`. A service's getter takes the
+    extent to look in (passed to `spatial.getVisibleItems(spatialID, extent)`).
+  - **What the box left behind is culled later** (`cullLater()`), when a frame has time: so a
+    feature outside the box may still be visible for a frame or two. It goes by what a pass
+    would gather: if a layer draws data because of other data (the Rapid layer, the ends of its
+    roads), it says so in `_gatheredInBox()`.
+  - **Say which spatial caches the layer draws from** (`gathersFrom(spatialID)`): then what changes
+    there reaches it by itself (`spatialChanged()`, "Data that arrives" in the design doc).
+  - **Whatever else changes what such a layer draws must ask for a redraw naming it,** or mark its
+    features dirty: a filter (`PhotoSystem._filtersChanged()`), conflation results, a Rapid feature
+    accepted (`RapidSystem`). A class on the layer's own data makes it do its pass by itself
+    (`classChanged()`). Nothing else looks.
 - **Count work in passes, not frames.** `cull()` destroys a feature after 20 passes without seeing
   it, and a layer that kept its features did no pass.
 - **Work out a feature's style when `feature.needsStyle` says so, not when it's `dirty`.** A zoom
@@ -300,7 +346,7 @@ rules that come out of it:
   set `needsStyle`.
 - **In a layer that keeps its features, draw with `this.updateFeature(feature, frame, viewport)`,**
   not `feature.update(viewport)`, and call `this.continueWaiting(frame, viewport)` on the frames
-  where `keepFeatures()` says yes. A feature may then be drawn a few frames late (section 10), so
+  where `keepFeatures()` says yes. A feature may then be drawn a few frames late, so
   don't read anything off a feature that's still `dirty` (its bounds, its hit area).
 - **A feature may not exist yet for data the layer has seen.** The OSM layer puts off making
   features that aren't needed at once (`_waitToMake()`), and makes them over the next frames.
@@ -326,10 +372,10 @@ rules that come out of it:
   (`scheduler.throttle()`).
 - **`immediateRedraw()` is for something the user did.** It skips the wait that spaces out
   expensive frames. With a layer's ID, only that layer is drawn at once (in a held frame, if a pass
-  is waiting). For data that arrived, use `deferredRedraw()`.
+  is waiting). For something that changed by itself (conflation results), use `deferredRedraw()`.
 - **Don't change the frame loop's timing without measuring it.** `bun run measure` reports frames
-  a second and long animation frames while the view moves on every animation frame (`glide`), and
-  section 9 has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
+  a second and long ticks while the view moves on every tick (`glide`), and section 9 of
+  `design/graphics-system-log.md` has a real drag and a load to compare with. `FramePacer` holds the rule and has unit
   tests; `test/e2e/rendering.test.js` checks it in a browser.
 
 ## Working with Services

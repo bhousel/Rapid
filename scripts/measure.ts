@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
 
 //
-// Measures frame stats on a set of difficult places (see `design/graphics-system.md`, plan step 2).
+// Measures frame stats on a set of difficult places (see "Measuring" in `design/graphics-system.md`).
 // It attaches to a Chrome started with `bun run start:chrome`, like `bun run cdp`, so it measures the
 // developer's real GPU. It moves the map, so it changes what the developer is looking at.
 //
@@ -33,8 +33,8 @@ import { parseArgs, styleText } from 'node:util';
 //            moved over and left behind, where it used to do its whole pass). No redraw is requested:
 //            a frame that only moves the view is drawn on the next tick, and a pass waits for the
 //            gap after the last one (`FramePacer`), with held frames in between, as in a real drag.
-// - glide:   the view moves a little on every animation frame, along the same path. It reports how
-//            many frames a second were drawn and how many animation frames ran long.
+// - glide:   the view moves a little on every tick, along the same path. It reports how
+//            many frames a second were drawn and how many ticks ran long.
 // - restyle: every feature is marked to be drawn again, as a change of zoom does. The first frame
 //            draws what it has time for, and the frames after it the rest: the table has the first
 //            frame's times, how many frames it took in all, and how long until they were done.
@@ -235,7 +235,7 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
 
     // The frames where the OSM layer kept its features as they were (only the view had moved, inside
     // its cull box), and the ones where the view left the box: the layer followed it to a new one
-    // (`steps.box`), or did its whole pass. See "A CULL pass" in the design doc.
+    // (`steps.box`), or did its whole pass. See "The cull box" in the design doc.
     const times = (subset: any[]) => ({
       frames: subset.length,
       appMs: median(subset.map((f: any) => f.appMs)),
@@ -262,14 +262,14 @@ async function measurePlace(args: { loc: [number, number], zoom: number, runs: n
     };
   };
 
-  // Glide: the view moves a little on every animation frame, along the pan path and back, twice, as
-  // a smooth drag does. How many frames a second get drawn, and how many animation frames ran long
+  // Glide: the view moves a little on every tick, along the pan path and back, twice, as
+  // a smooth drag does. How many frames a second get drawn, and how many ticks ran long
   // (stutter the user would see)? It keeps the page busy, so its pass frames show what a pass costs
   // in the middle of a drag (see "Frame pacing" in the design doc).
   const measureGlide = async () => {
     const GLIDE_TICKS = 240;
     const LEG = GLIDE_TICKS / 4;
-    const step = [PAN_STEP[0] * PAN_LEG / LEG, PAN_STEP[1] * PAN_LEG / LEG];   // pixels per animation frame
+    const step = [PAN_STEP[0] * PAN_LEG / LEG, PAN_STEP[1] * PAN_LEG / LEG];   // pixels per tick
     const startID = gfx.lastRenderFrame?.id ?? -1;
     const stamps: number[] = [];
     const start = performance.now();
@@ -366,8 +366,8 @@ console.log('masks = stencil mask instructions (partial fills), unbat = graphics
 console.log('tris = triangles in everything Pixi has to draw.');
 console.log('pan = pan frames where the OSM layer kept its features as they were (also while a pass was held');
 console.log('back). cull = pan frames where the view left the cull box, and the layer followed it to a new one');
-console.log('(or did its whole pass); of = how many. glide = the view moving on every animation frame for');
-console.log('240 of them: frames drawn a second, animation frames longer than 25 ms, and what a frame with');
+console.log('(or did its whole pass); of = how many. glide = the view moving on every tick for');
+console.log('240 of them: frames drawn a second, ticks longer than 25 ms, and what a frame with');
 console.log('a new cull box cost (APP + DRAW) in the middle of that. restyle = every feature drawn again, as after');
 console.log('a zoom: the first frame, then how many frames and how many ms until all of them were done.');
 

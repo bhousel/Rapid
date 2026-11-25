@@ -20,6 +20,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'keepright';
+    this.useBatches = true;
   }
 
 
@@ -55,8 +56,19 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
     const keepRight = context.services.keepright;
     if (val && keepRight) {
       keepRight.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
+  }
+
+
+  /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * KeepRight's issues.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'keepright';
   }
 
 
@@ -72,9 +84,11 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
     if (!this.enabled || !keepRight?.started || viewZoom < MINZOOM) return;
 
     keepRight.loadTiles();
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
     const parentContainer = this._spatialContainer('qa', this.id);
-    const data = keepRight.getData();
+    const data = this._gatherIn(extents, extent => keepRight.getData(extent));
 
     for (const d of data) {
       const part = d.geoms.parts[0];
@@ -92,7 +106,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -101,7 +114,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
       this.retainFeature(feature, frame);
     }
   }

@@ -1,4 +1,7 @@
 import * as PIXI from 'pixi.js';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
+
+import type { Viewport } from '@rapid-sdk/math';
 
 
 /**
@@ -6,9 +9,9 @@ import * as PIXI from 'pixi.js';
  * it, and the caller keeps it to change the thing or take it out. Its properties are the
  * batch's to change.
  */
-export interface BatchItem {
+export interface BatchMeshItem {
   /** The batch it's in, or `null` once it was removed */
-  batch: VertexBatch | null;
+  batch: BatchMesh | null;
   /** Its first vertex in the batch's buffers */
   first: number;
   /** How many vertices it has there */
@@ -24,7 +27,7 @@ export interface BatchItem {
 }
 
 /** A vertex attribute of a batch: which of its two buffers it's in, and where */
-export interface BatchAttribute {
+export interface BatchMeshAttribute {
   /** The buffer: the vertices' floats, or their bytes */
   buffer: 'floats' | 'bytes';
   /** Pixi's name for the format, e.g. `'float32x2'` or `'unorm8x4'` */
@@ -33,20 +36,20 @@ export interface BatchAttribute {
   offset: number;
 }
 
-/** What a vertex of a batch is made of (see `VertexBatch`) */
-export interface BatchLayout {
+/** What a vertex of a batch is made of (see `BatchMesh`) */
+export interface BatchMeshLayout {
   /** How many floats a vertex has. The first two are its position. */
   floats: number;
   /** How many bytes a vertex has besides */
   bytes: number;
   /**
    * Which of those bytes is 0 in a hidden thing's vertices, where the shader has to draw nothing.
-   * (The opacity in a `LineBatch` and a `FillBatch`; a byte of its own in a `PointBatch`, whose
+   * (The opacity in a `LineBatchMesh` and a `FillBatchMesh`; a byte of its own in a `PointBatchMesh`, whose
    * things have several opacities.)
    */
   alphaByte: number;
   /** The attributes that the shader reads, by name */
-  attributes: Record<string, BatchAttribute>;
+  attributes: Record<string, BatchMeshAttribute>;
 }
 
 
@@ -73,15 +76,24 @@ const MAX_FILL = 0.75;
 /** A batch with less than this part of its buffers in use gets smaller ones (when it's flushed) */
 const MIN_FILL = 0.3;
 
+/**
+ * A batch's vertices are 32-bit floats, relative to a place in the world near what's in it.
+ * `followView()` moves that place to the view's center when it's so far from it that a float
+ * could be off by this much of a pixel at the view's zoom. At zoom 16 that's 260,000 pixels
+ * away, at zoom 19 32,000 world units, at zoom 22 4,000.
+ */
+const PRECISION = 1 / 32;
+
 // A mesh with a shader of its own is never batched by Pixi, and never reads more of its `State`.
 const _state = PIXI.State.for2d();
 
 
 /**
- * A `VertexBatch` draws many things as one mesh, in one draw call, with a shader of its own.
+ * A `BatchMesh` draws many things as one mesh, in one draw call, with a shader of its own.
  * Each thing is a run of vertices in the batch's buffers, and its triangles a run of indices.
- * `LineBatch` (casings and strokes), `FillBatch` (the fills of areas) and `PointBatch` (markers
- * and icons) say what a vertex holds and how it's written; this class keeps the buffers.
+ * `LineBatchMesh` (casings and strokes), `FillBatchMesh` (the fills of areas) and
+ * `PointBatchMesh` (markers and icons) say what a vertex holds and how it's written; this class
+ * keeps the buffers. (It's not one of Pixi's batches: Pixi draws it on its own.)
  *
  * - **A vertex is some floats in one buffer and some bytes in another.** The first two floats
  *   are its position, relative to the batch's own `position` in the world. Keep them small
@@ -99,9 +111,9 @@ const _state = PIXI.State.for2d();
  * - **What changed is sent to the GPU when the batch is next rendered,** once, however much
  *   changed (`flush()`, which Pixi calls through `onRender`).
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
-export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
+export abstract class BatchMesh extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> {
 
   /**
    * How many features were given this batch to draw in. A feature may be drawn some frames
@@ -114,7 +126,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * The things in the batch, in the order they're drawn once `_sortDirty` is `false`, and the
    * ones that were removed since the index buffer was last built (their `batch` is `null`)
    */
-  protected _items: BatchItem[];
+  protected _items: BatchMeshItem[];
   /** How many of `_items` were removed */
   protected _removed: number;
   /** How many of the batch's things are visible */
@@ -161,7 +173,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * @param layout - What a vertex is made of
    * @param shader - The shader that draws it. Every batch of one kind shares one.
    */
-  public constructor(layout: BatchLayout, shader: PIXI.Shader) {
+  public constructor(layout: BatchMeshLayout, shader: PIXI.Shader) {
     const floats = new Float32Array(MIN_CAPACITY * layout.floats);
     const bytes = new Uint8Array(MIN_CAPACITY * layout.bytes);
     const indices = new Uint32Array(MIN_CAPACITY * 3);
@@ -258,7 +270,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * Takes something out of the batch. The item can't be used again.
    * @param item - The thing
    */
-  public remove(item: BatchItem): void {
+  public remove(item: BatchMeshItem): void {
     if (item.batch !== this) return;
 
     // (It leaves the list when the index buffer is next built: looking for it now would make
@@ -273,11 +285,27 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
 
 
   /**
+   * Where something is in the order the batch draws in: of two things with the same `order`,
+   * the one added later is drawn later.
+   * @param item - The thing
+   * @return Its place (higher is drawn later), or -1 if it isn't in this batch
+   */
+  public drawIndex(item: BatchMeshItem): number {
+    if (item.batch !== this) return -1;
+    if (this._sortDirty) {
+      this._items.sort((a, b) => a.order - b.order);   // (as `_buildIndices` will, which builds the index buffer in this order)
+      this._sortDirty = false;
+    }
+    return this._items.indexOf(item);
+  }
+
+
+  /**
    * Changes where something is drawn among the others.
    * @param item - The thing
    * @param order - Higher is on top
    */
-  public setOrder(item: BatchItem, order: number): void {
+  public setOrder(item: BatchMeshItem, order: number): void {
     if (item.batch !== this || item.order === order) return;
     item.order = order;
     this._sortDirty = true;
@@ -291,7 +319,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * @param item - The thing
    * @param visible - Whether it's drawn
    */
-  public setVisible(item: BatchItem, visible: boolean): void {
+  public setVisible(item: BatchMeshItem, visible: boolean): void {
     if (item.batch !== this || item.visible === visible) return;
     item.visible = visible;
     this._numVisible += visible ? 1 : -1;
@@ -330,6 +358,25 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
     if (this._end > 0) {
       this._dirtyFirst = 0;
       this._dirtyEnd = this._end;
+    }
+  }
+
+
+  /**
+   * Keeps the batch's coordinates fine enough for the view's zoom: when the view is far from
+   * the batch's place in the world (after a long pan), and zoomed in enough for it to show,
+   * the place moves to the view's center (see `moveOrigin`). Call it on every frame; it does
+   * nothing while the view is near.
+   * @param viewport - The viewport that's being drawn
+   */
+  public followView(viewport: Viewport): void {
+    if (this.destroyed) return;
+
+    // How far from its place the batch's floats are still good to a part of a pixel, at this zoom
+    const reach = PRECISION * (2 ** 23) * (2 ** (WORLD_ZOOM - viewport.transform.zoom));
+    const [x, y] = viewport.screenToWorld(viewport.center());
+    if (Math.abs(this.position.x - x) > reach || Math.abs(this.position.y - y) > reach) {
+      this.moveOrigin(Math.round(x), Math.round(y));
     }
   }
 
@@ -382,8 +429,8 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * @param order - Where it's drawn among the others (higher is on top; equal ones in the order they were added)
    * @return The thing in the batch
    */
-  protected _addItem(count: number, indices: ArrayLike<number>, order: number): BatchItem {
-    const item: BatchItem = { batch: this, first: 0, count: 0, indices: indices, order: order, visible: true, alpha: 255 };
+  protected _addItem(count: number, indices: ArrayLike<number>, order: number): BatchMeshItem {
+    const item: BatchMeshItem = { batch: this, first: 0, count: 0, indices: indices, order: order, visible: true, alpha: 255 };
     this._place(item, count);
     this._items.push(item);
     this._numVisible++;
@@ -402,7 +449,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * @param indices - Its triangles now
    * @return `true` if it moved
    */
-  protected _resizeItem(item: BatchItem, count: number, indices: ArrayLike<number>): boolean {
+  protected _resizeItem(item: BatchMeshItem, count: number, indices: ArrayLike<number>): boolean {
     if (item.indices !== indices) {
       item.indices = indices;
       this._indexDirty = true;
@@ -422,7 +469,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * @param item - The thing. Its `first` and `count` are set.
    * @param count - How many vertices it needs
    */
-  protected _place(item: BatchItem, count: number): void {
+  protected _place(item: BatchMeshItem, count: number): void {
     if (this._end + count > this._capacity) {
       const needed = this._end - this._wasted + count;
       const capacity = (needed <= this._capacity * MAX_FILL) ? this._capacity : Math.ceil(Math.max(needed, this._capacity * GROWTH));
@@ -478,7 +525,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * Remembers that the floats of a thing's vertices have to be sent to the GPU.
    * @param item - The thing
    */
-  protected _markDirty(item: BatchItem): void {
+  protected _markDirty(item: BatchMeshItem): void {
     if (item.first < this._dirtyFirst) this._dirtyFirst = item.first;
     if (item.first + item.count > this._dirtyEnd) this._dirtyEnd = item.first + item.count;
   }
@@ -488,7 +535,7 @@ export abstract class VertexBatch extends PIXI.Mesh<PIXI.Geometry, PIXI.Shader> 
    * Remembers that the bytes of a thing's vertices have to be sent to the GPU.
    * @param item - The thing
    */
-  protected _markBytesDirty(item: BatchItem): void {
+  protected _markBytesDirty(item: BatchMeshItem): void {
     if (item.first < this._dirtyBytesFirst) this._dirtyBytesFirst = item.first;
     if (item.first + item.count > this._dirtyBytesEnd) this._dirtyBytesEnd = item.first + item.count;
   }

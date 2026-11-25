@@ -5,7 +5,7 @@ import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 
@@ -21,6 +21,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary-signs';
+    this.useBatches = true;
   }
 
 
@@ -56,7 +57,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
@@ -90,8 +91,9 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
    * Renders the Mapillary traffic-sign markers for this frame.
    * @param  frame     The frame being rendered
    * @param  viewport  Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const context = this.context;
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
@@ -99,7 +101,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     const container = context.container();
     const parentContainer = this._spatialContainer('qa', this.id);
 
-    let markers = mapillary.getData('signs');
+    let markers = this._gatherIn(extents, extent => mapillary.getData('signs', extent));
     markers = this.filterMarkers(markers);
 
     for (const d of markers) {
@@ -130,7 +132,6 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -139,9 +140,20 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
       this.retainFeature(feature, frame);
     }
+  }
+
+
+  /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * Mapillary's traffic signs.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'mapillary-signs';
   }
 
 
@@ -156,7 +168,9 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;
 
     mapillary.loadTiles('signs');
-    this.renderMarkers(frame, viewport);
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+    this.renderMarkers(frame, viewport, extents);
   }
 
 }

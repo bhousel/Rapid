@@ -1,26 +1,31 @@
 import * as PIXI from 'pixi.js';
 import 'pixi.js/events';   // gives containers `eventMode`, as a renderer does in the app
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { PixiLayerKeepRight } from '../../../modules/pixi/PixiLayerKeepRight.ts';
 import { PixiLayerOsm } from '../../../modules/pixi/PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from '../../../modules/pixi/PixiLayerOsmNotes.ts';
 import { PixiLayerRapid } from '../../../modules/pixi/PixiLayerRapid.ts';
-import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
-import { FillBatch } from '../../../modules/pixi/lib/FillBatch.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
-import { PointBatch } from '../../../modules/pixi/lib/PointBatch.ts';
+import { FillBatchMesh } from '../../../modules/pixi/lib/FillBatchMesh.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
+import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
 import { PixiScene } from '../../../modules/pixi/PixiScene.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 describe('PixiScene', () => {
 
   // A real scene needs WebGL, so `showData` runs on a stand-in scene that has real layers.
   describe('showData', () => {
-    let context, scene, changes, enabledDatasetIDs;
+    let context, scene, changes, changedIDs, enabledDatasetIDs;
 
     beforeEach(() => {
       context = new Rapid.MockContext();
       changes = 0;
+      changedIDs = [];
       enabledDatasetIDs = [];
 
       const startAsync = () => Promise.resolve();
@@ -36,7 +41,12 @@ describe('PixiScene', () => {
       context.systems = { rapid: rapid };
 
       const gfx = { immediateRedraw: () => {} };
-      scene = { context: context, gfx: gfx, layers: new Map(), _layerChanged: () => changes++ };
+      scene = {
+        context: context, gfx: gfx, layers: new Map(),
+        _layerChanged: layerIDs => { changes++; changedIDs.push(...layerIDs); },
+        _enabledLayerIDs: PixiScene.prototype._enabledLayerIDs,
+        _changedLayerIDs: PixiScene.prototype._changedLayerIDs
+      };
       for (const Layer of [PixiLayerOsm, PixiLayerRapid, PixiLayerOsmNotes, PixiLayerKeepRight]) {
         const layer = new Layer(scene);
         layer.enabled = false;
@@ -50,6 +60,7 @@ describe('PixiScene', () => {
       PixiScene.prototype.showData.call(scene, ['w1', 'osm-notes:123', 'keepright:4']);
       assert.sameMembers(enabledLayerIDs(), ['osm', 'osm-notes', 'keepright']);
       assert.strictEqual(changes, 1);
+      assert.sameMembers(changedIDs, ['osm', 'osm-notes', 'keepright'], 'the layers that were turned on, and no others');
     });
 
     it('turns on a Rapid dataset along with its layer, for its data or a piece of one of its lines', () => {
@@ -65,6 +76,28 @@ describe('PixiScene', () => {
       PixiScene.prototype.showData.call(scene, ['nowhere:1']);
       assert.deepEqual(enabledLayerIDs(), []);
       assert.strictEqual(changes, 0);
+    });
+  });
+
+
+  // A layer that's turned on or off has something to draw or hide; the others don't, and a layer
+  // that keeps its features (OSM) shouldn't do its pass for another layer's change.
+  describe('_layerChanged', () => {
+    it('asks for a redraw of the layers it is given, each by name, and says the layers changed', () => {
+      const asked = [];
+      const scene = new EventEmitter();
+      scene.gfx = { immediateRedraw: layerID => asked.push(layerID ?? 'everything') };
+      let emitted = 0;
+      scene.on('layerchange', () => emitted++);
+
+      PixiScene.prototype._layerChanged.call(scene, ['osm-notes', 'keepright']);
+      assert.deepEqual(asked, ['osm-notes', 'keepright']);
+      assert.strictEqual(emitted, 1);
+
+      asked.length = 0;
+      PixiScene.prototype._layerChanged.call(scene);    // a reset: everything
+      assert.deepEqual(asked, ['everything']);
+      assert.strictEqual(emitted, 2);
     });
   });
 
@@ -91,7 +124,7 @@ describe('PixiScene', () => {
         gfx: { origin: new PIXI.Container() }
       };
       const names = [
-        'getSpatialContainer', 'releaseSpatialContainers', '_isInteractive', '_modeChanged',
+        'getSpatialContainer', 'releaseSpatialContainers', 'isInteractive', '_modeChanged',
         '_eventMode', 'setHitTester', 'hitTest',
         'worldContainer', 'worldContainersIn', 'destroyWorldContainer', 'setAnchor'
       ];
@@ -259,16 +292,23 @@ describe('PixiScene', () => {
         assert.strictEqual(scene.hitTest({ x: 0, y: 0 }, rapidLine.container), rapidLine);
       });
 
-      it('doesn\'t ask a layer whose data the mode keeps from the pointer', () => {
+      it('asks a layer once, whatever spatial IDs it finds the features of', () => {
         let asked = 0;
-        scene.setHitTester('fbRoads', { hitTest: () => { asked++; return null; } });
-        scene._modeChanged({ interactiveSpatialIDs: new Set(['osm']) });
+        const layer = { hitTest: () => { asked++; return null; } };
+        scene.setHitTester('fbRoads', layer);
+        scene.setHitTester('msBuildings', layer);
         assert.isNull(scene.hitTest({ x: 0, y: 0 }, null));
-        assert.strictEqual(asked, 0);
+        assert.strictEqual(asked, 1);
+      });
+
+      // (A layer asks `isInteractive()` of each spatial ID whose features it looks at.)
+      it('says which spatial IDs the mode lets the pointer reach', () => {
+        scene._modeChanged({ interactiveSpatialIDs: new Set(['osm']) });
+        assert.isTrue(scene.isInteractive('osm'));
+        assert.isFalse(scene.isInteractive('fbRoads'));
 
         scene._modeChanged({ interactiveSpatialIDs: null });
-        scene.hitTest({ x: 0, y: 0 }, null);
-        assert.strictEqual(asked, 1);
+        assert.isTrue(scene.isInteractive('fbRoads'));
       });
     });
 
@@ -359,91 +399,16 @@ describe('PixiScene', () => {
   });
 
 
-  // Label space is the screen minus an offset that moves with the map, so a pan changes nothing
-  // in it. The scene works it out once a frame, and owns the grid of what labels avoid.
-  describe('label space', () => {
-    function makeScene() {
-      const stage = new PIXI.Container();
-      const origin = new PIXI.Container();
-      stage.addChild(origin);
+  // Label space is the scene's (`scene.labelSpace`, see `LabelSpace.test.js`): it's a new one for
+  // a new zoom or rotation.
+  describe('dirtyTransform', () => {
+    it('starts a new label space, and tells every layer', () => {
+      const told = [];
       const scene = Object.create(PixiScene.prototype);
-      scene.gfx = { origin: origin };
-      scene.layers = new Map();
-      scene.labelOffset = new PIXI.Point();
-      scene._toScreen = new PIXI.Matrix();
-      scene._avoidHits = [];
-      scene._avoidFrees = [];
-      scene._changedFeatureIDs = new Set();
-      scene.avoidGrid = new AvoidGrid(2);
-      return { scene, stage, origin };
-    }
-    const viewportAt = (x, y) => ({ transform: { translation: [x, y] } });
-
-    it('gives a world coordinate the same label coordinates however the map is panned', () => {
-      const { scene, origin } = makeScene();
-      origin.scale.set(2, 2);
-      origin.position.set(-1000, -500);
-      scene.updateLabelSpace(viewportAt(300, 200));
-      const before = scene.worldToLabel(600, 400, [0, 0]).slice();
-
-      origin.position.set(-1000 + 37, -500 - 12);       // a pan moves `origin`, and nothing else
-      scene.updateLabelSpace(viewportAt(300, 200));
-      const after = scene.worldToLabel(600, 400, [0, 0]);
-      assert.closeTo(after[0], before[0], 1e-6);
-      assert.closeTo(after[1], before[1], 1e-6);
-    });
-
-    it('puts two world coordinates as far apart as they are on screen, also when the map is turned', () => {
-      const { scene, stage, origin } = makeScene();
-      origin.scale.set(2, 2);
-      stage.rotation = Math.PI / 2;
-      scene.updateLabelSpace(viewportAt(0, 0));
-      const a = scene.worldToLabel(100, 100, [0, 0]).slice();
-      const b = scene.worldToLabel(110, 100, [0, 0]);     // 10 world units east, 20 px on screen
-      assert.closeTo(b[0] - a[0], 0, 1e-6);               // which is down, a quarter turn on
-      assert.closeTo(b[1] - a[1], 20, 1e-6);
-    });
-
-    it('empties the avoid grid for a new zoom or rotation', () => {
-      const { scene } = makeScene();
-      const cells = scene.avoidGrid.cellsOf(0, 0, 10, 10);
-      scene.avoidGrid.mark('avoid', cells);
-      scene.avoidHit(cells);
-      const generation = scene.avoidGrid.generation;
-
+      scene.labelSpace = { reset: () => told.push('label space') };
+      scene.layers = new Map([['osm', { dirtyTransform: () => told.push('osm') }]]);
       scene.dirtyTransform();
-      assert.isFalse(scene.avoidGrid.isTaken('avoid', cells));
-      assert.isAbove(scene.avoidGrid.generation, generation);
-      assert.strictEqual(scene.numAvoidHits, 0);
-    });
-
-    it('hands over where something was drawn over a label, once', () => {
-      const { scene } = makeScene();
-      scene.avoidHit([1, 2, 3, 4]);
-      assert.strictEqual(scene.numAvoidHits, 1);
-      assert.deepEqual(scene.takeAvoidHits(), [[1, 2, 3, 4]]);
-      assert.deepEqual(scene.takeAvoidHits(), []);
-    });
-
-    it('hands over where something to avoid has left, once, and forgets it when label space changes', () => {
-      const { scene } = makeScene();
-      scene.avoidFreed([1, 2, 3, 4]);
-      assert.strictEqual(scene.numAvoidFrees, 1);
-      assert.deepEqual(scene.takeAvoidFrees(), [[1, 2, 3, 4]]);
-      assert.deepEqual(scene.takeAvoidFrees(), []);
-
-      scene.avoidFreed([1, 2, 3, 4]);
-      scene.dirtyTransform();
-      assert.strictEqual(scene.numAvoidFrees, 0);
-    });
-
-    it('hands over the features that changed, each once', () => {
-      const { scene } = makeScene();
-      scene.featureChanged({ id: 'osm-w1' });
-      scene.featureChanged({ id: 'osm-n1' });
-      scene.featureChanged({ id: 'osm-w1' });
-      assert.deepEqual([...scene.takeChangedFeatures()], ['osm-w1', 'osm-n1']);
-      assert.strictEqual(scene.takeChangedFeatures().size, 0);
+      assert.deepEqual(told, ['label space', 'osm']);
     });
   });
 
@@ -456,6 +421,7 @@ describe('PixiScene', () => {
         enabled: enabled,
         features: new Map(visibility.map((visible, i) => [`${id}-${i}`, { visible: visible }])),
         numVisible: visibility.filter(Boolean).length,
+        batches: { followView: viewport => calls.push(`follow ${id} ${viewport}`) },
         render: (frame, viewport) => calls.push(`render ${id} ${frame.id} ${viewport}`),
         cull: frame => calls.push(`cull ${id} ${frame.id}`),
         keptFeatures: () => kept,
@@ -464,7 +430,8 @@ describe('PixiScene', () => {
         takeWork: () => ({ created: 1, destroyed: 0, updated: 2, shown: 0, hidden: 0, steps: { gather: 0.5 } })
       });
       const scene = {
-        updateLabelSpace: viewport => calls.push(`label space ${viewport}`),
+        gfx: { origin: 'origin' },
+        labelSpace: { update: (origin, viewport) => calls.push(`label space ${origin} ${viewport}`) },
         setBatchViews: viewport => calls.push(`batch views ${viewport}`),
         layers: new Map([
           ['osm', makeLayer('osm', true, [true, true, false], true)],
@@ -475,10 +442,12 @@ describe('PixiScene', () => {
 
       PixiScene.prototype.render.call(scene, frame, 'viewport');
 
-      // (The batches' shaders hear about the view before any layer draws into a batch.)
+      // (The batches' shaders hear about the view before any layer draws into a batch, and each
+      // layer's batches follow the view before it draws.)
       assert.deepEqual(calls, [
-        'label space viewport', 'batch views viewport',
-        'render osm 7 viewport', 'cull osm 7', 'render keepright 7 viewport', 'cull keepright 7'
+        'label space origin viewport', 'batch views viewport',
+        'follow osm viewport', 'render osm 7 viewport', 'cull osm 7',
+        'follow keepright viewport', 'render keepright 7 viewport', 'cull keepright 7'
       ]);
       const osm = frame.layers.get('osm');
       assert.include(osm, { enabled: true, kept: true, features: 3, visible: 2, created: 1, updated: 2 });
@@ -496,6 +465,7 @@ describe('PixiScene', () => {
           id: id,
           enabled: true,
           features: new Map(),
+          batches: { followView: () => {} },
           numWaiting: waitingInView + waitingOutside,
           numWaitingInView: waitingInView,
           render: frame => {
@@ -514,7 +484,8 @@ describe('PixiScene', () => {
       };
 
       const scene = {
-        updateLabelSpace: () => {},
+        gfx: { origin: null },
+        labelSpace: { update: () => {} },
         setBatchViews: () => {},
         layers: new Map([
           ['osm', makeLayer('osm', 40, 100, 60)],
@@ -540,6 +511,52 @@ describe('PixiScene', () => {
       assert.isFalse(next.unfinished);
       assert.strictEqual(next.layers.get('osm').waiting, 0);
     });
+
+    // `SpatialSystem` reports what changed in its caches: the layers that draw from them hear of it,
+    // and the scene asks for a frame (not a redraw)
+    it('tells the layers what changed in the spatial caches, and asks for a frame if one draws from them', () => {
+      const told = [];
+      let frames = 0;
+      const layerFor = (id, cache) => ({ spatialChanged: (spatialID, change) => { told.push([id, spatialID]); return spatialID === cache; } });
+      const scene = {
+        gfx: { requestFrame: () => frames++ },
+        layers: new Map([['mapillary', layerFor('mapillary', 'mapillary-images')], ['osm', layerFor('osm', null)]])
+      };
+      const change = { boxes: [], changedIDs: new Set(), cleared: false };
+
+      PixiScene.prototype._spatialChanged.call(scene, new Map([['labels', change]]));
+      assert.strictEqual(frames, 0);
+      PixiScene.prototype._spatialChanged.call(scene, new Map([['mapillary-images', change]]));
+      assert.strictEqual(frames, 1);
+      assert.deepEqual(told.slice(2), [['mapillary', 'mapillary-images'], ['osm', 'mapillary-images']]);
+    });
+
+    // What a cull box left behind when it moved without a pass is outside the view: it's culled
+    // in a frame that has time left once every layer has rendered (see `AbstractPixiLayer.cullLater`).
+    it('culls what a layer\'s cull box left behind when the frame has time, and asks for another frame when it hasn\'t', () => {
+      let culled = 0;
+      const layer = {
+        id: 'mapillary', enabled: true, features: new Map(), numWaiting: 0, numWaitingInView: 0, cullDue: true,
+        batches: { followView: () => {} },
+        render: () => {}, cull: () => {},
+        cullLater: () => { culled++; layer.cullDue = false; },
+        keptFeatures: () => true,
+        takeWork: () => ({ created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} })
+      };
+      const scene = { gfx: { origin: null }, labelSpace: { update: () => {} }, setBatchViews: () => {}, layers: new Map([['mapillary', layer]]) };
+
+      const busy = new RenderFrame(7, 17);
+      busy.deadline = -Infinity;    // out of time
+      PixiScene.prototype.render.call(scene, busy, 'viewport');
+      assert.strictEqual(culled, 0);
+      assert.isTrue(busy.unfinished);
+
+      const idle = new RenderFrame(8, 17);
+      idle.deadline = Infinity;
+      PixiScene.prototype.render.call(scene, idle, 'viewport');
+      assert.strictEqual(culled, 1);
+      assert.isFalse(idle.unfinished);
+    });
   });
 
 
@@ -552,16 +569,16 @@ describe('PixiScene', () => {
     const lineView = () => [lines.uPixel, lines.uNarrow, lines.uWireframe, lines.uCasing, lines.uMarkers];
 
     beforeEach(() => {
-      lineBatch = new LineBatch();
-      fillBatch = new FillBatch();
+      lineBatch = new LineBatchMesh(batchShaders.lines);
+      fillBatch = new FillBatchMesh(batchShaders.fills);
       lines = lineBatch.shader.resources.lineUniforms.uniforms;
       fills = fillBatch.shader.resources.fillUniforms.uniforms;
       map = { wireframeMode: false, effectiveZoom: () => 17 };
-      scene = { context: { systems: { map: map } } };
+      scene = { context: { systems: { map: map } }, batchShaders: batchShaders };
     });
     afterEach(() => {
-      LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
-      FillBatch.setView({ pixel: 1, rotation: 0, wireframe: false });
+      batchShaders.lines.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+      batchShaders.fills.setView({ pixel: 1, rotation: 0, wireframe: false });
       lineBatch.destroy();
       fillBatch.destroy();
     });
@@ -638,8 +655,8 @@ describe('PixiScene', () => {
     let lineBatch, pointBatch, lines, points, scene;
 
     beforeEach(() => {
-      lineBatch = new LineBatch();
-      pointBatch = new PointBatch();
+      lineBatch = new LineBatchMesh(batchShaders.lines);
+      pointBatch = new PointBatchMesh(batchShaders.points);
       lines = lineBatch.shader.resources.lineUniforms.uniforms;
       points = pointBatch.shader.resources.pointUniforms.uniforms;
       scene = {
@@ -647,7 +664,9 @@ describe('PixiScene', () => {
         _classHasData: new Map(),
         _pulsing: new Map(),
         _reducedMotion: { matches: false },
-        layers: new Map()
+        layers: new Map(),
+        gfx: { requestFrame: () => {} },
+        batchShaders: batchShaders
       };
       const names = ['setClass', 'unsetClass', 'clearClass', '_classChanged', 'animate', 'addPulsing', 'removePulsing'];
       for (const name of names) {
@@ -656,8 +675,8 @@ describe('PixiScene', () => {
       Object.defineProperty(scene, 'animated', Object.getOwnPropertyDescriptor(PixiScene.prototype, 'animated'));
     });
     afterEach(() => {
-      LineBatch.setTime({ pulse: 1, shift: 0 });
-      PointBatch.setTime(1);
+      batchShaders.lines.setTime({ pulse: 1, shift: 0 });
+      batchShaders.points.setTime(1);
       lineBatch.destroy();
       pointBatch.destroy();
     });
@@ -820,20 +839,25 @@ describe('PixiScene', () => {
         layers: new Map([
           ['osm', { classChanged: dataID => told.push(`osm ${dataID}`) }],
           ['rapid', { classChanged: dataID => told.push(`rapid ${dataID}`) }]
-        ])
+        ]),
+        gfx: {
+          requestFrame: () => told.push('frame'),
+          deferredRedraw: () => told.push('redraw'),
+          immediateRedraw: () => told.push('redraw')
+        }
       };
       for (const name of ['setClass', 'unsetClass', 'clearClass', 'getDataWithClass', 'getClasses', '_classChanged']) {
         scene[name] = PixiScene.prototype[name];
       }
     });
 
-    it('tells every layer when a class is set on some data, once', () => {
+    it('tells every layer when a class is set on some data, once, and asks for a frame (not a redraw)', () => {
       scene.setClass('hover', 'w1');
-      assert.deepEqual(told, ['osm w1', 'rapid w1']);
+      assert.deepEqual(told, ['osm w1', 'rapid w1', 'frame']);
       assert.deepEqual([...scene.getClasses('w1')], ['hover']);
 
       scene.setClass('hover', 'w1');   // it has it already
-      assert.strictEqual(told.length, 2);
+      assert.strictEqual(told.length, 3);
     });
 
     it('tells every layer when a class is unset, and not when the data never had it', () => {
@@ -845,7 +869,7 @@ describe('PixiScene', () => {
       assert.deepEqual(told, []);
 
       scene.unsetClass('hover', 'w1');
-      assert.deepEqual(told, ['osm w1', 'rapid w1']);
+      assert.deepEqual(told, ['osm w1', 'rapid w1', 'frame']);
       assert.strictEqual(scene.getDataWithClass('hover').size, 0);
     });
 
@@ -856,40 +880,62 @@ describe('PixiScene', () => {
       told.length = 0;
 
       scene.clearClass('hover');
-      assert.sameMembers(told, ['osm w1', 'rapid w1', 'osm n1', 'rapid n1']);
+      assert.sameMembers(told.filter(what => what !== 'frame'), ['osm w1', 'rapid w1', 'osm n1', 'rapid n1']);
+      assert.include(told, 'frame');
+      assert.notInclude(told, 'redraw');
+
+      told.length = 0;
+      scene.clearClass('hover');   // nothing has it now
+      assert.deepEqual(told, []);
       assert.deepEqual([...scene.getDataWithClass('select')], ['w2']);
     });
   });
 
 
   describe('dataChanged', () => {
-    it('tells the one layer which data changed', () => {
+    it('tells the one layer which data changed, and asks for a frame (not a redraw)', () => {
       const told = [];
       const scene = {
         layers: new Map([
           ['osm', { dataChanged: dataIDs => told.push(['osm', ...dataIDs]) }],
           ['rapid', { dataChanged: dataIDs => told.push(['rapid', ...dataIDs]) }]
-        ])
+        ]),
+        gfx: {
+          requestFrame: () => told.push('frame'),
+          deferredRedraw: () => told.push('redraw'),
+          immediateRedraw: () => told.push('redraw')
+        }
       };
       PixiScene.prototype.dataChanged.call(scene, 'osm', ['w1', 'n1']);
+      assert.deepEqual(told, [['osm', 'w1', 'n1'], 'frame']);
+
+      told.length = 0;
       PixiScene.prototype.dataChanged.call(scene, 'no-such-layer', ['w1']);
-      assert.deepEqual(told, [['osm', 'w1', 'n1']]);
+      assert.deepEqual(told.filter(Array.isArray), []);   // no other layer is told
     });
   });
 
 
   describe('dataArrived', () => {
-    it('tells the one layer which data arrived', () => {
+    it('tells the one layer which data arrived, and asks for a frame (not a redraw)', () => {
       const told = [];
       const scene = {
         layers: new Map([
           ['osm', { dataArrived: dataIDs => told.push(['osm', ...dataIDs]) }],
           ['rapid', { dataArrived: dataIDs => told.push(['rapid', ...dataIDs]) }]
-        ])
+        ]),
+        gfx: {
+          requestFrame: () => told.push('frame'),
+          deferredRedraw: () => told.push('redraw'),
+          immediateRedraw: () => told.push('redraw')
+        }
       };
       PixiScene.prototype.dataArrived.call(scene, 'osm', new Set(['w1', 'n1']));
+      assert.deepEqual(told, [['osm', 'w1', 'n1'], 'frame']);
+
+      told.length = 0;
       PixiScene.prototype.dataArrived.call(scene, 'no-such-layer', ['w1']);
-      assert.deepEqual(told, [['osm', 'w1', 'n1']]);
+      assert.deepEqual(told.filter(Array.isArray), []);   // no other layer is told
     });
   });
 
@@ -915,7 +961,7 @@ describe('PixiScene', () => {
 
 
   // The part of the world layers have features ready for: the view and some padding, kept while
-  // the view stays inside it (see "A CULL pass" in `design/graphics-system.md`).
+  // the view stays inside it (see "The cull box" in `design/graphics-system.md`).
   describe('updateCullBox', () => {
     let scene;
 

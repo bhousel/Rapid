@@ -1,3 +1,4 @@
+import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { RenderFrame } from '../../../modules/pixi/RenderFrame.ts';
 
@@ -53,7 +54,7 @@ describe('AbstractPixiLayer', () => {
 
   // A layer's work for a frame is a pass: `render()` marks the features it sees, `cull()` hides the
   // rest. A layer that asks `keepFeatures()` skips the pass when only the view moved inside the
-  // frame's cull box (see "A CULL pass" in `design/graphics-system.md`).
+  // frame's cull box (see "The cull box" in `design/graphics-system.md`).
   describe('passes', () => {
     let layer, nextFrameID, box;
 
@@ -403,7 +404,7 @@ describe('AbstractPixiLayer', () => {
         assert.strictEqual(layer.numWaiting, 0);
       });
 
-      it('counts what each feature it draws will cost in the DRAW pass against the frame\'s time', () => {
+      it('counts what each feature it draws will cost in the DRAW phase against the frame\'s time', () => {
         const changed = addDirtyFeature('changed', 10);
         const zoomed = addDirtyFeature('zoomed', 20, { onlyTransformDirty: true });
         const frame = makeTimedFrame(true, { contentChanged: true });
@@ -487,6 +488,357 @@ describe('AbstractPixiLayer', () => {
       assert.include(work, { created: 2, destroyed: 1, updated: 0 });
       assert.isAtLeast(work.steps.gather, 5);
       assert.deepEqual(layer.takeWork(), { created: 0, destroyed: 0, updated: 0, shown: 0, hidden: 0, steps: {} });
+    });
+  });
+
+
+  // A layer that draws in batches (`useBatches`) gives each feature the batches of the container it's
+  // drawn for, puts it in the scene only if it draws something itself, and finds its features under
+  // the pointer itself: Pixi can't see what a batch draws.
+  describe('batches', () => {
+    let layer, scene, spatial, child, testers, interactive, frame;
+
+    // A stand-in feature: what `updateFeature` and `hitTest` use of one
+    function makeFeature(id, extent, { drawsItself = false, hit = true } = {}) {
+      const feature = {
+        id: id, dirty: true, visible: true, allowInteraction: true, hitReach: 0,
+        geometry: { world: { extent: new Rapid.sdk.Extent(extent.slice(0, 2), extent.slice(2)) } },
+        container: new PIXI.Container(), placed: [], asked: 0,
+        placeInBatches: (batches, parent) => feature.placed.push([batches, parent]),
+        update: () => { feature.dirty = false; },
+        drawsInContainer: () => drawsItself,
+        hitTest: () => { feature.asked++; return hit; },
+        sceneContainer: null, sceneOrder: 0, sceneItem: null
+      };
+      Object.defineProperty(feature, 'parentContainer', {
+        get: () => feature.container.parent,
+        set: val => {
+          if (val) {
+            val.addChild(feature.container);
+          } else {
+            feature.container.parent?.removeChild(feature.container);
+          }
+        }
+      });
+      feature.sceneContainer = feature.container;
+      layer.features.set(id, feature);
+      layer._numVisible++;
+      return feature;
+    }
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      context.viewport.transform = { x: 0, y: 0, z: 16 };    // a pixel is a world unit
+      frame = { id: 1, viewBox: new Rapid.sdk.Extent([-1e6, -1e6], [1e6, 1e6]), urgent: false, drawDebt: 0, hasTime: () => true };
+      spatial = new PIXI.Container();
+      child = new PIXI.Container();
+      spatial.addChild(child);
+      testers = new Map();
+      interactive = new Set(['fbRoads']);
+      scene = {
+        context: context, gfx: {},
+        getSpatialContainer: () => spatial,
+        releaseSpatialContainers: () => {},
+        setHitTester: (spatialID, l) => testers.set(spatialID, l),
+        isInteractive: spatialID => interactive.has(spatialID)
+      };
+      layer = new AbstractPixiLayer(scene);
+      layer.useBatches = true;
+      layer._spatialContainer('basemap', 'fbRoads');
+    });
+
+    it('says it finds its own features, for each spatial ID it draws', () => {
+      assert.strictEqual(testers.get('fbRoads'), layer);
+
+      const other = new AbstractPixiLayer(scene);    // one that doesn't draw in batches
+      other._spatialContainer('basemap', 'custom');
+      assert.isFalse(testers.has('custom'));
+    });
+
+    it('gives a dirty feature the layer\'s batches in the container, and draws it', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer.updateFeature(feature, frame, {}, child);
+      assert.deepEqual(feature.placed, [[layer.batches, child]]);
+      assert.isFalse(feature.dirty);
+      assert.isNull(feature.parentContainer, 'its batches draw it: it isn\'t in the scene');
+
+      layer.updateFeature(feature, frame, {}, child);    // not dirty: nothing to do
+      assert.lengthOf(feature.placed, 1);
+    });
+
+    it('puts a feature that draws something itself in the container', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10], { drawsItself: true });
+      layer.updateFeature(feature, frame, {}, child);
+      assert.strictEqual(feature.parentContainer, child);
+    });
+
+    it('gives no batches without `useBatches`', () => {
+      layer.useBatches = false;
+      const feature = makeFeature('a', [0, 0, 10, 10], { drawsItself: true });
+      layer.updateFeature(feature, frame, {}, child);
+      assert.deepEqual(feature.placed, [[null, child]]);
+      assert.strictEqual(feature.parentContainer, child);
+    });
+
+    it('finds the features near the pointer through its index, the one drawn on top first', () => {
+      const under = makeFeature('under', [0, 0, 10, 10]);
+      const over = makeFeature('over', [5, 5, 15, 15]);
+      const far = makeFeature('far', [500, 500, 510, 510]);
+      for (const feature of [under, over, far]) {
+        layer.updateFeature(feature, frame, {}, child);
+        child.addChild(feature.container);    // (where each is drawn, for `featureOrder`)
+      }
+
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 7, y: 7 }), over);
+      assert.strictEqual(far.asked, 0, 'a feature far from the pointer isn\'t asked');
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0.5, y: 0.5 }), under);    // (more than the margin of 4 from `over`)
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 100, y: 100 }));
+    });
+
+    it('finds no feature that\'s hidden, not interactive, or of data the mode keeps from the pointer', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer.updateFeature(feature, frame, {}, child);
+
+      feature.visible = false;
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      feature.visible = true;
+      feature.allowInteraction = false;
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      feature.allowInteraction = true;
+      interactive.clear();
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      interactive.add('fbRoads');
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }), feature);
+    });
+
+    it('finds a feature that moved where it is now, and no feature that\'s gone', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer.updateFeature(feature, frame, {}, child);
+
+      feature.geometry = { world: { extent: new Rapid.sdk.Extent([100, 100], [110, 110]) } };
+      feature.dirty = true;
+      layer.updateFeature(feature, frame, {}, child);
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 5, y: 5 }));
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 105, y: 105 }), feature);
+
+      layer.removeFeature(feature);
+      assert.isNull(layer.hitTest({ x: 0, y: 0 }, { x: 105, y: 105 }));
+    });
+
+    it('looks as far around the pointer as the furthest a feature it drew can be hit', () => {
+      const feature = makeFeature('pin', [0, 0, 0, 0]);    // a point
+      feature.hitReach = 30;                                // a pin, hit up to its top
+      layer.updateFeature(feature, frame, {}, child);
+      assert.strictEqual(layer.hitTest({ x: 0, y: 0 }, { x: 0, y: -28 }), feature);
+    });
+
+    // (A layer that keeps its features does its pass when what it draws changed: see `keepFeatures`.)
+    it('does its pass on the next frame when its own data changes class, and not for another layer\'s', () => {
+      const box = {};
+      layer.bindData('a', 'fbRoads:1');
+      layer._currentBox = box;
+      layer.classChanged('osm:w1');
+      assert.strictEqual(layer._currentBox, box);
+      layer.classChanged('fbRoads:1');
+      assert.isNull(layer._currentBox);
+    });
+
+    it('draws a feature that\'s still dirty after it\'s drawn (a texture it needs hasn\'t loaded) again when one arrives', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      feature.update = () => {};    // stays dirty, as a point without its icon does
+      layer.updateFeature(feature, frame, {}, child);
+      assert.isTrue(layer._waitingForTexture.has(feature));
+      layer.texturesLoaded();
+      assert.strictEqual(layer.numWaiting, 1);
+    });
+
+    it('puts off drawing a feature outside the view, and draws it later in its container\'s batches', () => {
+      const feature = makeFeature('far', [5000, 5000, 5010, 5010]);
+      frame.viewBox = new Rapid.sdk.Extent([0, 0], [100, 100]);
+      layer.retainFeature(feature, frame);
+      layer.cull(frame);    // (a pass ends: what waits belongs to it)
+      layer.updateFeature(feature, frame, {}, child);
+      assert.lengthOf(feature.placed, 0);
+      assert.strictEqual(layer.numWaiting, 1);
+
+      layer.continueWaiting(frame, {}, true);
+      assert.deepEqual(feature.placed, [[layer.batches, child]]);
+      assert.isFalse(feature.dirty);
+    });
+
+    it('forgets its batches and its index in a reset', () => {
+      const feature = makeFeature('a', [0, 0, 10, 10]);
+      layer.updateFeature(feature, frame, {}, child);
+      let forgot = 0;
+      layer.batches.forget = () => forgot++;
+      feature.destroy = () => layer.removeFeature(feature);
+      layer.reset();
+      assert.strictEqual(forgot, 1);
+      assert.strictEqual(layer._featureIndex.all().length, 0);
+    });
+  });
+
+
+  // A data layer that gets its data from a service by extent follows the cull box without a pass:
+  // it gathers only the parts the new box covers, and hides what the box left behind when a frame
+  // has time (see "The cull box" in `design/graphics-system.md`).
+  describe('following the cull box', () => {
+    const Extent = Rapid.sdk.Extent;
+    let layer;
+
+    const frameAt = (id, cullBox, changed = false) => ({
+      id: id, cullBox: cullBox, viewBox: cullBox, held: false, urgent: false, drawDebt: 0,
+      changedFor: () => changed, hasTime: () => true
+    });
+
+    // A stand-in feature whose visibility the layer counts, as a real one's is
+    function makeFeature(id, min, max) {
+      let visible = true;
+      const feature = {
+        id: id, lod: 2, dirty: false,
+        geometry: { world: { extent: new Extent(min, max) } },
+        destroy: () => layer.removeFeature(feature)
+      };
+      Object.defineProperty(feature, 'visible', {
+        get: () => visible,
+        set: val => {
+          if (val === visible) return;
+          visible = val;
+          layer.visibilityChanged(feature, val);
+        }
+      });
+      layer.addFeature(feature);
+      return feature;
+    }
+
+    beforeEach(() => {
+      const context = new Rapid.MockContext();
+      layer = new AbstractPixiLayer({ context: context, gfx: {} });
+    });
+
+    it('gathers the cull box for a pass, nothing while the view moves inside it, and what\'s new when it leaves', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const b = new Extent([60, 0], [160, 100]);     // the view went right, out of `a`
+
+      assert.deepEqual(layer._gatherExtents(frameAt(1, a), {}), [a]);
+      layer.cull(frameAt(1, a));
+
+      assert.deepEqual(layer._gatherExtents(frameAt(2, a), {}), []);
+      assert.isTrue(layer.keptFeatures(frameAt(2, a)));
+
+      const strips = layer._gatherExtents(frameAt(3, b), {});
+      assert.lengthOf(strips, 1);
+      assert.deepEqual([strips[0].min, strips[0].max], [[100, 0], [160, 100]]);
+      assert.isTrue(layer.keptFeatures(frameAt(3, b)), 'it\'s not a pass: `cull()` leaves the features alone');
+      assert.isTrue(layer.cullDue);
+
+      assert.deepEqual(layer._gatherExtents(frameAt(4, b, true), {}), [b], 'something changed: a pass');
+    });
+
+    it('counts what it gathers after the box moved as seen by the last pass, and culls nothing then', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const b = new Extent([60, 0], [160, 100]);
+      const old = makeFeature('old', [10, 10], [20, 20]);
+      layer._gatherExtents(frameAt(1, a), {});
+      layer.retainFeature(old, frameAt(1, a));
+      layer.cull(frameAt(1, a));
+
+      layer._gatherExtents(frameAt(2, b), {});
+      const fresh = makeFeature('new', [120, 10], [130, 20]);
+      layer.retainFeature(fresh, frameAt(2, b));
+      layer.cull(frameAt(2, b));
+      assert.isTrue(old.visible, 'left behind, but not hidden by `cull()`');
+      assert.strictEqual(layer.retained.get('new'), layer.retained.get('old'));
+    });
+
+    // `SpatialSystem` reports what changed in its caches, and the scene passes it on (`spatialChanged`)
+    it('gathers where data arrived in the cull box, on a frame that\'s otherwise kept, and no pass', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      layer.enabled = true;
+      layer.gathersFrom = spatialID => spatialID === 'photos';
+      layer._gatherExtents(frameAt(1, a), {});
+      layer.cull(frameAt(1, a));
+
+      const change = { boxes: [{ minX: 90, minY: 90, maxX: 150, maxY: 150 }], changedIDs: new Set(), cleared: false };
+      assert.isFalse(layer.spatialChanged('osm', change), 'not a cache it draws from');
+      assert.isTrue(layer.spatialChanged('photos', change));
+
+      const extents = layer._gatherExtents(frameAt(2, a), {});
+      assert.lengthOf(extents, 1);
+      assert.deepEqual([extents[0].min, extents[0].max], [[90, 90], [100, 100]], 'what of it is in the box');
+      assert.isTrue(layer.keptFeatures(frameAt(2, a)));
+      assert.deepEqual(layer._gatherExtents(frameAt(3, a), {}), [], 'taken');
+    });
+
+    it('hides the features of replaced or removed data that the gathering doesn\'t find again', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      layer.enabled = true;
+      layer.gathersFrom = () => true;
+      const moved = makeFeature('moved', [10, 10], [20, 20]);
+      const gone = makeFeature('gone', [30, 30], [40, 40]);
+      layer.bindData('moved', 'photos:1');
+      layer.bindData('gone', 'photos:2');
+      layer._gatherExtents(frameAt(1, a), {});
+      for (const feature of [moved, gone]) layer.retainFeature(feature, frameAt(1, a));
+      layer.cull(frameAt(1, a));
+
+      layer.spatialChanged('photos', { boxes: [], changedIDs: new Set(['1', '2']), cleared: false });
+      layer._gatherExtents(frameAt(2, a), {});
+      layer.retainFeature(moved, frameAt(2, a));    // found again, where it is now
+      layer.cull(frameAt(2, a));
+      assert.isTrue(moved.visible);
+      assert.isFalse(gone.visible);
+    });
+
+    // (A photo sequence that curves around the box, so that none of its parts reaches in, is
+    // still gathered by a pass: its data's box does.)
+    it('keeps a feature outside the box while its data\'s own box reaches in, as a pass gathers it', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const part = makeFeature('part', [150, 0], [160, 10]);
+      part.data = { dataID: 'photos:s1', geoms: { world: { extent: new Extent([50, 0], [160, 10]) } } };
+      layer._currentBox = a;
+      layer._cullDue = true;
+      layer.cullLater();
+      assert.isTrue(part.visible);
+
+      part.data = { dataID: 'photos:s1', geoms: { world: { extent: new Extent([150, 0], [160, 10]) } } };
+      layer._cullDue = true;
+      layer.cullLater();
+      assert.isFalse(part.visible);
+    });
+
+    it('does a pass when a cache it draws from was cleared', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      layer.enabled = true;
+      layer.gathersFrom = () => true;
+      layer._gatherExtents(frameAt(1, a), {});
+      layer.cull(frameAt(1, a));
+      layer.spatialChanged('photos', { boxes: [], changedIDs: new Set(), cleared: true });
+      assert.deepEqual(layer._gatherExtents(frameAt(2, a), {}), [a]);
+    });
+
+    it('hides what the box left behind when told there\'s time, and destroys it once it\'s been hidden long enough', () => {
+      const a = new Extent([0, 0], [100, 100]);
+      const stays = makeFeature('stays', [70, 10], [80, 20]);
+      const left = makeFeature('left', [10, 10], [20, 20]);
+      layer._gatherExtents(frameAt(1, a), {});
+      for (const feature of [stays, left]) layer.retainFeature(feature, frameAt(1, a));
+      layer.cull(frameAt(1, a));
+
+      let box = a;
+      for (let i = 2; i < 25; i++) {     // keep moving right, a little out of the box each time
+        box = new Extent([box.min[0] + 60, 0], [box.max[0] + 60, 100]);
+        layer._gatherExtents(frameAt(i, box), {});
+        if (i === 2) {
+          layer.cullLater();
+          assert.isTrue(stays.visible);
+          assert.isFalse(left.visible);
+          assert.isFalse(layer.cullDue);
+        } else {
+          layer.cullLater();
+        }
+      }
+      assert.isFalse(layer.features.has('left'), 'destroyed after 20 moves of the box');
     });
   });
 });

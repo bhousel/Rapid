@@ -505,7 +505,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     this.convolutionFilter = null;
 
     // A filter draws the imagery into a texture the size of the screen, then draws that texture again
-    // through its shader (about 2 ms of GPU time per frame, see `design/graphics-system.md`).
+    // through its shader (about 2 ms of GPU time per frame, see section 6 of `design/graphics-system-log.md`).
     // At the default values the adjustment changes nothing, so leave it out.
     const filters: PIXI.Filter[] = [];
     if (brightness !== 1 || contrast !== 1 || saturation !== 1) {

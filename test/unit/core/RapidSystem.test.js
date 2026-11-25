@@ -402,6 +402,21 @@ describe('RapidSystem', () => {
         assert.deepEqual(_rapid.actedRanges('test:k1'), []);
       });
 
+      // The Rapid layer keeps its features while only the view moves, so it's told
+      it('asks the Rapid layer for a redraw when what the user accepted or ignored changes', () => {
+        const redrawn = [];
+        context.systems.gfx = { immediateRedraw: layerID => redrawn.push(layerID) };
+        replay([{ type: 'rapid_accept_feature', acceptIDs: ['test:k1'] }]);
+        assert.deepEqual(redrawn, ['rapid']);
+
+        replay([{ type: 'rapid_accept_feature', acceptIDs: ['test:k1'] }, {}]);   // another edit, nothing new accepted
+        assert.deepEqual(redrawn, ['rapid']);
+
+        replay([]);    // undone
+        assert.deepEqual(redrawn, ['rapid', 'rapid']);
+        delete context.systems.gfx;
+      });
+
       it('gathers accepted and ignored pieces of a line from the edit history, sorted and merged', () => {
         replay([
           { type: 'rapid_accept_feature', acceptIDs: ['test.pieces:k1@0.6-1'] },

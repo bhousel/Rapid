@@ -19,6 +19,11 @@ describe('KartaviewService', () => {
   // Spy on redraws..
   const gfx = context.systems.gfx;
   const spyRedraw = mock();
+  // What the spatial system reports of the data that a load wrote: the map's layers draw what arrived from that
+  const spyReport = mock();
+  context.systems.spatial.on('datachange', changes => {
+    if ([...changes.values()].some(change => !change.cleared)) spyReport(changes);
+  });
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
@@ -35,6 +40,7 @@ describe('KartaviewService', () => {
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
     spyRedraw.mockClear();
+    spyReport.mockClear();
   });
 
 
@@ -152,14 +158,14 @@ describe('KartaviewService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', async () => {
+      it('loads a tile of data and reports it to the spatial system', async () => {
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10, { delay: 1 });
         _kartaview.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -175,7 +181,7 @@ describe('KartaviewService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -191,7 +197,7 @@ describe('KartaviewService', () => {
         assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
         assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -203,7 +209,7 @@ describe('KartaviewService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] considered loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
+        assert.lengthOf(spyReport.mock.calls, 0, 'nothing reported');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
         assert.match(spyError.mock.lastCall[0], /Forbidden/i);
 
@@ -212,7 +218,7 @@ describe('KartaviewService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch still called once');
-        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw still not called');
+        assert.lengthOf(spyReport.mock.calls, 0, 'still nothing reported');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error still called once');
       });
     });

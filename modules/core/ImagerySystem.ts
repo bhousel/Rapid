@@ -1185,7 +1185,7 @@ export class ImagerySystem extends AbstractSystem {
       }
     }
 
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('background');
     this.emit('imagerychange');
   }
 

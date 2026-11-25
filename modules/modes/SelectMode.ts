@@ -379,7 +379,7 @@ export class SelectMode extends AbstractMode {
       const noteEditor = new UiNoteEditor(context);
       noteEditor.datum = datum;
       noteEditor.on('change', (saved?: MarkerData) => {
-        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        gfx?.immediateRedraw('osm-notes');  // force a redraw (there is no history change that would otherwise do this)
         // A new note gets its real id when it's saved (the new one is gone), so select the saved note.
         if (saved instanceof MarkerData && saved.id !== datum.id) {
           context.enter('select', { selection: [saved.dataID] });
@@ -400,7 +400,7 @@ export class SelectMode extends AbstractMode {
       const keepRightEditor = new UiKeepRightEditor(context);
       keepRightEditor.datum = datum;
       keepRightEditor.on('change', () => {
-        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        gfx?.immediateRedraw('keepright');  // force a redraw (there is no history change that would otherwise do this)
         const keepright = context.services.keepright;
         const d = keepright?.getError(datum.id);  // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) {
@@ -416,7 +416,7 @@ export class SelectMode extends AbstractMode {
       const osmoseEditor = new UiOsmoseEditor(context);
       osmoseEditor.datum = datum;
       osmoseEditor.on('change', () => {
-        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        gfx?.immediateRedraw('osmose');  // force a redraw (there is no history change that would otherwise do this)
         const osmose = context.services.osmose;
         const d = osmose?.getError(datum.id);     // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) {
@@ -434,7 +434,7 @@ export class SelectMode extends AbstractMode {
       const menu = ui?.MapRouletteMenu;
       if (menu) menu.datum = datum;
       maprouletteEditor.on('change', () => {
-        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        gfx?.immediateRedraw('maproulette');  // force a redraw (there is no history change that would otherwise do this)
         const maproulette = context.services.maproulette;
         const d = maproulette?.getTask(datum.id);  // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) {

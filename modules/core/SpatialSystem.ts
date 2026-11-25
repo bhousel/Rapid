@@ -10,7 +10,7 @@ import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -39,6 +39,22 @@ interface SpatialCache {
   /** RBush index over the items that have a valid box */
   rbush: RBush<SpatialItem>;
 }
+
+/**
+ * What changed in a spatial cache since it was last reported (see `SpatialSystem`, `datachange`).
+ */
+export interface SpatialChange {
+  /** Boxes where items were added or replaced, a few for each write: where something may have appeared, or moved from */
+  boxes: BBox[];
+  /** The items that were replaced or removed: what was drawn for them may be gone, or somewhere else */
+  changedIDs: Set<BoxID>;
+  /** Whether the cache was cleared: everything that was in it is gone */
+  cleared: boolean;
+}
+
+/** Past this many boxes in a report, a cache's boxes are reported as one around them all */
+const MAX_REPORTED_BOXES = 16;
+
 
 /**
  * Finds a datum for a spatial ID whose data isn't simply in the cache with that ID
@@ -72,6 +88,15 @@ export type DataResolver = (localID: string) => AbstractData | undefined;
  * Note that because the spatial system has no specialized knowledge about its contents, we don't
  * clear the caches on reset - calling code is responsible for managing any objects that it has stored!
  *
+ * **It says what changed.** Each write is noted for its cache (where items appeared or moved from,
+ * which were replaced or removed, whether it was cleared), and the notes are reported together in
+ * a `datachange` event, once the task that wrote them is done: a service that writes a tile item
+ * by item makes one report. The map's layers draw what arrived from these (`PixiScene`), so a
+ * service that writes its data here needn't ask anything of the renderer.
+ *
+ * Events available:
+ * - `datachange`   `Map<SpatialID, SpatialChange>`, for the caches that changed
+ *
  * This code is a wrapper around the RBush library
  * @see https://github.com/mourner/rbush
  *
@@ -87,6 +112,8 @@ export class SpatialSystem extends AbstractSystem {
   protected _caches: Map<SpatialID, SpatialCache>;
   /** Lookups for spatial IDs whose data isn't simply in the cache with that ID */
   protected _resolvers: Map<SpatialID, DataResolver>;
+  /** What changed in each cache since the last `datachange` */
+  protected _changes: Map<SpatialID, SpatialChange>;
 
 
   /**
@@ -98,6 +125,7 @@ export class SpatialSystem extends AbstractSystem {
 
     this._caches = new Map<SpatialID, SpatialCache>();
     this._resolvers = new Map<SpatialID, DataResolver>();
+    this._changes = new Map<SpatialID, SpatialChange>();
   }
 
   /**
@@ -154,6 +182,12 @@ export class SpatialSystem extends AbstractSystem {
   public clearCache(spatialID: SpatialID): void {
     const cache = this._caches.get(spatialID);
     if (cache) {
+      if (cache.items.size) {
+        const change = this._changeOf(spatialID);
+        change.cleared = true;
+        change.boxes = [];
+        change.changedIDs.clear();
+      }
       cache.items.clear();
       cache.rbush.clear();
     }
@@ -211,16 +245,33 @@ export class SpatialSystem extends AbstractSystem {
    */
   public replaceItems(spatialID: SpatialID, items: OneOrMore<SpatialItem>): void {
     const cache = this.getCache(spatialID);
+    const added = this._emptyBox();     // around what this write puts in, and what it replaces
+    const replaced = this._emptyBox();
+    let change: SpatialChange | undefined;
 
     // (Items are inserted after the loop, so a repeated id would otherwise be inserted twice.)
     const toInsert = new Map<BoxID, SpatialItem>();
     for (const item of utilIterable(items)) {
       if (!item) continue;
+      const existing = cache.items.get(item.id);
+      if (existing) {
+        change ??= this._changeOf(spatialID);
+        change.changedIDs.add(item.id);
+        this._extendBox(replaced, existing);
+      }
       this._removeItem(cache, item.id);
       toInsert.delete(item.id);
       cache.items.set(item.id, item);
       if (this._hasValidBox(item)) {
         toInsert.set(item.id, item);
+        this._extendBox(added, item);
+      }
+    }
+
+    for (const box of [added, replaced]) {
+      if (box.minX <= box.maxX) {
+        change ??= this._changeOf(spatialID);
+        change.boxes.push(box);
       }
     }
 
@@ -299,9 +350,74 @@ export class SpatialSystem extends AbstractSystem {
     const cache = this.getCache(spatialID);
 
     for (const id of utilIterable(ids)) {
-      if (!id) continue;
+      if (!id || !cache.items.has(id)) continue;
+      this._changeOf(spatialID).changedIDs.add(id);
       this._removeItem(cache, id);
     }
+  }
+
+
+  /**
+   * Returns the notes of what changed in a cache since the last report, starting them (and
+   * asking for a report once the task that's writing is done) if there are none yet.
+   * @param spatialID - The cache's spatial ID
+   * @return Its notes
+   */
+  protected _changeOf(spatialID: SpatialID): SpatialChange {
+    let change = this._changes.get(spatialID);
+    if (!change) {
+      if (!this._changes.size) {
+        queueMicrotask(() => this._report());
+      }
+      change = { boxes: [], changedIDs: new Set<BoxID>(), cleared: false };
+      this._changes.set(spatialID, change);
+    }
+    return change;
+  }
+
+
+  /**
+   * Reports what changed in each cache since the last report (`datachange`), and starts over.
+   * Where a cache has many boxes (items written one at a time), it reports one around them all.
+   */
+  protected _report(): void {
+    const changes = this._changes;
+    if (!changes.size) return;
+    this._changes = new Map<SpatialID, SpatialChange>();
+
+    for (const change of changes.values()) {
+      if (change.boxes.length > MAX_REPORTED_BOXES) {
+        const all = this._emptyBox();
+        for (const box of change.boxes) {
+          this._extendBox(all, box);
+        }
+        change.boxes = [all];
+      }
+    }
+    this.emit('datachange', changes);
+  }
+
+
+  /**
+   * Internal helper - a box around nothing, to extend (see `_extendBox`).
+   * @return The box
+   */
+  protected _emptyBox(): BBox {
+    return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  }
+
+
+  /**
+   * Internal helper - extends a box to cover another, if that one is valid.
+   * @param box - The box to extend
+   * @param other - The box to cover
+   */
+  protected _extendBox(box: BBox, other: BBox): void {
+    if (!this._hasValidBox(other as SpatialItem)) return;
+    if (other.minX < box.minX) box.minX = other.minX;
+    if (other.minY < box.minY) box.minY = other.minY;
+    if (other.maxX > box.maxX) box.maxX = other.maxX;
+    if (other.maxY > box.maxY) box.maxY = other.maxY;
   }
 
 
@@ -487,14 +603,16 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Returns all items in the current viewport.
+   * Returns all items in the current viewport, or in a part of the world that's given (a map
+   * layer gives its frame's cull box, which has the view and some padding around it).
    * Note that this assumes that the items in the given spatialID cache are stored in world coordinates.
    * @param  spatialID - spatialID of the cache to search
+   * @param  extent - The part of the world to look in, in world coordinates (by default the view)
    * @return Array of boxes at the given location
    */
-  public getVisibleItems(spatialID: SpatialID): SpatialItem[] {
+  public getVisibleItems(spatialID: SpatialID, extent?: Extent): SpatialItem[] {
     const context = this.context;
-    const box = context.viewport.visibleWorldExtent().bbox();
+    const box = (extent ?? context.viewport.visibleWorldExtent()).bbox();
     return this.getItemsAtBox(spatialID, box);
   }
 

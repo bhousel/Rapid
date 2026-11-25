@@ -1,12 +1,14 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import { PointBatch } from './lib/PointBatch.ts';
+import { PointBatchMesh } from './lib/PointBatchMesh.ts';
 import { glowColor } from './helpers.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BatchMeshItem } from './lib/BatchMesh.ts';
+import type { LayerBatches } from './lib/LayerBatches.ts';
 import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
-import type { PointBatchItem, PointBatchQuad } from './lib/PointBatch.ts';
+import type { PointBatchMeshItem, PointBatchMeshQuad } from './lib/PointBatchMesh.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 // How many points make the circle of a halo
@@ -15,8 +17,9 @@ const HALO_CIRCLE_POINTS = 20;
 // The markers that are pins: anchored at their tip, with the icon up in their head
 const PINS = ['pin', 'boldPin', 'osmose'];
 
-// Where a pin's icon goes, in pixels above its tip. (The middle of a pin is 15 above it; this looks nicer.)
-const PIN_ICON_Y = -14;
+// Where a pin's icon goes, in pixels above its tip. (The middle of a pin is 15 above it; this looks nicer.
+// The `osmose` pin is taller, with its head higher.)
+const PIN_ICON_Y: Record<string, number> = { pin: -14, boldPin: -14, osmose: -17 };
 
 // A point can be hit at least this close to it, in pixels across, and this much beyond its marker
 const HIT_MINSIZE = 20;
@@ -25,6 +28,8 @@ const HIT_PAD = 4;
 // In a batch, a point with viewfields is drawn over every point without (see `sceneOrder`).
 // (Points are ordered by their place in the world, which is under 2^24.)
 const VIEWFIELDS_ABOVE = 2 ** 25;
+// ..and the photo that's selected or highlighted over every other (see `sceneOrder`)
+const ACTIVE_PHOTO_ABOVE = 2 ** 26;
 
 
 /** Scratch space for `PixiFeaturePoint.updateAvoid` */
@@ -41,7 +46,7 @@ const GLOW_ALPHA = 0.9;
 // What `_layout()` worked out, for the feature that's being drawn: its pictures, the lowest
 // first (the glow, then the viewfields, then the marker, then the icon), and which of them is
 // which. The objects are used again for every feature, so that drawing one makes none.
-const QUADS: PointBatchQuad[] = [];
+const QUADS: PointBatchMeshQuad[] = [];
 let _glowQuad = -1;
 let _firstViewfield = 0;
 let _numViewfields = 0;
@@ -53,7 +58,7 @@ let _iconQuad = -1;
  * @param index - Which one
  * @return The picture
  */
-function quadAt(index: number): PointBatchQuad {
+function quadAt(index: number): PointBatchMeshQuad {
   let quad = QUADS[index];
   if (!quad) {
     quad = { texture: PIXI.Texture.EMPTY, x: 0, y: 0, width: 0, height: 0, anchorX: 0.5, anchorY: 0.5, rotation: 0, color: 0xffffff, alpha: 1, turns: false, pulses: false };
@@ -69,7 +74,7 @@ function quadAt(index: number): PointBatchQuad {
  * @param scale - The style's `scale`: one number, or one for each direction
  * @param fallback - The size to use if the style has none, or `null` for the texture's own
  */
-function setSize(quad: PointBatchQuad, size: number | undefined, scale: number | number[] | undefined, fallback: number | null): void {
+function setSize(quad: PointBatchMeshQuad, size: number | undefined, scale: number | number[] | undefined, fallback: number | null): void {
   let [scaleX, scaleY] = Array.isArray(scale) ? scale : [scale];
   if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
   if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
@@ -99,7 +104,7 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
  * under it. They're drawn at a size on screen, whatever the zoom, and the marker and icon stay
  * upright however the map is turned.
  *
- * A layer that draws many points gives the feature a `PointBatch`. Its pictures are then a
+ * A layer that draws many points gives the feature a `PointBatchMesh`. Its pictures are then a
  * few rectangles in the batch's buffers, drawn with the other points there, and the feature
  * has no sprites and nothing in its container: it needn't be in the scene at all
  * (`drawsInContainer()`). A zoom or a rotation changes nothing in a batch.
@@ -107,10 +112,10 @@ export interface PixiFeaturePointProps extends PixiFeatureProps {
  * Without a batch, the pictures are sprites in the feature's container, which is scaled and
  * turned to undo the map's zoom and rotation. A hovered or highlighted point has one picture
  * more, either way: a glow behind the others.
- * (See `design/graphics-system.md` section 15.)
+ * (See "Batches" in `design/graphics-system.md`.)
  *
  * Properties available:
- * - `batch`       - `PointBatch` that draws the point, if the layer gave it one
+ * - `batch`       - `PointBatchMesh` that draws the point, if the layer gave it one
  * - `marker`      - `PIXI.Sprite` for the marker (or `null` while a batch draws the point)
  * - `icon`        - `PIXI.Sprite` for the icon (or `null` if there's none to draw)
  * - `viewfields`  - `PIXI.Container` containing the viewfields (or `null` if none)
@@ -133,11 +138,11 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public declare props: PixiFeaturePointProps;
 
   /** The batch that the layer gave this feature to draw in (see `batch`) */
-  protected _batch: PointBatch | null;
+  protected _batch: PointBatchMesh | null;
   /** The point in a batch, if a batch draws it */
-  protected _item: PointBatchItem | null;
+  protected _item: PointBatchMeshItem | null;
   /** The point's glow in the batch that its batch has for glows, while it's hovered or highlighted there */
-  protected _glowItem: PointBatchItem | null;
+  protected _glowItem: PointBatchMeshItem | null;
   /** Whether the point was last drawn with sprites of its own, in its container */
   protected _ownDraw: boolean;
   /** Whether the point's batch couldn't draw it the last time it was drawn (see `drawsInContainer`) */
@@ -202,17 +207,17 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * The batch to draw the point in, with the other points of the layer, or `null` to draw it
    * with sprites of its own. The layer sets it before `update()`, and positions the batch near
    * the point. The feature may be drawn some frames later, so the batch counts the features it
-   * was given to (`VertexBatch.users`).
+   * was given to (`BatchMesh.users`).
    * @return The batch, or `null`
    */
-  public get batch(): PointBatch | null {
+  public get batch(): PointBatchMesh | null {
     return this._batch;
   }
   /**
    * @param val - The batch to draw the point in from the next `update()`, or `null` for none.
    *   A point that gets another is drawn again.
    */
-  public set batch(val: PointBatch | null) {
+  public set batch(val: PointBatchMesh | null) {
     if (val === this._batch) return;
     if (this._batch) this._batch.users--;
     if (val) val.users++;
@@ -227,19 +232,35 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @return The batch's item, or `null`
    * @readonly
    */
-  public get item(): PointBatchItem | null {
+  public get item(): PointBatchMeshItem | null {
     return this._item;
   }
 
 
   /**
    * The point's glow in a batch of its own, while the point is hovered or highlighted and its
-   * batch has one for glows (see `PointBatch.glows`)
+   * batch has one for glows (see `PointBatchMesh.glows`)
    * @return The glows' batch's item, or `null`
    * @readonly
    */
-  public get glowItem(): PointBatchItem | null {
+  public get glowItem(): PointBatchMeshItem | null {
     return this._glowItem;
+  }
+
+
+  /**
+   * Gives this point its batch: the one for points in the container (see
+   * `LayerBatches.pointBatch`). A point already in that container's batch keeps it.
+   * @param batches - The layer's batches, or `null` to draw the point with sprites
+   * @param parent - The container whose batch to draw in
+   */
+  public override placeInBatches(batches: LayerBatches | null, parent: PIXI.Container): void {
+    const origin = this._geom?.world?.origin;
+    if (!batches || !origin) {
+      this.batch = null;
+    } else if (this._batch?.parent !== parent) {   // (a destroyed batch has no parent)
+      this.batch = batches.pointBatch(parent, origin);
+    }
   }
 
 
@@ -248,11 +269,11 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * layer asks before `update()`, to know whether to give it a place there).
    * A point that a batch draws has nothing in its container, unless the batch couldn't draw
    * it the last time: one of its pictures isn't in the texture that batches draw from
-   * (`PointBatch.canDraw`). That's only known once it's drawn, so a layer asks again after
+   * (`PointBatchMesh.canDraw`). That's only known once it's drawn, so a layer asks again after
    * `update()`.
    * @return `true` if its container has to be in the scene
    */
-  public drawsInContainer(): boolean {
+  public override drawsInContainer(): boolean {
     const batch = this._batch;
     if (!batch || batch.destroyed) return true;
     return this._unbatchable;
@@ -305,6 +326,16 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
+   * Its item in the batch that draws it (see `sceneItem`)
+   * @return The item, or `null` if no batch draws it
+   */
+  public override get sceneItem(): BatchMeshItem | null {
+    const item = this._item;
+    return (item?.batch && item.visible) ? item : null;
+  }
+
+
+  /**
    * Whether the Feature is currently visible
    * @return `true` if the feature is currently visible
    */
@@ -331,7 +362,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * The box of everything this point draws, in label space (see `PixiScene.updateLabelSpace`),
+   * The box of everything this point draws, in label space (see `LabelSpace.update`),
    * as the point was last drawn. Labels are placed around it, and keep clear of it.
    * @param out - Where to put the result
    * @return `out`, as `[minX, minY, maxX, maxY]`, or `null` if the point draws nothing
@@ -341,7 +372,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const origin = this._geom?.world?.origin;
     if (!origin || box[2] < box[0]) return null;
 
-    const [x, y] = this.scene.worldToLabel(origin[0], origin[1], TEMP);
+    const [x, y] = this.scene.labelSpace.worldToLabel(origin[0], origin[1], TEMP);
     out[0] = x + box[0];
     out[1] = y + box[1];
     out[2] = x + box[2];
@@ -413,7 +444,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.updateHitArea();
     this.updateHalo();
     this.updateAvoid();
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 
@@ -427,7 +458,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    */
   public override updateAvoid(): void {
     const scene = this.scene;
-    if (!this.labelAvoid || !this.container?.visible || !scene?.avoidGrid) {
+    if (!this.labelAvoid || !this.container?.visible || !scene?.labelSpace?.avoidGrid) {
       this._setAvoid(null);
       return;
     }
@@ -525,7 +556,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // A batch draws the point if every picture is in the batch's texture.
     let inBatch = !!batch;
     for (let i = 0; inBatch && i < count; i++) {
-      inBatch = PointBatch.canDraw(QUADS[i].texture);
+      inBatch = batch!.canDraw(QUADS[i].texture);
     }
 
     this._ownDraw = !inBatch;
@@ -671,7 +702,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         const quad = quadAt(count);
         quad.texture = texture;
         quad.x = 0;
-        quad.y = isPinned ? PIN_ICON_Y : 0;   // in the pin's head, or in the middle
+        quad.y = isPinned ? (PIN_ICON_Y[markerID] ?? -14) : 0;   // in the pin's head, or in the middle
         quad.anchorX = anchorX!;
         quad.anchorY = anchorY!;
         setSize(quad, style.icon.size || 11, style.icon.scale, 11);   // default to 11px to fit within the marker
@@ -759,15 +790,17 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @param count - How many pictures the point has
    * @param hasViewfields - Whether the point's style has viewfields
    */
-  protected _drawBatched(batch: PointBatch, count: number, hasViewfields: boolean): void {
+  protected _drawBatched(batch: PointBatchMesh, count: number, hasViewfields: boolean): void {
     const position = this.container.position;    // the point's place in the world
     const x = position.x - batch.position.x;
     const y = position.y - batch.position.y;
     const scale = this._screenScale;
 
-    // From north to south, so that each pin overlaps the ones above it on the map, and the
-    // ones with viewfields over the ones without.
-    const order = position.y + (hasViewfields ? VIEWFIELDS_ABOVE : 0);
+    // From north to south, so that each pin overlaps the ones above it on the map, the ones
+    // with viewfields over the ones without, and the photo that's selected or highlighted over
+    // them all (as its container's `zIndex` says when it draws itself).
+    const isActivePhoto = this._classes.has('selectphoto') || this._classes.has('highlightphoto');
+    const order = position.y + (hasViewfields ? VIEWFIELDS_ABOVE : 0) + (isActivePhoto ? ACTIVE_PHOTO_ABOVE : 0);
 
     let item = this._item;
     if (item && item.batch !== batch) {
@@ -926,7 +959,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @param sprite - The sprite
    * @param quad - The picture
    */
-  protected _drawSprite(sprite: PIXI.Sprite, quad: PointBatchQuad): void {
+  protected _drawSprite(sprite: PIXI.Sprite, quad: PointBatchMeshQuad): void {
     const texture = quad.texture;
     sprite.texture = texture;
     sprite.anchor.set(quad.anchorX, quad.anchorY);

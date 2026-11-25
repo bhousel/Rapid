@@ -208,7 +208,7 @@ export class MockGfxSystem extends MockSystem {
     (this.scene as any).dataChanged = () => {};
     (this.scene as any).dataArrived = () => {};
   }
-  /** Schedules a redraw at the next animation frame (no-op stub) */
+  /** Schedules a redraw at the next tick (no-op stub) */
   public deferredRedraw() {}
   /** Forces an immediate redraw (no-op stub) */
   public immediateRedraw() {}

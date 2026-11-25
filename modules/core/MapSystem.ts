@@ -9,7 +9,6 @@ import { utilTotalExtent } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { Difference } from '../lib/Difference.ts';
 import type { Edit } from '../lib/Edit.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
@@ -133,42 +132,9 @@ export class MapSystem extends AbstractSystem {
             this._updateHash();
           });
 
+        // (The OSM layer hears what arrived and what an edit changed from the editor itself, and
+        // `FilterSystem` clears its cache for them.)
         editor
-          .on('merge', (entityIDs: EntityID[]) => {
-            if (entityIDs) {
-              // New data can change what was matched for what's on the tile (e.g. a relation gaining members).
-              const graph = editor.staging.graph!;
-              for (const entityID of entityIDs) {
-                const entity = graph.hasEntity(entityID);
-                if (entity) {
-                  filters?.clearEntity(entity);
-                }
-              }
-              // A frame, not a redraw of everything: the OSM layer makes and draws what arrived
-              // as its frames have time. (`entityIDs` is everything on the tile, also what we had
-              // already, and what the new data reshaped. See `PixiLayerOsm.dataArrived`.)
-              scene.dataArrived('osm', entityIDs);
-              gfx.requestFrame();
-            } else {
-              gfx.deferredRedraw();
-            }
-          })
-          .on('stagingchange', (difference: Difference) => {
-            // `EditSystem` emits with staging's geometry already current, so there's nothing to recompute.
-            // The renderer binds each feature to its entity and its part of staging's geometry, and
-            // binds again when either is a different object. These are marked dirty to restyle them,
-            // since what changed may be only their topology (a vertex that's now shared).
-            const complete = difference.complete();
-            for (const entity of complete.values()) {
-              if (entity) {      // may be undefined if entity was deleted
-                filters?.clearEntity(entity);  // clear feature filter cache
-              }
-            }
-            // (A frame, not a redraw of everything: the OSM layer draws what the edit affects, and
-            // a drag makes an edit on every pointer move. See `PixiLayerOsm._renderChanged`.)
-            scene.dataChanged('osm', [...complete.keys()]);
-            gfx.requestFrame();
-          })
           .on('historyjump', (prevIndex: number, currIndex: number) => {
             this._historyJumped(prevIndex, currIndex);
           })
@@ -1310,8 +1276,8 @@ export class MapSystem extends AbstractSystem {
     this._highlightEdits = val;
 
     const gfx = this.context.systems.gfx!;
-    gfx.scene!.dirtyScene();
-    gfx.immediateRedraw();
+    gfx.scene!.dirtyLayers('osm');   // (what's edited is OSM data)
+    gfx.immediateRedraw('osm');
     this.emit('mapchange');
   }
 

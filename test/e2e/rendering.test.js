@@ -23,7 +23,7 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
     return rapidContext.systems.gfx.renderFrames.find(frame => frame.time >= since).toJSON();
   }, since);
 
-  // From the APP pass: each layer's time and features
+  // From the APP phase: each layer's time and features
   expect(frame.appMs).toBeGreaterThan(0);
   expect(frame.layers.osm.enabled).toBe(true);
   expect(frame.layers.osm.visible).toBeGreaterThan(50);
@@ -32,7 +32,7 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
   expect(frame.layers.osm.steps).toHaveProperty('gather');    // ..and timed its steps (a step can take 0 ms)
   expect(frame.layers.osm.steps).toHaveProperty('vertices');
 
-  // From the DRAW pass: Pixi's instructions, read from its internals
+  // From the DRAW phase: Pixi's instructions, read from its internals
   expect(frame.draw.ms).toBeGreaterThan(0);
   expect(frame.draw.renderGroups).toBeGreaterThan(5);   // the scene's containers are render groups
   expect(frame.draw.rebuiltGroups).toBeLessThanOrEqual(frame.draw.renderGroups);
@@ -49,8 +49,8 @@ test('records what each frame drew, from Rapid\'s layers and Pixi\'s instruction
 });
 
 
-// The CULL pass: a layer has features ready for more than the view, so that a frame where only the
-// view moved has nothing to do (see "A CULL pass" in `design/graphics-system.md`).
+// The cull box: a layer has features ready for more than the view, so that a frame where only the
+// view moved has nothing to do (see "The cull box" in `design/graphics-system.md`).
 test('keeps the OSM features as they are while only the view moves, and does the work when something changes', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -121,7 +121,7 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
   await waitForOsmData(page);
   await waitForIdle(page);
 
-  // Move the view a little on every animation frame, staying inside the cull box.
+  // Move the view a little on every tick, staying inside the cull box.
   const panned = await page.evaluate(async () => {
     const { gfx, map } = rapidContext.systems;
     const nextFrame = () => new Promise(resolve => { requestAnimationFrame(resolve); });
@@ -195,7 +195,8 @@ test('draws frames as fast as the view moves, and holds a pass back until its ga
 
 
 // A deadline on the frame: after a zoom every feature has to be drawn again, and the ones a frame
-// has no time for are drawn in the frames after it (see `design/graphics-system.md`, section 10).
+// has no time for are drawn in the frames after it (see "A deadline on the frame" in
+// `design/graphics-system.md`).
 test('after a zoom, draws the features again over the following frames, with the styles they had', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -263,11 +264,11 @@ test('after a zoom, draws the features again over the following frames, with the
 
 
 // A line's casing and stroke, and each ring of an area's outline, are drawn from a stroke mesh
-// that's built once, for any width (see `design/graphics-system.md`, section 15).
-// - The lines are in batches (`LineBatch`), one for the casings and one for the strokes of each
+// that's built once, for any width (see "The line builder" in `design/graphics-system.md`).
+// - The lines are in batches (`LineBatchMesh`), one for the casings and one for the strokes of each
 //   level: a line is a run of vertices in its batches' buffers, and the shader works out its
 //   width. A zoom changes four numbers, and nothing in a batch. The line's feature isn't in the scene.
-// - Areas are in two batches too: every fill (`FillBatch`), then every outline. A zoom changes
+// - Areas are in two batches too: every fill (`FillBatchMesh`), then every outline. A zoom changes
 //   nothing in the outlines' batch, and in the fills' batch only the areas whose band changed.
 test('draws lines, areas and points in batches that a zoom leaves alone', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
@@ -298,7 +299,7 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
     // What the points' batch holds: its arrays, and a sum of everything in them except the
     // byte that says whether a point is shown (the sixth of a vertex's eight).
     const pointBatch = () => {
-      const batch = layer.pointBatch;
+      const batch = layer.batches.points[0];
       let sum = 0;
       for (const n of batch._floats) {
         sum += n;
@@ -313,7 +314,7 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
     // (A hidden line has an opacity of 0 in its vertices, and that's all that changes when it's hidden.)
     const batches = () => {
       const found = new Map();
-      for (const batch of layer.lineBatches) {
+      for (const batch of layer.batches.lines) {
         let sum = 0;
         let hiddenVertices = 0;
         for (const n of batch._floats) {
@@ -436,7 +437,7 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
       dashed: dashed.length,
       batches: batchesBefore.size,
       levels: new Set([...batchesBefore.keys()].map(batch => batch.parent)).size,
-      polygonBatches: layer.polygonBatches.map(batch => batch.label).sort(),
+      polygonBatches: layer.batches.polygons.map(batch => batch.label).sort(),
       // A line that its batches draw isn't in the scene: none is, oneway arrows and all
       oneways: oneways.length,
       arrowsWrong: arrowsWrong,
@@ -554,7 +555,8 @@ test('draws lines, areas and points in batches that a zoom leaves alone', async 
 
 // A zoom changes how features are drawn, not which ones there are. So the OSM layer follows the
 // cull box to its new size without a pass, and runs its features through its `render…()`
-// functions again over the next frames (see `design/graphics-system.md`, section 12).
+// functions again over the next frames (see "A zoom without a pass" in
+// `design/graphics-system.md`).
 test('follows a zoom without a pass, and ends up with what a full pass shows', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
   await waitForOsmData(page);
@@ -596,7 +598,7 @@ test('follows a zoom without a pass, and ends up with what a full pass shows', a
 
 
 // Labels are placed around the points and vertices: each of those marks where it's drawn in the
-// scene's avoid grid, and no label goes there (see `design/graphics-system.md`, section 14).
+// scene's avoid grid, and no label goes there (see "Label placement" in `design/graphics-system.md`).
 // (For a while the avoids were made for whole map tiles of points, wherever those were at the time.)
 test('marks every point in view for labels to avoid, and puts no label over a point', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);
@@ -606,8 +608,8 @@ test('marks every point in view for labels to avoid, and puts no label over a po
   const check = () => page.evaluate(() => {
     const { gfx, spatial } = rapidContext.systems;
     const scene = gfx.scene;
-    const grid = scene.avoidGrid;
-    const offset = scene.labelOffset;
+    const grid = scene.labelSpace.avoidGrid;
+    const offset = scene.labelSpace.offset;
     const screen = gfx.pixi.screen;
 
     const labelBoxes = spatial.getCache('labels').rbush.all().filter(item => item.contents.labelID).length;
@@ -893,7 +895,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
 
     // In a batch: by road class, then by the way's ID, which is the feature's `zIndex`.
     let batchesOutOfOrder = 0;
-    for (const batch of layer.lineBatches) {
+    for (const batch of layer.batches.lines) {
       const orders = batch._items.map(item => item.order);
       if (orders.some((order, i) => i > 0 && order < orders[i - 1])) batchesOutOfOrder++;
     }
@@ -910,7 +912,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
     }
 
     // The points are in one batch, from north to south, the ones with viewfields after the others.
-    const pointOrders = layer.pointBatch._items.map(item => item.order);
+    const pointOrders = layer.batches.points[0]._items.map(item => item.order);
     const expectedOrder = feature => feature.geometry.world.origin[1] + (feature.style.viewfield.angles.length ? 2 ** 25 : 0);
 
     return {
@@ -929,7 +931,7 @@ test('keeps lines in the order of their road class, casings under strokes, and p
       pointsOrderedOtherwise: points.filter(feature => feature.item?.order !== expectedOrder(feature)).length,
       pointsWithViewfields: points.filter(feature => feature.style.viewfield.angles.length).length,
       pointBatchOutOfOrder: pointOrders.some((order, i) => i > 0 && order < pointOrders[i - 1]),
-      pointBatchFirst: layer.pointContainer.children[0] === layer.pointBatch.glows && layer.pointContainer.children[1] === layer.pointBatch,
+      pointBatchFirst: layer.pointContainer.children[0] === layer.batches.points[0].glows && layer.pointContainer.children[1] === layer.batches.points[0],
       outOfOrder: outOfOrder
     };
   });
@@ -986,7 +988,7 @@ test('draws oneway arrows from the lines\' shader, where sprites would draw them
     const drawn = pixels();
 
     // Without: the shader leaves the markers out, or the sprites are hidden
-    const uniforms = layer.lineBatches[0].shader.resources.lineUniforms.uniforms;
+    const uniforms = layer.batches.lines[0].shader.resources.lineUniforms.uniforms;
     uniforms.uMarkers = 0;
     sprites.forEach(container => { container.visible = false; });
     const without = pixels();
@@ -1032,7 +1034,7 @@ test('draws oneway arrows from the lines\' shader, where sprites would draw them
   // (The zoom that counts is the map's effective one. Saying it's lower loads no other tiles.)
   const lowZoom = await page.evaluate(async () => {
     const { gfx, map } = rapidContext.systems;
-    const uniforms = gfx.scene.layers.get('osm').lineBatches[0].shader.resources.lineUniforms.uniforms;
+    const uniforms = gfx.scene.layers.get('osm').batches.lines[0].shader.resources.lineUniforms.uniforms;
     const drawn = async () => {
       const startID = gfx.lastRenderFrame.id;
       gfx.immediateRedraw();
@@ -1152,7 +1154,7 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 
     const state = () => {
       const found = { filled: 0, banded: 0, whole: 0, masked: 0, wrong: [] };
-      const fills = layer.polygonBatches.find(batch => batch.label === 'fills');
+      const fills = layer.batches.polygons.find(batch => batch.label === 'fills');
       const drawsFills = !!fills && fills.shader.resources.fillUniforms.uniforms.uWireframe === 0;
 
       for (const feature of layer.features.values()) {
@@ -1229,7 +1231,7 @@ test('draws partial fills as bands along the edge, with no stencil mask in any a
 // something rebuilt it. (It was found with the masks that partial fills had.) A `LineMesh` is
 // always batched, so crossing the line changes nothing. (The lasso and the lines of the other
 // layers are `LineMesh`es. The OSM layer's lines and outlines are in
-// `LineBatch`es, which have a shader of their own and are never batched by Pixi: the test
+// `LineBatchMesh`es, which have a shader of their own and are never batched by Pixi: the test
 // turns those off to get an outline's `LineMesh` in a tile.)
 test('keeps drawing an outline whose mesh crosses 100 vertices in a frame its tile is rebuilt', async ({ page, consoleErrors }) => {
   await startRapid(page, TEST_MAP);

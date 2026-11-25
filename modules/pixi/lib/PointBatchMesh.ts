@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
-import { VertexBatch } from './VertexBatch.ts';
+import { BatchMesh } from './BatchMesh.ts';
 
-import type { BatchItem, BatchLayout } from './VertexBatch.ts';
+import type { BatchMeshItem, BatchMeshLayout } from './BatchMesh.ts';
 
 
 /**
@@ -9,8 +9,8 @@ import type { BatchItem, BatchLayout } from './VertexBatch.ts';
  * It says what a `PIXI.Sprite` would: a texture, where its anchor is, how big it is and how
  * it's turned. Everything is in pixels, whatever the zoom.
  */
-export interface PointBatchQuad {
-  /** The picture. It has to be in the texture that the batches draw from (`PointBatch.canDraw`). */
+export interface PointBatchMeshQuad {
+  /** The picture. It has to be in the texture that the batches draw from (`PointBatchMesh.canDraw`). */
   texture: PIXI.Texture;
   /** Where its anchor is, in pixels to the right of the point */
   x: number;
@@ -32,12 +32,12 @@ export interface PointBatchQuad {
   alpha: number;
   /** Whether it turns with the map (a viewfield: it points somewhere on the ground), not staying upright on screen */
   turns: boolean;
-  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatch.setTime`) */
+  /** Whether its opacity follows the clock (the glow of a hovered point breathes: see `PointBatchShader.setTime`) */
   pulses?: boolean;
 }
 
-/** One point in a batch. `PointBatch.add()` returns it, and the caller keeps it to change the point or take it out. */
-export type PointBatchItem = BatchItem;
+/** One point in a batch. `PointBatchMesh.add()` returns it, and the caller keeps it to change the point or take it out. */
+export type PointBatchMeshItem = BatchMeshItem;
 
 
 // A vertex is 6 floats in one buffer and 8 bytes in another (32 bytes), and a picture is 4 of them:
@@ -47,13 +47,13 @@ export type PointBatchItem = BatchItem;
 //   bytes   0 - 3   aColor     red, green, blue, opacity
 //           4       aFlags.x   255 if the picture turns with the map
 //           5       aFlags.y   255 if the point is shown, 0 if it's hidden
-//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatch.setTime`)
+//           6       aFlags.z   255 if the picture pulses (a glow: see `PointBatchShader.setTime`)
 //           7                  not used
 const FLOATS = 6;
 const BYTES = 8;
 const SHOWN_BYTE = 5;
 
-const LAYOUT: BatchLayout = {
+const LAYOUT: BatchMeshLayout = {
   floats: FLOATS,
   bytes: BYTES,
   alphaByte: SHOWN_BYTE,
@@ -195,40 +195,69 @@ fn mainFrag(
 `;
 
 
-// Every batch draws with the same shader, from the same texture, at the same moment.
-let _shader: PIXI.Shader | null = null;
-let _source: PIXI.TextureSource | null = null;
-let _uniforms: PIXI.UniformGroup | null = null;
-
 /**
- * Returns the uniforms that say how the pictures that pulse are drawn at this moment.
- * @return The uniform group
+ * The shader that every `PointBatchMesh` of a scene draws with (see `BatchShaders`). It holds the
+ * texture that the points' pictures are in, and a uniform for how bright the pictures that pulse
+ * are at this moment.
  */
-function pointUniforms(): PIXI.UniformGroup {
-  _uniforms ??= new PIXI.UniformGroup({
-    uPulse: { value: 1, type: 'f32' }
-  });
-  return _uniforms;
-}
+export class PointBatchShader extends PIXI.Shader {
 
-/**
- * Returns the shader that every batch draws with, making it the first time.
- * @return The shader
- */
-function pointShader(): PIXI.Shader {
-  _shader ??= PIXI.Shader.from({
-    gl: { vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'point-batch' },
-    gpu: {
-      vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
-      fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
-    },
-    resources: {
-      uTexture: PIXI.Texture.WHITE.source,
-      uSampler: PIXI.Texture.WHITE.source.style,
-      pointUniforms: pointUniforms()
-    }
-  });
-  return _shader;
+  /** The texture that the batches draw from, or `null` before there's one (see `setTexture`) */
+  protected _source: PIXI.TextureSource | null;
+
+
+  /** Makes the shader, with no texture: a batch can draw nothing until it has one. */
+  public constructor() {
+    super({
+      glProgram: PIXI.GlProgram.from({ vertex: VERTEX_GLSL, fragment: FRAGMENT_GLSL, name: 'point-batch' }),
+      gpuProgram: PIXI.GpuProgram.from({
+        vertex: { entryPoint: 'mainVert', source: SOURCE_WGSL },
+        fragment: { entryPoint: 'mainFrag', source: SOURCE_WGSL }
+      }),
+      resources: {
+        uTexture: PIXI.Texture.WHITE.source,
+        uSampler: PIXI.Texture.WHITE.source.style,
+        pointUniforms: new PIXI.UniformGroup({
+          uPulse: { value: 1, type: 'f32' }
+        })
+      }
+    });
+    this._source = null;
+  }
+
+
+  /**
+   * Gives every batch the texture that the points' pictures are in. A batch can draw only
+   * what's in that one.
+   * @param source - The texture, or `null` for none
+   */
+  public setTexture(source: PIXI.TextureSource | null): void {
+    const used = source ?? PIXI.Texture.WHITE.source;
+    this.resources.uTexture = used;
+    this.resources.uSampler = used.style;
+    this._source = source;
+  }
+
+
+  /**
+   * Says how bright the pictures that pulse are at this moment, in every batch (a glow
+   * breathes). Call it before a frame is drawn; nothing in any batch changes for it.
+   * @param pulse - How bright, from 0 to 1
+   */
+  public setTime(pulse: number): void {
+    this.resources.pointUniforms.uniforms.uPulse = pulse;
+  }
+
+
+  /**
+   * Whether a batch can draw a picture: it has to be in the texture that the batches draw from.
+   * (An icon that hasn't loaded isn't, nor is anything in a second slab of the atlas.)
+   * @param texture - The picture
+   * @return `true` if a batch can draw it
+   */
+  public canDraw(texture: PIXI.Texture): boolean {
+    return !!this._source && texture.source === this._source;
+  }
 }
 
 
@@ -256,19 +285,19 @@ function quadIndices(count: number): Uint16Array {
 
 
 /**
- * A `PointBatch` draws many points as one mesh, in one draw call. A point is a few pictures
+ * A `PointBatchMesh` draws many points as one mesh, in one draw call. A point is a few pictures
  * (a marker, perhaps an icon over it and viewfields under it), each a rectangle of one texture
- * that holds them all: the symbol atlas of `PixiTextures` (`PointBatch.setTexture()`).
+ * that holds them all: the symbol atlas of `PixiTextures` (`PointBatchShader.setTexture()`).
  *
  * The shader puts each picture a number of pixels from where its point is on screen. So the
  * pictures are the same size at every zoom and stay upright when the map is turned (or turn
  * with it, for a viewfield), and neither a zoom nor a rotation changes anything in a batch.
  * What the batch does with its buffers (a point that changes, hiding, order, the place its
- * coordinates start at) is `VertexBatch`'s.
+ * coordinates start at) is `BatchMesh`'s.
  *
- * See `design/graphics-system.md` section 15.
+ * See "Batches" in `design/graphics-system.md`.
  */
-export class PointBatch extends VertexBatch {
+export class PointBatchMesh extends BatchMesh {
 
   /**
    * The batch that the glows of this batch's points are drawn in, if its owner made one: a
@@ -277,12 +306,19 @@ export class PointBatch extends VertexBatch {
    * built again: 7 ms where the batch holds a town's points. It's destroyed with this batch.
    * (`null`: a point's glow is the lowest of its pictures in this batch.)
    */
-  public glows: PointBatch | null;
+  public glows: PointBatchMesh | null;
+
+  /** The shader it draws with (the same object as `shader`, with its own type) */
+  protected _pointShader: PointBatchShader;
 
 
-  /** Makes a batch with no points in it. It draws nothing until one is added. */
-  public constructor() {
-    super(LAYOUT, pointShader());
+  /**
+   * Makes a batch with no points in it. It draws nothing until one is added.
+   * @param shader - The shader it draws with: its scene's, which every point batch there shares (`BatchShaders.points`)
+   */
+  public constructor(shader: PointBatchShader) {
+    super(LAYOUT, shader);
+    this._pointShader = shader;
     this.glows = null;
   }
 
@@ -300,37 +336,13 @@ export class PointBatch extends VertexBatch {
 
 
   /**
-   * Gives every batch the texture that the points' pictures are in. A batch can draw only
-   * what's in that one.
-   * @param source - The texture, or `null` for none
-   */
-  public static setTexture(source: PIXI.TextureSource | null): void {
-    const shader = pointShader();
-    const used = source ?? PIXI.Texture.WHITE.source;
-    shader.resources.uTexture = used;
-    shader.resources.uSampler = used.style;
-    _source = source;
-  }
-
-
-  /**
-   * Says how bright the pictures that pulse are at this moment, in every batch (a glow
-   * breathes). Call it before a frame is drawn; nothing in any batch changes for it.
-   * @param pulse - How bright, from 0 to 1
-   */
-  public static setTime(pulse: number): void {
-    pointUniforms().uniforms.uPulse = pulse;
-  }
-
-
-  /**
-   * Whether a batch can draw a picture: it has to be in the texture that the batches draw from.
-   * (An icon that hasn't loaded isn't, nor is anything in a second slab of the atlas.)
+   * Whether the batch can draw a picture: it has to be in the texture that its shader draws
+   * from (see `PointBatchShader.canDraw`).
    * @param texture - The picture
-   * @return `true` if a batch can draw it
+   * @return `true` if the batch can draw it
    */
-  public static canDraw(texture: PIXI.Texture): boolean {
-    return !!_source && texture.source === _source;
+  public canDraw(texture: PIXI.Texture): boolean {
+    return this._pointShader.canDraw(texture);
   }
 
 
@@ -345,7 +357,7 @@ export class PointBatch extends VertexBatch {
    * @param start - Which of `quads` is the first to use
    * @return The point in the batch, to change or remove it with
    */
-  public add(quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, order: number = 0, start: number = 0): PointBatchItem {
+  public add(quads: PointBatchMeshQuad[], count: number, x: number, y: number, scale: number = 1, order: number = 0, start: number = 0): PointBatchMeshItem {
     const item = this._addItem(count * 4, quadIndices(count), order);
     this._write(item, quads, count, x, y, scale, start);
     return item;
@@ -363,7 +375,7 @@ export class PointBatch extends VertexBatch {
    * @param scale - How much larger than the pictures say everything is drawn
    * @param start - Which of `quads` is the first to use
    */
-  public set(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number = 1, start: number = 0): void {
+  public set(item: PointBatchMeshItem, quads: PointBatchMeshQuad[], count: number, x: number, y: number, scale: number = 1, start: number = 0): void {
     if (item.batch !== this) return;
     this._resizeItem(item, count * 4, quadIndices(count));
     this._write(item, quads, count, x, y, scale, start);
@@ -380,7 +392,7 @@ export class PointBatch extends VertexBatch {
    * @param scale - How much larger than the pictures say everything is drawn
    * @param start - Which of `quads` is the first of them
    */
-  protected _write(item: PointBatchItem, quads: PointBatchQuad[], count: number, x: number, y: number, scale: number, start: number): void {
+  protected _write(item: PointBatchMeshItem, quads: PointBatchMeshQuad[], count: number, x: number, y: number, scale: number, start: number): void {
     const floats = this._floats;
     const bytes = this._bytes;
     const shown = item.visible ? item.alpha : 0;

@@ -137,7 +137,7 @@ remembered answers equal answers worked out from an empty cache.
 | Užice | 106 → 39.4 | 211 → 144 |
 
 (Medians of redraw frames from `bun run measure --fresh`, in two sessions. In one session at
-Staten Island, old build then new: the frame's APP pass 57.1 → 34.5 ms, and a pan frame that does
+Staten Island, old build then new: the frame's APP phase 57.1 → 34.5 ms, and a pan frame that does
 the pass 100 → 72 ms.)
 
 **What's left of it** (Staten Island, 8.4 ms for `filterScene()` on its own):
@@ -149,8 +149,8 @@ the pass 100 → 72 ms.)
 
 **Options that don't need the rethink:**
 
-- **Don't ask about vertices the layer won't draw.** Done (Nov 19; `graphics-system.md` section
-  12, "The vertices that aren't drawn"). The layer draws a vertex when it's "interesting"
+- **Don't ask about vertices the layer won't draw.** Done (Nov 19; "The vertices that aren't
+  drawn" in `graphics-system.md`). The layer draws a vertex when it's "interesting"
   (tagged, an endpoint or an intersection) at effective zoom 16 and up, or when it belongs to a
   selected or hovered way. All 65,695 went through `filterScene()`, then `classify` (4.2 ms),
   then the `vertices` step (5.4 ms), which tested each one. Now the layer leaves out the ones it

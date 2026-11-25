@@ -3,6 +3,7 @@ import { utilArrayUnion } from '@rapid-sdk/util';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
+import type { Difference } from '../lib/Difference.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/index.ts';
 
@@ -107,6 +108,8 @@ export class FilterSystem extends AbstractSystem {
     this._hashChanged = this._hashChanged.bind(this);
     this._filterChanged = this._filterChanged.bind(this);
     this._settingsChanged = this._settingsChanged.bind(this);
+    this._merged = this._merged.bind(this);
+    this._stagingChanged = this._stagingChanged.bind(this);
 
     // hardcode the filters for now
     this._filters.set('points',          new Filter(this._isPoint.bind(this)));
@@ -136,6 +139,7 @@ export class FilterSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
+    const editor = context.systems.editor!;
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
@@ -150,6 +154,10 @@ export class FilterSystem extends AbstractSystem {
       .then(() => {
         // Setup event handlers..
         urlhash?.on('hashchange', this._hashChanged);
+        // What's matched for an entity can change when data arrives (a relation gains members)
+        // and when it's edited: forget it then.
+        editor.on('merge', this._merged);
+        editor.on('stagingchange', this._stagingChanged);
       });
   }
 
@@ -360,6 +368,40 @@ export class FilterSystem extends AbstractSystem {
   public clear(entities: OsmEntity[]): void {
     for (const entity of entities) {
       this.clearEntity(entity);
+    }
+  }
+
+
+  /**
+   * OSM data arrived and was merged (`EditSystem`'s `merge`): what's matched for it, and for what it
+   * reshaped, is forgotten.
+   * @param entityIDs - What arrived, if that's known
+   */
+  protected _merged(entityIDs?: Iterable<EntityID>): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+
+    if (!entityIDs) return;
+    const graph = editor.staging.graph!;
+    for (const entityID of entityIDs) {
+      const entity = graph.hasEntity(entityID);
+      if (entity) {
+        this.clearEntity(entity);
+      }
+    }
+  }
+
+
+  /**
+   * An edit changed staging (`EditSystem`'s `stagingchange`): what's matched for everything it
+   * affects is forgotten.
+   * @param difference - What the edit changed
+   */
+  protected _stagingChanged(difference: Difference): void {
+    for (const entity of difference.complete().values()) {
+      if (entity) {      // may be undefined if entity was deleted
+        this.clearEntity(entity);
+      }
     }
   }
 
@@ -678,8 +720,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
     if (changedIDs.size) {
-      scene.dataChanged('osm', [...changedIDs]);
-      gfx.requestFrame();
+      scene.dataChanged('osm', [...changedIDs]);   // (and asks for a frame)
     }
   }
 
@@ -822,7 +863,7 @@ export class FilterSystem extends AbstractSystem {
       settings?.set('filters.disabledFilters', this._knownSaved);
     }
 
-    gfx?.immediateRedraw();
+    gfx?.immediateRedraw('osm');   // (only the OSM layer is filtered)
     this.emit('filterchange');
   }
 

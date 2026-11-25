@@ -10,7 +10,7 @@ import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 import type { ZoomBehavior } from 'd3-zoom';
 
 
@@ -269,21 +269,23 @@ export class KartaviewService extends AbstractSystem {
 
   /**
    * Get already loaded image data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of image data
    */
-  public getImages(): MarkerData[] {
+  public getImages(extent?: Extent): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('kartaview-images').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('kartaview-images', extent).map(hit => hit.contents) as MarkerData[];
   }
 
 
   /**
    * Get already loaded sequence data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of sequence data
    */
-  public getSequences(): GeoJSONData[] {
+  public getSequences(extent?: Extent): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('kartaview-sequences').map(hit => hit.contents) as GeoJSONData[];
+    return spatial.getVisibleItems('kartaview-sequences', extent).map(hit => hit.contents) as GeoJSONData[];
   }
 
 
@@ -362,9 +364,6 @@ export class KartaviewService extends AbstractSystem {
    * @param response - Response data
    */
   protected _gotTile(tile: Tile, page: number, response: any): void {
-    const context = this.context;
-    const gfx = context.systems.gfx;
-
     const data = response?.currentPageItems || [];
     if (!data.length) return;
 
@@ -398,7 +397,6 @@ export class KartaviewService extends AbstractSystem {
       this._cacheSequence(images);
     }
 
-    gfx?.deferredRedraw('kartaview');
 
     if (data.length === MAXRESULTS) {
       this._nextPage.set(tile.id, page + 1);
@@ -607,7 +605,6 @@ export class KartaviewService extends AbstractSystem {
    */
   protected _loadImageAsync(imageID: PhotoID): Promise<KartaviewImage | void> {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
@@ -645,7 +642,6 @@ export class KartaviewService extends AbstractSystem {
 
         // Update the sequence to include this image, create if needed..
         this._cacheSequence([image]);
-        gfx?.deferredRedraw('kartaview');
         return image;
       })
       .catch(err => {

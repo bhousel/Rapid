@@ -16,7 +16,7 @@ import type {
   OutlineTag, OutlineTagOptions, PolygonGeometry, SequenceComponent, TagComponent, Viewer,
   ViewerBearingEvent, ViewerImageEvent, ViewerOptions, ViewerStateEvent
 } from 'mapillary-js';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /** Mapillary API access token */
@@ -203,9 +203,8 @@ export type MapillaryDetection = MarkerData<MapillaryDetectionProps>;
  * - `imageChanged`   - fired when a new image is visible in the viewer
  * - `bearingChanged` - fired when the viewer has been panned, receives the bearing value in degrees.
  * - `fovChanged`     - fired when the viewer has been zoomed, receives the fov value in degrees.
- * - `loadedImages`
- * - `loadedSigns`
- * - `loadedDetections`
+ *
+ * (What a tile loads goes in the spatial caches, which say what changed: see `SpatialSystem`.)
  */
 export class MapillaryService extends AbstractSystem {
 
@@ -401,18 +400,19 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Get already loaded data that appears in the current map view
    * @param  datasetID - one of 'images', 'signs', or 'detections'
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of Markers
    */
-  public getData(datasetID: MapillaryDatasetID): MarkerData[] {
+  public getData(datasetID: MapillaryDatasetID, extent?: Extent): MarkerData[] {
     const spatial = this.context.systems.spatial!;
 
     if (datasetID === 'images') {
-      return spatial.getVisibleItems('mapillary-images')
+      return spatial.getVisibleItems('mapillary-images', extent)
         .map(hit => hit.contents) as MarkerData[];
 
     } else {   // traffic signs and the other detections each have their own cache
       const cacheID = (datasetID === 'signs') ? 'mapillary-signs' : 'mapillary-detections';
-      return spatial.getVisibleItems(cacheID)
+      return spatial.getVisibleItems(cacheID, extent)
         .map(hit => hit.contents) as MarkerData[];
     }
   }
@@ -420,11 +420,12 @@ export class MapillaryService extends AbstractSystem {
 
   /**
    * Get already loaded sequence data that appears in the current map view
+   * @param extent - The part of the world to look in, in world coordinates (by default the view)
    * @return  Array of GeoJSONData sequences
    */
-  public getSequences(): GeoJSONData[] {
+  public getSequences(extent?: Extent): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('mapillary-sequences')
+    return spatial.getVisibleItems('mapillary-sequences', extent)
       .map(hit => hit.contents) as GeoJSONData[];
   }
 
@@ -543,17 +544,7 @@ export class MapillaryService extends AbstractSystem {
       listenerID: 'network:fetchAndParseMVT',
       listenerData: { tileXYZ: tile.xyz }
     })
-      .then(results => {
-        this._gotTile(results);
-
-        if (datasetID === 'images') {
-          this.emit('loadedImages');
-        } else if (datasetID === 'signs') {
-          this.emit('loadedSigns');
-        } else if (datasetID === 'detections') {
-          this.emit('loadedDetections');
-        }
-      })
+      .then(results => this._gotTile(results))
       .catch(err => {
         if (err.name === 'AbortError') return;  // ok
         console.error(err);  // eslint-disable-line
@@ -568,7 +559,6 @@ export class MapillaryService extends AbstractSystem {
    */
   protected _gotTile(results: MVTFeatureResult[]): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
 
     for (const { layerID, feature } of results) {
@@ -616,11 +606,6 @@ export class MapillaryService extends AbstractSystem {
           object_type: layerID
         });
       }
-    }
-
-    // (A tile has photos, sequences, detections and signs: three layers draw them.)
-    for (const mapLayerID of ['mapillary', 'mapillary-detections', 'mapillary-signs']) {
-      gfx?.deferredRedraw(mapLayerID);
     }
   }
 
@@ -1005,7 +990,6 @@ export class MapillaryService extends AbstractSystem {
    */
   protected _loadDetectionAsync(detectionID: DetectionID): Promise<MapillaryDetection | void> {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const network = context.systems.network!;
 
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
@@ -1041,7 +1025,6 @@ export class MapillaryService extends AbstractSystem {
           object_type:        type
         });
 
-        gfx?.immediateRedraw();
         return detection;
       })
       .catch(err => {

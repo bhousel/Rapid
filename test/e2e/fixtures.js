@@ -88,7 +88,7 @@ export async function startRapid(page, hash = '') {
   await page.waitForFunction(() => globalThis.rapidContext?.systems?.editor?.started, null, { timeout: 60_000 });
 
   // A new browser profile gets the welcome screen, which covers the map.
-  // It fades out over animation frames, and while Rapid is still starting up there are few of those:
+  // It fades out over ticks, and while Rapid is still starting up there are few of those:
   // with software rendering and several pages at once, closing it takes 3 seconds or more.
   const splash = page.locator('.modal-splash');
   if (await splash.isVisible()) {
@@ -144,7 +144,7 @@ export async function waitForIdle(page) {
  * Describes what the OSM layer shows: for each visible feature, the container it's in, its
  * classes, whether it's been drawn (not dirty), whether it's bound to the entity as it is now,
  * and where it is. For a line, which level's batches draw it, and whether its casing and stroke
- * are shown there (see `LineBatch`); the same for an area's fill and outlines, and for a point.
+ * are shown there (see `LineBatchMesh`); the same for an area's fill and outlines, and for a point.
  * A feature that its batches draw isn't in the scene itself.
  * Two of these are equal if a mapper would see the same features the same way.
  *

@@ -5,7 +5,7 @@ import type { MarkerData } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { RenderFrame } from './RenderFrame.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Extent, Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 const MAPILLARY_GREEN = 0x05cb63;
@@ -23,6 +23,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary-detections';
+    this.useBatches = true;
   }
 
 
@@ -58,7 +59,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
@@ -92,8 +93,9 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * Renders the Mapillary detection markers for this frame.
    * @param  frame    -  The frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
+   * @param extents - Where to gather the data, in world coordinates (see `_gatherExtents`)
    */
-  public renderMarkers(frame: RenderFrame, viewport: Viewport): void {
+  public renderMarkers(frame: RenderFrame, viewport: Viewport, extents: Extent[]): void {
     const context = this.context;
     const schema = context.systems.schema!;
 
@@ -102,7 +104,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
     const parentContainer = this._spatialContainer('qa', this.id);
 
-    let markers = mapillary.getData('detections');
+    let markers = this._gatherIn(extents, extent => mapillary.getData('detections', extent));
     markers = this.filterMarkers(markers);
 
     for (const d of markers) {
@@ -117,7 +119,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.parentContainer = parentContainer;
       }
 
       if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
@@ -148,9 +149,20 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport);
+      this.updateFeature(feature, frame, viewport, parentContainer);
       this.retainFeature(feature, frame);
     }
+  }
+
+
+  /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * Mapillary's detections, other than traffic signs.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'mapillary-detections';
   }
 
 
@@ -165,7 +177,9 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;
 
     mapillary.loadTiles('detections');
-    this.renderMarkers(frame, viewport);
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+    this.renderMarkers(frame, viewport, extents);
   }
 
 }

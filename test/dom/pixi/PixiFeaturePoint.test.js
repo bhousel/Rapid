@@ -2,8 +2,13 @@ import * as PIXI from 'pixi.js';
 import { AvoidGrid } from '../../../modules/pixi/lib/AvoidGrid.ts';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from '../../../modules/pixi/PixiFeaturePoint.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
-import { PointBatch } from '../../../modules/pixi/lib/PointBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
+import { PointBatchMesh } from '../../../modules/pixi/lib/PointBatchMesh.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+import { LayerBatches } from '../../../modules/pixi/lib/LayerBatches.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 // A point that draws itself has a marker sprite. Its icon sprite is made only when the style
@@ -45,11 +50,11 @@ describe('PixiFeaturePoint', () => {
     pulsing = new Map();      // the sprites whose opacity follows the scene's clock
     const scene = {
       context: context, gfx: gfx, layers: new Map(),
-      addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {},
+      addFeature: () => {}, removeFeature: () => {}, labelSpace: { featureChanged: () => {}, avoidFreed: () => {} },
       addPulsing: (sprite, alpha) => pulsing.set(sprite, alpha),
       removePulsing: sprite => pulsing.delete(sprite)
     };
-    haloBatch = new LineBatch();
+    haloBatch = new LineBatchMesh(batchShaders.lines);
     haloBatch.position.set(8388000, 8388000);    // near the world's middle, where the point is
     scene.layers.set('map-ui', { haloBatchAt: () => haloBatch });
     const layer = new AbstractPixiLayer(scene);
@@ -285,10 +290,10 @@ describe('PixiFeaturePoint', () => {
       grid = new AvoidGrid(2);
       hits = [];
       const scene = feature.scene;
-      scene.avoidGrid = grid;
-      scene.labelOffset = new PIXI.Point(0, 0);
-      scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };    // where the point is on screen
-      scene.avoidHit = cells => hits.push(cells);
+      scene.labelSpace.avoidGrid = grid;
+      scene.labelSpace.offset = new PIXI.Point(0, 0);
+      scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };    // where the point is on screen
+      scene.labelSpace.avoidHit = cells => hits.push(cells);
       feature.labelAvoid = true;
     });
 
@@ -537,13 +542,13 @@ describe('PixiFeaturePoint', () => {
     const STAGE = { x: 0, y: 0 };    // not looked at
 
     beforeEach(() => {
-      PointBatch.setTexture(source);
+      batchShaders.points.setTexture(source);
       missing = new Set();
       feature.gfx.textureManager.getTexture = (atlasID, textureID) => missing.has(textureID) ? PIXI.Texture.EMPTY : (TEXTURES[textureID] ?? null);
       origin = { worldTransform: new PIXI.Matrix() };    // (Pixi works a container's out when it renders)
       feature.gfx.origin = origin;
 
-      batch = new PointBatch();
+      batch = new PointBatchMesh(batchShaders.points);
       batch.position.set(8388000, 8388000);    // near the world's middle, where the point is
       calls = [];
       ['add', 'set', 'remove', 'setOrder', 'setVisible'].forEach(method => {
@@ -557,7 +562,7 @@ describe('PixiFeaturePoint', () => {
     });
     afterEach(() => {
       if (!batch.destroyed) batch.destroy();
-      PointBatch.setTexture(null);
+      batchShaders.points.setTexture(null);
     });
 
     it('draws its pictures there, and has no sprites and nothing in its container', () => {
@@ -608,6 +613,31 @@ describe('PixiFeaturePoint', () => {
       closeTo(cornersOf(2), [[-6, -6], [6, -6], [6, 6], [-6, 6]]);            // the pin, as a circle
       assert.deepEqual(bytesOf(0).slice(0, 4), [0x33, 0x33, 0x33, 128]);
       assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25);
+    });
+
+    it('draws the photo that\'s selected or highlighted over every other', () => {
+      feature.style = { marker: { image: 'largeCircle' }, viewfield: { angles: [0], image: 'viewfield' } };
+      feature.setClass('selectphoto');
+      drawAt(17);
+      assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25 + 2 ** 26);
+
+      feature.unsetClass('selectphoto');
+      feature.setClass('highlightphoto');
+      drawAt(17);
+      assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25 + 2 ** 26);
+
+      feature.unsetClass('highlightphoto');
+      drawAt(17);
+      assert.strictEqual(feature.item.order, feature.container.position.y + 2 ** 25);
+    });
+
+    it('puts the icon higher in the head of the taller `osmose` pin', () => {
+      TEXTURES.osmose = new PIXI.Texture({ source: source, frame: new PIXI.Rectangle(0, 0, 20, 26) });
+      feature.style = { marker: { image: 'osmose' }, icon: { image: 'maki-cafe' } };
+      drawAt(17);
+      closeTo(cornersOf(0), [[-10, -26], [10, -26], [10, 0], [-10, 0]]);
+      closeTo(cornersOf(1), [[-5.5, -22.5], [5.5, -22.5], [5.5, -11.5], [-5.5, -11.5]]);
+      delete TEXTURES.osmose;
     });
 
     it('draws a pin as a circle below zoom 17, everything smaller, without viewfields', () => {
@@ -678,7 +708,7 @@ describe('PixiFeaturePoint', () => {
 
     it('works its box out again after a rotation if it has viewfields, which turn', () => {
       feature.style = { marker: { image: 'smallCircle' }, viewfield: { angles: [0], image: 'viewfield' } };
-      feature.scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
+      feature.scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
       drawAt(17);
       assert.deepEqual(feature.labelBox([0, 0, 0, 0]).map(Math.round), [490, 290, 510, 310]);
 
@@ -693,7 +723,7 @@ describe('PixiFeaturePoint', () => {
     });
 
     it('says where it is drawn, for labels: the box of its pictures around its place', () => {
-      feature.scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
+      feature.scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
       feature.style = PIN;
       drawAt(17);
       assert.deepEqual(feature.labelBox([0, 0, 0, 0]), [492, 276, 508, 300]);    // the pin, above its tip
@@ -712,9 +742,9 @@ describe('PixiFeaturePoint', () => {
     it('has no box, and marks nothing, when it draws nothing', () => {
       const grid = new AvoidGrid(2);
       const scene = feature.scene;
-      scene.avoidGrid = grid;
-      scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
-      scene.avoidHit = () => {};
+      scene.labelSpace.avoidGrid = grid;
+      scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
+      scene.labelSpace.avoidHit = () => {};
       feature.labelAvoid = true;
       feature.style = { marker: { image: '' } };
       drawAt(17);
@@ -728,9 +758,9 @@ describe('PixiFeaturePoint', () => {
     it('marks its box for labels to avoid, again after a zoom that changed nothing else', () => {
       const grid = new AvoidGrid(2);
       const scene = feature.scene;
-      scene.avoidGrid = grid;
-      scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
-      scene.avoidHit = () => {};
+      scene.labelSpace.avoidGrid = grid;
+      scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
+      scene.labelSpace.avoidHit = () => {};
       feature.labelAvoid = true;
       feature.style = PIN;
       drawAt(17);
@@ -849,7 +879,7 @@ describe('PixiFeaturePoint', () => {
     // points. A hover then adds nothing to the points' batch: the point's pictures are written
     // where they were, and no index buffer is built again for every point there is.
     it('has its glow in the batch that its batch has for glows, and stays as it is in its own', () => {
-      const glows = new PointBatch();
+      const glows = new PointBatchMesh(batchShaders.points);
       glows.position.set(30, -20);
       batch.glows = glows;
       const FLOATS = 6;
@@ -958,9 +988,9 @@ describe('PixiFeaturePoint', () => {
     it('keeps its box for labels, and what it marks for them to avoid, while it glows', () => {
       const grid = new AvoidGrid(2);
       const scene = feature.scene;
-      scene.avoidGrid = grid;
-      scene.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
-      scene.avoidHit = () => {};
+      scene.labelSpace.avoidGrid = grid;
+      scene.labelSpace.worldToLabel = (x, y, out) => { out[0] = 500; out[1] = 300; return out; };
+      scene.labelSpace.avoidHit = () => {};
       feature.labelAvoid = true;
       feature.style = PIN;
       drawAt(17);
@@ -1136,7 +1166,7 @@ describe('PixiFeaturePoint', () => {
       drawAt(17);
       assert.strictEqual(batch.size, 1);
 
-      const other = new PointBatch();
+      const other = new PointBatchMesh(batchShaders.points);
       other.position.set(8388000, 8388000);
       feature.batch = other;
       assert.strictEqual(batch.users, 0);
@@ -1182,5 +1212,42 @@ describe('PixiFeaturePoint', () => {
     assert.strictEqual(other.style, feature.style);
     draw({ marker: { image: 'pin' } });
     assert.notStrictEqual(other.style, feature.style);
+  });
+
+
+  // A layer gives a point the batch of the container it's drawn for (`AbstractPixiLayer._drawInBatches`)
+  describe('placeInBatches', () => {
+    let batches, parent, other;
+    beforeEach(() => {
+      batches = new LayerBatches(batchShaders);
+      parent = new PIXI.Container();
+      other = new PIXI.Container();
+    });
+    afterEach(() => {
+      parent.destroy({ children: true });
+      other.destroy({ children: true });
+    });
+
+    it('takes the container\'s batch for points, and keeps it', () => {
+      feature.placeInBatches(batches, parent);
+      const batch = feature.batch;
+      assert.strictEqual(batch, batches.pointBatch(parent, [0, 0]));
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.batch, batch);
+      assert.strictEqual(batch.users, 1);
+    });
+
+    it('takes another container\'s when it\'s drawn for that one', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(batches, other);
+      assert.strictEqual(feature.batch.parent, other);
+    });
+
+    it('gives it back, and draws itself, without the layer\'s batches', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(null, parent);
+      assert.isNull(feature.batch);
+      assert.isTrue(feature.drawsInContainer());
+    });
   });
 });

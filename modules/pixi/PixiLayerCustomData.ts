@@ -57,6 +57,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'custom-data';
+    this.useBatches = true;
 
     this._dataUsed = null;
     this._fileList = null;
@@ -117,6 +118,20 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * the custom data's, or its vector tiles' (a cache for each zoom).
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    const vtService = this.context.services.vectortile;
+    const template = this._template;
+    if (template) return !!vtService?.holdsData(template, spatialID);
+    return !!this._spatialID && spatialID === this._spatialID;
+  }
+
+
+  /**
    * Render the GeoJSONData custom data
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -129,14 +144,19 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const vtService = context.services.vectortile;
     const viewZoom = viewport.transform.zoom;
 
+    if (this._template && vtService && viewZoom >= 13) {   // fetch data from vector tile service (not too many requests)
+      vtService.loadTiles(this._template);
+    }
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
+
     let geoData: GeoJSONData[] = [];
-    if (this._template && vtService) {   // fetch data from vector tile service
-      if (viewZoom >= 13) {  // avoid firing off too many API requests
-        vtService.loadTiles(this._template);
-      }
-      geoData = vtService.getData(this._template);
-    } else if (this._spatialID) {
-      geoData = spatial.getVisibleItems(this._spatialID).map(hit => hit.contents as GeoJSONData);
+    const template = this._template;
+    const spatialID = this._spatialID;
+    if (template && vtService) {
+      geoData = this._gatherIn(extents, extent => vtService.getData(template, extent));
+    } else if (spatialID) {
+      geoData = this._gatherIn(extents, extent => spatial.getVisibleItems(spatialID, extent).map(hit => hit.contents as GeoJSONData));
     }
 
     // Determine which renderer(s) to use for each feature
@@ -231,7 +251,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderPolygons(frame: RenderFrame, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    // (Polygons under lines: each kind in a container of its own, so their batches are in that order)
+    const basemapContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    const parentContainer = this._childContainer(basemapContainer, 'polygons', 0);
 
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR },
@@ -260,7 +282,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
           feature.style = polygonStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -271,7 +292,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }
@@ -287,7 +308,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderLines(frame: RenderFrame, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    const basemapContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
+    const parentContainer = this._childContainer(basemapContainer, 'lines', 1);
 
     const lineStyle = styleOverride ?? {
       stroke: { color: CUSTOM_COLOR },
@@ -315,7 +337,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
           feature.style = lineStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -326,7 +347,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }
@@ -412,7 +433,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
           feature = new PixiFeaturePoint(this, featureID);
           feature.labelAvoid = true;   // labels keep clear of it
           feature.style = pointStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -423,7 +443,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }

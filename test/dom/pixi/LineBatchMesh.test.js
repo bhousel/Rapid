@@ -1,11 +1,15 @@
-import { LineBatch, LINE_GLOW, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh, LINE_GLOW, LINE_MARKERS } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { geomStrokeMesh } from '../../../modules/geo/stroke.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 // A batch draws many lines as one mesh. Each vertex is 12 floats (the point on the line, its
 // offset for a half width of 1, the distance along the line, the second place it can have, and
 // the line's width) and 8 bytes (color, opacity, dashes).
-describe('LineBatch', () => {
+describe('LineBatchMesh', () => {
   const FLOATS = 12;
   const BYTES = 8;
   const STYLE = { width: 5, minWidth: 2, color: 0x336699, alpha: 0.5 };
@@ -17,7 +21,7 @@ describe('LineBatch', () => {
 
   let batch;
   beforeEach(() => {
-    batch = new LineBatch();
+    batch = new LineBatchMesh(batchShaders.lines);
   });
   afterEach(() => {
     if (!batch.destroyed) batch.destroy();
@@ -106,6 +110,19 @@ describe('LineBatch', () => {
     batch.setOrder(bottom, 3);
     batch.flush();
     assert.deepEqual(drawn().slice(2 * n), Array.from(straight.indices, index => index + bottom.first));
+  });
+
+  it('says where a line is in the order it draws in, before that order is built', () => {
+    const top = batch.add(straight, 0, 0, STYLE, 2);
+    const bottom = batch.add(straight, 0, 0, STYLE, 1);
+    const alsoTop = batch.add(straight, 0, 0, STYLE, 2);
+    assert.deepEqual([bottom, top, alsoTop].map(item => batch.drawIndex(item)), [0, 1, 2]);
+
+    batch.setOrder(bottom, 3);
+    assert.strictEqual(batch.drawIndex(bottom), 2);
+
+    batch.remove(top);
+    assert.strictEqual(batch.drawIndex(top), -1);
   });
 
   it('hides a line by the opacity in its vertices, and builds nothing', () => {
@@ -353,28 +370,28 @@ describe('LineBatch', () => {
   });
 
   it('says which dashes it can draw', () => {
-    assert.isTrue(LineBatch.canDraw(null));
-    assert.isTrue(LineBatch.canDraw(undefined));
-    assert.isTrue(LineBatch.canDraw([]));
-    assert.isTrue(LineBatch.canDraw([6, 3]));
-    assert.isTrue(LineBatch.canDraw([20, 5, 5, 5]));
-    assert.isFalse(LineBatch.canDraw([6]));
-    assert.isFalse(LineBatch.canDraw([6, 3, 2, 3, 2, 3]));
-    assert.isFalse(LineBatch.canDraw([6.5, 3]));
-    assert.isFalse(LineBatch.canDraw([300, 3]));
+    assert.isTrue(LineBatchMesh.canDraw(null));
+    assert.isTrue(LineBatchMesh.canDraw(undefined));
+    assert.isTrue(LineBatchMesh.canDraw([]));
+    assert.isTrue(LineBatchMesh.canDraw([6, 3]));
+    assert.isTrue(LineBatchMesh.canDraw([20, 5, 5, 5]));
+    assert.isFalse(LineBatchMesh.canDraw([6]));
+    assert.isFalse(LineBatchMesh.canDraw([6, 3, 2, 3, 2, 3]));
+    assert.isFalse(LineBatchMesh.canDraw([6.5, 3]));
+    assert.isFalse(LineBatchMesh.canDraw([300, 3]));
   });
 
   it('draws every batch with one shader, which gets the view\'s numbers', () => {
-    const other = new LineBatch();
+    const other = new LineBatchMesh(batchShaders.lines);
     assert.strictEqual(other.shader, batch.shader);
     other.destroy();
 
-    LineBatch.setView({ pixel: 0.25, narrow: 2, wireframe: true, casing: false, markers: true });
+    batchShaders.lines.setView({ pixel: 0.25, narrow: 2, wireframe: true, casing: false, markers: true });
     const uniforms = batch.shader.resources.lineUniforms.uniforms;
     assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing, uniforms.uMarkers], [0.25, 2, 1, 0, 1]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: false });
+    batchShaders.lines.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: false });
     assert.deepEqual([uniforms.uPixel, uniforms.uNarrow, uniforms.uWireframe, uniforms.uCasing, uniforms.uMarkers], [1, 0, 0, 1, 0]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+    batchShaders.lines.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
   });
 
   // The markers along a line (oneway arrows, the triangles of a line with sides) are a strip
@@ -513,7 +530,7 @@ describe('LineBatch', () => {
     });
 
     it('ignore the markers of another batch', () => {
-      const other = new LineBatch();
+      const other = new LineBatchMesh(batchShaders.lines);
       const item = other.addMarkers(straight, 0, 0, ARROWS);
       batch.setMarkers(item, corner, 0, 0, ARROWS);
       batch.setMarkerStyle(item, { kind: 'sided', color: 0, alpha: 1 });
@@ -688,7 +705,7 @@ describe('LineBatch', () => {
     });
 
     it('ignores the glow of another batch', () => {
-      const other = new LineBatch();
+      const other = new LineBatchMesh(batchShaders.lines);
       const item = other.addGlow(straight, 0, 0, GLOW);
       batch.setGlow(item, round, 0, 0, GLOW);
       batch.setGlowStyle(item, { ...GLOW, color: 0 });
@@ -730,26 +747,26 @@ describe('LineBatch', () => {
 
   it('tells every batch\'s shader what the clock says: how bright the glows are, how far the dashes have marched', () => {
     const uniforms = batch.shader.resources.lineUniforms.uniforms;
-    LineBatch.setTime({ pulse: 0.75, shift: 120.5 });
+    batchShaders.lines.setTime({ pulse: 0.75, shift: 120.5 });
     assert.deepEqual([uniforms.uGlow, uniforms.uShift], [0.75, 120.5]);
-    LineBatch.setView({ pixel: 0.5, narrow: 0, wireframe: false, casing: true, markers: true });
+    batchShaders.lines.setView({ pixel: 0.5, narrow: 0, wireframe: false, casing: true, markers: true });
     assert.deepEqual([uniforms.uGlow, uniforms.uShift, uniforms.uPixel], [0.75, 120.5, 0.5], 'the view\'s numbers are others');
-    LineBatch.setTime({ pulse: 1, shift: 0 });
+    batchShaders.lines.setTime({ pulse: 1, shift: 0 });
     assert.deepEqual([uniforms.uGlow, uniforms.uShift], [1, 0]);
-    LineBatch.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
+    batchShaders.lines.setView({ pixel: 1, narrow: 0, wireframe: false, casing: true, markers: true });
   });
 
   it('has no batch for its lines\' glows until it\'s given one, and destroys the one it has with it', () => {
     assert.isNull(batch.glows);
-    const glows = new LineBatch();
+    const glows = new LineBatchMesh(batchShaders.lines);
     batch.glows = glows;
     batch.destroy();
     assert.isTrue(glows.destroyed);
     assert.isNull(batch.glows);
 
     // ..unless that one is gone already, as when their container destroyed both
-    const other = new LineBatch();
-    other.glows = new LineBatch();
+    const other = new LineBatchMesh(batchShaders.lines);
+    other.glows = new LineBatchMesh(batchShaders.lines);
     other.glows.destroy();
     assert.doesNotThrow(() => other.destroy());
   });
@@ -770,5 +787,58 @@ describe('LineBatch', () => {
     assert.isNull(geometry.buffers);
     assert.isNull(item.batch);
     assert.isOk(shader.glProgram, 'the shader is every batch\'s');
+  });
+
+
+  // A batch's coordinates are 32-bit floats from the batch's place in the world. The place
+  // follows the view when the view has gone far, so that what's in it stays fine enough to draw.
+  describe('followView', () => {
+    const HALO = { width: 2, minWidth: 2, color: 0xffff00, alpha: 1, dash: [6, 3], marches: true };
+    const square = geomStrokeMesh([0, 0, 10, 0, 10, 10, 0, 10], { closed: true });
+
+    // A viewport whose middle is at a place in the world
+    const viewportAt = (zoom, x, y) => ({
+      transform: { zoom: zoom },
+      center: () => [400, 300],
+      screenToWorld: () => [x, y]
+    });
+
+    it('leaves the batch where it is while the view is near', () => {
+      batch.position.set(10000, 20000);
+      const item = batch.add(square, 0, 0, HALO);
+      const x = batch._floats[item.first * 12];
+
+      batch.followView(viewportAt(16, 10000 + 200000, 20000 - 200000));     // a quarter of a million pixels away, at zoom 16
+      assert.deepEqual([batch.position.x, batch.position.y], [10000, 20000]);
+      assert.strictEqual(batch._floats[item.first * 12], x);
+    });
+
+    it('moves the batch to the view when the view has gone far, and keeps what\'s in it where it is in the world', () => {
+      batch.position.set(10000, 20000);
+      const item = batch.add(square, 100, 50, HALO);     // at 10100, 20050 in the world
+      const worldX = i => batch.position.x + batch._floats[(item.first + i) * 12];
+      const worldY = i => batch.position.y + batch._floats[(item.first + i) * 12 + 1];
+      const before = Array.from({ length: item.count }, (_, i) => [worldX(i), worldY(i)]);
+
+      batch.followView(viewportAt(16, 10000 + 300000.4, 20000));
+      assert.deepEqual([batch.position.x, batch.position.y], [310000, 20000], 'whole numbers, at the middle of the view');
+      for (let i = 0; i < item.count; i++) {
+        assert.closeTo(worldX(i), before[i][0], 0.05);
+        assert.closeTo(worldY(i), before[i][1], 0.05);
+      }
+    });
+
+    it('moves it sooner the further the view is zoomed in: a pixel is less of the world there', () => {
+      batch.followView(viewportAt(16, 0, 100000));
+      assert.strictEqual(batch.position.y, 0, 'at zoom 16, not yet');
+      batch.followView(viewportAt(20, 0, 100000));
+      assert.strictEqual(batch.position.y, 100000, 'at zoom 20, where a pixel is a sixteenth of a unit');
+    });
+
+    it('does nothing to a batch that was destroyed', () => {
+      const other = new LineBatchMesh(batchShaders.lines);
+      other.destroy();
+      assert.doesNotThrow(() => other.followView(viewportAt(16, 1e7, 1e7)));
+    });
   });
 });

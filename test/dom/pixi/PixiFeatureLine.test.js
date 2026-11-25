@@ -1,7 +1,12 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from '../../../modules/pixi/AbstractPixiLayer.ts';
-import { LineBatch } from '../../../modules/pixi/lib/LineBatch.ts';
+import { LineBatchMesh } from '../../../modules/pixi/lib/LineBatchMesh.ts';
 import { PixiFeatureLine } from '../../../modules/pixi/PixiFeatureLine.ts';
+import { BatchShaders } from '../../../modules/pixi/lib/BatchShaders.ts';
+import { LayerBatches } from '../../../modules/pixi/lib/LayerBatches.ts';
+
+// The shaders that a scene's batches draw with (every batch of a kind shares its kind's shader)
+const batchShaders = new BatchShaders();
 
 
 // A line always has a stroke. Its casing is drawn from zoom 16, if the style has one that can
@@ -28,14 +33,14 @@ describe('PixiFeatureLine', () => {
     effectiveZoom = 17;
     context.systems.map = { effectiveZoom: () => effectiveZoom, wireframeMode: false };
     const gfx = { textureManager: { getTexture: () => null, getDashTexture: () => dashTexture } };
-    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, featureChanged: () => {}, avoidFreed: () => {} };
+    scene = { context: context, gfx: gfx, layers: new Map(), addFeature: () => {}, removeFeature: () => {}, labelSpace: { featureChanged: () => {}, avoidFreed: () => {} } };
 
     // The map UI layer makes its batch of halos where the first halo is, as the real one does.
     haloBatch = null;
     scene.layers.set('map-ui', {
       haloBatchAt: (x, y) => {
         if (!haloBatch) {
-          haloBatch = new LineBatch();
+          haloBatch = new LineBatchMesh(batchShaders.lines);
           haloBatch.position.set(x, y);
         }
         return haloBatch;
@@ -212,7 +217,7 @@ describe('PixiFeatureLine', () => {
 
   // The line's first segment runs along x from its first point, and nothing else is near that point.
   // The casing is 5 pixels wide, and a hit is good 5 pixels around it: 7.5 pixels from the line.
-  // A layer that draws many lines gives each two `LineBatch`es, one for its casing and one for
+  // A layer that draws many lines gives each two `LineBatchMesh`es, one for its casing and one for
   // its stroke. Each is a run of vertices in its batch then, and a zoom changes nothing there.
   describe('in batches', () => {
     const style = { casing: { width: 5, color: 0x444444 }, stroke: { width: 3, color: 0xffffff } };
@@ -230,8 +235,8 @@ describe('PixiFeatureLine', () => {
     }
 
     beforeEach(() => {
-      batch = new LineBatch();
-      casingBatch = new LineBatch();
+      batch = new LineBatchMesh(batchShaders.lines);
+      casingBatch = new LineBatchMesh(batchShaders.lines);
       for (const each of [batch, casingBatch]) {
         each.position.set(8388608, 8388608);    // the world's middle, where the line is
       }
@@ -356,8 +361,8 @@ describe('PixiFeatureLine', () => {
 
     it('moves to other batches when the layer gives it others', () => {
       drawAt(17, style);
-      const other = new LineBatch();
-      const otherCasings = new LineBatch();
+      const other = new LineBatchMesh(batchShaders.lines);
+      const otherCasings = new LineBatchMesh(batchShaders.lines);
       feature.batch = other;
       feature.casingBatch = otherCasings;
       drawAt(17);
@@ -407,7 +412,7 @@ describe('PixiFeatureLine', () => {
       assert.strictEqual(casingBatch.users, 1);
       assert.strictEqual(batch.size, 0);
 
-      const other = new LineBatch();
+      const other = new LineBatchMesh(batchShaders.lines);
       feature.batch = other;
       assert.strictEqual(batch.users, 0);
       assert.strictEqual(other.users, 1);
@@ -444,7 +449,7 @@ describe('PixiFeatureLine', () => {
       // A layer with many lines gives the strokes' batch a small batch for the glows: one that
       // comes or goes doesn't have the strokes' index buffer built again.
       it('has its glow in the batch that the strokes\' batch has for glows, and leaves the strokes\' batch as it is', () => {
-        const glows = new LineBatch();
+        const glows = new LineBatchMesh(batchShaders.lines);
         batch.glows = glows;
         feature.container.zIndex = 4.25;
         drawAt(17, style);
@@ -666,8 +671,8 @@ describe('PixiFeatureLine', () => {
         drawAt(17, style);
         glow();
         const item = feature.glowItem;
-        const other = new LineBatch();
-        const otherCasings = new LineBatch();
+        const other = new LineBatchMesh(batchShaders.lines);
+        const otherCasings = new LineBatchMesh(batchShaders.lines);
         feature.batch = other;
         feature.casingBatch = otherCasings;
         drawAt(17);
@@ -907,8 +912,8 @@ describe('PixiFeatureLine', () => {
       it('go to the batch that the line was given since, though only the zoom changed', () => {
         drawAt(17, oneway);
         const item = feature.arrowItem;
-        const other = new LineBatch();
-        const otherCasings = new LineBatch();
+        const other = new LineBatchMesh(batchShaders.lines);
+        const otherCasings = new LineBatchMesh(batchShaders.lines);
         other.position.set(8388608, 8388608);
         otherCasings.position.set(8388608, 8388608);
 
@@ -1328,6 +1333,59 @@ describe('PixiFeatureLine', () => {
       feature.unsetClass('select');
       drawAt(17);
       assert.lengthOf(feature.haloItems, 0);
+    });
+  });
+
+
+  // A layer gives a line the batches of the container it's drawn for (`AbstractPixiLayer._drawInBatches`)
+  describe('placeInBatches', () => {
+    let batches, parent, other;
+    beforeEach(() => {
+      batches = new LayerBatches(batchShaders);
+      parent = new PIXI.Container();
+      other = new PIXI.Container();
+    });
+    afterEach(() => {
+      parent.destroy({ children: true });
+      other.destroy({ children: true });
+    });
+
+    it('takes the container\'s batches for casings and strokes, and keeps them', () => {
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.batch, batches.lineBatch(parent, false, [0, 0]));
+      assert.strictEqual(feature.casingBatch, batches.lineBatch(parent, true, [0, 0]));
+
+      const batch = feature.batch;
+      feature.placeInBatches(batches, parent);
+      assert.strictEqual(feature.batch, batch);
+      assert.strictEqual(batch.users, 1);
+      assert.isFalse(feature.drawsInContainer());
+    });
+
+    it('takes another container\'s when it\'s drawn for that one', () => {
+      feature.placeInBatches(batches, parent);
+      const old = feature.batch;
+      feature.placeInBatches(batches, other);
+      assert.strictEqual(feature.batch.parent, other);
+      assert.strictEqual(feature.casingBatch.parent, other);
+      assert.strictEqual(old.users, 0);
+    });
+
+    it('takes new ones when the old were destroyed', () => {
+      feature.placeInBatches(batches, parent);
+      feature.batch.destroy();
+      batches.removeEmpty();
+      feature.placeInBatches(batches, parent);
+      assert.isFalse(feature.batch.destroyed);
+      assert.strictEqual(feature.batch.parent, parent);
+    });
+
+    it('gives them back, and draws itself, without the layer\'s batches', () => {
+      feature.placeInBatches(batches, parent);
+      feature.placeInBatches(null, parent);
+      assert.isNull(feature.batch);
+      assert.isNull(feature.casingBatch);
+      assert.isTrue(feature.drawsInContainer());
     });
   });
 });

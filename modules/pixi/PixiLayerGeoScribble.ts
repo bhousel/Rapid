@@ -27,6 +27,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'geoscribble';
+    this.useBatches = true;
 
     this.scribblesContainer = null;
   }
@@ -64,7 +65,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     const service = context.services.geoscribble;
     if (val && service) {
       service.startAsync()
-        .then(() => this.gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw(this.id));
     }
   }
 
@@ -80,6 +81,17 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
+   * Whether this layer draws data from a spatial cache (see `AbstractPixiLayer.gathersFrom`):
+   * GeoScribble's scribbles.
+   * @param spatialID - The cache's spatial ID
+   * @return `true` if this layer draws data from it
+   */
+  public override gathersFrom(spatialID: SpatialID): boolean {
+    return spatialID === 'geoscribble';
+  }
+
+
+  /**
    * Render the geojson custom data
    * @param frame - The frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -90,8 +102,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     const service = this.context.services.geoscribble;
     if (!service) return;
     service.loadTiles();
+    const extents = this._gatherExtents(frame, viewport);
+    if (!extents.length) return;   // only the view moved, inside the cull box the last pass covered
 
-    const geoData: GeoJSONData[] = service.getData();
+    const geoData: GeoJSONData[] = this._gatherIn(extents, extent => service.getData(extent));
 
     // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.
@@ -138,7 +152,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param lines - Array of line data
    */
   public renderLines(frame: RenderFrame, viewport: Viewport, lines: GeoJSONData[]): void {
-    const parentContainer = this.scribblesContainer;
+    const scribblesContainer = this.scribblesContainer;
+    if (!scribblesContainer) return;   // (made in `reset()`)
+
+    // (Lines under points: each kind in a container of its own, so their batches are in that order)
+    const parentContainer = this._childContainer(scribblesContainer, 'lines', 0);
 
     for (const d of lines) {
       const lineStyle = this.getLineStyle(d.properties);
@@ -162,7 +180,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
           feature.style = lineStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -173,7 +190,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }
@@ -187,7 +204,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param points - Array of point data
    */
   public renderPoints(frame: RenderFrame, viewport: Viewport, points: GeoJSONData[]): void {
-    const parentContainer = this.scribblesContainer;
+    const scribblesContainer = this.scribblesContainer;
+    if (!scribblesContainer) return;   // (made in `reset()`)
+
+    const parentContainer = this._childContainer(scribblesContainer, 'points', 1);
 
     const pointStyle: Partial<MatchedStyle> = {
       marker: { color: CUSTOM_COLOR, image: 'largeCircle' },
@@ -216,7 +236,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (!feature) {
           feature = new PixiFeaturePoint(this, featureID);
           feature.style = pointStyle;
-          feature.parentContainer = parentContainer;
         }
 
         // If data has changed.. Replace it.
@@ -227,7 +246,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport);
+        this.updateFeature(feature, frame, viewport, parentContainer);
         this.retainFeature(feature, frame);
       }
     }

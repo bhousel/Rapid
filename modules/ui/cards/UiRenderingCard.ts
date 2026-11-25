@@ -26,7 +26,7 @@ interface Row {
 
 
 /**
- * `UiRenderingCard` shows what recent frames of the map cost: the time of the APP and DRAW passes
+ * `UiRenderingCard` shows what recent frames of the map cost: the time of the APP and DRAW phases
  * against the frame budget, a chart of the last frames, and what Pixi drew.
  * The numbers are `GraphicsSystem`'s frame stats, see `design/graphics-system.md`.
  */
@@ -167,7 +167,7 @@ export class UiRenderingCard extends AbstractUiCard {
     if (textSelection?.containsNode($content.node() as Node, true)) return;
 
     const frames = gfx.renderFrames;
-    const budget = scheduler?.targetFrameTime ?? (1000 / 60);
+    const budget = scheduler?.targetTickTime ?? (1000 / 60);
 
     this._drawChart($content.selectAll('.rendering-chart').node() as HTMLCanvasElement, frames, budget);
 
@@ -361,7 +361,7 @@ export class UiRenderingCard extends AbstractUiCard {
         value: pairs([
           ['pending', count(scheduler.numPending)],
           ['pressure', metrics.pressure],
-          ['dropped', count(metrics.droppedFrames)]
+          ['long ticks', count(metrics.longTicks)]
         ])
       });
     }
@@ -371,8 +371,8 @@ export class UiRenderingCard extends AbstractUiCard {
 
 
   /**
-   * Draws the chart: one bar per frame, oldest on the left, with the DRAW pass stacked on the APP
-   * pass and a line at the frame budget. The chart is two budgets tall; a taller bar is cut off.
+   * Draws the chart: one bar per frame, oldest on the left, with the DRAW phase stacked on the APP
+   * phase and a line at the frame budget. The chart is two budgets tall; a taller bar is cut off.
    * A pass that went over the budget is drawn in red.
    * @param canvas - The canvas to draw on
    * @param frames - Recent frames, oldest first
@@ -435,7 +435,7 @@ export class UiRenderingCard extends AbstractUiCard {
     const enable = !gfx.detailedStats;
     gfx.enableDetailedStats(enable);
     this._turnedDetailsOn = enable && gfx.detailedStats;   // it stays off with a renderer that isn't WebGL
-    gfx.immediateRedraw();   // draw a frame that has them (or doesn't)
+    gfx.requestFrame();   // draw a frame that has them (or doesn't): nothing on the map changed
     this.render();
   }
 

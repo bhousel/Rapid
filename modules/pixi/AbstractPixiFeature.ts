@@ -5,11 +5,13 @@ import { styleDefaults } from '../lib/Style.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { BatchMeshItem } from './lib/BatchMesh.ts';
 import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
-import type { LineBatchItem } from './lib/LineBatch.ts';
+import type { LayerBatches } from './lib/LayerBatches.ts';
+import type { LineBatchMeshItem } from './lib/LineBatchMesh.ts';
 import type { MinimalStyleProps, StyleProps } from '../lib/Style.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
@@ -79,7 +81,7 @@ export class AbstractPixiFeature {
   public labelAvoid: boolean;
 
   /** The lines of the Feature's halo, in the map UI's batch (see `_drawHalo`) */
-  protected _haloItems: LineBatchItem[];
+  protected _haloItems: LineBatchMeshItem[];
   /** The cells of the scene's avoid grid that this Feature has marked, if any */
   protected _avoidCells: CellRect | null;
   /** The generation of the avoid grid that `_avoidCells` is for */
@@ -164,7 +166,7 @@ export class AbstractPixiFeature {
    */
   public destroy(): void {
     this._setAvoid(null);
-    this.scene.featureChanged(this);    // (its label goes with it)
+    this.scene.labelSpace.featureChanged(this);    // (its label goes with it)
     this.layer.removeFeature(this);
     this.scene.removeFeature(this);
 
@@ -205,7 +207,7 @@ export class AbstractPixiFeature {
     this.layer.work.updated++;
     this._geomDirty = false;
     this._styleDirty = false;
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 
@@ -225,7 +227,7 @@ export class AbstractPixiFeature {
    * @return The batch's items
    * @readonly
    */
-  public get haloItems(): readonly LineBatchItem[] {
+  public get haloItems(): readonly LineBatchMeshItem[] {
     return this._haloItems;
   }
 
@@ -296,6 +298,27 @@ export class AbstractPixiFeature {
 
 
   /**
+   * Gives this Feature the batches it should draw in, from its layer's (see `LayerBatches`), or
+   * takes them away. A kind of Feature that batches can draw overrides this; this one draws
+   * itself, always. Call it before `update()`.
+   * @param _batches - The layer's batches, or `null` to draw without them
+   * @param _parent - The container whose batches to draw in
+   */
+  public placeInBatches(_batches: LayerBatches | null, _parent: PIXI.Container): void {
+  }
+
+
+  /**
+   * Whether this Feature draws something in its own container, and so has to be in the scene.
+   * A kind of Feature that batches can draw overrides this; this one always does.
+   * @return `true` if its container has to be in the scene
+   */
+  public drawsInContainer(): boolean {
+    return true;
+  }
+
+
+  /**
    * The container in the scene that says where this Feature is drawn among the others: the one
    * drawn later is on top, and is what the pointer hits (`featureOrder()` in `helpers.ts`).
    * It's the Feature's own container, unless something else draws the Feature.
@@ -313,6 +336,16 @@ export class AbstractPixiFeature {
    */
   public get sceneOrder(): number {
     return 0;
+  }
+
+
+  /**
+   * What says where this Feature is drawn in its `sceneContainer`, if that's a batch: its item
+   * there. Of two with the same `sceneOrder`, the batch draws the item it was given later on top.
+   * @return The batch's item, or `null` if no batch draws the Feature
+   */
+  public get sceneItem(): BatchMeshItem | null {
+    return null;
   }
 
 
@@ -382,7 +415,7 @@ export class AbstractPixiFeature {
     } else if (!this.dirty) {
       this.updateAvoid();
     }
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 
@@ -402,7 +435,7 @@ export class AbstractPixiFeature {
    * @return The cells, or `null`
    */
   public get avoidCells(): CellRect | null {
-    const grid = this.scene?.avoidGrid;
+    const grid = this.scene?.labelSpace?.avoidGrid;
     return (grid && this._avoidGeneration === grid.generation) ? this._avoidCells : null;
   }
 
@@ -413,9 +446,9 @@ export class AbstractPixiFeature {
    * @param box - What the Feature covers, `[minX, minY, maxX, maxY]` in label space, or `null` for nothing
    */
   protected _setAvoid(box: [number, number, number, number] | null): void {
-    const scene = this.scene;
-    const grid = scene?.avoidGrid;
-    if (!grid) return;
+    const labelSpace = this.scene?.labelSpace;
+    const grid = labelSpace?.avoidGrid;
+    if (!labelSpace || !grid) return;
 
     const old = (this._avoidGeneration === grid.generation) ? this._avoidCells : null;   // (else: cleared since)
     const cells = box && grid.cellsOf(box[0], box[1], box[2], box[3]);
@@ -423,12 +456,12 @@ export class AbstractPixiFeature {
 
     if (old) {
       grid.unmark('avoid', old);
-      scene.avoidFreed(old);
+      labelSpace.avoidFreed(old);
     }
     if (cells) {
       grid.mark('avoid', cells);
       if (grid.isTaken('label', cells)) {
-        scene.avoidHit(cells);
+        labelSpace.avoidHit(cells);
       }
     }
     this._avoidCells = cells;
@@ -463,7 +496,7 @@ export class AbstractPixiFeature {
    * Whether the Feature's label has to be placed again: its shape, its label or its visibility
    * changed since the label was placed. (Not for a hover or a selection: see `setClass`.)
    * The labels layer reads this when the Feature tells the scene it changed
-   * (`PixiScene.featureChanged`), and clears it with `labelPlaced()`.
+   * (`LabelSpace.featureChanged`), and clears it with `labelPlaced()`.
    * @return `true` if the label is out of date
    */
   public get labelDirty(): boolean {
@@ -608,7 +641,7 @@ export class AbstractPixiFeature {
     if (str === this._label) return;  // no change
     this._label = str;
     this._labelDirty = true;
-    this.scene.featureChanged(this);
+    this.scene.labelSpace.featureChanged(this);
   }
 
 

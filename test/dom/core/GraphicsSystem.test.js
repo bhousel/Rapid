@@ -164,9 +164,9 @@ describe('GraphicsSystem', () => {
 
 
   // While something that's shown moves by itself (a hover's glow, a selection's dashes), the
-  // frame loop draws the scene again as it is, when its `AnimationPacer` says one is due.
+  // game loop draws the scene again as it is, when its `AnimationPacer` says one is due.
   // These tests run the tick of a system made without its constructor, with what a tick uses.
-  describe('animation frames', () => {
+  describe('animation draws', () => {
     let gfx, scene, pacer, calls;
 
     beforeEach(() => {
@@ -185,7 +185,7 @@ describe('GraphicsSystem', () => {
         _appPending: false,
         _isTempTransformed: false,
         _animationPacer: pacer,
-        _animationFrames: 0,
+        _animationDraws: 0,
         scene: scene,
         textureManager: { loaded: true },
         pixi: { render: () => calls.push(['render']) },
@@ -196,7 +196,7 @@ describe('GraphicsSystem', () => {
       });
     });
 
-    it('draws the scene again when a frame is due: what moves is moved first, then Pixi renders', () => {
+    it('draws the scene again when an animation draw is due: what moves is moved first, then Pixi renders', () => {
       const before = performance.now();
       pacer.changed(before - 100);     // the last frame was a while ago
       gfx._tick(16.7);
@@ -204,14 +204,14 @@ describe('GraphicsSystem', () => {
       assert.deepEqual(calls.map(call => call[0]), ['animate', 'render']);
       assert.isAtLeast(calls[0][1], before);
       assert.isFalse(calls[0][2], 'not the last one before a rest');
-      assert.strictEqual(gfx.animationFrames, 1);
+      assert.strictEqual(gfx.animationDraws, 1);
     });
 
     it('waits for the pacer\'s gap before the next one', () => {
       pacer.changed(performance.now() - 100);
       gfx._tick(16.7);
       gfx._tick(16.7);
-      assert.strictEqual(gfx.animationFrames, 1);
+      assert.strictEqual(gfx.animationDraws, 1);
       assert.isFalse(pacer.isDue(performance.now()));
     });
 
@@ -220,7 +220,7 @@ describe('GraphicsSystem', () => {
       pacer.changed(performance.now() - 100);
       gfx._tick(16.7);
       assert.deepEqual(calls, []);
-      assert.strictEqual(gfx.animationFrames, 0);
+      assert.strictEqual(gfx.animationDraws, 0);
     });
 
     it('draws none while a frame is being prepared, or while the view has moved on from what\'s drawn', () => {
@@ -233,7 +233,7 @@ describe('GraphicsSystem', () => {
       gfx._isTempTransformed = true;
       gfx._tick(16.7);
       assert.deepEqual(calls, [['app']]);
-      assert.strictEqual(gfx.animationFrames, 0);
+      assert.strictEqual(gfx.animationDraws, 0);
     });
 
     it('draws none before the textures are there, and doesn\'t count one', () => {
@@ -241,18 +241,18 @@ describe('GraphicsSystem', () => {
       pacer.changed(performance.now() - 100);
       gfx._tick(16.7);
       assert.deepEqual(calls, []);
-      assert.strictEqual(gfx.animationFrames, 0);
+      assert.strictEqual(gfx.animationDraws, 0);
     });
 
-    it('tells the pacer how long the browser took to come back after an animation frame', () => {
+    it('tells the pacer how long the browser took to come back after an animation draw', () => {
       pacer.changed(performance.now() - 100);
       gfx._tick(16.7);
-      assert.strictEqual(gfx.animationFrames, 1);
+      assert.strictEqual(gfx.animationDraws, 1);
       gfx._tick(60);                   // the GPU needed that long
       assert.strictEqual(pacer.gap, 60 * ANIMATION_GAP_FACTOR);
     });
 
-    it('settles what moves with one last frame when nothing else was drawn for a while, then rests', () => {
+    it('settles what moves with one last draw when nothing else was drawn for a while, then rests', () => {
       pacer.changed(performance.now() - ANIMATION_REST_MS - 100);
       gfx._tick(16.7);
       assert.deepEqual(calls.map(call => call[0]), ['animate', 'render']);
@@ -260,12 +260,12 @@ describe('GraphicsSystem', () => {
 
       gfx._tick(16.7);
       gfx._tick(16.7);
-      assert.strictEqual(gfx.animationFrames, 1);
+      assert.strictEqual(gfx.animationDraws, 1);
 
       // ..until something is drawn again
       pacer.changed(performance.now() - 100);
       gfx._tick(16.7);
-      assert.strictEqual(gfx.animationFrames, 2);
+      assert.strictEqual(gfx.animationDraws, 2);
       assert.isFalse(calls.at(-2)[2]);
     });
   });

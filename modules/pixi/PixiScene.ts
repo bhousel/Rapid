@@ -18,21 +18,19 @@ import { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
-import { AvoidGrid } from './lib/AvoidGrid.ts';
-import { FillBatch } from './lib/FillBatch.ts';
-import { LineBatch } from './lib/LineBatch.ts';
-import { PointBatch } from './lib/PointBatch.ts';
+import { BatchShaders } from './lib/BatchShaders.ts';
+import { LabelSpace } from './lib/LabelSpace.ts';
 import { featureOrder } from './helpers.ts';
-import { Extent, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
+import { Extent, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractMode } from '../modes/AbstractMode.ts';
 import type { AbstractPixiFeature, FeatureContainer } from './AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import type { CellRect } from './lib/AvoidGrid.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { RenderFrame } from './RenderFrame.ts';
+import type { SpatialChange } from '../core/SpatialSystem.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 /** Returned by `getClasses()` for data that has no classes */
@@ -44,17 +42,6 @@ const EMPTY_CLASSES: ReadonlySet<ClassID> = new Set<ClassID>();
  * made and drawn outside the view (at 256, about twice what a 1300×1100 view holds).
  */
 const CULL_PADDING = 256;
-
-
-/**
- * The size of the avoid grid's cells, in pixels of label space (see `PixiScene.avoidGrid`).
- * A pin is marked in every cell it touches, so it takes up to a cell more room on each side
- * than it's drawn with, and fewer labels fit between pins. Measured Nov 2026 by the labels placed
- * after a load in downtown Seattle, where a box for each pin gave 232: cells of 4 px 104 (before
- * a point's own cells were set aside for its label), then 2 px 208 and 1 px 219. At 1 px the
- * grid is four times the blocks and the marking four times the writes.
- */
-const AVOID_CELL_PX = 2;
 
 
 // The classes whose features are drawn with something that moves (see `PixiScene.animated`)
@@ -108,10 +95,10 @@ export class PixiScene extends EventEmitter {
   public layers: Map<LayerID, AbstractPixiLayer>;
   /** All registered features, keyed by FeatureID */
   public features: Map<FeatureID, AbstractPixiFeature>;
-  /** Where labels can't go: what's drawn that they avoid, and the labels placed so far, in label space */
-  public avoidGrid: AvoidGrid;
-  /** The offset between the screen and label space, as of this frame (see `updateLabelSpace`) */
-  public labelOffset: PIXI.Point;
+  /** The shaders that the batches of every layer draw with: told the view and the clock here (`setBatchViews`, `animate`) */
+  public batchShaders: BatchShaders;
+  /** What the labels layer needs: the space labels are placed in, what they avoid there, and which features changed */
+  public labelSpace: LabelSpace;
 
   /** Map of dataID to Set of classIDs */
   protected _dataHasClass: Map<DataID, Set<ClassID>>;
@@ -125,14 +112,6 @@ export class PixiScene extends EventEmitter {
   protected _worldContainers: Set<PIXI.Container>;
   /** The part of the world layers have features ready for, or `null` before the first frame (see `updateCullBox`) */
   protected _cullBox: Extent | null;
-  /** The transform from world coordinates to the screen, as of this frame (see `updateLabelSpace`) */
-  protected _toScreen: PIXI.Matrix;
-  /** Cells where something to avoid was drawn over a placed label (see `avoidHit`) */
-  protected _avoidHits: CellRect[];
-  /** Cells that something to avoid has left (see `avoidFreed`) */
-  protected _avoidFrees: CellRect[];
-  /** The features that were drawn, shown, hidden or destroyed since the labels layer last asked (see `featureChanged`) */
-  protected _changedFeatureIDs: Set<FeatureID>;
   /** The zoom the cull box was made at */
   protected _cullZoom: number;
   /** Spatial IDs the pointer can reach in the current mode, or `null` for all of them */
@@ -158,6 +137,7 @@ export class PixiScene extends EventEmitter {
     this.groups = new Map<GroupID, PIXI.Container>();
     this.layers = new Map<LayerID, AbstractPixiLayer>();
     this.features = new Map<FeatureID, AbstractPixiFeature>();
+    this.batchShaders = new BatchShaders();   // (before the layers, which make batches with them)
 
     // Data <-> Class
     // Data classes are strings (like what CSS classes used to do for us)
@@ -176,18 +156,15 @@ export class PixiScene extends EventEmitter {
     this._worldContainers = new Set<PIXI.Container>();
     this._cullBox = null;
     this._cullZoom = 0;
-    this.avoidGrid = new AvoidGrid(AVOID_CELL_PX);
-    this.labelOffset = new PIXI.Point();
-    this._toScreen = new PIXI.Matrix();
-    this._avoidHits = [];
-    this._avoidFrees = [];
-    this._changedFeatureIDs = new Set<FeatureID>();
+    this.labelSpace = new LabelSpace();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
     this._modeChanged = this._modeChanged.bind(this);
+    this._spatialChanged = this._spatialChanged.bind(this);
 
     this.context.on('modechange', this._modeChanged);
+    this.context.systems.spatial?.on('datachange', this._spatialChanged);   // (optional: not in some tests)
 
     // Create Layers
     [
@@ -470,7 +447,7 @@ export class PixiScene extends EventEmitter {
    * should have features ready for. It is the view with `CULL_PADDING` pixels around it, and it's
    * kept (the same object) for as long as the view stays inside it at the same zoom. So while the
    * user pans around inside the padding, a layer that has made everything in the box has nothing to
-   * do (see `AbstractPixiLayer.keepFeatures` and "A CULL pass" in `design/graphics-system.md`).
+   * do (see `AbstractPixiLayer.keepFeatures` and "The cull box" in `design/graphics-system.md`).
    * `GraphicsSystem` calls this for each frame.
    * @param viewport - The map's viewport (not Pixi's, which lags behind a pan)
    * @return The cull box
@@ -497,7 +474,7 @@ export class PixiScene extends EventEmitter {
    * @param spatialID - The spatial ID, e.g. 'osm' or 'fbRoads'
    * @return `true` if that data's features can be hovered and clicked
    */
-  protected _isInteractive(spatialID: SpatialID): boolean {
+  public isInteractive(spatialID: SpatialID): boolean {
     return this._interactiveSpatialIDs === null || this._interactiveSpatialIDs.has(spatialID);
   }
 
@@ -510,7 +487,7 @@ export class PixiScene extends EventEmitter {
    * @return The `eventMode` for that spatial ID's containers
    */
   protected _eventMode(spatialID: SpatialID): PIXI.EventMode {
-    return (this._isInteractive(spatialID) && !this._hitTesters.has(spatialID)) ? 'passive' : 'none';
+    return (this.isInteractive(spatialID) && !this._hitTesters.has(spatialID)) ? 'passive' : 'none';
   }
 
 
@@ -540,9 +517,9 @@ export class PixiScene extends EventEmitter {
    * Finds the feature under the pointer.
    *
    * Pixi's hit test has an answer already (a pointer event's `target`), for everything except
-   * the spatial IDs whose layers find their own (`setHitTester`). Those layers are asked here,
-   * if the mode lets the pointer reach their data, and the answer is whichever feature is drawn
-   * on top, as it would be if Pixi had tested them all.
+   * the spatial IDs whose layers find their own (`setHitTester`). Those layers are asked here
+   * (each looks only at the spatial IDs that the mode lets the pointer reach, `isInteractive`),
+   * and the answer is whichever feature is drawn on top, as it would be if Pixi had tested them all.
    * @param point - The pointer's place in the stage's coordinates (a pointer event's `global`)
    * @param target - What Pixi's hit test found there (a pointer event's `target`), if anything
    * @return The feature, or `null` if the pointer is over none
@@ -564,14 +541,39 @@ export class PixiScene extends EventEmitter {
     // Features are positioned in world coordinates under `origin`, as it was last drawn.
     const world = origin.worldTransform.applyInverse(point, this._hitWorld);
 
-    for (const [spatialID, layer] of this._hitTesters) {
-      if (!this._isInteractive(spatialID)) continue;
+    // (A layer may find the features of several spatial IDs, and checks which the mode lets the pointer reach.)
+    for (const layer of new Set(this._hitTesters.values())) {
       const hit = layer.hitTest(point, world);
       if (hit && (!best || featureOrder(hit, best) > 0)) {
         best = hit;
       }
     }
     return best;
+  }
+
+
+  /**
+   * Data changed in some spatial caches (`SpatialSystem`'s `datachange`): it arrived from a service,
+   * or was replaced or removed. Each layer that draws from a cache hears of it
+   * (`AbstractPixiLayer.spatialChanged`) and draws it on the next frame without a pass, so this
+   * asks for a frame, not a redraw. A service that writes its data to `SpatialSystem` needn't ask
+   * the renderer for anything.
+   * @param changes - What changed, by the caches' spatial IDs
+   */
+  protected _spatialChanged(changes: Map<SpatialID, SpatialChange>): void {
+    const gfx = this.gfx;
+
+    let any = false;
+    for (const layer of this.layers.values()) {
+      for (const [spatialID, change] of changes) {
+        if (layer.spatialChanged(spatialID, change)) {
+          any = true;
+        }
+      }
+    }
+    if (any) {
+      gfx.requestFrame();
+    }
   }
 
 
@@ -619,12 +621,16 @@ export class PixiScene extends EventEmitter {
     // the `origin` container (set up in `GraphicsSystem._app`) provides the position
     // and scale that maps world coords → screen coords. Group containers themselves
     // need no extra transform (except the `labels` group which renders in screen space).
-    this.updateLabelSpace(viewport);   // (the features mark what labels avoid as they're drawn)
+    const origin = this.gfx.origin;
+    if (origin) {
+      this.labelSpace.update(origin, viewport);   // (the features mark what labels avoid as they're drawn)
+    }
     this.setBatchViews(viewport);
 
     const times = new Map<LayerID, { renderMs: number, cullMs: number }>();
     for (const layer of this.layers.values()) {
       const t0 = performance.now();
+      layer.batches.followView(viewport);   // (keeps their coordinates fine enough for the view's zoom)
       layer.render(frame, viewport);
       const t1 = performance.now();
       layer.cull(frame);
@@ -635,7 +641,9 @@ export class PixiScene extends EventEmitter {
     }
 
     // With every layer done, whatever time the frame has left goes to the features that were put
-    // off because they're outside the view (see `AbstractPixiLayer.updateFeature`).
+    // off because they're outside the view (see `AbstractPixiLayer.updateFeature`), and then to
+    // culling what a cull box left behind when it moved without a pass, which is outside the view
+    // too (see `AbstractPixiLayer.cullLater`).
     for (const layer of this.layers.values()) {
       const time = times.get(layer.id)!;
       if (layer.numWaiting) {
@@ -643,9 +651,14 @@ export class PixiScene extends EventEmitter {
         layer.continueWaiting(frame, viewport, true);
         time.renderMs += performance.now() - t0;
       }
+      if (layer.cullDue && frame.hasTime()) {
+        const t0 = performance.now();
+        layer.cullLater();
+        time.cullMs += performance.now() - t0;
+      }
 
       const waiting = layer.numWaiting;
-      if (waiting) {
+      if (waiting || layer.cullDue) {
         frame.unfinished = true;   // another frame should follow
       }
 
@@ -668,13 +681,14 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to enable
    */
   public enableLayers(layerIDs: OneOrMore<LayerID>): void {
-    for (const layerID of utilIterable(layerIDs)) {
+    const asked = [...utilIterable(layerIDs)];
+    for (const layerID of asked) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = true;
       }
     }
-    this._layerChanged();
+    this._layerChanged(asked);
   }
 
 
@@ -683,13 +697,14 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to disable
    */
   public disableLayers(layerIDs: OneOrMore<LayerID>): void {
-    for (const layerID of utilIterable(layerIDs)) {
+    const asked = [...utilIterable(layerIDs)];
+    for (const layerID of asked) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = false;
       }
     }
-    this._layerChanged();
+    this._layerChanged(asked);
   }
 
 
@@ -698,13 +713,14 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to toggle
    */
   public toggleLayers(layerIDs: OneOrMore<LayerID>): void {
-    for (const layerID of utilIterable(layerIDs)) {
+    const asked = [...utilIterable(layerIDs)];
+    for (const layerID of asked) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = !layer.enabled;
       }
     }
-    this._layerChanged();
+    this._layerChanged(asked);
   }
 
 
@@ -714,7 +730,7 @@ export class PixiScene extends EventEmitter {
    * @param dataIDs - The data IDs, e.g. `['w1', 'osm-notes:123']`
    */
   public showData(dataIDs: OneOrMore<DataID>): void {
-    const wasEnabled = new Set<LayerID>([...this.layers.values()].filter(layer => layer.enabled).map(layer => layer.id));
+    const wasEnabled = this._enabledLayerIDs();
 
     for (const dataID of utilIterable(dataIDs)) {
       for (const layer of this.layers.values()) {
@@ -725,11 +741,9 @@ export class PixiScene extends EventEmitter {
       }
     }
 
-    for (const layer of this.layers.values()) {
-      if (layer.enabled !== wasEnabled.has(layer.id)) {
-        this._layerChanged();
-        break;
-      }
+    const changed = this._changedLayerIDs(wasEnabled);
+    if (changed.length) {
+      this._layerChanged(changed);
     }
   }
 
@@ -739,11 +753,12 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to keep enabled
    */
   public onlyLayers(layerIDs: OneOrMore<LayerID>): void {
+    const wasEnabled = this._enabledLayerIDs();
     const toEnable = new Set<LayerID>(utilIterable(layerIDs));
     for (const layer of this.layers.values()) {
       layer.enabled = toEnable.has(layer.id);
     }
-    this._layerChanged();
+    this._layerChanged(this._changedLayerIDs(wasEnabled));
   }
 
 
@@ -779,14 +794,14 @@ export class PixiScene extends EventEmitter {
     const styleZoom = map?.effectiveZoom() ?? viewZoom;
     const pixel = 2 ** (WORLD_ZOOM - viewZoom);
     const isWireframe = !!map?.wireframeMode;
-    LineBatch.setView({
+    this.batchShaders.lines.setView({
       pixel: pixel,
       narrow: (styleZoom < 16) ? 4 : (styleZoom < 17) ? 2 : 0,
       wireframe: isWireframe,
       casing: styleZoom >= 16,
       markers: styleZoom >= 16
     });
-    FillBatch.setView({ pixel: pixel, rotation: viewport.transform.rotation, wireframe: isWireframe });
+    this.batchShaders.fills.setView({ pixel: pixel, rotation: viewport.transform.rotation, wireframe: isWireframe });
   }
 
 
@@ -823,8 +838,8 @@ export class PixiScene extends EventEmitter {
     // A glow breathes: from its brightest down by `PULSE_DEPTH` and back, in `PULSE_SECONDS`.
     const breath = (isStill || isResting) ? 0 : (0.5 - 0.5 * Math.cos(2 * Math.PI * seconds / PULSE_SECONDS));
     const pulse = 1 - PULSE_DEPTH * breath;
-    LineBatch.setTime({ pulse: pulse, shift: (seconds * MARCH_SPEED) % MARCH_WRAP });
-    PointBatch.setTime(pulse);
+    this.batchShaders.lines.setTime({ pulse: pulse, shift: (seconds * MARCH_SPEED) % MARCH_WRAP });
+    this.batchShaders.points.setTime(pulse);
     for (const [sprite, alpha] of this._pulsing) {
       sprite.alpha = alpha * pulse;
     }
@@ -854,7 +869,7 @@ export class PixiScene extends EventEmitter {
   /**
    * Sets a dataID as being classed a certain way (e.g. 'hover').
    * Data IDs are unique across Rapid, so whichever layer draws the data shows the class
-   * (see `design/data-ids.md`).
+   * (see `design/data-ids.md`). If that's a change, the layers are told and a frame is asked for.
    * @param classID - classID (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123', 'fbRoads:w-1')
    */
@@ -881,7 +896,8 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Unsets a dataID from being classed a certain way (e.g. 'hover')
+   * Unsets a dataID from being classed a certain way (e.g. 'hover').
+   * If that's a change, the layers are told and a frame is asked for.
    * @param classID - classID (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123')
    */
@@ -912,13 +928,14 @@ export class PixiScene extends EventEmitter {
   /**
    * Tells the layers that the classes of some data changed, so that a layer that keeps its
    * features can draw that data's again without doing its whole pass
-   * (see `AbstractPixiLayer.classChanged`).
+   * (see `AbstractPixiLayer.classChanged`), and asks for a frame to show it.
    * @param dataID - The data whose classes changed
    */
   protected _classChanged(dataID: DataID): void {
     for (const layer of this.layers.values()) {
       layer.classChanged(dataID);
     }
+    this.gfx.requestFrame();
   }
 
 
@@ -957,7 +974,7 @@ export class PixiScene extends EventEmitter {
 
   /**
    * Mark the whole scene as `dirty`: anything about any feature may have changed (the styles, the
-   * language, how areas are filled). During the next "APP" pass, dirty features will be rebuilt.
+   * language, how areas are filled). During the next APP phase, dirty features will be rebuilt.
    * For a new zoom or rotation, use `dirtyTransform()`.
    */
   public dirtyScene(): void {
@@ -974,140 +991,11 @@ export class PixiScene extends EventEmitter {
    */
   public dirtyTransform(): void {
     // Label space is a new one. Every feature is drawn again, and marks what it covers again.
-    this.avoidGrid.clear();
-    this._avoidHits = [];
-    this._avoidFrees = [];
+    this.labelSpace.reset();
 
     for (const layer of this.layers.values()) {
       layer.dirtyTransform();
     }
-  }
-
-
-  /**
-   * Works out this frame's label space: the coordinates that labels are placed in, and that the
-   * avoid grid covers (see "Label placement" in `design/graphics-system.md`).
-   *
-   * Label space is the screen minus `labelOffset`, an offset that changes by exactly the pan
-   * on each frame. So a feature has the same label coordinates however the map is panned, and
-   * what's been placed and marked stays valid until the zoom or the rotation changes.
-   *
-   * `origin.toGlobal(P)` gives that for any constant P in `origin`'s coordinates, since a pan
-   * only changes `origin.position`. The naive choice P = (0, 0) is world coordinate [0,0], far
-   * from the viewport at high zooms: a huge offset, and GPU float32 precision loss in the rope
-   * labels' vertex math (distorted text). So P is picked to map near the viewport: it takes off
-   * the constant `(pixiT - WORLD_HALF * worldScale)` term that `origin.position` carries.
-   * @param viewport - The Pixi viewport of the frame (see `GraphicsSystem._app`)
-   */
-  public updateLabelSpace(viewport: Viewport): void {
-    const origin = this.gfx.origin;
-    if (!origin) return;
-
-    const worldScale = origin.scale.x;
-    const pixiT = viewport.transform.translation;
-    origin.toGlobal({
-      x: WORLD_HALF - pixiT[0] / worldScale,
-      y: WORLD_HALF - pixiT[1] / worldScale
-    }, this.labelOffset);
-    origin.getGlobalTransform(this._toScreen, false);   // (worked out now: the cached one is the last frame's)
-  }
-
-
-  /**
-   * Converts a world coordinate to label space (see `updateLabelSpace`).
-   * @param x - World x
-   * @param y - World y
-   * @param out - Where to put the result
-   * @return `out`, as `[x, y]` in label space
-   */
-  public worldToLabel(x: number, y: number, out: Vec2): Vec2 {
-    const m = this._toScreen;
-    out[0] = (m.a * x) + (m.c * y) + m.tx - this.labelOffset.x;
-    out[1] = (m.b * x) + (m.d * y) + m.ty - this.labelOffset.y;
-    return out;
-  }
-
-
-  /**
-   * A feature tells the scene that it has been drawn again, shown, hidden or destroyed, or has
-   * another label. The labels layer takes these (`takeChangedFeatures`) and looks at the labels
-   * of those features only: it used to walk every feature in the scene on every frame to find
-   * the ones that had changed.
-   * @param feature - The feature
-   */
-  public featureChanged(feature: AbstractPixiFeature): void {
-    this._changedFeatureIDs.add(feature.id);
-  }
-
-
-  /**
-   * Returns the features that changed since the last call (see `featureChanged`), and forgets them.
-   * @return Their IDs. A feature may be gone by now.
-   */
-  public takeChangedFeatures(): Set<FeatureID> {
-    const changed = this._changedFeatureIDs;
-    this._changedFeatureIDs = new Set<FeatureID>();
-    return changed;
-  }
-
-
-  /**
-   * A feature that labels avoid was drawn where a label is. The labels layer takes these and
-   * places the labels it finds there again, somewhere else (`takeAvoidHits`).
-   * @param cells - The cells of the avoid grid that the feature covers
-   */
-  public avoidHit(cells: CellRect): void {
-    this._avoidHits.push(cells);
-  }
-
-
-  /**
-   * How many times something was drawn over a label since the labels layer last looked.
-   * @return The number of hits waiting
-   */
-  public get numAvoidHits(): number {
-    return this._avoidHits.length;
-  }
-
-
-  /**
-   * Returns the cells where something was drawn over a label since the last call, and forgets them.
-   * @return The cells, one rectangle for each feature
-   */
-  public takeAvoidHits(): CellRect[] {
-    const hits = this._avoidHits;
-    this._avoidHits = [];
-    return hits;
-  }
-
-
-  /**
-   * A feature that labels avoid isn't where it was: it was hidden, moved or destroyed. The
-   * labels layer tries the labels again that had no room there (`takeAvoidFrees`).
-   * @param cells - The cells of the avoid grid that the feature covered
-   */
-  public avoidFreed(cells: CellRect): void {
-    this._avoidFrees.push(cells);
-  }
-
-
-  /**
-   * How many features that labels avoid have left their place since the labels layer last looked.
-   * @return The number waiting
-   */
-  public get numAvoidFrees(): number {
-    return this._avoidFrees.length;
-  }
-
-
-  /**
-   * Returns the cells that something to avoid has left since the last call, and forgets them.
-   * @return The cells, one rectangle for each feature
-   */
-  public takeAvoidFrees(): CellRect[] {
-    const frees = this._avoidFrees;
-    this._avoidFrees = [];
-    return frees;
   }
 
 
@@ -1138,7 +1026,7 @@ export class PixiScene extends EventEmitter {
 
   /**
    * Mark specific features features as `dirty`
-   * During the next "APP" pass, dirty features will be rebuilt.
+   * During the next APP phase, dirty features will be rebuilt.
    * @param featureIDs - featureIDs to flag as 'dirty'
    */
   public dirtyFeatures(featureIDs: OneOrMore<FeatureID>): void {
@@ -1162,35 +1050,69 @@ export class PixiScene extends EventEmitter {
   /**
    * Says that some of a layer's data changed (an edit), and nothing else in it did. The layer
    * draws that data again on the next frame, without doing its whole pass if it can
-   * (see `AbstractPixiLayer.dataChanged`). Follow it with `gfx.requestFrame()`.
+   * (see `AbstractPixiLayer.dataChanged`). Asks for a frame to show it.
    * @param layerID - layerID that is rendering the data
    * @param dataIDs - Everything the change affects: what changed, was added or was removed, and
    *   whatever is drawn differently because of it (for an OSM edit, `Difference.complete()`)
    */
   public dataChanged(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
     this.layers.get(layerID)?.dataChanged(dataIDs);
+    this.gfx.requestFrame();
   }
 
 
   /**
    * Says that more of a layer's data arrived (a tile loaded), and nothing else in it changed. The
    * layer makes and draws that data over the next frames, without doing its whole pass if it can
-   * (see `AbstractPixiLayer.dataArrived`). Follow it with `gfx.requestFrame()`.
+   * (see `AbstractPixiLayer.dataArrived`). Asks for a frame to start on it.
    * @param layerID - layerID that is rendering the data
    * @param dataIDs - What arrived, and whatever it changes the look of (for OSM, what the `merge`
    *   event lists)
    */
   public dataArrived(layerID: LayerID, dataIDs: OneOrMore<DataID>): void {
     this.layers.get(layerID)?.dataArrived(dataIDs);
+    this.gfx.requestFrame();
   }
 
 
   /**
-   * Called whenever the enabled layers change.
-   * This will trigger a redraw and emit a 'layerchange' event.
+   * Returns the layers that are enabled now, to compare with later (see `_layerChanged`).
+   * @return Their IDs
    */
-  protected _layerChanged(): void {
-    this.gfx.immediateRedraw();
+  protected _enabledLayerIDs(): Set<LayerID> {
+    const layerIDs = new Set<LayerID>();
+    for (const layer of this.layers.values()) {
+      if (layer.enabled) layerIDs.add(layer.id);
+    }
+    return layerIDs;
+  }
+
+
+  /**
+   * Returns the layers that were turned on or off since `wasEnabled` was taken.
+   * @param wasEnabled - The layers that were enabled before (see `_enabledLayerIDs`)
+   * @return Their IDs
+   */
+  protected _changedLayerIDs(wasEnabled: Set<LayerID>): LayerID[] {
+    return [...this.layers.values()].filter(layer => layer.enabled !== wasEnabled.has(layer.id)).map(layer => layer.id);
+  }
+
+
+  /**
+   * Called whenever the enabled layers change: asks for a redraw of the layers concerned (the
+   * others have nothing new to draw), and emits a 'layerchange' event.
+   * @param layerIDs - The layers that were turned on or off, or asked to be; nothing for all of them (a reset)
+   */
+  protected _layerChanged(layerIDs?: Iterable<LayerID>): void {
+    const gfx = this.gfx;
+
+    if (layerIDs) {
+      for (const layerID of layerIDs) {
+        gfx.immediateRedraw(layerID);
+      }
+    } else {
+      gfx.immediateRedraw();
+    }
     this.emit('layerchange');
   }
 

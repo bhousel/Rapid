@@ -22,6 +22,11 @@ describe('OsmoseService', () => {
   // Spy on redraws..
   const gfx = context.systems.gfx;
   const spyRedraw = mock();
+  // What the spatial system reports of the data that a load wrote: the map's layers draw what arrived from that
+  const spyReport = mock();
+  context.systems.spatial.on('datachange', changes => {
+    if ([...changes.values()].some(change => !change.cleared)) spyReport(changes);
+  });
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
@@ -43,6 +48,7 @@ describe('OsmoseService', () => {
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
     spyRedraw.mockClear();
+    spyReport.mockClear();
   });
 
 
@@ -156,14 +162,14 @@ describe('OsmoseService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', async () => {
+      it('loads a tile of data and reports it to the spatial system', async () => {
         fetchMock.route(/issues/, sample.data10, { delay: 1 });
         _osmose.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -176,7 +182,7 @@ describe('OsmoseService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
@@ -191,7 +197,7 @@ describe('OsmoseService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -207,7 +213,7 @@ describe('OsmoseService', () => {
         assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
         assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
-        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyReport.mock.calls, 1, 'reported once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
@@ -219,7 +225,7 @@ describe('OsmoseService', () => {
         await Bun.sleep(5);  // after all fetches have settled
         assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] considered loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
+        assert.lengthOf(spyReport.mock.calls, 0, 'nothing reported');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
         assert.match(spyError.mock.lastCall[0], /Forbidden/i);
 
@@ -228,7 +234,7 @@ describe('OsmoseService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch still called once');
-        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw still not called');
+        assert.lengthOf(spyReport.mock.calls, 0, 'still nothing reported');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error still called once');
       });
     });
@@ -292,6 +298,28 @@ describe('OsmoseService', () => {
         it('returns the icon for a given item type', () => {
           const result = _osmose.getIcon('1070-1');
           assert.strictEqual(result, 'maki-home');
+        });
+      });
+
+      // A change to an issue is a change in its spatial cache, which the spatial system reports
+      // (the Osmose layer draws it from that)
+      describe('replaceItem, removeItem', () => {
+        it('change the issue in the cache', async () => {
+          const item = _osmose.getData()[0];
+          await Bun.sleep(1);
+          spyReport.mockClear();
+
+          const updated = item.update({ props: { ...item.props, newStatus: 'done' } });
+          assert.strictEqual(_osmose.replaceItem(updated), updated);
+          assert.strictEqual(_osmose.getData().find(d => d.id === item.id), updated);
+          await Bun.sleep(1);
+          assert.lengthOf(spyReport.mock.calls, 1);
+          assert.isTrue(spyReport.mock.calls[0][0].get('osmose').changedIDs.has(item.id));
+
+          _osmose.removeItem(updated);
+          assert.isUndefined(_osmose.getData().find(d => d.id === item.id));
+          await Bun.sleep(1);
+          assert.lengthOf(spyReport.mock.calls, 2);
         });
       });
 

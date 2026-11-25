@@ -118,8 +118,7 @@ export function utilHighlightEntities(context: Context, entityIDs: EntityID[], h
   } else {
     scene.clearClass('highlight');
   }
-
-  gfx?.immediateRedraw();
+  // (The scene asks for a frame when a class changes: no layer has to do its pass for it.)
 }
 
 
